@@ -1,0 +1,38 @@
+{
+  "description": "Spike verification only: store a test value in the project database.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string",
+        "description": "test key, 1-256 characters"
+      },
+      "value": {
+        "type": "string",
+        "description": "test value, up to 64 KiB"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "name": "state_put_test",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "key",
+      "value"
+    ],
+    "additionalProperties": false
+  }
+}

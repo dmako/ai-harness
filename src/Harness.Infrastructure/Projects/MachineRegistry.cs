@@ -31,7 +31,13 @@ public sealed class MachineRegistry(string path)
         }
     }
 
-    public async Task NoteInitAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, CancellationToken cancellationToken = default)
+    public Task NoteInitAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, CancellationToken cancellationToken = default) =>
+        NoteAsync(project, worktrees, version, "last_init", cancellationToken);
+
+    public Task NoteMcpAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, CancellationToken cancellationToken = default) =>
+        NoteAsync(project, worktrees, version, "last_mcp", cancellationToken);
+
+    private async Task NoteAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, string eventKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(worktrees);
@@ -53,7 +59,7 @@ public sealed class MachineRegistry(string path)
         entry["schema_version"] = HarnessDatabase.LatestSchemaVersion;
         entry["harness_version"] = version;
         entry["worktrees"] = new JsonArray(worktrees.Select(tree => JsonValue.Create(tree.Path)).ToArray<JsonNode?>());
-        entry["last_init"] = now;
+        entry[eventKey] = now;
         // Preserve names, clients, workspaces and future fields written by other versions.
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try

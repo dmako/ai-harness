@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Harness.Cli/Harness.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/Harness.Infrastructure/Harness.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Harness.Mcp/Harness.Mcp.csproj" />
     <ProjectReference Include="Storage/Worker/Harness.StorageWorker.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="xunit.v3" />
     <Compile Remove="Storage/Worker/**/*.cs" />

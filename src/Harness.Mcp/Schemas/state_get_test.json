@@ -1,0 +1,36 @@
+{
+  "description": "Spike verification only: read a test value stored with state_put_test.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string",
+        "description": "test key, 1-256 characters"
+      }
+    },
+    "required": [
+      "key"
+    ],
+    "additionalProperties": false
+  },
+  "name": "state_get_test",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string"
+      },
+      "found": {
+        "type": "boolean"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "key",
+      "found"
+    ],
+    "additionalProperties": false
+  }
+}

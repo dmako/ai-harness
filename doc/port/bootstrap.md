@@ -8,7 +8,8 @@ Infrastructure, Providers, Mcp and Web reference Core; Cli references all five.
 The existing MSBuild dependency guard enforces that direction.
 
 The CLI bootstrap implements help and version. TASK-0006 adds the
-[project lifecycle commands](project-lifecycle.md). Providers, MCP and Web are
+[project lifecycle commands](project-lifecycle.md), and TASK-0007 adds the
+[stdio MCP server](stdio-mcp.md). Providers and Web are
 project boundaries for their existing later tasks; this bootstrap does not claim
 their commands, tools, endpoints or UI are implemented. The existing SQLite
 implementation remains in Infrastructure and its tests run through the solution.

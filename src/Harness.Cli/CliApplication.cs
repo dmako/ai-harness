@@ -45,6 +45,7 @@ public static class CliApplication
             configuration.AddCommand<InitCommand>("init").WithDescription("Initialize project state");
             configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
+            configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
             configureCommands?.Invoke(configuration);
         });
 

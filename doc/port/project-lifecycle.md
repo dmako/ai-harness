@@ -17,7 +17,7 @@ Operational failures return 1, usage errors 2, cooperative cancellation 130.
 As in Go, status returns 0 inside a discovered repository even when its report
 contains a configuration/database problem; doctor returns 1 for failed checks.
 Uninitialized repositories are inspectable; init requires a Git worktree.
-`LocateAsync(..., allowNonGit: true)` supports future MCP readers outside Git.
+`LocateAsync(..., allowNonGit: true)` supports the stdio MCP server outside Git.
 
 ## Configuration
 

@@ -73,7 +73,7 @@ public sealed record GitRepository(string Root, string GitDir, string CommonDir,
     {
         var start = new ProcessStartInfo(FindExecutable())
         {
-            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
+            UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
             StandardOutputEncoding = new UTF8Encoding(false, true), StandardErrorEncoding = new UTF8Encoding(false, true),
         };
         start.ArgumentList.Add("-C");
@@ -102,6 +102,7 @@ public sealed record GitRepository(string Root, string GitDir, string CommonDir,
             {
                 process.Start();
                 started = true;
+                process.StandardInput.Close(); // A read-only Git command must never inherit the MCP protocol input pipe.
             }
             catch (Win32Exception exception)
             {

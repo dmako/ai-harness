@@ -1,0 +1,191 @@
+{
+  "description": "Report harness version, project root, config sources and database state.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false
+  },
+  "name": "diagnostics",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "version": {
+        "type": "string"
+      },
+      "commit": {
+        "type": "string"
+      },
+      "go_version": {
+        "type": "string"
+      },
+      "platform": {
+        "type": "string"
+      },
+      "project_root": {
+        "type": "string"
+      },
+      "state_root": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      },
+      "worktree_id": {
+        "type": "string"
+      },
+      "config_global": {
+        "type": "string"
+      },
+      "config_project": {
+        "type": "string"
+      },
+      "git_branch": {
+        "type": "string"
+      },
+      "git_commit": {
+        "type": "string"
+      },
+      "git_detached": {
+        "type": "boolean"
+      },
+      "git_unborn": {
+        "type": "boolean"
+      },
+      "git_linked_worktree": {
+        "type": "boolean"
+      },
+      "git_error": {
+        "type": "string"
+      },
+      "db_path": {
+        "type": "string"
+      },
+      "schema_version": {
+        "type": "integer"
+      },
+      "db_error": {
+        "type": "string"
+      },
+      "sync": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "synced_at": {
+            "type": "string"
+          },
+          "stale": {
+            "type": "string"
+          },
+          "recent_runs": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "started_at": {
+                  "type": "string"
+                },
+                "finished_at": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "mode": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "base_commit": {
+                  "type": "string"
+                },
+                "head_commit": {
+                  "type": "string"
+                },
+                "added": {
+                  "type": "integer"
+                },
+                "changed": {
+                  "type": "integer"
+                },
+                "removed": {
+                  "type": "integer"
+                },
+                "providers": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "status": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "started_at",
+                "mode",
+                "added",
+                "changed",
+                "removed",
+                "providers",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "recent_runs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "version",
+      "commit",
+      "go_version",
+      "platform",
+      "project_root",
+      "state_root",
+      "db_path",
+      "schema_version"
+    ],
+    "additionalProperties": false
+  }
+}
