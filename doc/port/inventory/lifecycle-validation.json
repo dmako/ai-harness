@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "task": "TASK-0006",
+  "validated_on_local": "2026-10-21",
+  "host": "Windows x64",
+  "source_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "summary": {
+    "passed_tests": 67,
+    "skipped_tests": 1,
+    "failed_tests": 0,
+    "lifecycle_comparisons_passed": 8,
+    "single_file_package_passed": true
+  },
+  "reports": [
+    {
+      "path": "artifacts/lifecycle-results-validated/Harness.Integration_net10.0_x64.trx",
+      "sha256": "0fa29052b30de69ea3d32a79ce4cdffea65c3d9e423052f1901180aa779ba26f"
+    },
+    {
+      "path": "artifacts/lifecycle-results-validated/Harness.Unit_net10.0_x64.trx",
+      "sha256": "25c4ecd763c8f7caef4726c88467129e4eed45ab65463001eec5d01e7bcd3884"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Harness.Integration.Storage.StorageTests.InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(mutation: \"INSERT INTO schema_migrations VALUES (20, '0020_fu\"···, newer: True)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.CliProcessTests.ExecutableVersionIsMachineReadableOutsideTheRepository",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(mutation: \"INSERT INTO schema_migrations VALUES (0, '0000_inv\"···, newer: False)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(mutation: \"UPDATE schema_migrations SET name = '0001_wrong' W\"···, newer: False)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.CompetingProcessesMigrateExactlyOnceAndKeepAllWrites",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.MigrationFilesMustHaveValidNamesAndContiguousUniqueVersions",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.NewFilesAndBackupsAreOwnerOnlyOnUnix",
+      "outcome": "NotExecuted"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.ReadOnlyInspectionDoesNotCreateMigrateOrModifyFiles",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.ForeignKeyViolationsDuringRebuildRollBackAndRestoreEnforcement",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.DryRunAndInspectionNeverInitializeOrModifyState",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.CurrentSchemaAndReadersDoNotWaitForWriterButImmediateWritersTimeOut",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.PathsCannotInjectOptionsAndTimestampsKeepNineFractionDigits",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.FailedMigrationRollsBackSchemaDataAndLedgerAndNamesRecoveryBackup",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.BackupFailureAbortsUpgradeAndRetentionKeepsTheLastFive",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.TransactionsCommitOrRollBackAndReadersCannotWrite",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.GoThenCSharpThenGoPreservesSchemaAndUnicodeData",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.EmbeddedMigrationsMatchEveryFrozenByte",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.ForeignKeyRebuildPreservesCompletedAndBlockedTasksAndReferences",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.RegistryPreservesUserMetadataRejectsCorruptionAndReleasesLock",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.FreshDatabaseHasPragmasStrictSchemaAndPersistentDiagnostics",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 13)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 1)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 19)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 4)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.InspectionReadsCommittedLiveWalAndDoesNotChangeDatabaseRows",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 5)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.InspectionDoesNotMigrateAnOldDatabaseOrWriteRegistry",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.CliStatusDoctorAndInitUseIsolatedConfigurationOverride",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.ConcurrentCliInitializationsDoNotLoseRegistryEntriesAndDoctorAllHandlesMissingRoots",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.InvalidConfigurationBlocksInitBeforeWritesAndInspectionReportsIt",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.MovingKeepsProjectIdAndCopyingForksItWithoutLosingKnowledge",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.LinkedWorktreesShareStateKeepIdsOnMoveAndHandleDetachedAndDeletedTrees",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.ProjectLifecycleTests.NonGitLocationWorksForReadersButInitRefusesIt",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.GlobalPathUsesGoOperatingSystemConventions(platform: \"darwin\", variable: \"HOME\", suffix: \"Library/Application Support/harness\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.GlobalPathUsesGoOperatingSystemConventions(platform: \"windows\", variable: \"APPDATA\", suffix: \"harness\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.GlobalPathUsesGoOperatingSystemConventions(platform: \"linux\", variable: \"XDG_CONFIG_HOME\", suffix: \"harness\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'harness'\\ncommand = 'x'\\nonly \"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'mcp'\\ncommand = 'x'\\n[provider\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[storage]\\ndb_path = ''\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[storage]\\nbusy_timeout_ms = '500'\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'harness'\\ncommand = 'x'\\ntypo \"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\npack = '../unknown'\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[storage\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'mcp'\\ncommand = 'x'\\n[provider\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"typo = 1\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'harness'\\ncommand = 'x'\\nis_en\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.BareInvocationShowsHelpAndHelpVersionShowsItsFlags",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.InvalidInputReturnsUsageErrorOnStderr(arguments: [\"version\", \"unexpected\"])",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'mcp'\\ncommand = 'x'\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.InvalidInputReturnsUsageErrorOnStderr(arguments: [\"unknown-command\"])",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.InvalidInputReturnsUsageErrorOnStderr(arguments: [\"version\", \"--unknown\"])",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[storage]\\nbusy_timeout_ms = -1\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[log]\\nlevel = 'verbose'\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"-h\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"-help\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.InvalidLayerIdentifiesItsFileAndCannotBeMasked(content: \"[providers.x]\\ntype = 'mcp'\\ncommand = 'x'\\n[provider\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"--help\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"help\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HostServicesAreSharedDisposedAndLoggingGoesToStderr",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.ProjectReplacesProviderTableAndPacksOverlayPerCapability",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HumanVersionHasStableFormattingAndExplicitUnknownValues",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.CancellationReachesCommandsAndDisposesTheHost",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.VersionUsesOneInjectedServiceAndPreservesTheJsonEnvelope(argument: \"version\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.EveryFrozenPackLoadsAndMalformedUtf8IsRejected",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.VersionUsesOneInjectedServiceAndPreservesTheJsonEnvelope(argument: \"-v\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.ConfigurationTests.MissingLayersUseDefaultsAndDoNotCreateDirectories",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.VersionUsesOneInjectedServiceAndPreservesTheJsonEnvelope(argument: \"--version\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.OperationalFailuresUseStderrAndExitOne",
+      "outcome": "Passed"
+    }
+  ],
+  "differential": {
+    "path": "artifacts/lifecycle-differential-final.json",
+    "sha256": "dad0b32d7dd1518cabab5f8ece456b9df2da964832de2b2797ff785dee77b7ff",
+    "scenarios": [
+      {
+        "name": "uninitialized",
+        "passed": true
+      },
+      {
+        "name": "dry-run",
+        "passed": true
+      },
+      {
+        "name": "go-initialized-identity-read-by-csharp",
+        "passed": true
+      },
+      {
+        "name": "inspection-preserves-database",
+        "passed": true
+      },
+      {
+        "name": "csharp-reregistered-identity-read-by-go",
+        "passed": true
+      },
+      {
+        "name": "detached-head",
+        "passed": true
+      },
+      {
+        "name": "linked-worktree-shared-state",
+        "passed": true
+      },
+      {
+        "name": "invalid-config-rejected",
+        "passed": true
+      }
+    ]
+  },
+  "package": {
+    "passed": true,
+    "platform": "win-x64",
+    "schema": 19,
+    "dry_run_no_state": true,
+    "repeated_init_id_preserved": true,
+    "inspection_preserved_db_and_registry": true,
+    "embedded_pack_load": true,
+    "executable_sha256": "934cc09282bc7219c9e416eadfbfd26abac0e330f2958d4520443af0ce76cf40"
+  },
+  "package_receipt": {
+    "path": "artifacts/lifecycle-package-probe/result.json",
+    "sha256": "2f8c63c73af6d35f3e72d978c4ddf7d4baeb598b6c3386130a0a8d41b1a35219"
+  },
+  "embedded_packs": [
+    {
+      "path": "src/Harness.Infrastructure/Configuration/Packs/codebase-memory.toml",
+      "sha256": "7b6a87e64d2061b45ec2a26d415af5d13831c86658a4f02c8c557563a59f0cea"
+    },
+    {
+      "path": "src/Harness.Infrastructure/Configuration/Packs/graphify-csharp.toml",
+      "sha256": "66858d975b2755692b5c082e130fc74ad5b47b3bf03aaab2510b6da9979f5ee8"
+    },
+    {
+      "path": "src/Harness.Infrastructure/Configuration/Packs/nuget.toml",
+      "sha256": "671991cc26f3a98e72f17ee399d46563be2bd3451b78617101ad1b3a371396c2"
+    },
+    {
+      "path": "src/Harness.Infrastructure/Configuration/Packs/rg-fd.toml",
+      "sha256": "3b1d51cf0d8e6dc199a2093527788ac722e44c0c59b2135e14f8284e44d38033"
+    },
+    {
+      "path": "src/Harness.Infrastructure/Configuration/Packs/ripwire.toml",
+      "sha256": "917f6c95e3ddc67b22c3669bcfae75917a93f79d018a0fbcc701868f0ec007d1"
+    }
+  ],
+  "lock_files": {
+    "src/Harness.Cli/packages.lock.json": "e181c449b1a945828c349a9fb3399377c6b6fbdecd0e00bd36aacc2993d0a2e5",
+    "src/Harness.Cli/packages.publish.lock.json": "12290a18730bcec70be44511ca3145e4cf3bcb643de785710addf2798e624563",
+    "src/Harness.Core/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+    "src/Harness.Infrastructure/packages.lock.json": "8800c8a934fc90f13cdc404b1399a7a04ea1271a9679745deba99507ccc58f20",
+    "src/Harness.Mcp/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "src/Harness.Providers/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "src/Harness.Web/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "test/Harness.Integration/packages.lock.json": "0f0006767789dfd3f5734ad5c83e39aa4d7b2de78f2085506bc2beb270752b26",
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": "c709535b9e8d938d00256ed29e48f20b00a0aa8c26abaf9b7b765bd0f0931f7d",
+    "test/Harness.Unit/packages.lock.json": "a1b25f937c6b02667b52afa39c779a0f958011f621cca11d393ea96bd658d692"
+  },
+  "source_sha256": {
+    "doc/port/README.md": "72139bf3660fd3454929c096d74891611940196db8cc73b559786d97ca328a1d",
+    "doc/port/bootstrap.md": "2f4b31c8f8893d984704b30980574328b203d11c767ac4d1a13f5542cf1d4b44",
+    "doc/port/project-lifecycle.md": "33c6a051f1d9df29e6a24ec70c0106d40f03859601f13b110e5e97e22040d769",
+    "src/Harness.Cli/CliApplication.cs": "c0d9e8a87a151457e05e300d3a7b115a29b13113a97ab031eafdb670a267df20",
+    "src/Harness.Cli/ProjectCommands.cs": "dcacd57184c5d48590821196210f766415390ca89021d2ce8374291fc1dd491e",
+    "src/Harness.Cli/packages.lock.json": "e181c449b1a945828c349a9fb3399377c6b6fbdecd0e00bd36aacc2993d0a2e5",
+    "src/Harness.Cli/packages.publish.lock.json": "12290a18730bcec70be44511ca3145e4cf3bcb643de785710addf2798e624563",
+    "src/Harness.Core/Projects/ProjectIdentity.cs": "e3cd1ce7a3cb5ffbad09b8be7d6c264645cb2751136b747dbd35a1cec9c38d7c",
+    "src/Harness.Infrastructure/Configuration/ConfigurationLoader.cs": "f85f6166169331a65271196577fa032cbe43b574cd4ba8579192aaaed5426b23",
+    "src/Harness.Infrastructure/Configuration/ConfigurationPaths.cs": "430be854be251ab365e8dfa98199eb8101fc4134df9e8598db35d08c2543494c",
+    "src/Harness.Infrastructure/Configuration/ConfigurationValidation.cs": "2622c23dd2a8e444dd6a41842fa9eb3b519a3771d95c55988554771814e2c268",
+    "src/Harness.Infrastructure/Configuration/HarnessConfiguration.cs": "c296b868a3c3bce7c1cda585e3ae882cca56caf51fd1e58872bea1feec88a5ee",
+    "src/Harness.Infrastructure/Configuration/Packs/LICENSE.txt": "00e134d965f519f8a0000f1b197d1a4e4e27ac051149fd10b04b27d2039cca19",
+    "src/Harness.Infrastructure/Configuration/Packs/codebase-memory.toml": "7b6a87e64d2061b45ec2a26d415af5d13831c86658a4f02c8c557563a59f0cea",
+    "src/Harness.Infrastructure/Configuration/Packs/graphify-csharp.toml": "66858d975b2755692b5c082e130fc74ad5b47b3bf03aaab2510b6da9979f5ee8",
+    "src/Harness.Infrastructure/Configuration/Packs/nuget.toml": "671991cc26f3a98e72f17ee399d46563be2bd3451b78617101ad1b3a371396c2",
+    "src/Harness.Infrastructure/Configuration/Packs/rg-fd.toml": "3b1d51cf0d8e6dc199a2093527788ac722e44c0c59b2135e14f8284e44d38033",
+    "src/Harness.Infrastructure/Configuration/Packs/ripwire.toml": "917f6c95e3ddc67b22c3669bcfae75917a93f79d018a0fbcc701868f0ec007d1",
+    "src/Harness.Infrastructure/Git/GitRepository.cs": "37576c59e561c27f123cd044b0f12432073224e412288f189a548b0d37d29499",
+    "src/Harness.Infrastructure/Harness.Infrastructure.csproj": "13b4772f34ab9fe393aacebcf2347163fbb307829379cab830409c2ca1dd746f",
+    "src/Harness.Infrastructure/Projects/MachineRegistry.cs": "d2b9b77c518a0f9dc2271f5f0587861c5c419b15c0684a51fa56bdd0fbd6c970",
+    "src/Harness.Infrastructure/Projects/ProjectInspection.cs": "a99d9bccd330f89be301d4937b2913ee3c123473392b3bdb0e515717aae671e2",
+    "src/Harness.Infrastructure/Projects/ProjectLifecycle.cs": "27a59c713c9a88274706a2430bf95f1b20b1303116f577735fd21a7f86fcebc8",
+    "src/Harness.Infrastructure/Projects/ProjectStore.cs": "6e7bad41fa5f0bc7633d737b0c9389bd4874fe3eae3b5d85a62acd25935c20c0",
+    "src/Harness.Infrastructure/packages.lock.json": "8800c8a934fc90f13cdc404b1399a7a04ea1271a9679745deba99507ccc58f20",
+    "test/Harness.Compatibility/lifecycle.py": "ea31cc7ab509564b586f0d1509b8365c69f10b8e477f850172b389ceffbd3dad",
+    "test/Harness.Integration/ProjectLifecycleTests.cs": "6324b6cfe375fca25ef889b315c194c71e50d3f6d3916e7f48fd1f4347be5a85",
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": "c709535b9e8d938d00256ed29e48f20b00a0aa8c26abaf9b7b765bd0f0931f7d",
+    "test/Harness.Integration/packages.lock.json": "0f0006767789dfd3f5734ad5c83e39aa4d7b2de78f2085506bc2beb270752b26",
+    "test/Harness.Unit/ConfigurationTests.cs": "83f9603d2d4437f67966faee7c90e4a606c75fab89cd24c3bdfaef5bdfc9d773",
+    "test/Harness.Unit/packages.lock.json": "a1b25f937c6b02667b52afa39c779a0f958011f621cca11d393ea96bd658d692"
+  },
+  "binlogs": {
+    "artifacts/lifecycle-restore-03.binlog": "cd97330c7a639e1d8540583a7264189e38a87a4516ca948d14017eff7a227967",
+    "artifacts/lifecycle-publish-restore-01.binlog": "7c1525c7e8f4e396b15f0cbbb7139aa50fa4cbbc0ff33095de2cae654bcd3c1a",
+    "artifacts/lifecycle-locked-restore-01.binlog": "653d782f5401bfad9ef6d661bab1551cb479bb6eb6719931fe70dbe6938c56b4",
+    "artifacts/lifecycle-test-09.binlog": "89307096787fdfa7bb0f13b9ef392d22ea4ff764e8571fec78c233910793b019",
+    "artifacts/lifecycle-test-09-dotnet-test.binlog": "c9d31a81279ae76b72be554dabf25c8d4b666d239b25a1b09dd02f75acb87c8b",
+    "artifacts/lifecycle-release-02.binlog": "79dd66cdb429615a647d17a62faaf6ae364cc0e5da67bd70c114349a09b22617",
+    "artifacts/lifecycle-publish-01.binlog": "bd3d2bc268950c29c5e8501f6e25b1a31c41d7d3aac895fba5afbcde3971441c",
+    "artifacts/lifecycle-locked-restore-final.binlog": "9626d52e7a4fa3741c968e45c2c817f96d5c00dba7091792798f869f31eb183f"
+  },
+  "commands": [
+    "dotnet restore Harness.slnx --locked-mode -p:ContinuousIntegrationBuild=true -bl:artifacts/lifecycle-locked-restore-final.binlog",
+    "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/lifecycle-test-09.binlog --report-trx --results-directory artifacts/lifecycle-results-validated",
+    "dotnet build Harness.slnx -c Release --no-restore -m -p:ContinuousIntegrationBuild=true -bl:artifacts/lifecycle-release-02.binlog",
+    "python test/Harness.Compatibility/lifecycle.py --oracle artifacts/compatibility/oracle/harness.exe --candidate src/Harness.Cli/bin/Debug/net10.0/harness.dll --output artifacts/lifecycle-differential-final.json",
+    "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release -p:ContinuousIntegrationBuild=true -o artifacts/lifecycle-publish/win-x64 -bl:artifacts/lifecycle-publish-01.binlog",
+    "Published harness.exe: isolated init --dry-run, init, status --json, doctor --json, repeated init and disabled rg-fd embedded pack",
+    "git diff --check"
+  ],
+  "limits": [
+    "Native Linux/macOS execution has not run; OS path rules are unit-tested with injected environments.",
+    "SQLite read-only WAL connections may create coordination sidecars; application DB/config/registry state and WAL frames are not written.",
+    "Client detection/hooks/instructions, provider probing, sync reports and UI overview are assigned to later tasks.",
+    "Windows registry locking improves Go's no-op lock; an older Go writer that ignores locks cannot be serialized by the C# lock.",
+    "Regex validation uses .NET with Go-style named-group adaptation; full provider regex conformance remains PORT-013/014."
+  ]
+}

@@ -1,8 +1,10 @@
+using Harness.Infrastructure.Projects;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Spectre.Console;
 using Spectre.Console.Cli;
+using Spectre.Console;
 
 namespace Harness.Cli;
 
@@ -22,6 +24,7 @@ public static class CliApplication
         using var loggerProvider = new WriterLoggerProvider(TextWriter.Synchronized(stderr));
         builder.Logging.AddProvider(loggerProvider);
         builder.Services.AddSingleton(BuildInformation.Current());
+        builder.Services.AddSingleton(services => new ProjectLifecycle(version: services.GetRequiredService<BuildInformation>().Version));
         builder.Services.AddSingleton(stdout);
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
@@ -39,6 +42,9 @@ public static class CliApplication
                 Interactive = InteractionSupport.No,
             });
             configuration.AddCommand<VersionCommand>("version").WithDescription("Print version and build information");
+            configuration.AddCommand<InitCommand>("init").WithDescription("Initialize project state");
+            configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
+            configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
             configureCommands?.Invoke(configuration);
         });
 
@@ -57,7 +63,7 @@ public static class CliApplication
             await stderr.WriteLineAsync($"harness: {exception.Message}");
             return 2;
         }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException or CommandRuntimeException)
+        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or CommandRuntimeException or UnauthorizedAccessException or SqliteException or System.Text.Json.JsonException)
         {
             await stderr.WriteLineAsync($"harness: {exception.Message}");
             return 1;
@@ -71,12 +77,48 @@ public static class CliApplication
             return ["--help"];
         }
 
-        var normalized = args.Select(value => value == "-help" ? "--help" : value).ToArray();
+        var normalized = NormalizeLegacyFlags(args);
         return normalized[0] switch
         {
             "-v" or "--version" => ["version", .. normalized[1..]],
             "help" => [.. normalized[1..], "--help"],
             _ => normalized,
         };
+    }
+
+    private static string[] NormalizeLegacyFlags(string[] args)
+    {
+        var normalized = (string[])args.Clone();
+        var index = 0;
+        while (index < normalized.Length)
+        {
+            var argument = normalized[index];
+            if (argument == "--")
+            {
+                break;
+            }
+
+            var equals = argument.IndexOf('=', StringComparison.Ordinal);
+            var name = equals < 0 ? argument : argument[..equals];
+            var replacement = name switch
+            {
+                "-help" => "--help",
+                "-project" => "--project",
+                "-dry-run" => "--dry-run",
+                "-json" => "--json",
+                "-syncs" => "--syncs",
+                "-all" => "--all",
+                _ => name,
+            };
+            normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
+            if (equals < 0 && replacement is "--project" or "--syncs")
+            {
+                index++; // A value is data, even when it resembles another option.
+            }
+
+            index++;
+        }
+
+        return normalized;
     }
 }

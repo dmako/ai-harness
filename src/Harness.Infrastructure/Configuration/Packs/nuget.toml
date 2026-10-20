@@ -1,0 +1,35 @@
+# NugetMcpServer (https://github.com/DimonSmart/NugetMcpServer), verified
+# with 1.1.9: public API of NuGet packages for package_api.
+type = "mcp"
+command = "NugetMcpServer"
+timeout_ms = 60000
+languages = ["csharp"]
+
+[capabilities."package.search"]
+tool = "search_packages"
+args = { query = "{query}", maxResults = "{limit}" }
+items = "packages"
+fields = { name = "packageId", label = "version", snippet = "description", score = "downloadCount" }
+
+[capabilities."package.info"]
+tool = "get_package_info"
+args = { packageId = "{package}", version = "{version}" }
+
+[capabilities."package.types"]
+tool = "list_classes_records_structs"
+args = { packageId = "{package}", version = "{version}", filter = "{query}" }
+items = "types"
+fields = { name = "name", qualified_name = "fullName", label = "kind" }
+combine = "all"
+chain = [
+  { tool = "list_interfaces", args = { packageId = "{package}", version = "{version}", filter = "{query}" }, items = "interfaces", fields = { name = "name", qualified_name = "fullName" } },
+]
+
+[capabilities."package.type_definition"]
+tool = "get_class_or_record_or_struct_definition"
+args = { packageId = "{package}", typeName = "{type}", version = "{version}" }
+miss = "not found in package"
+chain = [
+  { tool = "get_interface_definition", args = { packageId = "{package}", interfaceName = "{type}", version = "{version}" }, miss = "not found in package" },
+  { tool = "get_enum_definition", args = { packageId = "{package}", enumName = "{type}", version = "{version}" }, miss = "not found in package" },
+]
