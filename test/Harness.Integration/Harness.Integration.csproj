@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Harness.Infrastructure/Harness.Infrastructure.csproj" />
+    <ProjectReference Include="Storage/Worker/Harness.StorageWorker.csproj" ReferenceOutputAssembly="false" />
+    <PackageReference Include="xunit.v3" />
+    <Compile Remove="Storage/Worker/**/*.cs" />
+    <None Include="../fixtures/compatibility/sqlite/*" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../doc/port/inventory/storage.json" Link="Fixtures/storage.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

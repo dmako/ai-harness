@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <InternalsVisibleTo Include="Harness.Integration" />
+    <EmbeddedResource Include="Storage/Migrations/*.sql" LogicalName="Harness.Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Storage/Migrations/LICENSE.txt" LogicalName="Harness.Storage.MigrationLicense.txt" />
+  </ItemGroup>
+</Project>
