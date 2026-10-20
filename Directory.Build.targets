@@ -1,0 +1,105 @@
+<Project>
+
+  <!-- Add SourceLink info when running on CI pipeline -->
+  <PropertyGroup Condition=" '$(ContinuousIntegrationBuild)' == 'true' ">
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(CI)' != '' ">
+    <!-- PackageReference specific to GitLab repositories when running on GitLab pipeline -->
+    <PackageReference Include="Microsoft.SourceLink.GitLab" PrivateAssets="All" />
+  </ItemGroup>
+
+  <PropertyGroup Label="SAST Values">
+    <ProductionOutput Condition=" '$(ProductionOutput)' == ''" >true</ProductionOutput>
+    <DisableSastOnProject Condition=" '$(DisableSastOnProject)' == ''">false</DisableSastOnProject>
+    <_SarifOutputDirPath>$(OutDir)</_SarifOutputDirPath>
+    <_SarifOutputDirPath Condition=" Exists('$(MSBuildThisFileDirectory)\artifacts\sarif\') ">$(MSBuildThisFileDirectory)\artifacts\sarif\</_SarifOutputDirPath>
+    <CodeAnalysisIgnoreGeneratedCode>true</CodeAnalysisIgnoreGeneratedCode>
+    <ErrorLog Condition=" '$(DisableSastOnProject)' != 'true' AND '$(ProductionOutput)' == 'true' ">$(_SarifOutputDirPath)$(TargetName).$(TargetFramework).sarif,version=2.1</ErrorLog>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnableNETAnalyzers Condition=" '$(DisableSastOnProject)' != 'true' ">true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Test Projects" Condition=" '$(IsTestProject)' == 'true' ">
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup Label="Test Projects" Condition=" '$(IsTestProject)' == 'true' ">
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" PrivateAssets="All" />
+  </ItemGroup>
+  
+  <ItemGroup Label="SAST Anlyzers" Condition=" '$(DisableSastOnProject)' != 'true' ">
+
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)\configuration\BannedSymbols.Corlib.txt" Visible="false" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)\configuration\BannedSymbols.NewtonsoftJson.txt" Visible="false" />
+
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+  </ItemGroup>
+
+  <PropertyGroup Label="Git Values">
+    <CommitBranch Condition=" '$(CommitBranch)' == '' ">$(GIT_BRANCH)</CommitBranch>
+    <CommitHash Condition=" '$(CommitHash)' == '' ">$(GIT_COMMIT)</CommitHash>
+    <CommitTimestamp>Unknown</CommitTimestamp>
+  </PropertyGroup>
+
+  <Target Name="EmbedBannedSymbolsInBinLog" AfterTargets="CoreCompile">
+    <ItemGroup>
+      <EmbedInBinlog Include="@(AdditionalFiles)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)%(Extension)', '^BannedSymbols(\..+)?\.txt$'))" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="EmbedEditorConfigInBinLog" AfterTargets="CoreCompile">
+    <ItemGroup>
+      <EmbedInBinlog Include="@(EditorConfigFiles)" />
+    </ItemGroup>
+  </Target>
+
+
+  <Target Name="AddGitMetadaAssemblyAttributes" AfterTargets="Build" BeforeTargets="PrepareForBuild;CoreGenerateAssemblyInfo">
+    <Exec Command="git rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" Condition=" '$(CommitHash)' == '' ">
+      <Output TaskParameter="ConsoleOutput" PropertyName="CommitHash"/>
+    </Exec>
+    <Exec Command="git rev-parse --abbrev-ref HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" Condition=" '$(CommitBranch)' == '' ">
+      <Output TaskParameter="ConsoleOutput" PropertyName="CommitBranch"/>
+    </Exec>
+    <Exec Command="git log -1 --pretty=format:%25%25ci" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="CommitTimestamp"/>
+    </Exec>
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>BuildTimestamp</_Parameter1>
+        <_Parameter2>$([System.DateTime]::UtcNow.ToString(yyyy-MM-ddTHH:mm:ssK))</_Parameter2>
+      </AssemblyAttribute>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition=" $(CommitHash) != '' ">
+        <_Parameter1>CommitHash</_Parameter1>
+        <_Parameter2>$(CommitHash)</_Parameter2>
+      </AssemblyAttribute>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition=" $(CommitBranch) != '' ">
+        <_Parameter1>CommitBranch</_Parameter1>
+        <_Parameter2>$(CommitBranch)</_Parameter2>
+      </AssemblyAttribute>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition=" $(CommitTimestamp) != '' ">
+        <_Parameter1>CommitTimestamp</_Parameter1>
+        <_Parameter2>$(CommitTimestamp)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
+</Project>

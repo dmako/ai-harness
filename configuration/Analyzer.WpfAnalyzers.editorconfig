@@ -1,0 +1,414 @@
+# global_level must be higher than the NET Analyzer files
+is_global = true
+global_level = 0
+
+# WPF0001: Backing field for a DependencyProperty should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0001.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0001.severity = warning
+
+# WPF0002: Backing field for a DependencyPropertyKey should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0002.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0002.severity = warning
+
+# WPF0003: CLR property for a DependencyProperty should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0003.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0003.severity = warning
+
+# WPF0004: CLR method for a DependencyProperty must match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0004.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0004.severity = warning
+
+# WPF0005: Name of PropertyChangedCallback should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0005.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0005.severity = warning
+
+# WPF0006: Name of CoerceValueCallback should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0006.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0006.severity = warning
+
+# WPF0007: Name of ValidateValueCallback should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0007.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0007.severity = warning
+
+# WPF0008: [DependsOn(target)] must exist
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0008.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0008.severity = warning
+
+# WPF0010: Default value type must match registered type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0010.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0010.severity = warning
+
+# WPF0011: Containing type should be used as registered owner
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0011.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0011.severity = warning
+
+# WPF0012: CLR property type should match registered type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0012.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0012.severity = warning
+
+# WPF0013: CLR accessor for attached property must match registered type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0013.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0013.severity = warning
+
+# WPF0014: SetValue must use registered type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0014.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0014.severity = warning
+
+# WPF0015: Registered owner type must inherit DependencyObject
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0015.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0015.severity = warning
+
+# WPF0016: Default value is shared reference type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0016.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0016.severity = warning
+
+# WPF0017: Metadata must be of same type or super type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0017.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0017.severity = warning
+
+# WPF0018: Use containing type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0018.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0018.severity = warning
+
+# WPF0019: Cast sender to correct type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0019.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0019.severity = warning
+
+# WPF0020: Cast value to correct type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0020.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0020.severity = warning
+
+# WPF0021: Cast sender to containing type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0021.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0021.severity = warning
+
+# WPF0022: Cast value to correct type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0022.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0022.severity = warning
+
+# WPF0023: The callback is trivial, convert to lambda
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0023.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0023.severity = suggestion
+
+# WPF0024: Parameter type should be nullable
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0024.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0024.severity = warning
+
+# WPF0030: Backing field for a DependencyProperty should be static and readonly
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0030.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0030.severity = warning
+
+# WPF0031: DependencyPropertyKey member must be declared before DependencyProperty member
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0031.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0031.severity = warning
+
+# WPF0032: Use same dependency property in get and set
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0032.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0032.severity = warning
+
+# WPF0033: Add [AttachedPropertyBrowsableForType]
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0033.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0033.severity = suggestion
+
+# WPF0034: Use correct argument for [AttachedPropertyBrowsableForType]
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0034.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0034.severity = suggestion
+
+# WPF0035: Use SetValue in setter
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0035.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0035.severity = warning
+
+# WPF0036: Avoid side effects in CLR accessors
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0036.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0036.severity = warning
+
+# WPF0040: A readonly DependencyProperty must be set with DependencyPropertyKey
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0040.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0040.severity = warning
+
+# WPF0041: Set mutable dependency properties using SetCurrentValue
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0041.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0041.severity = warning
+
+# WPF0042: Avoid side effects in CLR accessors
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0042.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0042.severity = warning
+
+# WPF0043: Don't set DataContext and Style using SetCurrentValue
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0043.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0043.severity = warning
+
+# WPF0050: XmlnsPrefix must map to the same url as XmlnsDefinition
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0050.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0050.severity = warning
+
+# WPF0051: XmlnsDefinition must map to existing namespace
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0051.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0051.severity = warning
+
+# WPF0052: XmlnsDefinitions does not map all namespaces with public types
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0052.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0052.severity = suggestion
+
+# WPF0060: Backing member for DependencyProperty should have standard documentation text
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0060.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0060.severity = suggestion
+
+# WPF0061: Accessor method for attached property should have standard documentation text
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0061.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0061.severity = suggestion
+
+# WPF0062: Property changed callback should have standard documentation text
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0062.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0062.severity = suggestion
+
+# WPF0070: Add default field to converter
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0070.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0070.severity = suggestion
+
+# WPF0071: Add ValueConversion attribute
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0071.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0071.severity = suggestion
+
+# WPF0072: ValueConversion must use correct types
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0072.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0072.severity = warning
+
+# WPF0073: Add ValueConversion attribute (unknown types)
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0073.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0073.severity = suggestion
+
+# WPF0074: Use containing type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0074.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0074.severity = warning
+
+# WPF0080: Add MarkupExtensionReturnType attribute
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0080.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0080.severity = suggestion
+
+# WPF0081: MarkupExtensionReturnType must use correct return type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0081.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0081.severity = warning
+
+# WPF0082: [ConstructorArgument] must match
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0082.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0082.severity = warning
+
+# WPF0083: Add [ConstructorArgument]
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0083.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0083.severity = suggestion
+
+# WPF0084: Target of [XamlSetMarkupExtension] should exist and have correct signature
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0084.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0084.severity = warning
+
+# WPF0085: Target of [XamlSetTypeConverter] should exist and have correct signature
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0085.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0085.severity = warning
+
+# WPF0090: Name the invoked method OnEventName
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0090.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0090.severity = suggestion
+
+# WPF0091: Name the invoked method OnEventName
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0091.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0091.severity = suggestion
+
+# WPF0092: Use correct handler type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0092.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0092.severity = warning
+
+# WPF0100: Backing field for a RoutedEvent should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0100.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0100.severity = warning
+
+# WPF0101: Containing type should be used as registered owner
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0101.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0101.severity = warning
+
+# WPF0102: Name of the event should match registered name
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0102.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0102.severity = warning
+
+# WPF0103: Use same event in add and remove
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0103.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0103.severity = warning
+
+# WPF0104: Call AddHandler in add
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0104.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0104.severity = warning
+
+# WPF0105: Call RemoveHandler in remove
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0105.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0105.severity = warning
+
+# WPF0106: Use the registered handler type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0106.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0106.severity = warning
+
+# WPF0107: Backing member for a RoutedEvent should be static and readonly
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0107.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0107.severity = warning
+
+# WPF0108: Backing member for RoutedEvent should have standard documentation text
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0108.md
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.WPF0108.severity = suggestion
+
+# WPF0120: Register containing member name as name for routed command
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0120.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0120.severity = warning
+
+# WPF0121: Register containing type as owner for routed command
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0121.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0121.severity = warning
+
+# WPF0122: Register name and owning type for routed command
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0122.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0122.severity = warning
+
+# WPF0123: Backing field for a RoutedCommand should be static and readonly
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0123.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0123.severity = warning
+
+# WPF0130: Add [TemplatePart] to the type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0130.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0130.severity = warning
+
+# WPF0131: Use correct [TemplatePart] type
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0131.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0131.severity = warning
+
+# WPF0132: Use PART prefix
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0132.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0132.severity = warning
+
+# WPF0133: ContentProperty target does not exist
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0133.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0133.severity = warning
+
+# WPF0140: Use containing type when creating a ComponentResourceKey
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0140.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0140.severity = warning
+
+# WPF0141: Use containing member as key when creating a ComponentResourceKey
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0141.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0141.severity = warning
+
+# WPF0150: Use nameof() instead of literal
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0150.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0150.severity = warning
+
+# WPF0151: Use nameof() instead of constant
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0151.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0151.severity = warning
+
+# WPF0170: StyleTypedProperty.Property must exist
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0170.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0170.severity = warning
+
+# WPF0171: StyleTypedProperty.Property must specify a property of type Style
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0171.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0171.severity = warning
+
+# WPF0172: StyleTypedProperty.Property must be specified
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0172.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0172.severity = warning
+
+# WPF0173: StyleTypedProperty.StyleTargetType must be assignable to a type that has a Style property
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0173.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0173.severity = warning
+
+# WPF0174: StyleTypedProperty.StyleTargetType must be specified
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0174.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0174.severity = warning
+
+# WPF0175: StyleTypedProperty.Property must be specified only once
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0175.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0175.severity = warning
+
+# WPF0176: StyleTypedProperty is missing
+# Help link: https://github.com/DotNetAnalyzers/WpfAnalyzers/tree/master/documentation/WPF0176.md
+# Enabled: True, Severity: warning
+dotnet_diagnostic.WPF0176.severity = warning
+
