@@ -12,7 +12,8 @@ The authority is the Git object tree at that commit, read with `git archive`.
 The neighboring working copy and the installed `harness.exe` are separate
 artifacts. The installed executable reports commit `7038401`; it must not be
 used as an executable oracle for this pin. Building the pinned Go oracle and
-capturing actual wire responses belongs to PORT-002.
+capturing actual wire responses is implemented by the
+[fixture harness](fixture-harness.md) in PORT-002.
 
 The capture contains 30 registered MCP tools, their input/output schema source
 roots and tagged type declarations, 19 migrations, 76 HTTP registrations across
@@ -51,7 +52,9 @@ Schema source inventories deliberately retain the Go SDK's inputs rather than
 claim to reproduce its JSON Schema inference. PORT-002 must capture `tools/list`
 from a binary built at the pin and verify SDK-generated input/output schemas,
 nullability, rejection of unknown properties and result envelopes. Source tags
-alone do not establish every SDK inference rule.
+alone do not establish every SDK inference rule. The runtime schemas and
+representative responses captured by PORT-002 are saved in
+`test/fixtures/compatibility/go-windows-amd64.json`.
 
 ## Validation and reproduction
 
