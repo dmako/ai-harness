@@ -42,6 +42,7 @@ the hashes and newline counts; the source files have not been changed.
 | [State reference](state.md) | Database, machine/user/workspace state, client files, locks and generated files |
 | [Scope map](scope-map.md) | Every implemented subsystem and executable mapped to plan keys and approved harness task IDs |
 | [Compatibility policy](compatibility-policy.md) | Observable behavior, comparison rules, performance priorities and permitted Windows corrections |
+| [Solution and packages](solution-and-packages.md) | PORT-003 assembly boundaries, enforced dependency graph, CPM choices, API validation and deployment constraints |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

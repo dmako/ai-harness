@@ -1,0 +1,1362 @@
+{
+  "schema_version": 1,
+  "task": "TASK-0003",
+  "validated_on": "2026-10-20",
+  "platform": "Windows x64",
+  "sdk": "10.0.402",
+  "framework": "net10.0",
+  "limitations": [
+    "Only Windows x64 executed; native assets inventoried for other RIDs.",
+    "Temporary probe disables analyzers/style enforcement and clears RuntimeIdentifiers.",
+    "MCP echo validates SDK transport, not the complete frozen tool contract.",
+    "No timing, production publish, IDE runner, trimming or NativeAOT claims.",
+    "Source and binary logs under artifacts are local ignored spike artifacts."
+  ],
+  "allowed_project_references": {
+    "Harness.Core": [],
+    "Harness.Infrastructure": [
+      "Harness.Core"
+    ],
+    "Harness.Providers": [
+      "Harness.Core"
+    ],
+    "Harness.Mcp": [
+      "Harness.Core"
+    ],
+    "Harness.Web": [
+      "Harness.Core"
+    ],
+    "Harness.Cli": [
+      "Harness.Core",
+      "Harness.Infrastructure",
+      "Harness.Providers",
+      "Harness.Mcp",
+      "Harness.Web"
+    ]
+  },
+  "validation_commands": [
+    {
+      "command": "dotnet restore Tests/Tests.csproj --configfile NuGet.Config -bl:restore-03.binlog",
+      "result": "pass"
+    },
+    {
+      "command": "dotnet build Tests/Tests.csproj --no-restore -bl:build-03.binlog",
+      "result": "pass"
+    },
+    {
+      "command": "dotnet test --project Tests/Tests.csproj --no-restore -bl:test-06.binlog --report-trx --report-trx-filename package-spike-verified.trx --results-directory C:/repos/personal/ai-harness-cs/artifacts/package-spike/results",
+      "result": "pass",
+      "total": 7,
+      "passed": 7
+    },
+    {
+      "command": "./check-graph.ps1",
+      "result": "pass",
+      "total": 48,
+      "allowed": 15,
+      "rejected": 33
+    },
+    {
+      "command": "python -m unittest discover -s test/Harness.Compatibility -p test_compatibility.py -v",
+      "working_directory": "repository root",
+      "result": "pass",
+      "total": 16,
+      "passed": 16
+    },
+    {
+      "command": "dotnet msbuild graph/Harness.Core.csproj -t:PrepareProjectReferences -p:ProbeForbiddenEdge=true -bl:graph/sdk-PrepareProjectReferences-02.binlog -nologo",
+      "result": "pass",
+      "expected_exit": 1,
+      "expected_error": "forbidden project references: Host"
+    },
+    {
+      "command": "dotnet msbuild graph/Harness.Core.csproj -t:_GenerateRestoreProjectPathWalk -p:ProbeForbiddenEdge=true -bl:graph/sdk-_GenerateRestoreProjectPathWalk-02.binlog -nologo",
+      "result": "pass",
+      "expected_exit": 1,
+      "expected_error": "forbidden project references: Host"
+    }
+  ],
+  "observations": [
+    "Isolated NuGet.Config needed because inherited package source mapping rejected public packages.",
+    "NU1510 on explicit Hosting reference with ASP.NET shared framework; standalone host restores and runs the Hosting pin.",
+    "MTP v2 rejects legacy dotnet test VSTest mode on SDK 10; global.json native MTP mode passed.",
+    "Spectre default accepted unknown flags; UseStrictParsing rejected them with -1; missing required argument returned 1.",
+    "Tomlyn syntax parsing preserves CRLF/comments but accepts arbitrary key names; schema validation remains application-owned."
+  ],
+  "test_report": {
+    "path": "artifacts/package-spike/results/package-spike-verified.trx",
+    "sha256": "7a26724d3e18de328129d29bf5cbcf5ae7d84c1b3cf56a96ea7c915cfa6819f2",
+    "tests": [
+      {
+        "name": "PackageTests.TomlynPreservesTriviaAndReportsInvalidSyntax",
+        "outcome": "Passed"
+      },
+      {
+        "name": "PackageTests.YamlRejectsUnknownDuplicateAndMalformedProperties",
+        "outcome": "Passed"
+      },
+      {
+        "name": "PackageTests.SqliteReadsHistoricalFixturesAndRunsAllMigrations",
+        "outcome": "Passed"
+      },
+      {
+        "name": "PackageTests.HostingChannelsAndJsonAreAvailable",
+        "outcome": "Passed"
+      },
+      {
+        "name": "PackageTests.SpectreParsesRequiredArgumentsAndReturnsExitCode",
+        "outcome": "Passed"
+      },
+      {
+        "name": "PackageTests.AspNetCoreSharedFrameworkServesHttp",
+        "outcome": "Passed"
+      },
+      {
+        "name": "PackageTests.McpStdioListsAndCallsATool",
+        "outcome": "Passed"
+      }
+    ]
+  },
+  "project_assets": [
+    {
+      "project": "Host",
+      "sha256": "84e6df6973cddd6a5ac576fa50da3e1c4a73f7edc1ad10f03b156b5b9c93b6a1"
+    },
+    {
+      "project": "Tests",
+      "sha256": "53bd07363a069c6b91884f6314dd106f11f4fe5f6f04783eceff0068fc204123"
+    }
+  ],
+  "source_sha256": {
+    "Directory.Build.props": "bbe3f5d03d974ae85f7dd72b713941938520b24f508f0ced620fed70fe3f0d5a",
+    "Directory.Build.targets": "763d9acb5d65ed8d08c7bda9b07243d09ba546fb6a52295a93608ccd714dc0a6",
+    "Directory.Packages.props": "2e7c3600a331c741631792043e29fe3535c9af5a2e213340ee0c46921514d0eb",
+    "artifacts/package-spike/global.json": "bf30159b12386cc6086fb2bc614a7dcaa7d2c2c76f036f17461cfc832232c9c4",
+    "artifacts/package-spike/NuGet.Config": "0bc8b5cfba429bcbd0cb692405e3b6e504793c122350d6a8c95a69c2d718b472",
+    "artifacts/package-spike/Directory.Build.props": "9e9c2fd8449e0601c19668c70abc313b30ebc128222573407adf06d1d20a11bf",
+    "artifacts/package-spike/Host/Host.csproj": "f9235b69f807a770fb219424bd3eb02ca5aacc0d95337b73d47bb54ea0c5bf15",
+    "artifacts/package-spike/Host/Program.cs": "516748019629396127a138c0bd87907173e9122ec74b7270f4f9d5d90e40f722",
+    "artifacts/package-spike/Tests/Tests.csproj": "3a550f3fc4a195dd95eaddb6998e8f7f18ed3bb4d2fd87cac2821d62a5f6b18a",
+    "artifacts/package-spike/Tests/PackageTests.cs": "6262aafe7b33dbe9180753c65310b0ad3291bcbb0ef1b2b42350fee4736b3f89",
+    "artifacts/package-spike/check-graph.ps1": "394fbc597e0d52716388f4c5a256d17e760bd2befb5ef0265addd0bbfba37c8b"
+  },
+  "binlogs": [
+    {
+      "path": "artifacts/package-spike/restore-03.binlog",
+      "sha256": "080f6dcfdeaa0900aa7bfc1f154de4eb764f412c9e5ff762bd2b6a785f248801"
+    },
+    {
+      "path": "artifacts/package-spike/build-03.binlog",
+      "sha256": "45125e03404f19a84aa98a717587711876e87272df4d31644ffb2ce0fd13972a"
+    },
+    {
+      "path": "artifacts/package-spike/test-06.binlog",
+      "sha256": "2465dfc4671b15f4d908c458870c1fcdfaf1b7b82c3810e538e8a0f02814980a"
+    },
+    {
+      "path": "artifacts/package-spike/test-06-dotnet-test.binlog",
+      "sha256": "bf45cf53ae5995374bd963146d6dd1eaad352be473ec2cc1638d7b295143c526"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Harness.Cli.binlog",
+      "sha256": "0347e7f3a5faf9a6477c08a0a0f1fd330100b1c9ece94b02ac2b530c0e83d836"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Harness.Core.binlog",
+      "sha256": "3e874f2a91566be0c24fc80467ebb518458b868e46438f63e98c9ca6b14c97e5"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Harness.Infrastructure.binlog",
+      "sha256": "117637d3b24fb135976ffdba87ff98c9cd25b04b32b93a970a98fbae1b8bed52"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Harness.Mcp.binlog",
+      "sha256": "2a61a6022e62f06f3a3a3db047b32ae1a45f49f0ac0e8e210577914edd207933"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Harness.Providers.binlog",
+      "sha256": "d52faf6919fae26896547c8530865583b5258d9f3116054e4fd6ee9c8de3c611"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Harness.Web.binlog",
+      "sha256": "d83d8d47a251e1be45f060d52ed1e90688a68a4debb4ebeffbddcb1c2b05271c"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-none.binlog",
+      "sha256": "e85e1f269a4040a1edf637a6796a5aa67ef48e7afcc86fbf216b6d3e50865cdc"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Cli-Unplanned.Assembly.binlog",
+      "sha256": "0c3fc9673e50fc07014f89de745e62628deef474928cb65d31d88061772ae775"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Harness.Cli.binlog",
+      "sha256": "1bcd8158bd6745daeaf670ff4e39d1998d437638bc99b869570fed04abaecd24"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Harness.Core.binlog",
+      "sha256": "d37a88d28e0cf3b01c60ed2dbba1c1945395322b947a94524c84adbb56dede0b"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Harness.Infrastructure.binlog",
+      "sha256": "fde06a65a267ebc28f5279f8b7662764b2e03b242f31a8204b1b2af18eb01e30"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Harness.Mcp.binlog",
+      "sha256": "e4395e9e035796dcbf032cc342c7f31f63c3fc6e3746ed9ed7e01d3218007e66"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Harness.Providers.binlog",
+      "sha256": "470ecc2f2a0b6f319bec8f0f00d9e147d520a0c5271cb90186bcab9beb07b742"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Harness.Web.binlog",
+      "sha256": "6d4648d6cc22ae4321c5c60321e7189f47ce41949dae86214b3e3baa2b1e66de"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-none.binlog",
+      "sha256": "0eee341c368a05ab51c7ae543e89f85fd3b71b479e9f2b31dc4397450c2cf33b"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Core-Unplanned.Assembly.binlog",
+      "sha256": "e49f4801cbd479a5ecc47573d7cfc61e4a6f6faba903e15a5fc6b114b9697ef6"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Harness.Cli.binlog",
+      "sha256": "5522e51d7510cfe3f30015863a6782b19383aef5d95404d7efedb11a5c69b7c9"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Harness.Core.binlog",
+      "sha256": "795921d5a6bddaafa5db060b7624179c44ca56e823fea913c921ee26c4a68ed5"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Harness.Infrastructure.binlog",
+      "sha256": "ed853155a74f64109395750f9579330a4c597df2ca89b55fea440eb8d9b246f2"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Harness.Mcp.binlog",
+      "sha256": "a22f7b85c6385c910851fd5f1f29266ccd6a8b759f7a4f0f24b77ad302214ea5"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Harness.Providers.binlog",
+      "sha256": "82b1a06ed64c3823bf8baaaf98edd45a01f404785b4647d43fb64b9cd36433ff"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Harness.Web.binlog",
+      "sha256": "608188b009305b14e677c0cfde52d278079c64c71e037e705fd4fa363fc0efef"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-none.binlog",
+      "sha256": "19a16587e91e01705cc4e5a40a1aee84c95f4fe984d7e1bc1091380890b0ad54"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Infrastructure-Unplanned.Assembly.binlog",
+      "sha256": "dee696e347d57e40dfa7d1b506754b159e220c91e1cbcd531802ac6afc0cb24f"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Harness.Cli.binlog",
+      "sha256": "780e01d9e1d820454dcdb03a81725d9eac535f0e4c0cf9b3f21dffb3e0aef364"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Harness.Core.binlog",
+      "sha256": "7e2a2ccbfdad9c5c071f5fe18b30d4caf0094aeb6580c28d972a8fe714925b06"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Harness.Infrastructure.binlog",
+      "sha256": "501257c21c03c686997d2b23cc51d940fafc23d5419217e9817776cc123e5af2"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Harness.Mcp.binlog",
+      "sha256": "7f97a11df82b3075bb0e0a89e0a0908eecb60d14329df192fa7f84fe24e9afe3"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Harness.Providers.binlog",
+      "sha256": "c56e059449a2555a98b2a9dd5ac6978425e7d21fb74f44f5cd22a1ee38901956"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Harness.Web.binlog",
+      "sha256": "c1045725ba91aa227cd0c4a3cd63e3b2b171dfba546096e7dce3eacd22caef80"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-none.binlog",
+      "sha256": "98daf50dc30430045bf08223c92099ce38960927c912c4f88eeb373487004d5e"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Mcp-Unplanned.Assembly.binlog",
+      "sha256": "8f08f59ee2fa57cb0a23389cfac6d62c5e3b96f3b02d354762734ba640c91ce7"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Harness.Cli.binlog",
+      "sha256": "028dc62b9bc5da39bab7df3b475ad3aea3170537197e450f2bc35333fe986cbc"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Harness.Core.binlog",
+      "sha256": "7f27703f3ac260c4a8ad174d1f3c5aed6b047681713127d4960488a009dd9fd4"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Harness.Infrastructure.binlog",
+      "sha256": "dc4c5312508dc6407cbbab0e8c5e6e4183642a0e1cd7718abbe8cc82e5b7e159"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Harness.Mcp.binlog",
+      "sha256": "e6a099867997ffd3e91533542ad88af29077ab5205c0b4d1b8edd5fd95b60aca"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Harness.Providers.binlog",
+      "sha256": "cee1f55ebe9c47f6406f4498162a33a75639ed413a65bcbb332cfb7eaca67041"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Harness.Web.binlog",
+      "sha256": "84d3901d46bb1d410f44551462c502a32de9c3a93a4e02c78d271024ae5855b8"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-none.binlog",
+      "sha256": "a1b5d333cad09fc6509b59b8b1f40f1472e3f6c70d6bcfbe5203fbbe972d084b"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Providers-Unplanned.Assembly.binlog",
+      "sha256": "31da731ce17dab2b727c87396a616e0e7016cd8b062e08189f0d6cdca9b40d32"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Harness.Cli.binlog",
+      "sha256": "b86ddf3d07996153ce0f06d86eb321a4bc36d6a9871b5424e4e7f94b6ffb0eb0"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Harness.Core.binlog",
+      "sha256": "63246a774159829c880e6445aed309a83592625a1d599aaca0e760df23fdc1c5"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Harness.Infrastructure.binlog",
+      "sha256": "17d373633e02ad8a3841ede79f6611a6c47aa25819201dc7f47151f49578370f"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Harness.Mcp.binlog",
+      "sha256": "22110fa1c61383426bc26c40a0749b7fb04509abaf0bf42fabde3c92b145e612"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Harness.Providers.binlog",
+      "sha256": "6bd06ba95a6f42c6d4952c3dc64474d5fb83788724284d710e5260352fbd71ec"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Harness.Web.binlog",
+      "sha256": "f556f9b25a063fd9d42d99744b7f07941cb4a0fa87ec07d955bf24a80aadba31"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-none.binlog",
+      "sha256": "248e976daa031365f6512516d4fdf8d11e4c0e3c000925e8c4796d8b493add64"
+    },
+    {
+      "path": "artifacts/package-spike/graph/Harness.Web-Unplanned.Assembly.binlog",
+      "sha256": "8699a9f1fc3a2b0857905cb0f2493d484f95f70da7956e582c7e0ae77cb7fdda"
+    },
+    {
+      "path": "artifacts/package-spike/graph/sdk-restore-01.binlog",
+      "sha256": "b136a9d08a31d1ff4922b46032b8844030d7739bf69ef0410e22433a26e78191"
+    },
+    {
+      "path": "artifacts/package-spike/graph/sdk-PrepareProjectReferences-02.binlog",
+      "sha256": "7a22264fa46648d898afd48d2ef2902c17070b70cfa6c54e0942976a3edd56ae"
+    },
+    {
+      "path": "artifacts/package-spike/graph/sdk-_GenerateRestoreProjectPathWalk-02.binlog",
+      "sha256": "d4ae54c638ad50995462992e8997c0637552c7d67230b650fc88a1ece9fa2bf5"
+    }
+  ],
+  "packages": [
+    {
+      "id": "Microsoft.ApplicationInsights",
+      "version": "2.23.0",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "nWArUZTdU7iqZLycLKWe0TDms48KKGE6pONH2terYNa8REXiqixrMOkf1sk5DHGMaUTqONU2YkS4SAXBhLStgw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.ApplicationInsights/2.23.0",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Bcl.AsyncInterfaces",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "PEC80XidOaP1vyHWiSIOHOfh6MpkFln/gkLXKaSmjrAdBSwcAaowvOaVBKvnb+HAb2UTGrZqROajIKMVFu2jdw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Bcl.AsyncInterfaces/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Data.Sqlite",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "w37nz3WFmDtRfXxWEwIXX2OgqDRiwhD1JGbFwfpFCF8GkCrV/yO6Y2JF5058J2RGoI2sCcdn02wrk0yEcekWcw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Data.Sqlite.Core",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "Gge8XsSCOwcbkbdmt2UDAe6kIv9Q0vA6yb3wsTStjjexaMFLTWfc/1gH4kbhJ+zWiXRTRA4lG2sOQNVfir204w==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Data.Sqlite.Core/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.AI.Abstractions",
+      "version": "10.8.3",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "K0B05oApxmviWalNHPMBBcRC7erKiDATz3ENNR/jqTR9JwIwLRefgDhj2jCRwL1aca99pXUe0qyQC73/xIuZig==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.AI.Abstractions/10.8.3",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Caching.Abstractions",
+      "version": "10.0.10",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "4ZFBNE+jzR+CrWWlhOesnmywCW7pYKT0dxyAQRdL11yJwxe4jvcAu31eorFtEkoFeCDcUTeNssgPv2yaRRptaQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Abstractions/10.0.10",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "inhujYI/nikhmLxYI6ZEcaCgZ28ipJsKMPPxxr2XWf3vM0Q2P+E9R3hDHABZOLBxzD3gjpgcbSH/+hd2+gvI2A==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.Abstractions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "DY4C2qzTt2lOIY3VoscBH/TCwTolI5DKOfgJLuI+k1QUvRNT5vTMS58AOerNiihdVRStO0wEpLeRWA8jytzHBQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.Abstractions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.Binder",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "yJJl/b0+W+GEWbu+7viw6C3h2BoNkB69Vlz7s/4e+hm4mYbJqfhdcDSi9sCXJw47blsBaiQd3UDPgDtop92+ug==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.Binder/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.CommandLine",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "RwdNZ9JdGs8eZmeL5qRe7ugp0Irk3KVkWpC/w1c8kjJwu1R4HvCXYz9kwHZxn45WiaRBG5lphQKtqnBaJOQC+Q==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.CommandLine/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.EnvironmentVariables",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "qJK2dm9/AxyPVfqqBaZtjkUFl2hnBR/CQnMJtSO5LdEoyATMqvZjeQVY+8l0oa6PM6qlVe28iMEyXIRQ0wyZjA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.EnvironmentVariables/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.FileExtensions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "kwC1DY55CsqPmDtJAz+7alD3G+gJcM+XwHSZrcRO8mJGYB9hRq1qC6ZH8DL0SPW9WtJ/Bae5ikzPic8SxSv6Vw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.FileExtensions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.Json",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "acCWM2+WR67kBAz6gAhD2zG+IZH9Q2VpKv5le7Msiu0vAMsnnLXpnV3BAzxd8/i+uOEo/dfb2XRYTynRVTDvEg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.Json/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.UserSecrets",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "kQ/Tx972unP+ueQL8SSninthIj6w6XP2o0VnJPFC5HQIimPMwEN704MOspEgDkmm4FUL5SuxLEU0bNiW4HEZFA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Configuration.UserSecrets/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyInjection",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "4tnWU9vrU/A8NwYe9Z6wvieZ0EBb/uM82LAT+edNhdepOBWREZ7M7mzb941EIDPJaeOFdbVrDd5+7s9e89U6bQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyInjection.Abstractions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "G2GrGWNAPZBsii2F6AU8n+JT2tC1/I0Ml/e9ZyNCgPjf3hZqronP7o0X91aAynCmVeae8KkSIUNXXeXCNRmdVQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection.Abstractions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Diagnostics",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "J9ODOrffj1mK3Et69elNsLGRguesPxvThTdVpFmQX7fLNPhIOgqHQfLdGnTBEwNAV3yf8yiyVlpDZNw2qN87Nw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Diagnostics/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Diagnostics.Abstractions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "oZzqZze8ed1fLS20HtIrkPxQXGRG/koq09srIw2ptnDHm9RHfwB++d35hosB/cXc55TH7Pshv85O0txongjCIg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Diagnostics.Abstractions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.FileProviders.Abstractions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "BZDwtN3uoWRghDi5lRRZPDjMMCg2Ds7J6YEYjqka/TLjqnzquEpXyvchrIMeoubwT1ns23ow6PPeAoBHJO81Rw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.FileProviders.Abstractions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.FileProviders.Physical",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "U7HkgGCNPICN5k7NVK6dmLsSPSPeO/EbNcuxOl/5qdC9Ahjp9UZWKOvlnUC+rYurmoxIlwyv9e5j0BaQlTOELA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.FileProviders.Physical/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.FileSystemGlobbing",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "vQVzmAbnzlhXSXA2caYnlxtG9GXxEwtj5bODiWLu06A6iqeJmfBtlfKjuOSJGRy0/CFaNUrm7u9nxEUlljc2Rg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.FileSystemGlobbing/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Hosting",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "Q+hmPoDqeHipHyJcY7mDCQiLDUcn9jIgjoCThcgaOgjLTTT3ApTe8p6M2+twsDyfKuuCsKhSNlnNjaaggtXxRA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Hosting/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Hosting.Abstractions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "zIrbe9vkIFXxW3mOApIOWXw+xMwX7Cgsptr3ZSlglJt4hW2qp4fB/JU1NHgAevteBNH4PicvU9DsFPHxlnnloA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Hosting.Abstractions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "fqbiPy4nUp4H2XHKAVQXKN2y3T2h4cFIx1DAAgE6iY9OHkN/OA1cKFi+geJKRWGuX6pS5SFbsjIPWHJqrxE0eg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Abstractions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "aSZEhEig4fvNiw2zs8Z6NyDlniKtq6YjcF3DyHuqTEHcZ2VKA/6itMPZ+dW+yWABWExlDcQwwdbqX1Rcb7W8WQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.Abstractions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Configuration",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "OyYJOaE9WbBx1Hp+Dd2zrqeFM0JwH5M/x0VL6tNUv3V18vIAVpix8UjhvY9eW/iXpguEHy68JO/Z9YkBOwftIw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.Configuration/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Console",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "i9rn0rHkiCxfNVbf4DRG7LOFcKPy/BioAxS07w6daWvIpLNRjskqDJcGGaYVFWndsq0iTRaS8Msry0t5fRYQug==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.Console/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Debug",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "yBig0DNMq+3UgliwxYlUC48dg0fPqvqI5B3ljzmLTrpR6maoKTOO5i9QnPgQUmQoaQWZMgu74fuF6oSDihb6pg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.Debug/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.EventLog",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "OAK40lXhgMuvyNwvzW3fxLvvucN8yr5XS7dQRcPmtnPf+Pt1lpbMgao5T4Wa6VdFagtIeDZNgPtV5Ig4xstziQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.EventLog/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.EventSource",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "SxJu3oczk+TJtHvpgAmCVzEkzx69/obA6GZCbGrbqYqc981YOAyfEprySBdFX7Yc5qatHJKHNTlpGeeBAQkZcA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Logging.EventSource/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Options",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "tmMJgdrE4uhf1JcNs9CV9moAHW+hmDuvgMiPpnQxarKaUxqI2eN33sYK5S4l9Uw+rG9PJvlm4qPxMhvolTDTaQ==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Options.ConfigurationExtensions",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "xVO5HhATc09WXuS/RaDmx8ZeWS0mTpT1L0tkEDMSBHtAnNpNsDr0ge0wIO2jinCWWqpq5dL1tRTzpYNVlvyqLw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Options.ConfigurationExtensions/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Extensions.Primitives",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "ZjTwxzhiw2TMEzIbUDkMF0dfDB2I4NQgIfKD0ELu9/5Mk+SRGdKZcD0/lvBrRCAPo6KN2r0BW86MRancoyJkoA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Extensions.Primitives/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Testing.Extensions.Telemetry",
+      "version": "2.3.3",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "nY8ceQyPWB9TRE1WE5Oe/sks2e10SxgPv61vBHsFYpgCeDtNwhpMZwmL29GklO3/etTdOsLdrCmNr4zJWaR2fg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Testing.Extensions.Telemetry/2.3.3",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Testing.Extensions.TrxReport",
+      "version": "2.5.0",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "U0dDWXTARCh41DXh0km+fkpAOS+987ymijXsdjOLyTZb4Zss92565PsEqisOncdoGhvDgJiAT+rfO4agfmaVqw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Testing.Extensions.TrxReport/2.5.0",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Testing.Extensions.TrxReport.Abstractions",
+      "version": "2.5.0",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "awUJ9LERhvqQeBCf+CGo5fTMp6glXL8lck2mn/3sHUJ1cKOEfI9yaVS3wRRgAAdJQ0tX6rqisFvhEaZCWW3mcw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Testing.Extensions.TrxReport.Abstractions/2.5.0",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Testing.Platform",
+      "version": "2.5.0",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "SQ+jJgs4I+Bwd+ua+c++6X+hOMOCceSHZxQPZVtkKit+ENUdErIuGjZjXe9XVDeHixZc3KCgsjhf/bxS4Mb5yA==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Testing.Platform/2.5.0",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Testing.Platform.MSBuild",
+      "version": "2.3.3",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "iVAvNbZ5JPDZSrTcIrCDoCsAkzjDxwDEt2mDuMd8ng1P6e2P2NCd0g0BsoBVG+nJLSmK//V+yeEvjCa3E2fxHw==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Testing.Platform.MSBuild/2.3.3",
+      "native_assets": []
+    },
+    {
+      "id": "Microsoft.Win32.Registry",
+      "version": "5.0.0",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "dDoKi0PnDz31yAyETfRntsLArTlVAVzUzCIvvEDsDsucrl33Dl8pIJG06ePTJTI3tGpeyHS9Cq7Foc/s4EeKcg==",
+      "metadata_url": "https://www.nuget.org/packages/Microsoft.Win32.Registry/5.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "ModelContextProtocol",
+      "version": "2.2.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "4Pb9u02Nwsp0poueDsqNdyGRojFxOYpljB7zDBsq+aHL+Afou3OgxlBc3GWFVnsRMRJrUtWqDh3s6k2JgPzmrQ==",
+      "metadata_url": "https://www.nuget.org/packages/ModelContextProtocol/2.2.0",
+      "native_assets": []
+    },
+    {
+      "id": "ModelContextProtocol.Core",
+      "version": "2.2.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "FeBfXU6T8k+jw4afg4sfxdEX2rL/e5oKOk9ROOGztu9k47+7Bz08sdaToYt2XvMY1opNbwxYQOFMj6wH9TInhA==",
+      "metadata_url": "https://www.nuget.org/packages/ModelContextProtocol.Core/2.2.0",
+      "native_assets": []
+    },
+    {
+      "id": "Spectre.Console",
+      "version": "0.57.2",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "wzsB+P9i6F9G+cFOJxRotCiQWNSzZVAMxi8YMiHlGXXU1JLMXGp7zSSqBMmROZS2bzpK5jk+Saa7Evp8HwqhKg==",
+      "metadata_url": "https://www.nuget.org/packages/Spectre.Console/0.57.2",
+      "native_assets": []
+    },
+    {
+      "id": "Spectre.Console.Ansi",
+      "version": "0.57.2",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "Y1+u73shwP+JYHmrkdN6bSt2kaGBEAafhi2nrecczbXdFRey+k7J/WF9YPfcB0rqivv2S8fmif6FSBq9m/AFvw==",
+      "metadata_url": "https://www.nuget.org/packages/Spectre.Console.Ansi/0.57.2",
+      "native_assets": []
+    },
+    {
+      "id": "Spectre.Console.Cli",
+      "version": "0.57.2",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "EAiwpJXAAvhyyzH6hljVo7z19ahG7WM+zViKEHtUagyPymYfJrsainXDOHzUakBHj6VYEpuaqPAShgqvs1N9aQ==",
+      "metadata_url": "https://www.nuget.org/packages/Spectre.Console.Cli/0.57.2",
+      "native_assets": []
+    },
+    {
+      "id": "SQLitePCLRaw.bundle_e_sqlite3",
+      "version": "2.1.13",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "NlDixlC7uHmo+ojXRgkNvN0tQtVGpLDZ3x2OpgNj+G07VHh5cXSszFDrAiC4BpUiPwkcaeuQkMV9WQ123xVtmQ==",
+      "metadata_url": "https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3/2.1.13",
+      "native_assets": []
+    },
+    {
+      "id": "SQLitePCLRaw.core",
+      "version": "2.1.13",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "2joofoinuHBFs0nMX3nKuXgxpXryRkCOdM2Ua6HBqQLLy6IW+5f28ZI+HAvMyF8vG7XfNz/lwfBfE6V4juru8Q==",
+      "metadata_url": "https://www.nuget.org/packages/SQLitePCLRaw.core/2.1.13",
+      "native_assets": []
+    },
+    {
+      "id": "SQLitePCLRaw.lib.e_sqlite3",
+      "version": "2.1.13",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "D2UAuiGxFYBqeRXjjjGgvJ5UQifzn6wefmSqeKU7XcNGKLbJRP6X7kcPZ6opOBJGdCIlgbSxTvDpBbLvsN594A==",
+      "metadata_url": "https://www.nuget.org/packages/SQLitePCLRaw.lib.e_sqlite3/2.1.13",
+      "native_assets": [
+        "runtimes/linux-arm/native/libe_sqlite3.so",
+        "runtimes/linux-arm64/native/libe_sqlite3.so",
+        "runtimes/linux-armel/native/libe_sqlite3.so",
+        "runtimes/linux-mips64/native/libe_sqlite3.so",
+        "runtimes/linux-musl-arm/native/libe_sqlite3.so",
+        "runtimes/linux-musl-arm64/native/libe_sqlite3.so",
+        "runtimes/linux-musl-riscv64/native/libe_sqlite3.so",
+        "runtimes/linux-musl-s390x/native/libe_sqlite3.so",
+        "runtimes/linux-musl-x64/native/libe_sqlite3.so",
+        "runtimes/linux-ppc64le/native/libe_sqlite3.so",
+        "runtimes/linux-riscv64/native/libe_sqlite3.so",
+        "runtimes/linux-s390x/native/libe_sqlite3.so",
+        "runtimes/linux-x64/native/libe_sqlite3.so",
+        "runtimes/linux-x86/native/libe_sqlite3.so",
+        "runtimes/maccatalyst-arm64/native/libe_sqlite3.dylib",
+        "runtimes/maccatalyst-x64/native/libe_sqlite3.dylib",
+        "runtimes/osx-arm64/native/libe_sqlite3.dylib",
+        "runtimes/osx-x64/native/libe_sqlite3.dylib",
+        "runtimes/win-arm64/native/e_sqlite3.dll",
+        "runtimes/win-x64/native/e_sqlite3.dll",
+        "runtimes/win-x86/native/e_sqlite3.dll"
+      ]
+    },
+    {
+      "id": "SQLitePCLRaw.provider.e_sqlite3",
+      "version": "2.1.13",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "ZU60dSqoSNRe49KcQDUmOVgdRtjITOssVXFtiISs+zJXDI4D2Sndwpn2NOtzDQNPu0ZAvpoLPQ+GLKv6iEZn8Q==",
+      "metadata_url": "https://www.nuget.org/packages/SQLitePCLRaw.provider.e_sqlite3/2.1.13",
+      "native_assets": []
+    },
+    {
+      "id": "System.Diagnostics.EventLog",
+      "version": "10.0.13",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "DkNjtQyPR5Ud/zHnWHdsOuKbFRL9nIC92Q76z0NmHVDoQm40toLtsGFTIWq7toBoVa6fo/DInL3PLxY3Asixyw==",
+      "metadata_url": "https://www.nuget.org/packages/System.Diagnostics.EventLog/10.0.13",
+      "native_assets": []
+    },
+    {
+      "id": "System.Security.AccessControl",
+      "version": "6.0.1",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw==",
+      "metadata_url": "https://www.nuget.org/packages/System.Security.AccessControl/6.0.1",
+      "native_assets": []
+    },
+    {
+      "id": "Tomlyn",
+      "version": "2.10.1",
+      "license": {
+        "type": "expression",
+        "value": "BSD-2-Clause"
+      },
+      "sha512": "ykjOY3IpYmC4SpPcAZRTl/w2jTmhPMDydHq8xcV7tTBAQ22nKBsOkPqauIrZlMjHm03cmKfV23UOPscKp+J4Og==",
+      "metadata_url": "https://www.nuget.org/packages/Tomlyn/2.10.1",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.analyzers",
+      "version": "2.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "2UtauxWDa9C6bT7MvFfZkNoFulfflb00jnDU2xeVO9Y58l4Ah2Mv/HiMs4b0zdpK/SfAxpajkgKNMN8zBKa+7Q==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.analyzers/2.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "czH4MaZ2k2eLjetuN5W1fUEnNVADsTOeYxDvrqIFh04XO6H3Y8Yu1FrSy3psF1q06DZV33wftjqZVv4acwIp9Q==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.assert",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "QxYfC+98lCMe7Kl9iWDUeUn+gmiPJ2Sz/r+trSdp1mvKyDMXj8S1kYdfkFNJSHyUSQ6KWomenSDgfWhGpR8zEQ==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.assert/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.common",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "cjaNGmOVA5QJxcp6uuSsDhbt0lNmxezFo226mbYOuXm9E9Owq8bYTKxa9wnAMZRnbvyCmCYhAvc/+UAzf0M2vA==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.common/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.core.mtp-v2",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "2I7apws+6HPz5aYi4choAn7c8P4jPAvwbfAtLSy0JPH89oeY/z1Zqz65Cm3HJmput5l56Z1sJOinTxsAQmbyWQ==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.core.mtp-v2/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.extensibility.core",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "+tTe9VX2vwrUHGI48FE4ly956Ry084wPH4I/7g5D36AkAMGjQRZZDVz8eH2GwX/CLS9PDQRSca534WyrAYsyzw==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.extensibility.core/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.mtp-v2",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "svYjct2c3VbLyUSB2r9VWiIkYwemwXHhOgIVAor8RvupcZBFcdiGdmq8G519ZCu30yjPCr0EP3Hy4mvgEXcXpQ==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.mtp-v2/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.runner.common",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "1IEIAVRgnPo9nihd9D0TvxxsLKVRySa+K0wLy/m0SJ4RMdveRCUj/mICFboruO+ILUJ10fUfCCyp7MC5/y7cGw==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.runner.common/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "xunit.v3.runner.inproc.console",
+      "version": "4.0.0",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "sha512": "Sp5AALIlZUf2U5pEt2LHs+ebn18eAPSFnXEouJTltLez5p+NQvBm7kzsKSkZOM6iyoS6nuN/wKdsJt2LvixjsQ==",
+      "metadata_url": "https://www.nuget.org/packages/xunit.v3.runner.inproc.console/4.0.0",
+      "native_assets": []
+    },
+    {
+      "id": "YamlDotNet",
+      "version": "18.1.0",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "sha512": "5K+9KFg2TdTl7VXv88Qzi/0lqK6JFoNP3lRuImPYGRV7K/QYklDyTrj4+A+KAki1JsQi6qKY+hDyY7d6WRqjrw==",
+      "metadata_url": "https://www.nuget.org/packages/YamlDotNet/18.1.0",
+      "native_assets": []
+    }
+  ],
+  "dependency_guard_matrix": [
+    {
+      "project": "Harness.Core",
+      "reference": "none",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Harness.Core",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Harness.Infrastructure",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Harness.Providers",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Harness.Mcp",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Harness.Web",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Harness.Cli",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Core",
+      "reference": "Unplanned.Assembly",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "none",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Harness.Core",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Harness.Infrastructure",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Harness.Providers",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Harness.Mcp",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Harness.Web",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Harness.Cli",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Infrastructure",
+      "reference": "Unplanned.Assembly",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "none",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Harness.Core",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Harness.Infrastructure",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Harness.Providers",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Harness.Mcp",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Harness.Web",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Harness.Cli",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Providers",
+      "reference": "Unplanned.Assembly",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "none",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Harness.Core",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Harness.Infrastructure",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Harness.Providers",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Harness.Mcp",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Harness.Web",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Harness.Cli",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Mcp",
+      "reference": "Unplanned.Assembly",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "none",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Harness.Core",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Harness.Infrastructure",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Harness.Providers",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Harness.Mcp",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Harness.Web",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Harness.Cli",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Web",
+      "reference": "Unplanned.Assembly",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "none",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Harness.Core",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Harness.Infrastructure",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Harness.Providers",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Harness.Mcp",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Harness.Web",
+      "allowed": true,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Harness.Cli",
+      "allowed": false,
+      "result": "pass"
+    },
+    {
+      "project": "Harness.Cli",
+      "reference": "Unplanned.Assembly",
+      "allowed": false,
+      "result": "pass"
+    }
+  ],
+  "sdk_guard_checks": [
+    {
+      "target": "PrepareProjectReferences",
+      "result": "pass",
+      "expected": "forbidden project references: Host"
+    },
+    {
+      "target": "_GenerateRestoreProjectPathWalk",
+      "result": "pass",
+      "expected": "forbidden project references: Host"
+    }
+  ]
+}
