@@ -1,0 +1,340 @@
+{
+  "tasks": {
+    "PORT-001": {
+      "id": "TASK-0001",
+      "title": "PORT-001 Freeze source baseline and observable compatibility matrix"
+    },
+    "PORT-002": {
+      "id": "TASK-0002",
+      "title": "PORT-002 Build isolated Go versus C# contract fixture harness"
+    },
+    "PORT-003": {
+      "id": "TASK-0003",
+      "title": "PORT-003 Decide solution boundaries and validate CPM candidates"
+    },
+    "PORT-005": {
+      "id": "TASK-0004",
+      "title": "PORT-005 Port SQLite migrations transactions and backups"
+    },
+    "PORT-004": {
+      "id": "TASK-0005",
+      "title": "PORT-004 Bootstrap solution CLI hosting and reproducible builds"
+    },
+    "PORT-006": {
+      "id": "TASK-0006",
+      "title": "PORT-006 Port configuration Git discovery and project lifecycle"
+    },
+    "PORT-007": {
+      "id": "TASK-0007",
+      "title": "PORT-007 Expose stdio MCP server and persistence smoke workflow"
+    },
+    "PORT-008": {
+      "id": "TASK-0008",
+      "title": "PORT-008 Port memory storage scope and history semantics"
+    },
+    "PORT-009": {
+      "id": "TASK-0009",
+      "title": "PORT-009 Expose memory tools proposals and human review"
+    },
+    "PORT-010": {
+      "id": "TASK-0010",
+      "title": "PORT-010 Port task and milestone state machines and backlog I/O"
+    },
+    "PORT-011": {
+      "id": "TASK-0011",
+      "title": "PORT-011 Port atomic claims proposals and validated completion tools"
+    },
+    "PORT-012": {
+      "id": "TASK-0012",
+      "title": "PORT-012 Port provider capability registry routing and failure isolation"
+    },
+    "PORT-013": {
+      "id": "TASK-0013",
+      "title": "PORT-013 Implement downstream MCP process client and generic mappings"
+    },
+    "PORT-014": {
+      "id": "TASK-0014",
+      "title": "PORT-014 Port harness provider v1 packs and public facade"
+    },
+    "PORT-015": {
+      "id": "TASK-0015",
+      "title": "PORT-015 Port graphify adapter and reusable warm-session lifecycle"
+    },
+    "PORT-016": {
+      "id": "TASK-0016",
+      "title": "PORT-016 Port incremental Git synchronization and freshness"
+    },
+    "PORT-017": {
+      "id": "TASK-0017",
+      "title": "PORT-017 Port deterministic context gathering merging and ranking"
+    },
+    "PORT-018": {
+      "id": "TASK-0018",
+      "title": "PORT-018 Enforce serialized context budgets and expose get_context"
+    },
+    "PORT-019": {
+      "id": "TASK-0019",
+      "title": "PORT-019 Port machine workspaces and layered cross-project search"
+    },
+    "PORT-020": {
+      "id": "TASK-0020",
+      "title": "PORT-020 Port library adoption concerns ecosystem and stack evidence"
+    },
+    "PORT-021": {
+      "id": "TASK-0021",
+      "title": "PORT-021 Port architecture readers rules and finding generation"
+    },
+    "PORT-022": {
+      "id": "TASK-0022",
+      "title": "PORT-022 Port clone detection co-change history and evidence caching"
+    },
+    "PORT-023": {
+      "id": "TASK-0023",
+      "title": "PORT-023 Port finding snapshots drift marks and architecture proposals"
+    },
+    "PORT-024": {
+      "id": "TASK-0024",
+      "title": "PORT-024 Port local event telemetry metrics and reports"
+    },
+    "PORT-025": {
+      "id": "TASK-0025",
+      "title": "PORT-025 Port safe client installation instructions and uninstall"
+    },
+    "PORT-026": {
+      "id": "TASK-0026",
+      "title": "PORT-026 Port Git/client hooks shell completion and tool-event ingestion"
+    },
+    "PORT-027": {
+      "id": "TASK-0027",
+      "title": "PORT-027 Port embedded UI read APIs assets and documentation"
+    },
+    "PORT-028": {
+      "id": "TASK-0028",
+      "title": "PORT-028 Port UI writes live events and review workflows"
+    },
+    "PORT-029": {
+      "id": "TASK-0029",
+      "title": "PORT-029 Port opt-in developer export and decide companion executables"
+    },
+    "PORT-030": {
+      "id": "TASK-0030",
+      "title": "PORT-030 Run full parity regression and performance evaluation"
+    },
+    "PORT-031": {
+      "id": "TASK-0031",
+      "title": "PORT-031 Publish self-contained multi-platform release artifacts"
+    },
+    "PORT-032": {
+      "id": "TASK-0032",
+      "title": "PORT-032 Rehearse data migration rollback and binary coexistence"
+    },
+    "PORT-033": {
+      "id": "TASK-0033",
+      "title": "PORT-033 Dogfood both clients and close port acceptance"
+    }
+  },
+  "subsystems": {
+    "activity": [
+      "PORT-024"
+    ],
+    "actor": [
+      "PORT-008",
+      "PORT-011"
+    ],
+    "arch": [
+      "PORT-021"
+    ],
+    "archread": [
+      "PORT-021"
+    ],
+    "brand": [
+      "PORT-004",
+      "PORT-027"
+    ],
+    "buildinfo": [
+      "PORT-004"
+    ],
+    "bus": [
+      "PORT-024"
+    ],
+    "cli": [
+      "PORT-004",
+      "PORT-006",
+      "PORT-009",
+      "PORT-011",
+      "PORT-014",
+      "PORT-025",
+      "PORT-026",
+      "PORT-029"
+    ],
+    "clients": [
+      "PORT-025"
+    ],
+    "clones": [
+      "PORT-022"
+    ],
+    "codefiles": [
+      "PORT-016"
+    ],
+    "config": [
+      "PORT-006",
+      "PORT-014"
+    ],
+    "coupling": [
+      "PORT-022"
+    ],
+    "devtelemetry": [
+      "PORT-029"
+    ],
+    "dotnet": [
+      "PORT-015",
+      "PORT-020"
+    ],
+    "ecosystem": [
+      "PORT-020"
+    ],
+    "fileedit": [
+      "PORT-025",
+      "PORT-026"
+    ],
+    "findings": [
+      "PORT-021",
+      "PORT-023"
+    ],
+    "fsutil": [
+      "PORT-005",
+      "PORT-006",
+      "PORT-013",
+      "PORT-016",
+      "PORT-025"
+    ],
+    "git": [
+      "PORT-006",
+      "PORT-016",
+      "PORT-022"
+    ],
+    "gitsync": [
+      "PORT-016"
+    ],
+    "goarch": [
+      "PORT-020",
+      "PORT-021"
+    ],
+    "graphify": [
+      "PORT-015"
+    ],
+    "gui": [
+      "PORT-027",
+      "PORT-028"
+    ],
+    "health": [
+      "PORT-006"
+    ],
+    "hooks": [
+      "PORT-026"
+    ],
+    "instructions": [
+      "PORT-025"
+    ],
+    "machine": [
+      "PORT-006",
+      "PORT-019"
+    ],
+    "mcp": [
+      "PORT-007",
+      "PORT-009",
+      "PORT-011",
+      "PORT-014",
+      "PORT-018",
+      "PORT-023"
+    ],
+    "memory": [
+      "PORT-008",
+      "PORT-009"
+    ],
+    "overview": [
+      "PORT-006",
+      "PORT-024",
+      "PORT-027"
+    ],
+    "project": [
+      "PORT-006"
+    ],
+    "providers": [
+      "PORT-012",
+      "PORT-013",
+      "PORT-014"
+    ],
+    "readcache": [
+      "PORT-017",
+      "PORT-027"
+    ],
+    "redact": [
+      "PORT-008",
+      "PORT-024",
+      "PORT-029"
+    ],
+    "report": [
+      "PORT-024"
+    ],
+    "retrieval": [
+      "PORT-017",
+      "PORT-018"
+    ],
+    "stack": [
+      "PORT-020"
+    ],
+    "storage": [
+      "PORT-005"
+    ],
+    "system": [
+      "PORT-020",
+      "PORT-021"
+    ],
+    "tasks": [
+      "PORT-010",
+      "PORT-011"
+    ],
+    "telemetry": [
+      "PORT-024"
+    ],
+    "tsarch": [
+      "PORT-020",
+      "PORT-021"
+    ],
+    "workspace": [
+      "PORT-019"
+    ],
+    "wsearch": [
+      "PORT-019",
+      "PORT-020"
+    ]
+  },
+  "executables": {
+    "harness": [
+      "PORT-004",
+      "PORT-007",
+      "PORT-025",
+      "PORT-031"
+    ],
+    "harness-bench": [
+      "PORT-002",
+      "PORT-029",
+      "PORT-030"
+    ],
+    "harness-collect": [
+      "PORT-029"
+    ],
+    "harness-e2e": [
+      "PORT-002",
+      "PORT-029",
+      "PORT-030"
+    ],
+    "harness-graphify": [
+      "PORT-015"
+    ],
+    "harness-share": [
+      "PORT-029"
+    ]
+  }
+}
