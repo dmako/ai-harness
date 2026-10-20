@@ -480,7 +480,7 @@ public sealed class StorageTests
     private static Process StartWorker(params string[] arguments)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Directory.Build.props")))
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Harness.slnx")))
         {
             root = root.Parent;
         }
@@ -492,6 +492,7 @@ public sealed class StorageTests
         const string Configuration = "Release";
 #endif
         var worker = Path.Combine(root.FullName, "test", "Harness.Integration", "Storage", "Worker", "bin", Configuration, "net10.0", "Harness.StorageWorker.dll");
+        Assert.True(File.Exists(worker), $"Missing storage worker: {worker}");
         return Start("dotnet", [worker, .. arguments]);
     }
 

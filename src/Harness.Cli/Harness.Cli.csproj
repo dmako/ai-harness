@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>harness</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
+    <ProjectReference Include="../Harness.Infrastructure/Harness.Infrastructure.csproj" />
+    <ProjectReference Include="../Harness.Providers/Harness.Providers.csproj" />
+    <ProjectReference Include="../Harness.Mcp/Harness.Mcp.csproj" />
+    <ProjectReference Include="../Harness.Web/Harness.Web.csproj" />
+    <PackageReference Include="Spectre.Console.Cli" />
+    <InternalsVisibleTo Include="Harness.Unit" />
+  </ItemGroup>
+</Project>

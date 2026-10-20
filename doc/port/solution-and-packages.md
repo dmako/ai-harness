@@ -6,6 +6,9 @@ scaffold belongs to PORT-004 (TASK-0005). The [baseline](README.md) and
 [compatibility fixtures](fixture-harness.md) remain the authority for behavior.
 Library defaults do not replace those contracts.
 
+The six-project scaffold, CLI and root build configuration are now implemented by
+[TASK-0005 / PORT-004](bootstrap.md).
+
 ## Assembly boundaries
 
 | Project under `src` | Responsibility | Allowed project references |

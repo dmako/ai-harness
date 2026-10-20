@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
+  </ItemGroup>
+</Project>

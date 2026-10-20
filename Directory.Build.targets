@@ -1,15 +1,10 @@
 <Project>
 
-  <!-- Add SourceLink info when running on CI pipeline -->
+  <!-- Use SDK-bundled SourceLink providers selected from the actual repository host. -->
   <PropertyGroup Condition=" '$(ContinuousIntegrationBuild)' == 'true' ">
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <DebugType>full</DebugType>
+    <DebugType Condition=" '$(DebugType)' == '' ">portable</DebugType>
   </PropertyGroup>
-
-  <ItemGroup Condition=" '$(CI)' != '' ">
-    <!-- PackageReference specific to GitLab repositories when running on GitLab pipeline -->
-    <PackageReference Include="Microsoft.SourceLink.GitLab" PrivateAssets="All" />
-  </ItemGroup>
 
   <PropertyGroup Label="SAST Values">
     <ProductionOutput Condition=" '$(ProductionOutput)' == ''" >true</ProductionOutput>
@@ -21,10 +16,6 @@
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
     <EnableNETAnalyzers Condition=" '$(DisableSastOnProject)' != 'true' ">true</EnableNETAnalyzers>
     <AnalysisLevel>latest-all</AnalysisLevel>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Test Projects" Condition=" '$(IsTestProject)' == 'true' ">
-    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
 
   <ItemGroup Label="Test Projects" Condition=" '$(IsTestProject)' == 'true' ">
@@ -53,12 +44,6 @@
 
   </ItemGroup>
 
-  <PropertyGroup Label="Git Values">
-    <CommitBranch Condition=" '$(CommitBranch)' == '' ">$(GIT_BRANCH)</CommitBranch>
-    <CommitHash Condition=" '$(CommitHash)' == '' ">$(GIT_COMMIT)</CommitHash>
-    <CommitTimestamp>Unknown</CommitTimestamp>
-  </PropertyGroup>
-
   <Target Name="EmbedBannedSymbolsInBinLog" AfterTargets="CoreCompile">
     <ItemGroup>
       <EmbedInBinlog Include="@(AdditionalFiles)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)%(Extension)', '^BannedSymbols(\..+)?\.txt$'))" />
@@ -72,36 +57,15 @@
   </Target>
 
 
-  <Target Name="AddGitMetadaAssemblyAttributes" AfterTargets="Build" BeforeTargets="PrepareForBuild;CoreGenerateAssemblyInfo">
-    <Exec Command="git rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" Condition=" '$(CommitHash)' == '' ">
-      <Output TaskParameter="ConsoleOutput" PropertyName="CommitHash"/>
-    </Exec>
-    <Exec Command="git rev-parse --abbrev-ref HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true" Condition=" '$(CommitBranch)' == '' ">
-      <Output TaskParameter="ConsoleOutput" PropertyName="CommitBranch"/>
-    </Exec>
-    <Exec Command="git log -1 --pretty=format:%25%25ci" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
-      <Output TaskParameter="ConsoleOutput" PropertyName="CommitTimestamp"/>
-    </Exec>
+  <!-- Stable metadata only; release builds can supply timestamp and dirty state explicitly. -->
+  <Target Name="AddHarnessBuildMetadata" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="InitializeSourceControlInformation"
+          Condition=" '$(MSBuildProjectName)' == 'Harness.Cli' ">
     <ItemGroup>
-      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-        <_Parameter1>BuildTimestamp</_Parameter1>
-        <_Parameter2>$([System.DateTime]::UtcNow.ToString(yyyy-MM-ddTHH:mm:ssK))</_Parameter2>
-      </AssemblyAttribute>
-      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition=" $(CommitHash) != '' ">
-        <_Parameter1>CommitHash</_Parameter1>
-        <_Parameter2>$(CommitHash)</_Parameter2>
-      </AssemblyAttribute>
-      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition=" $(CommitBranch) != '' ">
-        <_Parameter1>CommitBranch</_Parameter1>
-        <_Parameter2>$(CommitBranch)</_Parameter2>
-      </AssemblyAttribute>
-      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition=" $(CommitTimestamp) != '' ">
-        <_Parameter1>CommitTimestamp</_Parameter1>
-        <_Parameter2>$(CommitTimestamp)</_Parameter2>
-      </AssemblyAttribute>
+      <AssemblyMetadata Include="CommitHash" Value="$(SourceRevisionId)" />
+      <AssemblyMetadata Include="BuildTimestamp" Value="$(BuildTimestamp)" />
+      <AssemblyMetadata Include="Modified" Value="$(RepositoryModified)" />
     </ItemGroup>
   </Target>
-
   <!-- The six port assemblies form a DAG; tests and optional companion hosts are outside this rule. -->
   <Target Name="ValidateHarnessProjectReferences" BeforeTargets="PrepareProjectReferences;_GenerateRestoreProjectPathWalk"
           Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' ">

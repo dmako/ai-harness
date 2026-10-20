@@ -14,9 +14,8 @@ dotnet test --project Harness.Integration.csproj --no-restore -p:RuntimeIdentifi
 ```
 
 Select the relevant RID on other hosts. Every invocation must get a fresh binlog.
-The test-directory `global.json` selects the stable SDK and native MTP runner;
-TASK-0005 should consolidate it with the root SDK/runner configuration when
-bootstrapping the complete solution. The minimal infrastructure, integration and
+The root `global.json` selects the stable SDK and native MTP runner;
+TASK-0005 provides the complete [solution bootstrap](bootstrap.md). The infrastructure, integration and
 process-worker projects are necessary to run these storage tests; other product
 assemblies and CLI composition remain bootstrap work.
 

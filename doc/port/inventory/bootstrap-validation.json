@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "task": "TASK-0005",
+  "validated_on": "2026-10-20",
+  "host": "Windows x64",
+  "sdk": "10.0.402",
+  "framework": "net10.0",
+  "language": "C# 14",
+  "analyzers_enabled": true,
+  "summary": {
+    "projects": 9,
+    "passed_tests": 37,
+    "skipped_tests": 1,
+    "failed_tests": 0,
+    "unchanged_noop_assemblies": 9
+  },
+  "project_references": {
+    "Harness.Core": [],
+    "Harness.Infrastructure": [
+      "Harness.Core"
+    ],
+    "Harness.Providers": [
+      "Harness.Core"
+    ],
+    "Harness.Mcp": [
+      "Harness.Core"
+    ],
+    "Harness.Web": [
+      "Harness.Core"
+    ],
+    "Harness.Cli": [
+      "Harness.Core",
+      "Harness.Infrastructure",
+      "Harness.Providers",
+      "Harness.Mcp",
+      "Harness.Web"
+    ],
+    "Harness.Unit": [
+      "Harness.Cli"
+    ],
+    "Harness.Integration": [
+      "Harness.Cli",
+      "Harness.Infrastructure",
+      "Harness.StorageWorker"
+    ],
+    "Harness.StorageWorker": [
+      "Harness.Infrastructure"
+    ]
+  },
+  "package_locks": {
+    "src/Harness.Core/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "SonarAnalyzer.CSharp": "10.34.0.3385"
+      }
+    },
+    "src/Harness.Infrastructure/packages.lock.json": {
+      "sha256": "386c0fdb30cd30beb6f2dd4d3747a1d2bc1e6a1707cccf5e9fe50e3f4afc0422",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "Microsoft.Data.Sqlite": "10.0.13",
+        "SonarAnalyzer.CSharp": "10.34.0.3385",
+        "Microsoft.Data.Sqlite.Core": "10.0.13",
+        "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.core": "2.1.13",
+        "SQLitePCLRaw.lib.e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.provider.e_sqlite3": "2.1.13"
+      }
+    },
+    "src/Harness.Providers/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "SonarAnalyzer.CSharp": "10.34.0.3385"
+      }
+    },
+    "src/Harness.Mcp/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "SonarAnalyzer.CSharp": "10.34.0.3385"
+      }
+    },
+    "src/Harness.Web/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "SonarAnalyzer.CSharp": "10.34.0.3385"
+      }
+    },
+    "src/Harness.Cli/packages.lock.json": {
+      "sha256": "88c7dffc5efe96304c4cda4715c68e3931603688a288970bd56b01dddbbb4f9c",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "SonarAnalyzer.CSharp": "10.34.0.3385",
+        "Spectre.Console.Cli": "0.57.2",
+        "Microsoft.Data.Sqlite.Core": "10.0.13",
+        "Spectre.Console.Ansi": "0.57.2",
+        "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.core": "2.1.13",
+        "SQLitePCLRaw.lib.e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.provider.e_sqlite3": "2.1.13",
+        "Microsoft.Data.Sqlite": "10.0.13",
+        "Spectre.Console": "0.57.2"
+      }
+    },
+    "test/Harness.Unit/packages.lock.json": {
+      "sha256": "9a974bbc970e4cf335a3b4691a86aac8ea3c99766940fbd68fe002251bf3d724",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "Microsoft.Testing.Extensions.TrxReport": "2.5.0",
+        "SonarAnalyzer.CSharp": "10.34.0.3385",
+        "xunit.v3": "4.0.0",
+        "Microsoft.ApplicationInsights": "2.23.0",
+        "Microsoft.Data.Sqlite.Core": "10.0.13",
+        "Microsoft.Testing.Extensions.Telemetry": "2.3.3",
+        "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.5.0",
+        "Microsoft.Testing.Platform": "2.5.0",
+        "Microsoft.Testing.Platform.MSBuild": "2.3.3",
+        "Microsoft.Win32.Registry": "5.0.0",
+        "Spectre.Console.Ansi": "0.57.2",
+        "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.core": "2.1.13",
+        "SQLitePCLRaw.lib.e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.provider.e_sqlite3": "2.1.13",
+        "System.Security.AccessControl": "6.0.1",
+        "xunit.analyzers": "2.0.0",
+        "xunit.v3.assert": "4.0.0",
+        "xunit.v3.common": "4.0.0",
+        "xunit.v3.core.mtp-v2": "4.0.0",
+        "xunit.v3.extensibility.core": "4.0.0",
+        "xunit.v3.mtp-v2": "4.0.0",
+        "xunit.v3.runner.common": "4.0.0",
+        "xunit.v3.runner.inproc.console": "4.0.0",
+        "Microsoft.Bcl.AsyncInterfaces": "10.0.13",
+        "Microsoft.Data.Sqlite": "10.0.13",
+        "Spectre.Console": "0.57.2",
+        "Spectre.Console.Cli": "0.57.2"
+      }
+    },
+    "test/Harness.Integration/packages.lock.json": {
+      "sha256": "34195c3b55919f3185090c503eb7ecf260cf5448a85a3b8ebc8a70918ea539ee",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "Microsoft.Testing.Extensions.TrxReport": "2.5.0",
+        "SonarAnalyzer.CSharp": "10.34.0.3385",
+        "xunit.v3": "4.0.0",
+        "Microsoft.ApplicationInsights": "2.23.0",
+        "Microsoft.Data.Sqlite.Core": "10.0.13",
+        "Microsoft.Testing.Extensions.Telemetry": "2.3.3",
+        "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.5.0",
+        "Microsoft.Testing.Platform": "2.5.0",
+        "Microsoft.Testing.Platform.MSBuild": "2.3.3",
+        "Microsoft.Win32.Registry": "5.0.0",
+        "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.core": "2.1.13",
+        "SQLitePCLRaw.lib.e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.provider.e_sqlite3": "2.1.13",
+        "System.Security.AccessControl": "6.0.1",
+        "xunit.analyzers": "2.0.0",
+        "xunit.v3.assert": "4.0.0",
+        "xunit.v3.common": "4.0.0",
+        "xunit.v3.core.mtp-v2": "4.0.0",
+        "xunit.v3.extensibility.core": "4.0.0",
+        "xunit.v3.mtp-v2": "4.0.0",
+        "xunit.v3.runner.common": "4.0.0",
+        "xunit.v3.runner.inproc.console": "4.0.0",
+        "Microsoft.Bcl.AsyncInterfaces": "10.0.13",
+        "Microsoft.Data.Sqlite": "10.0.13"
+      }
+    },
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": {
+      "sha256": "ee0b0d37dbd859ce993d797202d5a5f189ebb36fcb67979e268e86d6f19ff03b",
+      "resolved": {
+        "Microsoft.CodeAnalysis.BannedApiAnalyzers": "5.6.0",
+        "Microsoft.CodeAnalysis.NetAnalyzers": "10.0.401",
+        "SonarAnalyzer.CSharp": "10.34.0.3385",
+        "Microsoft.Data.Sqlite.Core": "10.0.13",
+        "SQLitePCLRaw.bundle_e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.core": "2.1.13",
+        "SQLitePCLRaw.lib.e_sqlite3": "2.1.13",
+        "SQLitePCLRaw.provider.e_sqlite3": "2.1.13",
+        "Microsoft.Data.Sqlite": "10.0.13"
+      }
+    }
+  },
+  "publish_lock": {
+    "path": "src/Harness.Cli/packages.publish.lock.json",
+    "sha256": "ebb7bac1ae5f80c172b9b0a1b56e2e67465c97e698ecfafbe0d63b116b6d784b"
+  },
+  "architecture_probe": {
+    "runtime_identifier": "linux-arm64",
+    "platform_target": "arm64",
+    "native_execution": false
+  },
+  "published_version": {
+    "version": "0.1.0-localbuild",
+    "commit": "c483d1f5e6290f7c9b85b6bd1c9ea270b34c41f1",
+    "date": "",
+    "modified": false,
+    "go_version": ".NET 10.0.13",
+    "platform": "windows/amd64"
+  },
+  "native_sqlite_single_file_probe": {
+    "schema": 19,
+    "value": "single-file native SQLite",
+    "integrity_check": "ok"
+  },
+  "reports": [
+    {
+      "path": "artifacts/bootstrap-results-final/Harness.Integration_net10.0_x64.trx",
+      "sha256": "ebe4eb79648fefde2794682d994f47dc7c2b4a2788f31cecde88fb3e6204d01c"
+    },
+    {
+      "path": "artifacts/bootstrap-results-final/Harness.Unit_net10.0_x64.trx",
+      "sha256": "8b894bcc67dd98dbfdecd23bcba5900aa36e87ff30ac5b6c9a0175817a473aea"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Harness.Integration.Storage.StorageTests.InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(mutation: \"INSERT INTO schema_migrations VALUES (20, '0020_fu\"···, newer: True)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.CliProcessTests.ExecutableVersionIsMachineReadableOutsideTheRepository",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(mutation: \"INSERT INTO schema_migrations VALUES (0, '0000_inv\"···, newer: False)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(mutation: \"UPDATE schema_migrations SET name = '0001_wrong' W\"···, newer: False)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.CompetingProcessesMigrateExactlyOnceAndKeepAllWrites",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.MigrationFilesMustHaveValidNamesAndContiguousUniqueVersions",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.NewFilesAndBackupsAreOwnerOnlyOnUnix",
+      "outcome": "NotExecuted"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.ReadOnlyInspectionDoesNotCreateMigrateOrModifyFiles",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.ForeignKeyViolationsDuringRebuildRollBackAndRestoreEnforcement",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.CurrentSchemaAndReadersDoNotWaitForWriterButImmediateWritersTimeOut",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.PathsCannotInjectOptionsAndTimestampsKeepNineFractionDigits",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.FailedMigrationRollsBackSchemaDataAndLedgerAndNamesRecoveryBackup",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.BackupFailureAbortsUpgradeAndRetentionKeepsTheLastFive",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.TransactionsCommitOrRollBackAndReadersCannotWrite",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.GoThenCSharpThenGoPreservesSchemaAndUnicodeData",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.EmbeddedMigrationsMatchEveryFrozenByte",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.ForeignKeyRebuildPreservesCompletedAndBlockedTasksAndReferences",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.FreshDatabaseHasPragmasStrictSchemaAndPersistentDiagnostics",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 13)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 1)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 19)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 4)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Storage.StorageTests.HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(version: 5)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.BareInvocationShowsHelpAndHelpVersionShowsItsFlags",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.InvalidInputReturnsUsageErrorOnStderr(arguments: [\"version\", \"unexpected\"])",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.InvalidInputReturnsUsageErrorOnStderr(arguments: [\"unknown-command\"])",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.InvalidInputReturnsUsageErrorOnStderr(arguments: [\"version\", \"--unknown\"])",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"-h\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"-help\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"--help\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HelpWritesOnlyToStdout(argument: \"help\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HostServicesAreSharedDisposedAndLoggingGoesToStderr",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.HumanVersionHasStableFormattingAndExplicitUnknownValues",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.CancellationReachesCommandsAndDisposesTheHost",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.VersionUsesOneInjectedServiceAndPreservesTheJsonEnvelope(argument: \"version\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.VersionUsesOneInjectedServiceAndPreservesTheJsonEnvelope(argument: \"-v\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.VersionUsesOneInjectedServiceAndPreservesTheJsonEnvelope(argument: \"--version\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.CliTests.OperationalFailuresUseStderrAndExitOne",
+      "outcome": "Passed"
+    }
+  ],
+  "noop_assemblies": [
+    {
+      "path": "src\\Harness.Core\\bin\\Debug\\net10.0\\Harness.Core.dll",
+      "sha256": "2150D6C729CE7D0BD1FA96D0E44F9CC3C876A8DC8B44E27F1119FB2C78BF45E6",
+      "ticks": 639281294828279332
+    },
+    {
+      "path": "src\\Harness.Infrastructure\\bin\\Debug\\net10.0\\Harness.Infrastructure.dll",
+      "sha256": "F1DC5E8DFCD597618F27C561B14AD6A66286F738C55AC61CD135B36749008839",
+      "ticks": 639281294835854161
+    },
+    {
+      "path": "src\\Harness.Providers\\bin\\Debug\\net10.0\\Harness.Providers.dll",
+      "sha256": "07FF44633255B249E799076D2F0E315C88F8E5F36DF10548F7B4CDC44B3CA38A",
+      "ticks": 639281294833899625
+    },
+    {
+      "path": "src\\Harness.Mcp\\bin\\Debug\\net10.0\\Harness.Mcp.dll",
+      "sha256": "F8A6136EF3D5D8276157F1C0F0C2E02A2A2C48FB7EC6A95FAF1C26A0E5C1CE7F",
+      "ticks": 639281294834083219
+    },
+    {
+      "path": "src\\Harness.Web\\bin\\Debug\\net10.0\\Harness.Web.dll",
+      "sha256": "55CAAD379E7FD416BC62DFA53E0F27CEF9B43290620531CA5D6A061E599CDF23",
+      "ticks": 639281294835814165
+    },
+    {
+      "path": "src\\Harness.Cli\\bin\\Debug\\net10.0\\harness.dll",
+      "sha256": "F19C5765B0CFCA679EFBFB8068ED735A883A0A4D44A7AB7E59F9F04A2D4B3AE6",
+      "ticks": 639281294842040067
+    },
+    {
+      "path": "test\\Harness.Unit\\bin\\Debug\\net10.0\\Harness.Unit.dll",
+      "sha256": "B2E7FB673ADD531B4167BD069C944E630D959140C47C305F26BF9A4979D84559",
+      "ticks": 639281294849850302
+    },
+    {
+      "path": "test\\Harness.Integration\\bin\\Debug\\net10.0\\Harness.Integration.dll",
+      "sha256": "525452984459D7C6CE7052C82FFAC1CAAD3811F3672597D40917931A044BA213",
+      "ticks": 639281294848311082
+    },
+    {
+      "path": "test\\Harness.Integration\\Storage\\Worker\\bin\\Debug\\net10.0\\Harness.StorageWorker.dll",
+      "sha256": "DFD88DEA5A0E4E1D95623BA0728C4EA9205AC0D0AD0EF525CD378EB336880ECE",
+      "ticks": 639281293328427834
+    }
+  ],
+  "binlogs": [
+    {
+      "path": "artifacts/bootstrap-restore-02.binlog",
+      "sha256": "5073e9ab131f791e8f952d509a5b5f0fb3ba3f2394e81ed960d96f9036a0b09e"
+    },
+    {
+      "path": "artifacts/bootstrap-locked-final.binlog",
+      "sha256": "c284275b16d5c10242b922906e8819aaeb682d5e0d106e5abc0731a91a5af24f"
+    },
+    {
+      "path": "artifacts/bootstrap-locked-format-check.binlog",
+      "sha256": "14e20b20d7b6555777e077e6b8cc6448d54e4d8169109e767510b6bcb7d5d67b"
+    },
+    {
+      "path": "artifacts/bootstrap-build-final.binlog",
+      "sha256": "42413e74d58e9bcc1d744269b47a039b906aabbb6a67ec7dc659e2f6d5723c22"
+    },
+    {
+      "path": "artifacts/bootstrap-release-02.binlog",
+      "sha256": "e657422375b3b49ee130c4b2f78580f6ed69ce01dc53d12a297f81ff2ec2d372"
+    },
+    {
+      "path": "artifacts/bootstrap-warm-02.binlog",
+      "sha256": "7f0687fc65012588a56018e1d3629b1c4a30f5a81744fd21cd4c146a84f0c560"
+    },
+    {
+      "path": "artifacts/bootstrap-noop-01.binlog",
+      "sha256": "21ed579333db56b5df13dfde40f3f1876bef792ea689f90b0579f31cb1bbd299"
+    },
+    {
+      "path": "artifacts/bootstrap-test-04.binlog",
+      "sha256": "4fe89405c6c27c47d17ec31966bd0cb6285f90282c81c38df60413ac654c4747"
+    },
+    {
+      "path": "artifacts/bootstrap-test-04-dotnet-test.binlog",
+      "sha256": "ec3b8ee8f6323932f8887f3fa5efb32277535e533694592bc026d53d67277cf0"
+    },
+    {
+      "path": "artifacts/bootstrap-publish-04.binlog",
+      "sha256": "3b49c43e56c1489de7972e48b710e229aef59d835a74eb2cd836596000ea5fba"
+    },
+    {
+      "path": "artifacts/bootstrap-storage-publish-02.binlog",
+      "sha256": "74999710caa86794e8f27702639cd76908e183baef087563150f271ab141163e"
+    },
+    {
+      "path": "artifacts/bootstrap-arm64-01.binlog",
+      "sha256": "2175e4c86c97f85b302ae11bb8ca5bc0c258ca6f0bed6f348222ad7e70358a3d"
+    }
+  ],
+  "source_sha256": {
+    "NuGet.Config": "e84a897c5d714c11a0bd45ba649c88a0c9fbf8bf47e7f2129d188d547f061e78",
+    "doc/port/bootstrap.md": "ea07459b20f80e2edab7d5c5760162983650225b86b32364ee9a28a51fb7c2d0",
+    "src/Harness.Cli/BuildInformation.cs": "448eb0fc18e53e5e07c348fed517d8d8b0a1588330b86d042142504ea1e7c9d7",
+    "src/Harness.Cli/CliApplication.cs": "1d10506f11915423f2cb3d15ee3eaabfc0b53e331c86d6dcf04ebd1c4d815e9f",
+    "src/Harness.Cli/Harness.Cli.csproj": "14d3f0fb08b888e0ebe17fead5ef3ce51c665fa0c3c225c002fe3e11684ef2a9",
+    "src/Harness.Cli/HostTypeRegistrar.cs": "ee3018b7a268000ac95d69b6b4870b1e4f049f6ce2d99a373f49e767a3793c07",
+    "src/Harness.Cli/Program.cs": "18c9f3f08cd9285c82edae3b2bae5bce1142b8558ee93c5206f46089797b3616",
+    "src/Harness.Cli/VersionCommand.cs": "975dd35dbe324a0ff813e849b46b783f0a9e1b8703c54b3b1ab0dd5a83cba0bb",
+    "src/Harness.Cli/WriterLoggerProvider.cs": "6770ae7645cf2f505ccf44ff780f4d35607a4bd2318173b0896932d20c8c9738",
+    "src/Harness.Cli/packages.lock.json": "88c7dffc5efe96304c4cda4715c68e3931603688a288970bd56b01dddbbb4f9c",
+    "src/Harness.Cli/packages.publish.lock.json": "ebb7bac1ae5f80c172b9b0a1b56e2e67465c97e698ecfafbe0d63b116b6d784b",
+    "src/Harness.Core/Harness.Core.csproj": "e6fcb8e1e93a724d47a829cffd19d47840a5eb088e9ace43f3a34bbaf1524b07",
+    "src/Harness.Core/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+    "src/Harness.Infrastructure/packages.lock.json": "386c0fdb30cd30beb6f2dd4d3747a1d2bc1e6a1707cccf5e9fe50e3f4afc0422",
+    "src/Harness.Mcp/Harness.Mcp.csproj": "b0bccf1a3f6b5025f707324f1314b1ea9d1c5c49d2637253fc1840f9bc6e00c1",
+    "src/Harness.Mcp/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "src/Harness.Providers/Harness.Providers.csproj": "b0bccf1a3f6b5025f707324f1314b1ea9d1c5c49d2637253fc1840f9bc6e00c1",
+    "src/Harness.Providers/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "src/Harness.Web/Harness.Web.csproj": "ac702bab16a57224f0e3f4bf9cb70d8def893be86adf3dc5457254e210425e87",
+    "src/Harness.Web/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "test/Harness.Integration/CliProcessTests.cs": "909de9d43846281ab7e1f15b9b4f20d47e26188aa3a90dfa62fd2ddb516174af",
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": "ee0b0d37dbd859ce993d797202d5a5f189ebb36fcb67979e268e86d6f19ff03b",
+    "test/Harness.Integration/packages.lock.json": "34195c3b55919f3185090c503eb7ecf260cf5448a85a3b8ebc8a70918ea539ee",
+    "test/Harness.Unit/CliTests.cs": "b2419d044d9ed81fc4106e94602f9e9c209763148a1a4e4f3be6e1aeec25f181",
+    "test/Harness.Unit/Harness.Unit.csproj": "eb775bc64472b5658cef1ce64a7fa17dbda5a93650a7f7acb6a46aa7b71723fd",
+    "test/Harness.Unit/packages.lock.json": "9a974bbc970e4cf335a3b4691a86aac8ea3c99766940fbd68fe002251bf3d724"
+  },
+  "limits": [
+    "Unix permission test skipped on Windows; no non-Windows or clean-machine execution claimed.",
+    "SourceLink providers are SDK-bundled; no remote exists here to validate downloadable source mapping.",
+    "Only help/version commands are implemented; provider, MCP and Web features remain assigned to later tasks.",
+    "Build timestamp/dirty state are explicit inputs, not inferred from wall clock/worktree scans."
+  ],
+  "commands": [
+    "dotnet restore Harness.slnx --locked-mode -p:ContinuousIntegrationBuild=true -bl:artifacts/bootstrap-locked-final.binlog",
+    "dotnet build Harness.slnx --no-restore -m -bl:artifacts/bootstrap-build-final.binlog",
+    "dotnet build Harness.slnx -c Release --no-restore -m -p:ContinuousIntegrationBuild=true -bl:artifacts/bootstrap-release-02.binlog",
+    "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/bootstrap-test-04.binlog --report-trx --results-directory C:/repos/personal/ai-harness-cs/artifacts/bootstrap-results-final",
+    "dotnet build Harness.slnx --no-restore -m -bl:artifacts/bootstrap-noop-01.binlog (all output hashes/write times unchanged)",
+    "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release -p:ContinuousIntegrationBuild=true -o artifacts/bootstrap-publish/ci-final-win-x64 -bl:artifacts/bootstrap-publish-04.binlog",
+    "artifacts/bootstrap-publish/ci-final-win-x64/harness.exe version --json",
+    "artifacts/bootstrap-publish/storage-verified/Harness.StorageWorker.exe put artifacts/bootstrap-publish/native-probe/h.db bundle-check \"single-file native SQLite\""
+  ]
+}

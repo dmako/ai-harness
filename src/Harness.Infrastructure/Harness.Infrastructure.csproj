@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <InternalsVisibleTo Include="Harness.Integration" />
     <EmbeddedResource Include="Storage/Migrations/*.sql" LogicalName="Harness.Migrations.%(Filename)%(Extension)" />

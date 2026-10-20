@@ -1,11 +1,9 @@
 <Project>
 
   <PropertyGroup Label="Configurations">
-    <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
     <Configurations>Debug;Release</Configurations>
-    <TargetFrameworks>net10.0</TargetFrameworks>
-    <Platforms>x64</Platforms>
-    <PlatformTargets>x64</PlatformTargets>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU;x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
@@ -41,6 +39,7 @@
 
   <PropertyGroup Label="NuGet dependencies management and auditing">
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled> <!-- allow override version in specific cases -->
     <RestoreEnablePackagePruning>true</RestoreEnablePackagePruning>
@@ -55,7 +54,7 @@
     <Version>0.1.0-localbuild</Version>
     <Version Condition=" $(VERSION_LABEL) != '' ">$(VERSION_LABEL)</Version>
     <Company>Zaki+Maki</Company>
-    <Copyright>Copyright © 2026-$([System.DateTime]::Now.ToString(yyyy)) Zaki+Maki</Copyright>
+    <Copyright>Copyright © 2026 Zaki+Maki</Copyright>
     <Authors>Zaki+Maki</Authors>
   </PropertyGroup>
 
@@ -65,8 +64,9 @@
   </PropertyGroup>
 
   <PropertyGroup Label="CI Build detection or simulation">
-    <ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
+    <ContinuousIntegrationBuild Condition=" '$(ContinuousIntegrationBuild)' == '' ">false</ContinuousIntegrationBuild>
     <ContinuousIntegrationBuild Condition=" '$(CI)' != '' ">true</ContinuousIntegrationBuild>
+    <RestoreLockedMode Condition=" '$(ContinuousIntegrationBuild)' == 'true' AND '$(RestoreLockedMode)' == '' ">true</RestoreLockedMode>
   </PropertyGroup>
 
   <ItemGroup Label="EditorConfig files">
@@ -75,4 +75,3 @@
 
 
 </Project>
-

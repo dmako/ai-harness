@@ -44,6 +44,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Compatibility policy](compatibility-policy.md) | Observable behavior, comparison rules, performance priorities and permitted Windows corrections |
 | [Solution and packages](solution-and-packages.md) | PORT-003 assembly boundaries, enforced dependency graph, CPM choices, API validation and deployment constraints |
 | [Storage implementation](storage-implementation.md) | PORT-005 migration/transaction/backup implementation, test commands, native timeout behavior and platform limits |
+| [Solution bootstrap](bootstrap.md) | PORT-004 CLI composition, stable SDK/build metadata, locked restore, testing and release publish settings |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |
