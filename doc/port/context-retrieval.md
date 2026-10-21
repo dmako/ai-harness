@@ -7,8 +7,9 @@ provider, memory-search and recent-change contracts. Infrastructure supplies
 Git commit queries and request-scoped physical file bodies. No package, CPM
 version, database migration, model service or search index is added.
 
-Public `get_context`, answer budgeting and rendering remain PORT-018 work.
-The new contracts are available to that composition without starting a host.
+Public `get_context`, answer budgeting and rendering are implemented separately
+by [PORT-018](context-budgets.md). The retrieval contracts are usable by that
+composition without starting a host.
 
 ## Gathering
 

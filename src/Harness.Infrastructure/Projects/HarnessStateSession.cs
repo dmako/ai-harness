@@ -6,7 +6,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed partial class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime, string? globalConfigurationPath = null) : IHarnessStateSession, Harness.Core.Memory.IMemorySession, Harness.Core.Tasks.ITaskSession, Harness.Core.Providers.IProviderProjectSession
+public sealed partial class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime, string? globalConfigurationPath = null) : IHarnessStateSession, Harness.Core.Memory.IMemorySession, Harness.Core.Tasks.ITaskSession, Harness.Core.Providers.IProviderProjectSession, Harness.Core.Retrieval.IContextProjectSession
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private HarnessDatabase? _database;

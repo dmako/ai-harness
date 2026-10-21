@@ -1,0 +1,307 @@
+{
+  "task": "TASK-0018",
+  "base_commit": "c2e66578be9e6a30481888392c54cf669eb4b98a",
+  "generated_at": "2026-10-21T13:39:02.189454+00:00",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "platforms": {
+    "windows": "Windows x64; SDK 10.0.402/runtime 10.0.13",
+    "linux": "Ubuntu WSL x64; runtime 10.0.13",
+    "macos": "not executed"
+  },
+  "source_sha256": {
+    "doc/port/README.md": "cfaedaaa6d3efb6b36575e3499c9e5f3663fdee5e7123479d2a72096b2768537",
+    "doc/port/context-budgets.md": "da7dafc4973f713c2f6c7fed09465bcbcdd4b1b27907c8e2d6173d4387ce4e87",
+    "doc/port/context-retrieval.md": "eaa02311dd67881681d495422487286adbf77482f2a7bcfd1d9d7cea93970b8f",
+    "src/Harness.Core/Retrieval/ContextBudget.cs": "1c63390234ac0c9b17a99e685168d5e001866cf0e068aeae8197847d2d22c5c1",
+    "src/Harness.Core/Retrieval/IContextProjectSession.cs": "19bd42417006d2998895243d6abbdc2c8bb9d79f6092efbea6e99adc8efbc322",
+    "src/Harness.Infrastructure/Memory/MemoryService.cs": "a0aabd39127c67015beeee89fd774733955be84ccc349bbab68759a299d537b3",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.Context.cs": "6bd3bcdd36a4a515b281674c1952ca5aec42225a246e3ff0472e73fa55aea861",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.cs": "8571a524fdc3b9caf6a70d4a15f978eab3111bd443418841c4d19b1c1908f6fc",
+    "src/Harness.Mcp/Context/ContextJson.cs": "2ffcf5183d2c49fa697e5ca922588e9aee68fe1552d4b0862211ee1e73d67e9d",
+    "src/Harness.Mcp/Context/ContextRenderer.cs": "a86e52635318b2046a096fb278913dd9878bc626b558b05084fcedacd311db4d",
+    "src/Harness.Mcp/Context/ContextTools.cs": "da2e119b8caf5aeae4d32f94b6b5251b4a4e4e7af782b2db1913d86ea5708005",
+    "src/Harness.Mcp/Context/ContextWire.cs": "c6c169cb515661c4d3443ab92ebd956f0ede09a319430fa87edaababd8ea88b1",
+    "src/Harness.Mcp/HarnessMcpServer.cs": "910cc2649dc9b298fce27335a84fcf736ae7b14dfcbc629bf8429e82b847181d",
+    "src/Harness.Mcp/Schemas/get_context.json": "f54c52ff605889693a54d8a715c3e142b6562c5be826ac72ed83b1ad15e90b53",
+    "test/Harness.Compatibility/Context/build_oracle.py": "3eb801dbcab6b8ba9b1e2c7b24d42282283fc240f7ef272d1e61e83b387633c1",
+    "test/Harness.Compatibility/Context/export.go": "f8ff79112aa765e01a885afeab1fa2b9f8b62309f7f418a71ef94adbc010f9d9",
+    "test/Harness.Compatibility/Context/main.go": "ce835330bfd99017e5bb16fd2b839f8f4af39e658b8c78370040d92f8aac0509",
+    "test/Harness.Compatibility/Context/publish_smoke.py": "319518b5627d14951ca63fe3eba460ea25cf190d32f7771df23b12b225e69db4",
+    "test/Harness.Integration/Memory/MemoryMcpProcessTests.cs": "894d69dfa28f76827facc7545ae8c8b667c3d6b36c854f361c876164cdb153c0",
+    "test/Harness.Integration/Retrieval/ContextIntegrationTests.cs": "69056c0098ab7441def992b00988b7e27b34ce2ea37f8cc2eb2d610e981f5838",
+    "test/Harness.Unit/Retrieval/ContextBudgetTests.cs": "037dda575b52fb74c24bd27b943a934e11f8d4624217f6e1d46238ec566b9564"
+  },
+  "oracle_sources": {
+    "internal/retrieval/budget.go": "2ed72fd1a5b7befac5f0e2f06844df11e502297d1a286281310062a5625960d4",
+    "internal/retrieval/budget_test.go": "3bbad8ef337ba227dfac03e074651d51c2eddf575e0f5748e76baf435df3ae53",
+    "internal/retrieval/candidate.go": "ff492b3dd0570517eee594433bca6378b23dab2255a6f494979df8bc6a647f7d",
+    "internal/retrieval/gather.go": "5a75be74bfecf24accab3c47886c0efe3fcfdc8e4fd53e1ae4ef0e9ab7073d70",
+    "internal/retrieval/merge.go": "9fcd0d977addb1986cd75a6d76ed681270b2fef7d52d4d21b66be5c6e627cb9e",
+    "internal/retrieval/merge_test.go": "636b491e4e689fd91cdf7064c399c49081eb2f762bb6a2663ef5fe1f3e3e262c",
+    "internal/retrieval/rank.go": "f9dede332c13b28d545d3f49fb4aad1803300a87a7ac407769db620aeda2c619",
+    "internal/retrieval/rank_test.go": "d4c682517c154554b0c2ace44ab70707a365eba76b745d1d4823abf2c69e898c",
+    "internal/mcp/server/context_tool.go": "0c5d856dbc5953e1a0f3e8d5d5df9a93158d445e4272859b3cb9ede761419a23",
+    "internal/mcp/server/context_tool_test.go": "65c179fded5672885ade62da5b4a12c57523b33b74787963aae59ed5486f93ab"
+  },
+  "frozen_schema_capture_sha256": "d7219a1dcd89d5fa20c8f51ad8e9c51e400bcbb7f2d3e1cfd875dc56113dfe7b",
+  "package_locks": {
+    "src/Harness.Cli/packages.lock.json": {
+      "sha256": "d4d84ca30bc0b474e0d7b0d07f56fe692ccc12974362c10f7cfea2e28fe06ba6",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Cli/packages.publish.lock.json": {
+      "sha256": "a722475a638bd520f59b59025589764cbf5f370ca590edcdb7ddc157d03f6f79",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Core/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Graphify/packages.lock.json": {
+      "sha256": "79a73a25ec13072fd2f02aeb6d538fc3a3cc35bae95b4e93d42a310bc68e7ce2",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Graphify/packages.publish.lock.json": {
+      "sha256": "d1c1386057c7bc3bfd4beee0f89ecb0cfb8993a946c2a93084975ccfbd079787",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Infrastructure/packages.lock.json": {
+      "sha256": "6cd3dd55e3cddbaa75234490eddd16a6c670a664707ba076c47b9d3c2a7a80a2",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Mcp/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Providers/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Web/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": {
+      "sha256": "112ca61422e901e82b942eb5ad4f872610dc88b3c1f94b5b696c60118051430a",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/packages.lock.json": {
+      "sha256": "7abd3ee7cbf1b33703dbea24880483d545bdf9765bc257a9ea879424de58c7b5",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.ProviderWorker/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Unit/packages.lock.json": {
+      "sha256": "f18d62e17038c1e6cb4930ed6f427f9af1d2e8ed39d6f0118a0047558b698dde",
+      "semantic_change": "unchanged"
+    }
+  },
+  "test_results": {
+    "windows_unit": {
+      "path": "artifacts/context-regression-02/Harness.Unit_net10.0_x64.trx",
+      "sha256": "0263b05deb55ac800116aba9ca3b7d59d78f38ebece19013ec1d81778b97fc14",
+      "counters": {
+        "total": 167,
+        "executed": 167,
+        "passed": 167,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    "windows_integration": {
+      "path": "artifacts/context-regression-02/Harness.Integration_net10.0_x64.trx",
+      "sha256": "818394624e75331ba4826f80e79f59fae9639def0194ff963502bc6c4bd94f10",
+      "counters": {
+        "total": 243,
+        "executed": 240,
+        "passed": 240,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 3,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    "linux_unit": {
+      "path": "artifacts/context-linux-final/unit/Harness.Unit_net10.0_x64.trx",
+      "sha256": "2b1cc32b4394ac0055b505378ba79629701c4cf50a81cb1425b3a3203a04450d",
+      "counters": {
+        "total": 49,
+        "executed": 49,
+        "passed": 49,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    "linux_integration": {
+      "path": "artifacts/context-linux-final/integration/Harness.Integration_net10.0_x64.trx",
+      "sha256": "90123938bfe5d836b28ca5f9468b2835d310d1b6f974dd5750be12bf3ebd3f6a",
+      "counters": {
+        "total": 7,
+        "executed": 7,
+        "passed": 7,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  },
+  "published_smoke": {
+    "cases": [
+      {
+        "budget": 8000,
+        "used": 449,
+        "debug": false
+      },
+      {
+        "budget": 1000,
+        "used": 856,
+        "debug": true
+      },
+      {
+        "budget": 2000,
+        "used": 449,
+        "debug": false
+      },
+      {
+        "budget": 8000,
+        "used": 1695,
+        "debug": true
+      }
+    ],
+    "uninitialized_read_only": true,
+    "initialized_memory": true,
+    "excluded_heavy_provider_not_started": true
+  },
+  "artifacts": {
+    "artifacts/context-oracle/context-oracle.exe": "f16b0b6d7f64f5fd0cf9d68742bdc6e4787745de466a99dcea07ad01a9844e84",
+    "artifacts/context-oracle/context-oracle-linux": "f463c89636f88122a7b7c244bad91888efa7e3df09bb4bb4220c3fd2871edcec",
+    "artifacts/context-publish/harness.exe": "7af648ba987efef3c5cd46e7b4890d4e90eac0badd17fd0b9f9968ee9109b4dd",
+    "artifacts/context-published-smoke.json": "f915dd6eee739298436052147ef74da177459a19048f7246e2847235add4c11b"
+  },
+  "differential_contract": {
+    "packing_scenarios": 6,
+    "handler_scenarios": 5,
+    "earlier_merge_rank_gather_scenarios": 8,
+    "compared": "Complete pack decisions/costs and handler JSON values; no Unicode/body/provenance fields scrubbed.",
+    "excluded_fields": [
+      "measured provider latency in debug comparisons",
+      "Go used_bytes before debug is replaced by final serialized size"
+    ]
+  },
+  "intentional_corrections": [
+    "Final UTF-8 byte accounting includes debug. Oversized debug and optional diagnostics are deterministically truncated with a note; final lower-ranked unit removal updates omitted.",
+    "Task metadata that cannot fit is rejected with a larger-budget/shorter-task error.",
+    "Windows rooted paths and Int32/token multiplication overflow are rejected."
+  ],
+  "validation": [
+    {
+      "command": "python test/Harness.Compatibility/Context/build_oracle.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --modules artifacts/compatibility/oracle/modules --output artifacts/context-oracle/context-oracle-linux --goos linux",
+      "result": "pass",
+      "output": "Export-only bridge called the original handler and was removed after building."
+    },
+    {
+      "command": "python test/Harness.Compatibility/Context/build_oracle.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --modules artifacts/compatibility/oracle/modules --output artifacts/context-oracle/context-oracle.exe",
+      "result": "pass",
+      "output": "Export-only bridge called the original handler and was removed after building."
+    },
+    {
+      "command": "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/context-regression-02.binlog --report-trx --results-directory artifacts/context-regression-02",
+      "result": "pass",
+      "output": "410 total; 407 passed, 3 Unix-only skips, no failures; eight Go oracles and both installed real providers enabled."
+    },
+    {
+      "command": "wsl.exe -d Ubuntu -- bash -lc set -e\ncd /mnt/c/repos/personal/ai-harness-cs\nexport DOTNET_CLI_HOME=\"$PWD/artifacts/context-linux/cli-home\"\nexport DOTNET_CLI_TELEMETRY_OPTOUT=1\nexport TESTINGPLATFORM_TELEMETRY_OPTOUT=1\nexport HARNESS_GO_RETRIEVAL_ORACLE=\"$PWD/artifacts/retrieval-oracle/retrieval-oracle-linux\"\nexport HARNESS_GO_CONTEXT_ORACLE=\"$PWD/artifacts/context-oracle/context-oracle-linux\"\ndotnet test/Harness.Unit/bin/Debug/net10.0/Harness.Unit.dll --filter-class \"Harness.Unit.Retrieval.*\" --report-trx --results-directory \"$PWD/artifacts/context-linux-final/unit\"\ndotnet test/Harness.Integration/bin/Debug/net10.0/Harness.Integration.dll --filter-class \"Harness.Integration.Retrieval.*\" --report-trx --results-directory \"$PWD/artifacts/context-linux-final/integration\"",
+      "result": "pass",
+      "output": "49 unit + 7 integration passed, no skips or failures."
+    },
+    {
+      "command": "go test -mod=readonly ./internal/retrieval (frozen source, cached toolchain/modules)",
+      "result": "pass",
+      "output": "Original budget/merge/rank/retrieval fixtures passed (cached)."
+    },
+    {
+      "command": "go test -mod=readonly ./internal/mcp/server -run '^TestGetContext' (frozen source; HARNESS_CONFIG_DIR=artifacts/context-go-fixtures/global)",
+      "result": "pass",
+      "output": "Original get_context fixtures passed (9.455s); isolated global configuration."
+    },
+    {
+      "command": "dotnet restore src/Harness.Cli/Harness.Cli.csproj --locked-mode -p:RuntimeIdentifier=win-x64 -p:PublishProfile=Release -bl:artifacts/context-publish-restore-01.binlog",
+      "result": "pass",
+      "output": "Locked release dependencies restored; vulnerability audit enabled."
+    },
+    {
+      "command": "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release --no-restore -o artifacts/context-publish -bl:artifacts/context-publish-01.binlog",
+      "result": "pass",
+      "output": "Self-contained single-file Windows x64 publish succeeded."
+    },
+    {
+      "command": "python test/Harness.Compatibility/Context/publish_smoke.py --executable artifacts/context-publish/harness.exe --artifacts artifacts",
+      "result": "pass",
+      "output": "Four published get_context cases passed; byte/token/debug budgets, Unicode, provenance, read-only uninitialized state, initialized memory and excluded heavy provider verified in a synthetic Git repository."
+    },
+    {
+      "command": "dotnet restore Harness.slnx --locked-mode -bl:artifacts/context-restore-01.binlog",
+      "result": "pass",
+      "output": "Normal assets restored, 13 package locks semantically unchanged; audit enabled."
+    },
+    {
+      "command": "dotnet format whitespace Harness.slnx --no-restore --include src/Harness.Core/Retrieval/ContextBudget.cs src/Harness.Core/Retrieval/IContextProjectSession.cs src/Harness.Infrastructure/Memory/MemoryService.cs src/Harness.Infrastructure/Projects/HarnessStateSession.Context.cs src/Harness.Infrastructure/Projects/HarnessStateSession.cs src/Harness.Mcp/Context/ContextJson.cs src/Harness.Mcp/Context/ContextRenderer.cs src/Harness.Mcp/Context/ContextTools.cs src/Harness.Mcp/Context/ContextWire.cs src/Harness.Mcp/HarnessMcpServer.cs test/Harness.Integration/Memory/MemoryMcpProcessTests.cs test/Harness.Integration/Retrieval/ContextIntegrationTests.cs test/Harness.Unit/Retrieval/ContextBudgetTests.cs --verify-no-changes --binarylog artifacts/context-format-verify-03.binlog",
+      "result": "pass",
+      "output": "No formatting changes required."
+    },
+    {
+      "command": "python test/Harness.Compatibility/baseline.py; git diff HEAD --check; verify receipt hashes",
+      "result": "pass",
+      "output": "Contract inventories, local documentation links, UTF-8/CRLF formatting and receipt source/oracle/artifact/TRX/package-lock hashes verified."
+    }
+  ],
+  "limits": [
+    "Workspace composition is TASK-0019; architecture findings/proposal notes and context hit-rate persistence remain later architecture/telemetry tasks.",
+    "macOS not executed.",
+    "Budget covers the answer JSON payload, not the outer JSON-RPC frame or duplicate MCP representations.",
+    "Numerical performance budgets remain PORT-030."
+  ]
+}

@@ -13,6 +13,14 @@ public sealed record MemoryPromotion(MemoryRecord From, string Level, IReadOnlyL
 public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>> existingDatabase, KnowledgeLevels levels, Func<CancellationToken, Task<string>> branch,
     Func<CancellationToken, Task<string>>? projectIdentity = null) : IMemorySession
 {
+    public async Task<Harness.Core.Retrieval.RetrievalMemories> SearchContextAsync(MemoryQuery query, CancellationToken cancellationToken)
+    {
+        var project = new MemoryStore(await existingDatabase(cancellationToken));
+        using var opened = await LayersAsync(project, cancellationToken);
+        var result = opened.Layers.Search(query, cancellationToken);
+        return new(result.Memories) { Errors = result.Errors.Select(error => error.Scope + ": " + error.Error.Message).ToArray() };
+    }
+
     public async Task<MemoryPutResult> PutMemoryAsync(MemoryInput input, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);

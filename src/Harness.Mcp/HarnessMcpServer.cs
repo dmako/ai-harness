@@ -4,6 +4,8 @@ using System.Text;
 using Harness.Core.Projects;
 using Harness.Core.Providers;
 using Harness.Mcp.Providers;
+using Harness.Mcp.Context;
+using Harness.Core.Retrieval;
 using Harness.Core.Memory;
 using Harness.Mcp.Memory;
 using Harness.Core.Tasks;
@@ -30,6 +32,7 @@ public static class HarnessMcpServer
         ArgumentNullException.ThrowIfNull(loggerFactory);
         await using var ownedSession = session;
         var providerTools = new ProviderTools(providers, session as IProviderProjectSession);
+        var contextTools = new ContextTools(providers, session as IContextProjectSession);
         await using var transport = new CompatibleStdioTransport(input, output);
         var options = new McpServerOptions
         {
@@ -49,7 +52,7 @@ public static class HarnessMcpServer
                     var version = string.IsNullOrEmpty(client?.Version) ? "" : " " + client.Version;
                     var caller = string.IsNullOrEmpty(client?.Name) ? "unknown" : client.Name + version;
                     try
-                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools); }
+                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools); }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
                         // The C# SDK intentionally emits no reply for client-cancelled calls.
@@ -64,7 +67,7 @@ public static class HarnessMcpServer
     }
 
     internal static async ValueTask<CallToolResult> CallAsync(CallToolRequestParams parameters, IHarnessStateSession session,
-        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null)
+        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null, ContextTools? contextTools = null)
     {
         var tool = Tools.FirstOrDefault(tool => tool.Name == parameters.Name)
             ?? throw new McpProtocolException($"unknown tool {JsonSerializer.Serialize(parameters.Name)}", McpErrorCode.InvalidParams);
@@ -88,6 +91,8 @@ public static class HarnessMcpServer
         {
             try
             {
+                if (parameters.Name is "get_context")
+                    return Success(await (contextTools ?? new ContextTools(project: session as IContextProjectSession)).CallAsync(parameters.Arguments, cancellationToken));
                 if (ProviderTools.Handles(parameters.Name))
                     return Success(await (providerTools ?? new ProviderTools(project: session as IProviderProjectSession)).CallAsync(parameters.Name, parameters.Arguments, cancellationToken));
                 if (parameters.Name.StartsWith("task_", StringComparison.Ordinal))
@@ -137,6 +142,11 @@ public static class HarnessMcpServer
 
     private static CallToolResult Success(object value)
     {
+        if (value is ContextAnswer answer)
+        {
+            using var document = JsonDocument.Parse(answer.Json);
+            return new CallToolResult { Content = [new TextContentBlock { Text = answer.Json }], StructuredContent = document.RootElement.Clone() };
+        }
         // Go's result adapter writes canonical key order in both representations.
         var element = JsonSerializer.SerializeToElement(value, JsonOptions);
         var ordered = Order(element);
