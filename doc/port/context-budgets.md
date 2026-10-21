@@ -70,8 +70,8 @@ live candidates remain available. Directory hits from file search are omitted.
 Providers excluded from context are filtered before discovery or handshakes.
 Caller cancellation propagates through gathering and body reads.
 
-Workspace context remains PORT-019 work and currently returns the existing
-workspace-not-configured error. Architecture findings and their proposal notes
+Workspace context is implemented by [PORT-019](workspaces.md), sharing the
+serialized budget with the current project. Architecture findings and their proposal notes
 remain the architecture tasks; context hit-rate persistence remains the later
 telemetry work. The frozen schema is advertised unchanged, including these
 optional future sections.

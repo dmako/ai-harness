@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Text.Json;
 using System.Text;
@@ -9,7 +8,6 @@ namespace Harness.Infrastructure.Projects;
 
 public sealed class MachineRegistry(string path)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public JsonObject Load()
@@ -40,82 +38,58 @@ public sealed class MachineRegistry(string path)
     public Task NoteSyncAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, CancellationToken cancellationToken = default) =>
         NoteAsync(project, worktrees, version, "last_sync", cancellationToken);
 
-    private async Task NoteAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, string eventKey, CancellationToken cancellationToken)
+    private Task<bool> NoteAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, string eventKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(worktrees);
-        StorageFiles.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        await using var lease = await LockAsync(cancellationToken);
-        var before = File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
-        var registry = Load();
-        var projects = registry["projects"]!.AsArray();
-        var entry = projects.OfType<JsonObject>().FirstOrDefault(item => item["id"]?.GetValue<string>() == project.Id);
-        var now = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
-        if (entry is null)
+        return Harness.Infrastructure.Workspaces.AtomicMachineFile.UpdateAsync(path, Load, registry =>
         {
-            entry = new JsonObject { ["id"] = project.Id, ["first_seen"] = now };
-            projects.Add(entry);
-        }
-
-        entry["root"] = project.Root;
-        entry["db_path"] = project.DatabasePath;
-        entry["schema_version"] = HarnessDatabase.LatestSchemaVersion;
-        entry["harness_version"] = version;
-        entry["worktrees"] = new JsonArray(worktrees.Select(tree => JsonValue.Create(tree.Path)).ToArray<JsonNode?>());
-        entry[eventKey] = now;
-        // Preserve names, clients, workspaces and future fields written by other versions.
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
-            if (!OperatingSystem.IsWindows())
+            var projects = registry["projects"]!.AsArray();
+            var entry = projects.OfType<JsonObject>().FirstOrDefault(item => item["id"]?.GetValue<string>() == project.Id);
+            var now = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+            if (entry is null)
             {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+                entry = new JsonObject { ["id"] = project.Id, ["first_seen"] = now };
+                projects.Add(entry);
             }
 
-            using (var file = new FileStream(temporary, options))
-            {
-                var bytes = StrictUtf8.GetBytes(registry.ToJsonString(JsonOptions) + "\n");
-                await file.WriteAsync(bytes, cancellationToken);
-                file.Flush(flushToDisk: true);
-            }
-
-            var current = File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
-            if (before is null ? current is not null : current is null || !before.AsSpan().SequenceEqual(current))
-            {
-                throw new IOException("Machine registry changed while updating it; retry.");
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporary, path, overwrite: true);
-            StorageFiles.OwnerOnly(path);
-        }
-        finally
-        {
-            File.Delete(temporary);
-        }
+            entry["root"] = project.Root;
+            entry["db_path"] = project.DatabasePath;
+            entry["schema_version"] = HarnessDatabase.LatestSchemaVersion;
+            entry["harness_version"] = version;
+            entry["worktrees"] = new JsonArray(worktrees.Select(tree => JsonValue.Create(tree.Path)).ToArray<JsonNode?>());
+            entry[eventKey] = now;
+            return true;
+        }, cancellationToken);
     }
 
-    private async Task<FileStream> LockAsync(CancellationToken cancellationToken)
+    public Task<bool> ForgetAsync(string id, CancellationToken token = default) => Harness.Infrastructure.Workspaces.AtomicMachineFile.UpdateAsync(path, Load, registry =>
     {
-        var timer = Stopwatch.StartNew();
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var options = new FileStreamOptions { Mode = FileMode.OpenOrCreate, Access = FileAccess.ReadWrite, Share = FileShare.None };
-                if (!OperatingSystem.IsWindows())
-                {
-                    options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-                }
+        var projects = registry["projects"]!.AsArray();
+        var rows = projects.OfType<JsonObject>().Where(row => row["id"]?.GetValue<string>() == id).ToArray();
+        foreach (var row in rows)
+            projects.Remove(row);
+        return rows.Length > 0;
+    }, token);
 
-                return new FileStream(path + ".lock", options);
-            }
-            catch (IOException) when (timer.Elapsed < TimeSpan.FromSeconds(10))
-            {
-                await Task.Delay(25, cancellationToken);
-            }
-        }
+    public async Task<JsonObject> RenameAsync(string id, string? name, string? title, CancellationToken token = default)
+    {
+        name = name?.Trim();
+        if (name is { Length: > 0 } && !System.Text.RegularExpressions.Regex.IsMatch(name, @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", System.Text.RegularExpressions.RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1)))
+            throw new InvalidOperationException("short name " + JsonSerializer.Serialize(name) + ": use letters, digits, '.', '_' or '-' (max 64)");
+        title = Harness.Infrastructure.Workspaces.WorkspaceStore.NormalizeTitle(title);
+        JsonObject? result = null;
+        await Harness.Infrastructure.Workspaces.AtomicMachineFile.UpdateAsync(path, Load, registry =>
+        {
+            var row = registry["projects"]!.AsArray().OfType<JsonObject>().FirstOrDefault(row => row["id"]?.GetValue<string>() == id)
+                ?? throw new InvalidOperationException("project " + id + " is not registered on this machine");
+            if (name is not null)
+            { if (name.Length is 0) row.Remove("name"); else row["name"] = name; }
+            if (title is not null)
+            { if (title.Length is 0) row.Remove("title"); else row["title"] = title; }
+            result = (JsonObject)row.DeepClone();
+            return true;
+        }, token).ConfigureAwait(false);
+        return result!;
     }
 }

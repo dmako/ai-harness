@@ -1,3 +1,4 @@
+using Harness.Mcp.Workspaces;
 using Harness.Core.Retrieval;
 
 namespace Harness.Mcp.Context;
@@ -13,10 +14,12 @@ public static class ContextRenderer
         var bytes => bytes,
     };
 
-    public static async Task<ContextAnswer> RenderAsync(ContextRequest request, Gathered gathered, ContextProject? project = null, CancellationToken cancellationToken = default)
+    public static Task<ContextAnswer> RenderAsync(ContextRequest request, Gathered gathered, ContextProject? project = null, CancellationToken cancellationToken = default) => RenderAsync(request, gathered, project, null, cancellationToken);
+
+    public static async Task<ContextAnswer> RenderAsync(ContextRequest request, Gathered gathered, ContextProject? project, ContextWorkspace? workspace, CancellationToken cancellationToken = default)
     {
         var full = BudgetBytes(request);
-        var notes = (project?.Notes ?? []).Concat(gathered.Notes).ToList();
+        var notes = (project?.Notes ?? []).Concat(gathered.Notes).Concat(workspace?.Notes ?? []).ToList();
         var specified = request.Tokens > 0 ? ContextBudget.FromTokens(request.Tokens).Bytes : request.Budget;
         if (specified is > 0 and < 1000)
             notes.Add("budget raised to the minimum, 1000 bytes");
@@ -34,12 +37,12 @@ public static class ContextRenderer
         var merged = RetrievalMerger.Merge(candidates);
         var errors = gathered.Errors.ToList();
         var diagnosticsTruncated = false;
-        var empty = Base(request.Task, gathered.Symbols, errors, stale);
+        var empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
         while (ContextJson.Size(empty) + 100 > full && errors.Count > 0)
         {
             diagnosticsTruncated = true;
             errors.RemoveAt(errors.Count - 1);
-            empty = Base(request.Task, gathered.Symbols, errors, stale);
+            empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
         }
         if (ContextJson.Size(empty) + 100 > full)
             throw new ArgumentException("task metadata exceeds the context budget; raise the budget or shorten the task");
@@ -51,7 +54,7 @@ public static class ContextRenderer
                 errors.RemoveAt(errors.Count - 1);
             else
                 notes.RemoveAt(notes.Count - 1);
-            empty = Base(request.Task, gathered.Symbols, errors, stale);
+            empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
             envelope = EnvelopeSize(empty, notes);
         }
         var budget = new ContextBudget(Math.Max(full - envelope, 1)) { Cost = (unit, packed) => ContextWire.UnitCost(unit, packed, request.Debug) };
@@ -93,7 +96,7 @@ public static class ContextRenderer
 
         Dictionary<string, object?> Build()
         {
-            var output = Base(request.Task, gathered.Symbols, errors, stale);
+            var output = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
             output["budget_bytes"] = full;
             foreach (var unit in packed.Units)
             {
@@ -121,9 +124,11 @@ public static class ContextRenderer
         }
     }
 
-    private static Dictionary<string, object?> Base(string task, IReadOnlyList<string> symbols, List<string> errors, string stale)
+    private static Dictionary<string, object?> Base(string task, IReadOnlyList<string> symbols, List<string> errors, string stale, IReadOnlyList<object>? workspace)
     {
         var output = new Dictionary<string, object?> { ["task"] = task, ["code"] = new List<Dictionary<string, object?>>(), ["used_bytes"] = 0, ["budget_bytes"] = 0 };
+        if (workspace is { Count: > 0 })
+            output["workspace"] = workspace;
         if (symbols.Count > 0)
             output["symbols"] = symbols;
         if (errors.Count > 0)

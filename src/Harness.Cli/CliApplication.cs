@@ -1,3 +1,4 @@
+using Harness.Cli.Workspaces;
 using Harness.Infrastructure.Projects;
 using Harness.Cli.Memory;
 using Harness.Cli.Tasks;
@@ -31,6 +32,7 @@ public static class CliApplication
         builder.Services.AddSingleton(new CliErrorOutput(stderr));
         builder.Services.AddSingleton<MemoryCommandRunner>();
         builder.Services.AddSingleton<TaskCommandRunner>();
+        builder.Services.AddSingleton<WorkspaceCommandRunner>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -84,6 +86,23 @@ public static class CliApplication
                 proposals.AddCommand<ProposalsApproveCommand>("approve").WithDescription("Approve a proposal, optionally edited");
                 proposals.AddCommand<ProposalsRejectCommand>("reject").WithDescription("Reject a proposal");
             });
+            configuration.AddBranch("workspace", workspace =>
+            {
+                workspace.AddCommand<WorkspaceListCommand>("list");
+                workspace.AddCommand<WorkspaceCreateCommand>("create");
+                workspace.AddCommand<WorkspaceDiscoverCommand>("discover");
+                workspace.AddCommand<WorkspaceShowCommand>("show");
+                workspace.AddCommand<WorkspaceJoinCommand>("join");
+                workspace.AddCommand<WorkspaceLeaveCommand>("leave");
+                workspace.AddCommand<WorkspaceDeleteCommand>("delete");
+                workspace.AddCommand<WorkspaceRenameCommand>("rename");
+            }).WithAlias("workspaces");
+            configuration.AddBranch("projects", projects =>
+            {
+                projects.AddCommand<ProjectsListCommand>("list");
+                projects.AddCommand<ProjectsForgetCommand>("forget");
+                projects.AddCommand<ProjectsRenameCommand>("rename");
+            });
             configureCommands?.Invoke(configuration);
         });
 
@@ -117,6 +136,8 @@ public static class CliApplication
         }
 
         var normalized = NormalizeLegacyFlags(args);
+        if (normalized[0] is "workspace" or "workspaces" or "projects" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
+            normalized = [normalized[0], "list", .. normalized[1..]];
         return normalized[0] switch
         {
             "-v" or "--version" => ["version", .. normalized[1..]],
@@ -162,6 +183,9 @@ public static class CliApplication
                 "-id" => "--id",
                 "-prefix" => "--prefix",
                 "-title" => "--title",
+                "-discover" => "--discover",
+                "-clear-title" => "--clear-title",
+                "-reset-name" => "--reset-name",
                 "-goal" => "--goal",
                 "-type" => "--type",
                 "-priority" => "--priority",
@@ -177,7 +201,7 @@ public static class CliApplication
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
+            if (equals < 0 && replacement is "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
             {
                 index++; // A value is data, even when it resembles another option.
             }

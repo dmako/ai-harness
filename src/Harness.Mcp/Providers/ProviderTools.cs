@@ -1,9 +1,10 @@
+using Harness.Mcp.Workspaces;
 using System.Text.Json;
 using Harness.Core.Providers;
 
 namespace Harness.Mcp.Providers;
 
-public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderProjectSession? project = null)
+public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderProjectSession? project = null, WorkspaceTools? workspace = null)
 {
     public static bool Handles(string name) => name is "search_project" or "provider_status" or "package_api" or "project_overview";
 
@@ -46,7 +47,9 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
             var depth = String(arguments, "depth");
             if (depth is not ("" or "light" or "deep"))
                 throw new ArgumentException("depth must be light or deep");
-            throw new InvalidOperationException("this project is not in a workspace; use 'harness workspace create' to add it");
+            if (workspace is null)
+                throw new InvalidOperationException("this project is not in a workspace; use 'harness workspace create' to add it");
+            return await workspace.SearchAsync(query, kind, capabilities, path, Limit(arguments), depth is "deep", arguments?.TryGetValue("debug", out var wsDebug) is true && wsDebug.GetBoolean(), token).ConfigureAwait(false);
         }
         await DiscoverAsync(token).ConfigureAwait(false);
         var debug = arguments?.TryGetValue("debug", out var value) is true && value.GetBoolean();

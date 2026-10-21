@@ -1,3 +1,4 @@
+using Harness.Mcp.Workspaces;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text;
@@ -23,7 +24,7 @@ public static class HarnessMcpServer
     private static readonly IReadOnlyList<Tool> Tools = LoadTools();
 
     public static async Task RunAsync(Stream input, Stream output, IHarnessStateSession session, HarnessRuntime runtime,
-        ILoggerFactory loggerFactory, IServiceProvider? services = null, IProviderRegistry? providers = null, CancellationToken cancellationToken = default)
+        ILoggerFactory loggerFactory, IServiceProvider? services = null, IProviderRegistry? providers = null, WorkspaceTools? workspaceTools = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
@@ -31,8 +32,8 @@ public static class HarnessMcpServer
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         await using var ownedSession = session;
-        var providerTools = new ProviderTools(providers, session as IProviderProjectSession);
-        var contextTools = new ContextTools(providers, session as IContextProjectSession);
+        var providerTools = new ProviderTools(providers, session as IProviderProjectSession, workspaceTools);
+        var contextTools = new ContextTools(providers, session as IContextProjectSession, workspaceTools);
         await using var transport = new CompatibleStdioTransport(input, output);
         var options = new McpServerOptions
         {

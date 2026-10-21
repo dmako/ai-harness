@@ -1,10 +1,11 @@
+using Harness.Mcp.Workspaces;
 using System.Text.Json;
 using Harness.Core.Providers;
 using Harness.Core.Retrieval;
 
 namespace Harness.Mcp.Context;
 
-public sealed class ContextTools(IProviderRegistry? providers = null, IContextProjectSession? project = null)
+public sealed class ContextTools(IProviderRegistry? providers = null, IContextProjectSession? project = null, WorkspaceTools? workspace = null)
 {
     public async Task<ContextAnswer> CallAsync(IDictionary<string, JsonElement>? arguments, CancellationToken token)
     {
@@ -19,7 +20,7 @@ public sealed class ContextTools(IProviderRegistry? providers = null, IContextPr
             throw new ArgumentException("scope must be project or workspace");
         if (String("depth") is not ("" or "light" or "deep"))
             throw new ArgumentException("depth must be light or deep");
-        if (scope is "workspace")
+        if (scope is "workspace" && workspace is null)
             throw new InvalidOperationException("this project is not in a workspace; use 'harness workspace create' to add it");
         var request = new ContextRequest(task, Integer("budget"), Integer("tokens"), arguments?.TryGetValue("debug", out var debug) is true && debug.GetBoolean());
         var bytes = ContextRenderer.BudgetBytes(request);
@@ -34,7 +35,8 @@ public sealed class ContextTools(IProviderRegistry? providers = null, IContextPr
             var current = await freshness.ReadProviderProjectAsync(linked.Token).ConfigureAwait(false);
             context = context with { Stale = current.Stale, CrossBranch = current.CrossBranch };
         }
-        return await ContextRenderer.RenderAsync(request, gathered, context, linked.Token).ConfigureAwait(false);
+        var section = scope is "workspace" ? await workspace!.ContextAsync(task, gathered.Symbols, gathered.Phrases, String("depth") is "deep", bytes / 4, linked.Token).ConfigureAwait(false) : null;
+        return await ContextRenderer.RenderAsync(request, gathered, context, section, linked.Token).ConfigureAwait(false);
 
         string String(string key) => arguments?.TryGetValue(key, out var value) is true ? value.GetString() ?? "" : "";
         int Integer(string key) => arguments?.TryGetValue(key, out var value) is true ? value.GetInt32() : 0;
