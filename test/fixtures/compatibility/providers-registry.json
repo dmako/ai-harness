@@ -1,0 +1,232 @@
+{
+  "answers": [
+    {
+      "bytes": 123,
+      "capability": "code.text_search",
+      "items": [
+        {
+          "kind": "match",
+          "path": "src/a.cs",
+          "provider": "z",
+          "tool": "find"
+        }
+      ],
+      "provider": "z",
+      "truncated": true
+    },
+    {
+      "bytes": 123,
+      "capability": "code.text_search",
+      "items": [
+        {
+          "kind": "match",
+          "path": "src/a.cs",
+          "provider": "a",
+          "tool": "find"
+        }
+      ],
+      "provider": "a",
+      "truncated": true
+    }
+  ],
+  "capabilities": [
+    {
+      "capability": "code.symbol_search",
+      "provider": "a",
+      "cost": "low",
+      "latency": "medium",
+      "freshness": "indexed",
+      "scope": "project"
+    },
+    {
+      "capability": "code.text_search",
+      "provider": "a",
+      "cost": "low",
+      "latency": "medium",
+      "freshness": "indexed",
+      "scope": "project"
+    },
+    {
+      "capability": "code.text_search",
+      "provider": "z",
+      "cost": "low",
+      "latency": "medium",
+      "freshness": "indexed",
+      "scope": "project"
+    }
+  ],
+  "empty_item": {
+    "kind": "",
+    "provider": "",
+    "tool": ""
+  },
+  "health": {
+    "state": "idle"
+  },
+  "in_context": {
+    "a": true,
+    "z": false
+  },
+  "item": {
+    "kind": "relation",
+    "name": "A",
+    "qualified_name": "A.B",
+    "label": "project",
+    "path": "A.csproj",
+    "start_line": 2,
+    "end_line": 3,
+    "snippet": "reference",
+    "score": 0.7,
+    "depth": 1,
+    "related": {
+      "name": "B",
+      "path": "B.csproj",
+      "start_line": 4
+    },
+    "members": [
+      "A",
+      "B"
+    ],
+    "count": 8,
+    "confidence": 0.9,
+    "provider": "compiler",
+    "tool": "dependencies"
+  },
+  "metadata": [
+    {
+      "architecture": false,
+      "capability": "code.symbol_search",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.text_search",
+      "evidence": "exact",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.file_search",
+      "evidence": "exact",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "project.overview",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.callers",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.references",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.context",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.impact",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "code.flow",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": false,
+      "capability": "package.search",
+      "evidence": "inferred",
+      "package": true
+    },
+    {
+      "architecture": false,
+      "capability": "package.info",
+      "evidence": "inferred",
+      "package": true
+    },
+    {
+      "architecture": false,
+      "capability": "package.types",
+      "evidence": "inferred",
+      "package": true
+    },
+    {
+      "architecture": false,
+      "capability": "package.type_definition",
+      "evidence": "inferred",
+      "package": true
+    },
+    {
+      "architecture": true,
+      "capability": "arch.dependencies",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": true,
+      "capability": "arch.cycles",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": true,
+      "capability": "arch.change_coupling",
+      "evidence": "exact",
+      "package": false
+    },
+    {
+      "architecture": true,
+      "capability": "arch.duplicates",
+      "evidence": "inferred",
+      "package": false
+    },
+    {
+      "architecture": true,
+      "capability": "arch.dead_code",
+      "evidence": "inferred",
+      "package": false
+    }
+  ],
+  "paths": [
+    {
+      "covers": true,
+      "file": "any.cs",
+      "prefix": ""
+    },
+    {
+      "covers": true,
+      "file": "src",
+      "prefix": "src"
+    },
+    {
+      "covers": true,
+      "file": "src/a.cs",
+      "prefix": "src/"
+    },
+    {
+      "covers": false,
+      "file": "src2/a.cs",
+      "prefix": "src"
+    },
+    {
+      "covers": false,
+      "file": "other/a.cs",
+      "prefix": "src"
+    }
+  ]
+}
