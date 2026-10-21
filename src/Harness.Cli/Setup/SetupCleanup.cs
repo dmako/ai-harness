@@ -15,7 +15,10 @@ internal static class SetupCleanup
     {
         List<(string Client, string Path)> targets = [("claude-code", Path.Combine(Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is { Length: > 0 } dir ? dir : Path.Combine(paths.Home, ".claude"), "settings.json")), ("codex", Path.Combine(Path.GetDirectoryName(paths.CodexFile)!, "hooks.json"))];
         if (root is not null)
+        {
             targets.AddRange([("claude-code", Path.Combine(root, ".claude", "settings.json")), ("claude-code", Path.Combine(root, ".claude", "settings.local.json")), ("codex", Path.Combine(root, ".codex", "hooks.json"))]);
+        }
+
         return targets.Select(t => new Removal(t.Path, () => ClientHookCleanup.Remove(t.Path, t.Client, dryRun)));
     }
     public static async Task<IReadOnlyList<Removal>> GitHooksAsync(GitRepository repository, bool dryRun, CancellationToken token)
@@ -39,13 +42,21 @@ internal static class SetupCleanup
         {
             profile = await QueryAsync(exe, ["-NoProfile", "-NonInteractive", "-Command", "$PROFILE.CurrentUserAllHosts"], token);
             if (Path.IsPathRooted(profile))
+            {
                 break;
+            }
         }
         if (!Path.IsPathRooted(profile))
+        {
             profile = OperatingSystem.IsWindows() ? Path.Combine(home, "Documents", "PowerShell", "profile.ps1") : Path.Combine(config, "powershell", "profile.ps1");
+        }
+
         List<Removal> changes = [];
         foreach (var path in new[] { Path.Combine(zsh, ".zshrc"), Path.Combine(home, ".bashrc"), profile })
+        {
             changes.Add(new(path, () => FileEditor.Apply(path, (source, exists) => exists ? CompletionBlock.Cut(source) : new(source, "absent"), dryRun, backup: true)));
+        }
+
         var fish = Path.Combine(config, "fish", "completions", "harness.fish");
         changes.Add(new(fish, () => FileEditor.Apply(fish, (source, exists) =>
         {
@@ -63,7 +74,10 @@ internal static class SetupCleanup
         deadline.CancelAfter(TimeSpan.FromSeconds(10));
         using var process = new Process { StartInfo = new(executable) { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = new UTF8Encoding(false, true) } };
         foreach (var arg in args)
+        {
             process.StartInfo.ArgumentList.Add(arg);
+        }
+
         var started = false;
         try
         {

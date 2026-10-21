@@ -105,7 +105,10 @@ public sealed class ManifestReaderTests
     public void UnixAnalysisLinksCannotEscapeAndMalformedOrOversizedFilesRemainPartialEvidence()
     {
         if (OperatingSystem.IsWindows())
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Unix symlink fixture; Windows creation may require developer mode or privileges.");
+        }
+
         using var tree = new ReaderTree(new() { ["inside.cs"] = "public class Inside {}" });
         using var other = new ReaderTree(new() { ["outside.cs"] = "public class Outside {}" });
         File.CreateSymbolicLink(Path.Combine(tree.Root, "escape.cs"), Path.Combine(other.Root, "outside.cs"));

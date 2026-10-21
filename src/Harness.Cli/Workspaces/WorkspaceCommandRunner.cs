@@ -1,7 +1,7 @@
-using Harness.Cli.Memory;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Globalization;
+using Harness.Cli.Memory;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Workspaces;
@@ -39,7 +39,10 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         if (settings.Json)
         { await JsonAsync(new { workspaces = workspaces.Select(Wire) }); return 0; }
         if (workspaces.Count is 0)
+        {
             await output.WriteLineAsync("No workspaces yet: 'harness workspace create <name> --discover <folder>' groups the projects under a folder.");
+        }
+
         foreach (var workspace in workspaces)
         {
             var names = workspace.Members.Select(id => projects.FirstOrDefault(project => project["id"]?.GetValue<string>() == id) is { } row ? WorkspaceStore.ShortName(row) : id);
@@ -51,13 +54,19 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
     {
         var workspace = await Store.CreateAsync(settings.Name, token);
         if (settings.Title.Length > 0)
+        {
             workspace = await Store.RenameAsync(workspace.Name, "", settings.Title, token);
+        }
+
         await output.WriteLineAsync("Created workspace " + workspace.Name + ".");
         if (settings.Discover.Length is 0)
         { await output.WriteLineAsync("Add projects: harness workspace join " + workspace.Name + " --project <repository>"); return 0; }
         var projects = Store.Discover(settings.Discover);
         foreach (var project in projects)
+        {
             await output.WriteLineAsync("  + " + WorkspaceStore.ShortName(project) + "  " + project["root"]!.GetValue<string>());
+        }
+
         if (projects.Count is 0)
         { await output.WriteLineAsync("No registered projects under " + Path.GetFullPath(settings.Discover) + " ('harness init' in a repository registers it)."); return 0; }
         await Store.JoinAsync(workspace.Name, projects.Select(project => project["id"]!.GetValue<string>()).ToArray(), token);
@@ -68,11 +77,15 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
     {
         var projects = Store.Discover(settings.Directory);
         if (settings.Json)
+        {
             await JsonAsync(new { projects });
+        }
         else
         {
             foreach (var project in projects)
+            {
                 await output.WriteLineAsync(WorkspaceStore.ShortName(project) + "  " + project["root"]!.GetValue<string>());
+            }
         }
         return 0;
     }
@@ -83,7 +96,10 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         { await JsonAsync(Wire(workspace)); return 0; }
         await output.WriteLineAsync($"{workspace.Name}  ({workspace.Id}, {workspace.Members.Count} project(s))");
         if (workspace.Title.Length > 0)
+        {
             await output.WriteLineAsync("  shown as " + JsonSerializer.Serialize(workspace.Title));
+        }
+
         var projects = lifecycle.Registry.Load()["projects"]!.AsArray().OfType<JsonObject>().ToArray();
         foreach (var id in workspace.Members)
         {
@@ -123,19 +139,28 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
     {
         string? title = settings.ClearTitle ? "" : null;
         if (!settings.ClearTitle && settings.Title.Length > 0)
+        {
             title = settings.Title;
+        }
+
         if (settings.To.Length is 0 && title is null)
         { await error.Writer.WriteLineAsync("harness workspace rename: give --to <new name>, --title <display name> or --clear-title"); return 2; }
         var workspace = await Store.RenameAsync(settings.Name, settings.To, title, token);
         await output.WriteLineAsync("Workspace " + workspace.Name + (workspace.Title.Length > 0 ? ", shown as " + JsonSerializer.Serialize(workspace.Title) : "") + ".");
         if (workspace.Name != settings.Name)
+        {
             await output.WriteLineAsync("Agents and commands now use workspace:" + workspace.Name + "; its members and knowledge are unchanged.");
+        }
+
         return 0;
     }
     private async Task<int> ForgetAsync(ProjectForgetSettings settings, CancellationToken token)
     {
         if (!await lifecycle.Registry.ForgetAsync(settings.Id, token))
+        {
             throw new InvalidOperationException(settings.Id + " is not registered ('harness projects' lists them)");
+        }
+
         await output.WriteLineAsync("Forgot " + settings.Id + " (its repository and state are untouched; init, sync or an agent there registers it again).");
         return 0;
     }
@@ -143,10 +168,16 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
     {
         string? name = settings.ResetName ? "" : null;
         if (settings.To.Length > 0 && !settings.ResetName)
+        {
             name = settings.To;
+        }
+
         string? title = settings.ClearTitle ? "" : null;
         if (settings.Title.Length > 0 && !settings.ClearTitle)
+        {
             title = settings.Title;
+        }
+
         if (name is null && title is null)
         { await error.Writer.WriteLineAsync("harness projects rename: give --to, --reset-name, --title or --clear-title"); return 2; }
         var project = await RegisteredAsync(settings.Project, token);
@@ -164,18 +195,29 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             project["live"] = live;
             var membership = workspaces.Where(workspace => workspace.Members.Contains(project["id"]!.GetValue<string>(), StringComparer.Ordinal)).Select(workspace => JsonValue.Create(workspace.Name)).ToArray<JsonNode?>();
             if (membership.Length > 0)
+            {
                 project["workspaces"] = new JsonArray(membership);
+            }
+
             if (!settings.Json)
             {
                 if (project != projects[0])
+                {
                     await output.WriteLineAsync();
+                }
+
                 await PrintProjectAsync(project, live);
             }
         }
         if (settings.Json)
+        {
             await JsonAsync(new { projects });
+        }
         else if (projects.Length is 0)
+        {
             await output.WriteLineAsync("No projects registered yet: 'harness init' in a repository registers it.");
+        }
+
         return 0;
     }
     private async Task PrintProjectAsync(JsonObject project, JsonObject live)
@@ -183,9 +225,15 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         string Value(JsonObject row, string key) => row[key]?.GetValue<string>() ?? "";
         var state = Value(live, "state").Replace('_', ' ');
         if (Value(live, "detail") is { Length: > 0 } detail)
+        {
             state += ": " + detail;
+        }
+
         if (Value(live, "state") is "ok")
+        {
             state += string.Create(CultureInfo.InvariantCulture, $" (schema {live["schema"]}/{live["schema_latest"]})");
+        }
+
         await output.WriteLineAsync(Value(project, "id") + "  " + Value(project, "root"));
         await Row("state", state);
         var commit = Value(live, "commit");
@@ -194,9 +242,15 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             var branch = Value(live, "branch");
             var git = commit[..Math.Min(commit.Length, 12)] + " on " + (branch.Length is 0 ? "detached HEAD" : branch);
             if (Value(live, "synced_at") is { Length: > 0 } synced)
+            {
                 git += ", synced " + Ago(synced);
+            }
+
             if (Value(live, "stale") is { Length: > 0 } stale)
+            {
                 git += " — " + stale;
+            }
+
             await Row("git", git);
         }
         if (Value(live, "state") is "ok")
@@ -205,25 +259,44 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             var hitRate = live["context_hit_rate_30d"]!.GetValue<double>();
             await Row("context", answers > 0 ? string.Create(CultureInfo.InvariantCulture, $"{hitRate * 100:0}% hit rate over {answers} scored answer(s), last 30 days") : "no scored get_context answers in the last 30 days");
             if (live["pending_proposals"]!.GetValue<int>() is > 0 and var pending)
+            {
                 await Row("proposals", string.Create(CultureInfo.InvariantCulture, $"{pending} pending (harness proposals list --project {Value(project, "root")})"));
+            }
         }
         List<string> used = [];
         if (Value(project, "last_mcp") is { Length: > 0 } mcp)
+        {
             used.Add("agent (MCP) " + Ago(mcp));
+        }
+
         if (Value(project, "last_sync") is { Length: > 0 } sync)
+        {
             used.Add("sync " + Ago(sync));
+        }
+
         if (used.Count > 0)
+        {
             await Row("used", string.Join(", ", used));
+        }
+
         foreach (var key in new[] { "clients", "workspaces", "worktrees" })
+        {
             if (project[key] is JsonArray values && values.Count > (key is "worktrees" ? 1 : 0))
+            {
                 await Row(key, string.Join(", ", values.Select(value => value!.GetValue<string>())));
+            }
+        }
+
         await Row("harness", Value(project, "harness_version"));
         Task Row(string name, string value) => output.WriteLineAsync($"    {name,-9} {value}");
     }
     private static string Ago(string value)
     {
         if (!DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var at))
+        {
             return value;
+        }
+
         var elapsed = DateTimeOffset.UtcNow - at;
         return elapsed.TotalMinutes switch
         {

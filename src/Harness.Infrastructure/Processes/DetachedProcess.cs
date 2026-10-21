@@ -29,7 +29,10 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
     public void Kill()
     {
         if (Completion.IsCompleted)
+        {
             return;
+        }
+
         if (!OperatingSystem.IsWindows())
         { _ = UnixProviderProcess.Native.kill(-Id, 9); return; }
         try
@@ -43,7 +46,10 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
     private static DetachedProcess Windows(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment, SafeFileHandle input, SafeFileHandle output, SafeFileHandle error)
     {
         foreach (var handle in new[] { input, output, error })
+        {
             Check(WindowsProviderProcess.Native.SetHandleInformation(handle, 1, 1));
+        }
+
         using var handles = new NativeMemory(IntPtr.Size * 3);
         Marshal.Copy(new[] { input.DangerousGetHandle(), output.DangerousGetHandle(), error.DangerousGetHandle() }, 0, handles.Pointer, 3);
         nuint size = 0;
@@ -62,7 +68,10 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
             using var block = new NativeMemory(string.Join('\0', environment.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase).Select(pair => pair.Key + "=" + pair.Value)) + "\0\0", unicode: true);
             // BREAKAWAY_FROM_JOB + EXTENDED_STARTUPINFO + UNICODE_ENVIRONMENT + NEW_PROCESS_GROUP + DETACHED_PROCESS.
             if (!WindowsProviderProcess.Native.CreateProcessW(executable, commandLine.Pointer, IntPtr.Zero, IntPtr.Zero, true, 0x01080608, block.Pointer, directory, ref startup, out var info))
+            {
                 throw new Win32Exception(Marshal.GetLastPInvokeError(), "Cannot detach graphify watch; a containing Windows job may forbid process breakaway.");
+            }
+
             using var processHandle = new SafeProcessHandle(info.Process, true);
             using var threadHandle = new SafeWaitHandle(info.Thread, true);
             var process = Process.GetProcessById(info.Id);
@@ -90,7 +99,10 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
     private static DetachedProcess Unix(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment, SafeFileHandle input, SafeFileHandle output, SafeFileHandle error)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+        {
             throw new PlatformNotSupportedException("Detached watches support Windows, Linux and macOS.");
+        }
+
         using var attributes = new NativeMemory(1024);
         using var actions = new NativeMemory(1024);
         Check(UnixProviderProcess.Native.posix_spawnattr_init(attributes.Pointer));
@@ -104,7 +116,10 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
                 using var cwd = new NativeMemory(directory);
                 Check(UnixProviderProcess.Native.posix_spawn_file_actions_addchdir_np(actions.Pointer, cwd.Pointer));
                 foreach (var (handle, target) in new[] { (input, 0), (output, 1), (error, 2) })
+                {
                     Check(UnixProviderProcess.Native.posix_spawn_file_actions_adddup2(actions.Pointer, handle.DangerousGetHandle().ToInt32(), target));
+                }
+
                 using var argv = new UnixProviderProcess.StringVector(new[] { executable }.Concat(arguments));
                 using var env = new UnixProviderProcess.StringVector(environment.Select(pair => pair.Key + "=" + pair.Value));
                 using var name = new NativeMemory(executable);
@@ -116,6 +131,14 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
         finally { _ = UnixProviderProcess.Native.posix_spawnattr_destroy(attributes.Pointer); }
     }
 
-    private static void Check(bool success) { if (!success) throw new Win32Exception(Marshal.GetLastPInvokeError()); }
-    private static void Check(int error) { if (error is not 0) throw new Win32Exception(error); }
+    private static void Check(bool success) { if (!success)
+        {
+            throw new Win32Exception(Marshal.GetLastPInvokeError());
+        }
+    }
+    private static void Check(int error) { if (error is not 0)
+        {
+            throw new Win32Exception(error);
+        }
+    }
 }

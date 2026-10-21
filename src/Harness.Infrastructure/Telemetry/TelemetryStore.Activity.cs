@@ -27,7 +27,10 @@ public sealed partial class TelemetryStore
         result.AddRange(SyncActivity(from));
         var ordered = result.OrderByDescending(r => MemoryTimestamp.Parse(r.At)).ToArray();
         if (ordered.Length is 0)
+        {
             return null;
+        }
+
         return limit > 0 ? ordered.Take(limit).ToArray() : ordered;
     }
     private static string At(string text)
@@ -50,7 +53,10 @@ public sealed partial class TelemetryStore
             void Flush()
             {
                 if (current.Count is 0)
+                {
                     return;
+                }
+
                 var start = Time(Text(current[0][0]));
                 var end = Time(Text(current[^1][0]));
                 var span = end - start;
@@ -63,7 +69,10 @@ public sealed partial class TelemetryStore
                 var tools = current.GroupBy(r => Text(r[1])).Select(g => (Tool: g.Key, Count: g.Count())).OrderByDescending(g => g.Count).ThenBy(g => g.Tool, StringComparer.Ordinal).ToArray();
                 var parts = tools.Take(4).Select(g => g.Tool + " ×" + g.Count.ToString(CultureInfo.InvariantCulture)).ToList();
                 if (tools.Length > 4)
+                {
                     parts.Add((tools.Length - 4).ToString(CultureInfo.InvariantCulture) + " more");
+                }
+
                 var errors = current.Count(r => Int(r[3]) is not 0);
                 var title = string.Create(CultureInfo.InvariantCulture, $"{(client.Key.Length is 0 ? "an agent" : client.Key)} used harness: {current.Count} call(s) over {duration}") + (errors > 0 ? string.Create(CultureInfo.InvariantCulture, $", {errors} failed") : "");
                 result.Add(new(At(Text(current[^1][0])), "session", title, string.Join(", ", parts), Actor: Optional(client.Key), Level: errors > 0 ? "warn" : null));
@@ -72,7 +81,10 @@ public sealed partial class TelemetryStore
             foreach (var call in client)
             {
                 if (current.Count > 0 && Time(Text(call[0])) - Time(Text(current[^1][0])) > TimeSpan.FromMinutes(30))
+                {
                     Flush();
+                }
+
                 current.Add(call);
             }
             Flush();
@@ -95,16 +107,23 @@ public sealed partial class TelemetryStore
                 {
                     var failed = providers.RootElement.EnumerateArray().Where(p => p.TryGetProperty("status", out var s) && s.GetString() is "failed").Select(p => p.GetProperty("name").GetString()).ToArray();
                     if (failed.Length > 0)
+                    {
                         detail += "; failed: " + string.Join(", ", failed);
+                    }
                 }
             }
             catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException) { /* Source ignores malformed optional provider observations. */ }
             var level = status switch { "failed" => "problem", "partial" => "warn", _ => null };
             if (status is "failed")
+            {
                 detail = Clip(Text(r[8]).Trim(), 160);
+            }
+
             var item = new ActivityItem(At(Text(r[0])), "sync", "sync " + status, Optional(detail), Level: level);
             if (result.Count > 0 && status is "ok" && result[^1].Level is null && Time(item.At) - Time(result[^1].At) < TimeSpan.FromHours(2))
+            {
                 result[^1] = item with { Title = (++runs).ToString(CultureInfo.InvariantCulture) + " syncs ok" };
+            }
             else
             { runs = 1; result.Add(item); }
         }

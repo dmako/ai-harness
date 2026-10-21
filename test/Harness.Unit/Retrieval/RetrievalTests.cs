@@ -109,7 +109,10 @@ public sealed class RetrievalTests
         var failures = 0;
         var broken = new FileReadCache((_, _) => { failures++; throw new IOException("missing"); });
         for (var i = 0; i < 2; i++)
+        {
             await FluentActions.Awaiting(() => broken.ReadBodyAsync("missing", 1, 1)).Should().ThrowAsync<IOException>();
+        }
+
         failures.Should().Be(1);
     }
 

@@ -12,11 +12,20 @@ public sealed partial class TaskStore
         ArgumentNullException.ThrowIfNull(definition);
         var d = (definition with { Id = "", Status = "" }).Normalize();
         if (d.Title.Length is 0)
+        {
             throw new ArgumentException("a task needs a title");
+        }
+
         if (string.IsNullOrWhiteSpace(d.Goal))
+        {
             throw new ArgumentException("a task needs its goal: the outcome and why");
+        }
+
         if (d.Acceptance.Count is 0)
+        {
             throw new ArgumentException("a task needs acceptance criteria that can be checked");
+        }
+
         try
         { (d with { Id = "X-1" }).Validate(); }
         catch (ArgumentException exception) { throw new ArgumentException(exception.Message.Replace("X-1: ", "", StringComparison.Ordinal), exception); }
@@ -24,7 +33,10 @@ public sealed partial class TaskStore
         {
             var (existing, _) = LoadGraph(c, t);
             if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+            {
                 throw new ArgumentException($"depends on unknown task {missing}");
+            }
+
             var proposal = new TaskProposal("tpr_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), d, reason.Trim(), "pending", by, Stamp());
             Execute(c, t, "INSERT INTO task_proposals(id,definition,reason,status,proposed_by,proposed_at) VALUES($id,$definition,$reason,'pending',$by,$at)",
                 ("$id", proposal.Id), ("$definition", JsonSerializer.Serialize(TaskViews.Definition(d), JsonOptions)), ("$reason", proposal.Reason), ("$by", by), ("$at", proposal.ProposedAt));
@@ -42,7 +54,10 @@ public sealed partial class TaskStore
         using var reader = command.ExecuteReader();
         List<TaskProposal> proposals = [];
         while (reader.Read())
+        {
             proposals.Add(ReadProposal(reader));
+        }
+
         return (IReadOnlyList<TaskProposal>)proposals;
     }, cancellationToken);
 
@@ -70,7 +85,10 @@ public sealed partial class TaskStore
     {
         var proposal = GetProposal(c, t, id);
         if (proposal.Status is not "pending")
+        {
             throw new InvalidOperationException($"{id} was already {proposal.Status}");
+        }
+
         var task = Create(c, t, edit ?? proposal.Task, prefix, new(by, "proposal:" + id, $"proposed by {proposal.ProposedBy} ({id}), approved by {by}"));
         return new TaskApproval(Decide(c, t, proposal, "approved", by, "", task.Id, Stamp()), task);
     }, cancellationToken);
@@ -79,7 +97,10 @@ public sealed partial class TaskStore
     {
         var proposal = GetProposal(c, t, id);
         if (proposal.Status is not "pending")
+        {
             throw new InvalidOperationException($"{id} was already {proposal.Status}");
+        }
+
         return Decide(c, t, proposal, "rejected", by, note.Trim(), "", Stamp());
     }, cancellationToken);
 

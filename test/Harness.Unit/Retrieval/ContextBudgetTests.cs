@@ -32,7 +32,10 @@ public sealed class ContextBudgetTests
             new() { Id = "memory:1", Source = "memory", Role = "decision", Text = statement, Evidence = "exact", Scores = new() { ["scope"] = 1 } },
         };
         for (var i = 0; i < 50; i++)
+        {
             candidates.Add(Code("LongSymbol" + i, "some/deeply/nested/path/File.cs", i + 1, i + 1));
+        }
+
         var bodies = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["a.cs"] = statement + "\n" + Lines(8, "x"),
@@ -92,8 +95,12 @@ public sealed class ContextBudgetTests
             actual.AsObject().Remove("used_bytes");
             expected!.AsObject().Remove("used_bytes");
             foreach (var value in new[] { actual, expected })
+            {
                 foreach (var call in value["debug"]!["calls"]!.AsArray())
+                {
                     call!.AsObject().Remove("latency_ms");
+                }
+            }
         }
         JsonNode.DeepEquals(actual, expected).Should().BeTrue("C# {0} equals Go {1}", actual, expected);
     }
@@ -148,7 +155,10 @@ public sealed class ContextBudgetTests
     {
         var candidate = Candidate.FromItem(new(Capabilities.SymbolSearch, "p", Evidence: "exact"), 0, new() { Name = name, Path = path, StartLine = start, EndLine = end, Provider = "p" });
         if (named)
+        {
             candidate.Scores["name"] = 1;
+        }
+
         return candidate;
     }
     private static string Lines(int count, string text) => string.Concat(Enumerable.Repeat(string.Concat(Enumerable.Repeat(text, 39)) + "\n", count));
@@ -158,7 +168,10 @@ public sealed class ContextBudgetTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_CONTEXT_ORACLE");
         if (string.IsNullOrEmpty(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_CONTEXT_ORACLE using Context/build_oracle.py.");
+        }
+
         using var process = new Process { StartInfo = new(oracle) { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true } };
         process.Start();
         try

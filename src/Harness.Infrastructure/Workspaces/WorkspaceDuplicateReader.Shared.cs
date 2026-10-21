@@ -39,13 +39,22 @@ public sealed partial class WorkspaceDuplicateReader
     {
         var holdingLibrary = libraries.FirstOrDefault(library => holders.Any(holder => holder.Id == library.Id));
         if (holdingLibrary is not null)
+        {
             return new("holds-copy", Name(holdingLibrary) + " is a library and already holds a copy: the others can use it from there", holdingLibrary.Id, Name(holdingLibrary));
+        }
+
         var provider = holders.FirstOrDefault(holder => holders.Length > 1 && holders.All(other => other.Id == holder.Id || uses.Contains((other.Id, holder.Id))));
         if (provider is not null)
+        {
             return new("provider", "the others already use " + Name(provider) + ", which has it: use its copy instead of keeping their own", provider.Id, Name(provider));
+        }
+
         var candidate = libraries.Select(library => (Library: library, Users: holders.Count(holder => uses.Contains((holder.Id, library.Id))))).OrderByDescending(candidate => candidate.Users).ThenBy(candidate => Name(candidate.Library), StringComparer.Ordinal).FirstOrDefault();
         if (candidate.Library is null)
+        {
             return new("new", "the workspace has no shared library: a new one the members with a copy use");
+        }
+
         var name = Name(candidate.Library);
         var kind = candidate.Users == holders.Length ? "used-by-all" : "library";
         var reason = candidate.Users switch
@@ -61,9 +70,13 @@ public sealed partial class WorkspaceDuplicateReader
     {
         var key = workspace + "\0" + about;
         if (_knowledge.TryGetValue(key, out var cached))
+        {
             return cached;
+        }
+
         IReadOnlyList<string>? output = null;
         if (levels is not null && workspace.Length > 0)
+        {
             try
             {
                 var path = levels.KnowledgePath(levels.Load(), new("workspace", workspace));
@@ -72,10 +85,14 @@ public sealed partial class WorkspaceDuplicateReader
                     using var database = HarnessDatabase.OpenReadOnly(path);
                     var records = new MemoryStore(database).Search(new() { Text = about, Types = ["decision", "convention"], Limit = 3 }, token);
                     if (records.Count > 0)
+                    {
                         output = records.Select(memory => memory.Content).ToArray();
+                    }
                 }
             }
             catch (Exception error) when (KnowledgeLevels.IsStorageError(error)) { /* Optional workspace knowledge must never create or migrate stores. */ }
+        }
+
         _knowledge.Add(key, output);
         return output;
     }

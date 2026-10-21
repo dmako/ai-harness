@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Storage;
@@ -23,7 +23,10 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
         var result = action(connection, transaction);
         cancellationToken.ThrowIfCancellationRequested();
         if (!dryRun)
+        {
             transaction.Commit();
+        }
+
         return result;
     }
 
@@ -45,7 +48,10 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
         using var reader = command.ExecuteReader();
         List<TaskEvent> events = [];
         while (reader.Read())
+        {
             events.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), MemoryTimestamp.Parse(reader.GetString(5))));
+        }
+
         return (IReadOnlyList<TaskEvent>)events;
     }, cancellationToken);
 
@@ -73,8 +79,13 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
         List<(string Id, string Status, string Claimant)> expired = [];
         using (var command = Command(c, t, "SELECT id,status,claimant FROM tasks WHERE status IN ('claimed','in_progress','review') AND lease_until IS NOT NULL AND lease_until <= $now", ("$now", now)))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
+            {
                 expired.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+        }
+
         foreach (var item in expired)
         {
             ClearClaim(c, t, item.Id, "ready", now);
@@ -91,20 +102,30 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
             FROM tasks t WHERE t.status IN ('backlog','ready') ORDER BY t.ordinal,t.id
             """))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
+            {
                 states.Add((reader.GetString(0), reader.GetString(1), reader.GetInt64(2)));
+            }
+        }
+
         List<string> unlocked = [];
         var now = Stamp();
         foreach (var item in states)
         {
             var to = item.Open is 0 ? "ready" : "backlog";
             if (to == item.Status)
+            {
                 continue;
+            }
+
             Execute(c, t, "UPDATE tasks SET status=$status,updated_at=$now WHERE id=$id", ("$status", to), ("$now", now), ("$id", item.Id));
             AddEvent(c, t, item.Id, to is "ready" ? "unlocked" : "relocked", item.Status, to, "system",
                 to is "ready" ? "all dependencies done" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{item.Open} dependencies not done"), now);
             if (to is "ready")
+            {
                 unlocked.Add(item.Id);
+            }
         }
         return unlocked;
     }
@@ -132,8 +153,13 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
         List<string> ids = [];
         using (var command = Command(c, t, sql, parameters.ToArray()))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
+            {
                 ids.Add(reader.GetString(0));
+            }
+        }
+
         return ids.Select(id => Get(c, t, id)).ToArray();
     }
 
@@ -148,7 +174,10 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
         using (var r = command.ExecuteReader())
         {
             if (!r.Read())
+            {
                 throw new KeyNotFoundException($"{id}: task not found");
+            }
+
             string Text(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
             MemoryTimestamp? Time(int i) => r.IsDBNull(i) ? null : MemoryTimestamp.Parse(r.GetString(i));
             record = new()
@@ -185,13 +214,23 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
         List<TaskDependency> dependencies = [];
         using (var command = Command(c, t, "SELECT d.depends_on,t.status FROM task_dependencies d JOIN tasks t ON t.id=d.depends_on WHERE d.task_id=$id ORDER BY d.depends_on", ("$id", id)))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
+            {
                 dependencies.Add(new(reader.GetString(0), reader.GetString(1)));
+            }
+        }
+
         List<TaskCriterion> criteria = [];
         using (var command = Command(c, t, "SELECT idx,criterion,result,COALESCE(evidence,'') FROM task_acceptance WHERE task_id=$id ORDER BY idx", ("$id", id)))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
+            {
                 criteria.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+            }
+        }
+
         return record with
         {
             Dependencies = dependencies,
@@ -212,12 +251,18 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
     private static string Json(IReadOnlyList<string>? values)
     {
         if (values is null)
+        {
             return "null";
+        }
+
         var builder = new StringBuilder("[");
         for (var i = 0; i < values.Count; i++)
         {
             if (i > 0)
+            {
                 builder.Append(',');
+            }
+
             builder.Append('"');
             foreach (var rune in values[i].EnumerateRunes())
             {
@@ -253,7 +298,10 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
             command.Transaction = t;
             command.CommandText = sql;
             foreach (var (name, value) in parameters)
+            {
                 command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+            }
+
             return command;
         }
         catch { command.Dispose(); throw; }

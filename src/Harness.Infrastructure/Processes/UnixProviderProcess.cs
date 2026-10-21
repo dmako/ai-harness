@@ -30,7 +30,9 @@ internal sealed class UnixProviderProcess : IProviderProcess
         while (Native.waitpid(pid, out status, 0) < 0)
         {
             if (Marshal.GetLastPInvokeError() is not 4)
+            {
                 throw new Win32Exception(Marshal.GetLastPInvokeError());
+            }
         }
         return (status & 0x7f) is 0 ? status >> 8 : 128 + (status & 0x7f);
     }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
@@ -44,7 +46,9 @@ internal sealed class UnixProviderProcess : IProviderProcess
     internal static UnixProviderProcess Start(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+        {
             throw new PlatformNotSupportedException("Provider process containment supports Linux, macOS and Windows.");
+        }
         // Opaque storage exceeds glibc's 336-byte attr/80-byte actions and Darwin's pointer-sized types.
         using var attributes = new NativeMemory(1024);
         using var actions = new NativeMemory(1024);
@@ -62,7 +66,10 @@ internal sealed class UnixProviderProcess : IProviderProcess
                 using var output = Pipe();
                 using var error = Pipe();
                 foreach (var (descriptor, target) in new[] { (input.Read, 0), (output.Write, 1), (error.Write, 2) })
+                {
                     Check(Native.posix_spawn_file_actions_adddup2(actions.Pointer, descriptor, target));
+                }
+
                 using var argv = new StringVector(new[] { executable }.Concat(arguments));
                 using var env = new StringVector(environment.Select(pair => pair.Key + "=" + pair.Value));
                 using var executableName = new NativeMemory(executable);
@@ -89,7 +96,10 @@ internal sealed class UnixProviderProcess : IProviderProcess
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) is not 0)
+        {
             return;
+        }
+
         try
         {
             _input.Dispose();
@@ -112,12 +122,18 @@ internal sealed class UnixProviderProcess : IProviderProcess
     {
         var descriptors = new int[2];
         if (Native.pipe(descriptors) is not 0)
+        {
             throw new Win32Exception(Marshal.GetLastPInvokeError());
+        }
+
         var pair = new PipePair(descriptors[0], descriptors[1]);
         try
         {
             if (Native.fcntl(pair.Read, 2, 1) < 0 || Native.fcntl(pair.Write, 2, 1) < 0) // FD_CLOEXEC
+            {
                 throw new Win32Exception(Marshal.GetLastPInvokeError());
+            }
+
             return pair;
         }
         catch { pair.Dispose(); throw; }
@@ -126,7 +142,9 @@ internal sealed class UnixProviderProcess : IProviderProcess
     private static void Check(int error)
     {
         if (error is not 0)
+        {
             throw new Win32Exception(error);
+        }
     }
 
     private sealed class PipePair(int read, int write) : IDisposable
@@ -149,19 +167,29 @@ internal sealed class UnixProviderProcess : IProviderProcess
             try
             {
                 foreach (var value in strings)
+                {
                     _strings.Add(new(value));
+                }
+
                 _vector = new((_strings.Count + 1) * IntPtr.Size);
                 Marshal.Copy(_strings.Select(value => value.Pointer).ToArray(), 0, _vector.Pointer, _strings.Count);
             }
             catch
             {
                 foreach (var value in _strings)
+                {
                     value.Dispose();
+                }
+
                 throw;
             }
         }
         internal IntPtr Pointer => _vector.Pointer;
-        public void Dispose() { _vector.Dispose(); foreach (var value in _strings) value.Dispose(); }
+        public void Dispose() { _vector.Dispose(); foreach (var value in _strings)
+            {
+                value.Dispose();
+            }
+        }
     }
 
     internal static class Native

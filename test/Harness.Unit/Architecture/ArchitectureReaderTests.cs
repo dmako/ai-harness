@@ -39,9 +39,14 @@ public sealed class ArchitectureReaderTests
         Equivalent(architecture, expected);
         architecture.Findings.Should().OnlyContain(finding => finding.Source.Provider == "harness" && finding.Measure > 0 && finding.Basis.Length > 0);
         if (language is "go")
+        {
             architecture.Findings.Should().Contain(finding => finding.Kind == "internal-import" && finding.Basis == "fact");
+        }
+
         if (language is "typescript")
+        {
             architecture.Findings.Should().Contain(finding => finding.Kind == "deep-import" && finding.Evidence!.Count == 3);
+        }
     }
     [Theory]
     [InlineData(false)]
@@ -200,6 +205,7 @@ public sealed class ArchitectureReaderTests
     private static void Canonical(JsonNode? node)
     {
         if (node is JsonObject obj)
+        {
             foreach (var pair in obj.ToArray())
             {
                 Canonical(pair.Value);
@@ -208,12 +214,19 @@ public sealed class ArchitectureReaderTests
                     var values = array.Select(value => value?.DeepClone()).OrderBy(value => value?.ToJsonString(), StringComparer.Ordinal).ToArray();
                     array.Clear();
                     foreach (var value in values)
+                    {
                         array.Add(value);
+                    }
                 }
             }
+        }
         else if (node is JsonArray array)
+        {
             foreach (var value in array)
+            {
                 Canonical(value);
+            }
+        }
     }
     [SuppressMessage("Security", "S4036:Searching OS commands in PATH is security-sensitive", Justification = "Explicit test oracle path, no shell.")]
     private static async Task<JsonNode?> OracleAsync(object input)

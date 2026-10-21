@@ -139,7 +139,10 @@ public sealed class SetupProcessTests
     public async Task ExplicitDataDeletionRefusesRedirectedStateDirectories()
     {
         if (OperatingSystem.IsWindows())
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Unix directory-link deletion fixture; Windows link creation may require privileges.");
+        }
+
         using var fixture = await SetupFixture.CreateAsync();
         var state = Path.Combine(fixture.Repository.Root, ".harness");
         var outside = Path.Combine(fixture.Repository.DirectoryRoot, "outside");
@@ -171,7 +174,10 @@ internal sealed class SetupFixture : IDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(fixture.Command)!);
             File.Copy(Environment.ProcessPath!, fixture.Command);
             if (!OperatingSystem.IsWindows())
+            {
                 File.SetUnixFileMode(fixture.Command, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+
             return fixture;
         }
         catch { fixture.Dispose(); throw; }
@@ -184,11 +190,20 @@ internal sealed class SetupFixture : IDisposable
         using var process = new Process { StartInfo = new("dotnet") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = Repository.Root } };
         process.StartInfo.ArgumentList.Add(binary);
         foreach (var arg in args)
+        {
             process.StartInfo.ArgumentList.Add(arg);
+        }
+
         foreach (var (key, value) in new Dictionary<string, string> { ["HARNESS_CONFIG_DIR"] = Repository.Global, ["HOME"] = Home, ["USERPROFILE"] = Home, ["CLAUDE_CONFIG_DIR"] = Path.GetDirectoryName(ClaudeFile)!, ["CODEX_HOME"] = Path.GetDirectoryName(CodexFile)!, ["ZDOTDIR"] = Home, ["XDG_CONFIG_HOME"] = Path.Combine(Home, ".config"), ["GIT_CONFIG_NOSYSTEM"] = "1", ["GIT_CONFIG_GLOBAL"] = Path.Combine(Home, "absent.gitconfig") })
+        {
             process.StartInfo.Environment[key] = value;
+        }
+
         foreach (var key in new[] { "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE" })
+        {
             process.StartInfo.Environment.Remove(key);
+        }
+
         process.Start();
         process.StandardInput.Close();
         var token = TestContext.Current.CancellationToken;

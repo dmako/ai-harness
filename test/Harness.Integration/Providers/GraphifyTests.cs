@@ -143,7 +143,10 @@ public sealed class GraphifyTests
             owned.StartedBy.Should().Be("fixture owner");
             await using (var otherManager = fixture.Manager())
             await using (var other = new GraphifyProvider(fixture.Options(), otherManager))
+            {
                 (await other.ExecuteAsync(new(Capabilities.SymbolSearch, "Save"), Token)).Error.Should().BeNull();
+            }
+
             GraphifySessionManager.ProcessAlive(owned.Pid).Should().BeTrue(manager.LastLog());
             fixture.Calls().Count(call => call[0] is "watch").Should().Be(1);
             await provider.DisposeAsync();
@@ -159,11 +162,17 @@ public sealed class GraphifyTests
         using var fixture = new GraphifyFixture();
         await using var manager = fixture.Manager();
         await using (var provider = new GraphifyProvider(fixture.Options() with { StopOnExit = false }, manager))
+        {
             (await provider.ExecuteAsync(new(Capabilities.Callers, "IService.Save"), Token)).Error.Should().BeNull();
+        }
+
         var session = (await manager.ListAsync(false, Token)).Single();
         GraphifySessionManager.ProcessAlive(session.Pid).Should().BeTrue(manager.LastLog());
         await using (var provider = new GraphifyProvider(fixture.Options(), manager))
+        {
             (await provider.ExecuteAsync(new(Capabilities.References, "IService.Save"), Token)).Error.Should().BeNull();
+        }
+
         GraphifySessionManager.ProcessAlive(session.Pid).Should().BeTrue(manager.LastLog());
         await manager.StopAsync(session.Id, Token);
         await ProviderFixture.GoneAsync(session.Pid);
@@ -231,7 +240,10 @@ internal sealed class GraphifyFixture : IDisposable
     {
         var path = Path.Combine(Data, "calls.log");
         if (!File.Exists(path))
+        {
             return [];
+        }
+
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         // The worker appends newline-delimited records; ignore a record still being written.
@@ -242,13 +254,18 @@ internal sealed class GraphifyFixture : IDisposable
     {
         var file = Path.Combine(Data, "sessions.json");
         if (File.Exists(file))
+        {
             foreach (var session in JsonNode.Parse(File.ReadAllText(file))!["sessions"]!.AsArray())
+            {
                 if (session?["session_id"]?.GetValue<string>().StartsWith("watch-", StringComparison.Ordinal) is true && session["process_id"]?.GetValue<int>() is { } pid)
                 {
                     try
                     { using var process = Process.GetProcessById(pid); if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(5000); } }
                     catch (ArgumentException) { /* Already reaped. */ }
                 }
+            }
+        }
+
         Path.GetFullPath(DirectoryRoot).Should().StartWith(Path.GetFullPath(Path.GetTempPath()));
         Directory.Delete(DirectoryRoot, recursive: true);
     }

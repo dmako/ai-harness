@@ -23,11 +23,19 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
         _properties["Configuration"] = "Debug";
         _properties["Platform"] = "AnyCPU";
         foreach (var name in new[] { "Directory.Build.props", "Directory.Packages.props" })
+        {
             if (Nearest(directory, name) is { } file)
+            {
                 await WalkAsync(file, 0, token).ConfigureAwait(false);
+            }
+        }
+
         await WalkAsync(project, 0, token).ConfigureAwait(false);
         if (Nearest(directory, "Directory.Build.targets") is { } targets)
+        {
             await WalkAsync(targets, 0, token).ConfigureAwait(false);
+        }
+
         var identity = new[] { "PackageId", "AssemblyName", "MSBuildProjectName" }.Select(name => _properties.GetValueOrDefault(name)).First(value => !string.IsNullOrWhiteSpace(value))!;
         return _uncertain || identity.Contains("$(", StringComparison.Ordinal) ? "" : identity;
     }
@@ -37,7 +45,10 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
         {
             var file = Path.Combine(directory, name);
             if (File.Exists(file))
+            {
                 return file;
+            }
+
             directory = Path.GetDirectoryName(directory) ?? "";
         }
         return null;
@@ -46,7 +57,10 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
     private async Task WalkAsync(string file, int depth, CancellationToken token)
     {
         if (!_seen.Add(file))
+        {
             return;
+        }
+
         if (depth > 8 || !Within(file))
         { _uncertain = true; return; }
         var text = await reader.ReadBodyAsync(Path.GetRelativePath(root, file), 1, int.MaxValue, token).ConfigureAwait(false);
@@ -57,7 +71,10 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
         {
             var allowed = Condition(element, directory);
             if (allowed is false)
+            {
                 continue;
+            }
+
             switch (element.Name.LocalName)
             {
                 case "PropertyGroup":
@@ -65,7 +82,10 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
                     {
                         var set = Condition(property, directory);
                         if (set is false)
+                        {
                             continue;
+                        }
+
                         if (allowed is null || set is null)
                         { _uncertain = true; continue; }
                         _properties[property.Name.LocalName] = Expand(property.Value.Trim(), directory);
@@ -79,7 +99,10 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
                     { _uncertain = true; break; }
                     path = Path.GetFullPath(path, directory);
                     if (File.Exists(path))
+                    {
                         await WalkAsync(path, depth + 1, token).ConfigureAwait(false);
+                    }
+
                     break;
                 case "ImportGroup" or "Choose":
                     _uncertain = true;
@@ -93,7 +116,10 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
         {
             var expanded = Property.Replace(value, match => match.Groups[1].Value.Equals("MSBuildThisFileDirectory", StringComparison.OrdinalIgnoreCase) ? directory + Path.DirectorySeparatorChar : _properties.GetValueOrDefault(match.Groups[1].Value) ?? match.Value);
             if (expanded == value)
+            {
                 break;
+            }
+
             value = expanded;
         }
         return value;
@@ -102,11 +128,17 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
     {
         var condition = element.Attribute("Condition")?.Value.Trim() ?? "";
         if (condition.Length is 0)
+        {
             return true;
+        }
+
         condition = Property.Replace(Expand(condition, directory), "");
         var match = Comparison.Match(condition);
         if (!match.Success)
+        {
             return null;
+        }
+
         var equal = string.Equals(match.Groups[1].Value, match.Groups[3].Value, StringComparison.OrdinalIgnoreCase);
         return match.Groups[2].Value is "==" ? equal : !equal;
     }

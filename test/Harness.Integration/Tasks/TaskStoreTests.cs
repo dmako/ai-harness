@@ -212,7 +212,10 @@ public sealed class TaskStoreTests
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+        {
             directory = directory.Parent;
+        }
+
         return directory?.FullName ?? throw new DirectoryNotFoundException();
     }
     private static void SeedExecution(HarnessDatabase database)
@@ -243,7 +246,9 @@ public sealed class TaskStoreTests
             command.CommandText = sql;
             using var reader = command.ExecuteReader();
             while (reader.Read())
+            {
                 rows.Add(Enumerable.Range(0, reader.FieldCount).Select(i => reader.IsDBNull(i) ? null : reader.GetValue(i)).ToArray());
+            }
         }
         return JsonSerializer.Serialize(rows);
     }

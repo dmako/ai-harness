@@ -14,9 +14,15 @@ internal static class ContextWire
         Add(value, "depth", c.Depth);
         Add(value, "body", unit.Body);
         if (unit.Clipped)
+        {
             value["clipped"] = true;
+        }
+
         if (debug)
+        {
             value["why"] = unit.Ranked.Explain();
+        }
+
         return value;
     }
     internal static Dictionary<string, object?> Memory(ContextUnit unit, bool debug)
@@ -24,15 +30,26 @@ internal static class ContextWire
         var c = unit.Ranked.Candidate;
         var value = new Dictionary<string, object?> { ["id"] = c.Id.StartsWith("memory:", StringComparison.Ordinal) ? c.Id[7..] : c.Id, ["type"] = c.Role };
         if (unit.Reference.StartsWith("see ", StringComparison.Ordinal))
+        {
             Add(value, "see", unit.Reference[4..]);
+        }
         else
+        {
             Add(value, "content", c.Text);
+        }
+
         Add(value, "path", c.Path);
         Add(value, "scope", c.MemoryScope);
         if (c.Overrides.Count > 0)
+        {
             value["overrides"] = c.Overrides;
+        }
+
         if (debug)
+        {
             value["why"] = unit.Ranked.Explain() + " (" + (c.Provenance.Count > 0 ? c.Provenance[0].Tool : "") + ")";
+        }
+
         return value;
     }
     internal static Dictionary<string, object?> Change(ContextUnit unit)
@@ -44,15 +61,27 @@ internal static class ContextWire
     {
         var c = unit.Ranked.Candidate;
         if (c.Source is "memory")
+        {
             return ContextJson.Size(Memory(unit, debug)) + 1;
+        }
+
         if (c.Source is not "code")
+        {
             return ContextJson.Size(Change(unit)) + 1;
+        }
+
         var size = ContextJson.Size(Code(unit, debug)) + 1;
         var previous = packed.Where(item => item.Ranked.Candidate.Source is "code").Select(item => item.Ranked.Candidate.Path).ToArray();
         if (!previous.Contains(c.Path, StringComparer.Ordinal))
+        {
             size += ContextJson.Size(new { path = c.Path, units = (object?)null }) + 1 - 4;
+        }
+
         if (!previous.Any(path => Area(path) == Area(c.Path)))
+        {
             size += ContextJson.Size(Area(c.Path)) + 4;
+        }
+
         return size;
     }
     internal static void AddCode(Dictionary<string, object?> output, ContextUnit unit, bool debug)
@@ -84,7 +113,9 @@ internal static class ContextWire
                 fate = unit.Body.Length > 0 ? "inlined" : "reference";
                 reason = unit.BodyNote;
                 if (unit.Body.Length > 0)
+                {
                     reason = unit.Clipped ? "clipped to the maximum body size" : "";
+                }
             }
             entries.Add(DebugCandidate(unit.Ranked, fate, reason));
         }
@@ -110,8 +141,16 @@ internal static class ContextWire
         Add(value, "why", item.Explain());
         return value;
     }
-    internal static void Add(Dictionary<string, object?> value, string name, string text) { if (text.Length > 0) value[name] = text; }
-    private static void Add(Dictionary<string, object?> value, string name, int number) { if (number is not 0) value[name] = number; }
+    internal static void Add(Dictionary<string, object?> value, string name, string text) { if (text.Length > 0)
+        {
+            value[name] = text;
+        }
+    }
+    private static void Add(Dictionary<string, object?> value, string name, int number) { if (number is not 0)
+        {
+            value[name] = number;
+        }
+    }
     private static string Area(string path) { var slash = path.IndexOf('/', StringComparison.Ordinal); return slash < 0 ? path : path[..slash]; }
     private static string[]? Providers(Candidate candidate) { var providers = candidate.Provenance.Select(item => item.Provider).Distinct(StringComparer.Ordinal).ToArray(); return providers.Length > 0 ? providers : null; }
 }

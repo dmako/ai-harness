@@ -1,5 +1,5 @@
-using System.Text;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
 using ModelContextProtocol.Client;
@@ -49,7 +49,10 @@ public sealed class McpProcessClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(options);
         if (options.StartTimeout <= TimeSpan.Zero || options.CallTimeout <= TimeSpan.Zero || options.StderrLimit is <= 0 or > 4 * 1024 * 1024 || options.MaximumFrameBytes is <= 0 or > 64 * 1024 * 1024)
+        {
             throw new ArgumentOutOfRangeException(nameof(options), "Timeouts must be positive; stderr and frames are limited to 4 MiB and 64 MiB respectively.");
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         using var deadline = new CancellationTokenSource(options.StartTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
@@ -64,7 +67,10 @@ public sealed class McpProcessClient : IAsyncDisposable
             _ = ReapLateStartAsync(launching);
             cancellationToken.ThrowIfCancellationRequested();
             if (deadline.IsCancellationRequested)
+            {
                 throw new TimeoutException(options.Name + ": start: timed out", error);
+            }
+
             throw new IOException(CredentialRedactor.Redact(options.Name + ": start: " + error.Message), error);
         }
         var client = new McpProcessClient(options, process);
@@ -85,7 +91,10 @@ public sealed class McpProcessClient : IAsyncDisposable
             await client.DisposeAsync().ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             if (deadline.IsCancellationRequested)
+            {
                 throw new TimeoutException(client.Message("start: timed out"), error);
+            }
+
             throw new IOException(client.Message("start: " + error.Message), error);
         }
     }
@@ -104,7 +113,9 @@ public sealed class McpProcessClient : IAsyncDisposable
             tools.AddRange(page.Tools);
             cursor = page.NextCursor;
             if (tools.Count > 10000 || !string.IsNullOrEmpty(cursor) && (!cursors.Add(cursor) || cursors.Count > 256))
+            {
                 throw new InvalidDataException("tools/list exceeded pagination limits");
+            }
         } while (!string.IsNullOrEmpty(cursor));
         return tools;
     }, cancellationToken);
@@ -114,13 +125,18 @@ public sealed class McpProcessClient : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         lock (_closeGate)
+        {
             return new(_closeTask ??= CloseAsync());
+        }
     }
 
     private async Task CloseAsync()
     {
         if (Interlocked.Exchange(ref _closed, 1) is not 0)
+        {
             return;
+        }
+
         try
         {
             await _process.DisposeAsync().ConfigureAwait(false);
@@ -130,7 +146,9 @@ public sealed class McpProcessClient : IAsyncDisposable
             try
             {
                 if (_client is not null)
+                {
                     await _client.DisposeAsync().ConfigureAwait(false);
+                }
             }
             finally { await Task.WhenAll(_stderrReader, _processExit).ConfigureAwait(false); }
         }
@@ -140,7 +158,9 @@ public sealed class McpProcessClient : IAsyncDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!Alive)
+        {
             throw new IOException(Message("provider process exited"));
+        }
         // Always apply the configured deadline, even when the registry has a longer parent deadline.
         using var deadline = new CancellationTokenSource(_options.CallTimeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
@@ -173,7 +193,9 @@ public sealed class McpProcessClient : IAsyncDisposable
         {
             int count;
             while ((count = await _process.Error.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+            {
                 _stderr.Append(buffer.AsSpan(0, count));
+            }
         }
         catch (Exception error) when (error is IOException or ObjectDisposedException) { /* Process cleanup closes the pipe. */ }
     }
@@ -206,7 +228,7 @@ public sealed class McpProcessClient : IAsyncDisposable
         private readonly byte[] _bytes = new byte[limit];
         private readonly object _gate = new();
         private int _count;
-        internal string Text { get { lock (_gate) return Encoding.UTF8.GetString(_bytes, 0, _count); } }
+        internal string Text { get { lock (_gate) { return Encoding.UTF8.GetString(_bytes, 0, _count); } } }
         internal void Append(ReadOnlySpan<byte> bytes)
         {
             lock (_gate)

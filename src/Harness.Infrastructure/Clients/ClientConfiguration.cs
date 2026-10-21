@@ -38,7 +38,10 @@ public sealed class ClientConfiguration(ClientPaths paths)
     public IReadOnlyList<ClientTarget> Targets(string client, string scope, string root)
     {
         if (scope is not ("user" or "project" or "local" or "all"))
+        {
             throw new ArgumentException("unknown scope \"" + scope + "\" (want user, project or local)");
+        }
+
         return (client is "all" ? All : [Get(client)]).SelectMany(c => c.Targets(scope, root)).ToArray();
     }
     public FileChange Install(ClientTarget target, ServerSpec spec, bool dryRun = false) => Apply(target, spec, dryRun);
@@ -65,22 +68,34 @@ public sealed class ClientConfiguration(ClientPaths paths)
             try
             {
                 if (!File.Exists(group.Key))
+                {
                     continue;
+                }
+
                 var text = FileEditor.Read(group.Key);
                 var node = client.Id is "codex" ? System.Text.Json.JsonSerializer.SerializeToNode(TomlConfigurationEditor.Parse(text))!.AsObject() : JsonConfigurationEditor.ParseObject(text);
                 foreach (var target in group)
                 {
                     JsonNode? current = node;
                     foreach (var key in client.Id is "codex" ? new[] { "mcp_servers" } : target.Keys)
+                    {
                         current = (current as JsonObject)?[key];
+                    }
+
                     if ((current as JsonObject)?["harness"] is not JsonObject entry)
+                    {
                         continue;
+                    }
+
                     var command = entry["command"]?.GetValue<string>() ?? "";
                     var args = (entry["args"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToArray() ?? [];
                     var resolved = Expand(command);
                     var problem = resolved.Length is 0 ? "no command configured" : "";
                     if (Path.IsPathRooted(resolved) && !Executable(resolved))
+                    {
                         problem = "command " + resolved + " not found or not executable";
+                    }
+
                     entries.Add(new(target.Scope, target.Path, command, args, resolved, problem));
                 }
             }
@@ -98,10 +113,16 @@ public sealed class ClientConfiguration(ClientPaths paths)
             return value;
         }
         if (root[keys[0]] is not JsonObject child)
+        {
             return null;
+        }
+
         var result = Pop(child, keys.Skip(1).ToArray());
         if (child.Count is 0)
+        {
             root.Remove(keys[0]);
+        }
+
         return result;
     }
     private sealed class ClaudeClient(ClientPaths paths) : IAgentClient
@@ -114,35 +135,58 @@ public sealed class ClientConfiguration(ClientPaths paths)
         {
             List<ClientTarget> targets = [];
             if (scope is "project" or "all")
+            {
                 targets.Add(new(Id, "project", Path.Combine(root, ".mcp.json"), ["mcpServers"]));
+            }
+
             if (scope is "local" or "all")
+            {
                 targets.Add(new(Id, "local", ConfigPath, ["projects", root, "mcpServers"]));
+            }
+
             if (scope is "user" or "all")
+            {
                 targets.Add(new(Id, "user", ConfigPath, ["mcpServers"]));
+            }
+
             return targets;
         }
         public string Missing(ClientTarget target) => target.Scope is "project" ? "" : "Claude Code user config " + target.Path + " not found (run Claude Code once, or use --scope project)";
         public TextEdit Edit(string source, bool exists, ClientTarget target, ServerSpec? spec)
         {
             if (spec is not null && (!exists || string.IsNullOrWhiteSpace(source)))
+            {
                 source = "{}\n";
+            }
+
             var before = JsonConfigurationEditor.ParseObject(source);
             JsonNode? current = before;
             foreach (var key in target.Keys)
+            {
                 current = (current as JsonObject)?[key];
+            }
+
             var hasExisting = current is JsonObject container && container.ContainsKey("harness");
             var existing = (current as JsonObject)?["harness"];
             TextEdit edit;
             JsonObject? want = null;
             if (spec is null)
+            {
                 edit = JsonConfigurationEditor.Delete(source, target.Keys, "harness");
+            }
             else
             {
                 if (hasExisting && existing is not JsonObject)
+                {
                     throw new InvalidDataException("existing harness entry is not an object");
+                }
+
                 want = existing?.DeepClone() as JsonObject ?? new();
                 if (Expand(want["command"]?.GetValue<string>() ?? "", paths.Home) == Expand(spec.Command, paths.Home) && (!want.ContainsKey("type") || want["type"]?.GetValue<string>() is "stdio") && JsonNode.DeepEquals(want["args"], System.Text.Json.JsonSerializer.SerializeToNode(spec.Args)))
+                {
                     return new(source, "unchanged");
+                }
+
                 want["type"] = "stdio";
                 want["command"] = spec.Command;
                 want["args"] = System.Text.Json.JsonSerializer.SerializeToNode(spec.Args);
@@ -152,7 +196,10 @@ public sealed class ClientConfiguration(ClientPaths paths)
             var got = Pop(after, target.Keys);
             Pop(before, target.Keys);
             if (!JsonNode.DeepEquals(want, got) || !JsonNode.DeepEquals(before, after))
+            {
                 throw new InvalidDataException("edit would change unrelated configuration; nothing written");
+            }
+
             return edit;
         }
     }

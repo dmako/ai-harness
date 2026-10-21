@@ -34,15 +34,26 @@ public sealed partial class WorkspaceSearchSession
             foreach (var hit in answer.Hits)
             {
                 if ((via is "impact") != (hit.Member.Id == Current.Id) || via is "package" && !IsManifest(hit.Item.Path ?? "") || via is "name" && IsManifest(hit.Item.Path ?? ""))
+                {
                     continue;
+                }
+
                 if (!seen.Add((hit.Member.Id, hit.Item.Path, hit.Item.StartLine)))
+                {
                     continue;
+                }
+
                 hits.Add(hit with { Via = via, Exact = via is "package" || via is "impact" or "references" && hit.Evidence is "exact" });
             }
             foreach (var note in answer.Notes.Where(note => !notes.Contains(note, StringComparer.Ordinal)))
+            {
                 notes.Add(note);
+            }
+
             foreach (var error in answer.Errors.Where(error => !errors.Contains(error, StringComparer.Ordinal)))
+            {
                 errors.Add(error);
+            }
         }
     }
     private async Task<SymbolHome> HomeAsync(string query, CancellationToken token)
@@ -53,19 +64,30 @@ public sealed partial class WorkspaceSearchSession
         foreach (var item in answer.Hits.Select(hit => hit.Item))
         {
             if (!string.Equals(WorkspaceReferences.LastSegment(item.Name ?? ""), shortName, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(item.Path))
+            {
                 continue;
+            }
+
             if (best is null || query != shortName && item.QualifiedName?.EndsWith(query, StringComparison.Ordinal) is true && best.QualifiedName?.EndsWith(query, StringComparison.Ordinal) is not true)
+            {
                 best = item;
+            }
         }
         if (best is null)
+        {
             return new();
+        }
+
         var reader = new RetrievalFileReader(Current.Root);
         var ns = "";
         try
         { ns = Regex.Match(await reader.ReadBodyAsync(best.Path!, 1, int.MaxValue, token).ConfigureAwait(false), @"(?m)^[\t\r\n ]*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)", RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1)).Groups[1].Value; }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or DecoderFallbackException) { /* Namespace evidence can still come from a qualified symbol. */ }
         if (ns.Length is 0 && best.QualifiedName?.Count(c => c is '.') >= 2 && !best.Path!.EndsWith(".go", StringComparison.Ordinal))
+        {
             ns = best.QualifiedName[..best.QualifiedName.LastIndexOf('.')];
+        }
+
         var (package, space, reference) = await OwningPackageAsync(reader, best.Path!, ns, token).ConfigureAwait(false);
         return new(best.Path!, space, package, reference);
     }
@@ -88,7 +110,9 @@ public sealed partial class WorkspaceSearchSession
                 {
                     using var document = JsonDocument.Parse(await reader.ReadBodyAsync(Path.GetRelativePath(root, npm), 1, int.MaxValue, token).ConfigureAwait(false));
                     if (document.RootElement.TryGetProperty("name", out var name) && name.GetString() is { Length: > 0 } package)
+                    {
                         return (package, ns, "\"" + package + "\":");
+                    }
                 }
                 var go = Path.Combine(directory, "go.mod");
                 if (File.Exists(go))
@@ -105,7 +129,10 @@ public sealed partial class WorkspaceSearchSession
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or DecoderFallbackException or XmlException or JsonException) { /* Preserve available evidence when a manifest is unreadable. */ }
             if (directory == root)
+            {
                 break;
+            }
+
             directory = Path.GetDirectoryName(directory)!;
         }
         return ("", ns, "");

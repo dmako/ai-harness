@@ -21,7 +21,10 @@ public sealed partial class HarnessStateSession
             catch (Exception error) when (error is IOException or InvalidDataException) { /* Overview retains available identity when Git cannot report HEAD. */ }
         }
         if (!File.Exists(location.DatabasePath))
+        {
             return snapshot;
+        }
+
         try
         {
             var database = await DatabaseAsync(cancellationToken).ConfigureAwait(false);
@@ -39,7 +42,10 @@ public sealed partial class HarnessStateSession
     {
         var result = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         if (!File.Exists(location.DatabasePath))
+        {
             return result;
+        }
+
         try
         {
             var database = await DatabaseAsync(cancellationToken).ConfigureAwait(false);
@@ -53,7 +59,10 @@ public sealed partial class HarnessStateSession
                 await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                 var stats = new Dictionary<string, object?> { ["calls"] = reader.GetInt32(0), ["errors"] = reader.GetInt32(1), ["avg_ms"] = reader.IsDBNull(2) ? 0 : reader.GetDouble(2), ["avg_bytes"] = reader.IsDBNull(3) ? 0 : reader.GetDouble(3) };
                 if (!reader.IsDBNull(4))
+                {
                     stats["last_call_at"] = reader.GetString(4);
+                }
+
                 result["recent_24h"] = JsonSerializer.SerializeToElement(stats);
             }
             command.Parameters.Clear();
@@ -68,7 +77,9 @@ public sealed partial class HarnessStateSession
             await hits.ReadAsync(cancellationToken).ConfigureAwait(false);
             var changed = hits.GetInt32(1);
             if (changed > 0)
+            {
                 result["context_30d"] = JsonSerializer.SerializeToElement(new { hits = hits.GetInt32(0), changed, hit_rate = Math.Truncate((double)hits.GetInt32(0) / changed * 100) / 100 });
+            }
         }
         catch (Exception error) when (error is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException) { /* Optional observations must not prevent health diagnostics. */ }
         return result;

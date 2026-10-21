@@ -21,8 +21,13 @@ public sealed class TaskWorkflowTests
             ["done"] = [],
         };
         foreach (var from in TaskWorkflow.Statuses)
+        {
             foreach (var to in TaskWorkflow.Statuses)
+            {
                 TaskWorkflow.CanTransition(from, to).Should().Be(expected[from].Contains(to, StringComparer.Ordinal));
+            }
+        }
+
         TaskWorkflow.ParseStatus(" IN_PROGRESS ").Should().Be("in_progress");
         TaskWorkflow.HoldsClaim("deferred").Should().BeFalse();
         TaskWorkflow.HoldsClaim("review").Should().BeTrue();

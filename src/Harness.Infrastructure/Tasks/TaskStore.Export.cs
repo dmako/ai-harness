@@ -20,21 +20,35 @@ public sealed partial class TaskStore
         var result = new TaskExportResult(path, definitions.Select(d => d.Id).ToArray(), original is null);
         string content;
         if (original is null)
+        {
             content = BacklogCodec.Write(new(1, definitions, Milestones(cancellationToken).Where(m => m.Definition.Title.Length is not 0).Select(m => m.Definition).ToArray()));
+        }
         else
         {
             if (definitions.Length is 0 || dryRun)
+            {
                 return result;
+            }
+
             var key = TasksKey().Match(text);
             if (!key.Success)
+            {
                 throw new InvalidDataException($"{path}: no top-level 'tasks:' list to append to");
+            }
+
             var item = ListItem().Match(text, key.Index + key.Length);
             var indent = item.Success ? item.Groups[1].Value : "  ";
             content = key.Groups[1].Success ? text[..key.Index] + "tasks:" + text[(key.Index + key.Length)..] : text;
             if (!content.EndsWith('\n'))
+            {
                 content += "\n";
+            }
+
             if (!content.EndsWith("\n\n", StringComparison.Ordinal))
+            {
                 content += "\n";
+            }
+
             content += string.Concat(BacklogCodec.WriteDefinitions(definitions).Split('\n').Select(line => line.Length is 0 ? "" : indent + line + "\n"));
             BacklogFile parsed;
             try
@@ -42,10 +56,15 @@ public sealed partial class TaskStore
             catch (InvalidDataException exception)
             { throw new InvalidDataException($"{path}: appending the tasks would break the file ({exception.Message}); is 'tasks:' its last section?", exception); }
             if (parsed.Tasks.Count != present.Count + definitions.Length)
+            {
                 throw new InvalidDataException($"{path}: 'tasks:' must be the file's last section to append to it");
+            }
         }
         if (dryRun)
+        {
             return result;
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         WriteAtomic(path, Encoding.UTF8.GetBytes(content), original);
         return result;
@@ -66,12 +85,22 @@ public sealed partial class TaskStore
                 stream.Flush(flushToDisk: true);
             }
             if (!OperatingSystem.IsWindows())
+            {
                 File.SetUnixFileMode(temporary, mode);
+            }
+
             if (expected is not null && !File.ReadAllBytes(absolute).AsSpan().SequenceEqual(expected))
+            {
                 throw new IOException($"{path}: file changed while exporting; try again");
+            }
+
             File.Move(temporary, absolute, overwrite: expected is not null);
         }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        finally { if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
     }
     [GeneratedRegex(@"(?m)^tasks:[ \t]*(\[\])?[ \t]*\r?$", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex TasksKey();

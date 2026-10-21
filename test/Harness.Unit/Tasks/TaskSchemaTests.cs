@@ -27,7 +27,10 @@ public sealed class TaskSchemaTests
         var tool = JsonSerializer.Deserialize<Tool>(stream, ModelContextProtocol.McpJsonUtilities.DefaultOptions)!;
         var arguments = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!;
         foreach (var key in new[] { "id", "claim_token", "summary" })
+        {
             arguments[key] = JsonSerializer.SerializeToElement("value");
+        }
+
         (MemoryArguments.Validate(tool, arguments) is null).Should().Be(valid);
     }
 }

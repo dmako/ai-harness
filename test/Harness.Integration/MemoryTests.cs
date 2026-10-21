@@ -77,7 +77,10 @@ public sealed class MemoryTests
         clock.Advance();
         var third = store.Supersede(second.Id, new MemoryInput { Content = second.Content, SupersedeReason = "reconfirmed", Source = new MemorySource(By: "claude") }, cancellationToken: TestContext.Current.CancellationToken).Memory!;
         foreach (var id in new[] { first.Id, second.Id, third.Id })
+        {
             store.History(id, cancellationToken: TestContext.Current.CancellationToken).Select(memory => memory.Id).Should().Equal(first.Id, second.Id, third.Id);
+        }
+
         store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Should().ContainSingle().Which.Id.Should().Be(third.Id);
         var detail = store.Details(first.Id, history: true, cancellationToken: TestContext.Current.CancellationToken);
         detail.Current.Should().BeFalse();
@@ -121,7 +124,10 @@ public sealed class MemoryTests
         store.Put(Input("No network in tests") with { Type = "constraint" }, cancellationToken: TestContext.Current.CancellationToken);
         clock.Advance();
         for (var index = 0; index < 6; index++)
+        {
             store.Put(Input($"General rule number {index} about naming consistently") with { Force = true }, cancellationToken: TestContext.Current.CancellationToken);
+        }
+
         var query = new MemoryQuery { Scope = MemoryScope.Parse("path:internal/storage/nested/db.cs"), Branch = "m16", Limit = 2 };
         store.Search(query, cancellationToken: TestContext.Current.CancellationToken).Select(memory => memory.Id).Should().Equal(deep.Id, path.Id);
         var applying = store.Applying(query.Scope.ToString(), "m16", cancellationToken: TestContext.Current.CancellationToken);

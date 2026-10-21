@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using Harness.Core.Architecture;
-using Harness.Core.Workspaces;
 using Harness.Core.Retrieval;
+using Harness.Core.Workspaces;
 using Harness.Infrastructure.Architecture;
 
 namespace Harness.Infrastructure.Workspaces;
@@ -36,7 +36,10 @@ public sealed partial class WorkspaceDuplicateReader(IReadOnlyList<WorkspaceMemb
                 {
                     var lines = Normalize(member.Id, repository, file);
                     if (lines.Length < 8)
+                    {
                         continue;
+                    }
+
                     var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines))));
                     if (!byHash.TryGetValue(hash, out var files))
                     { files = []; byHash.Add(hash, files); }
@@ -58,38 +61,57 @@ public sealed partial class WorkspaceDuplicateReader(IReadOnlyList<WorkspaceMemb
                 var lines = Normalize(member.Id, repository, declaration.Path);
                 var extends = declaration.Bases?.Contains(name, StringComparer.Ordinal) is true;
                 if (!extends)
+                {
                     bodies.Add(lines);
+                }
+
                 copies.Add(new(member.Name, declaration.Path, lines.Length, declaration.Line, extends));
                 covered.Add((member.Id, declaration.Path));
             }
             var similarity = 1.0;
             for (var left = 0; left < bodies.Count; left++)
+            {
                 for (var right = left + 1; right < bodies.Count; right++)
+                {
                     similarity = Math.Min(similarity, Similarity(bodies[left], bodies[right]));
+                }
+            }
+
             groups.Add(new(name, declarations[0].Type.Kind, copies, bodies.Count < 2 ? 0 : similarity, bodies.Count < 2 ? "extends" : Verdict(similarity)));
         }
         foreach (var files in byHash.Values.Where(files => files.Select(file => file.Member.Id).Distinct(StringComparer.Ordinal).Count() >= 2 && !files.All(file => covered.Contains((file.Member.Id, file.Path)))))
+        {
             groups.Add(new(Path.GetFileName(files[0].Path), "file", files.DistinctBy(file => file.Member.Id, StringComparer.Ordinal).Select(file => new WorkspaceCopy(file.Member.Name, file.Path, _normalized[(file.Member.Id, file.Path)].Length)).ToArray(), 1, "identical"));
+        }
+
         List<WorkspaceDuplicateGroup> merged = [];
         Dictionary<string, int> indices = new(StringComparer.Ordinal);
         foreach (var group in groups)
         {
             var key = string.Join('\u0001', group.Copies.Select(copy => copy.Project + "\0" + copy.Path).Order(StringComparer.Ordinal));
             if (indices.TryGetValue(key, out var index) && group.Kind is not "file")
+            {
                 merged[index] = merged[index] with { Names = [.. merged[index].Names ?? [], group.Name] };
+            }
             else
             { indices[key] = merged.Count; merged.Add(group); }
         }
         var output = merged.Select(group => group.Names is null ? group : group with { Names = new[] { group.Name }.Concat(group.Names).Order(StringComparer.Ordinal).ToArray(), Name = Path.GetFileName(group.Copies[0].Path), Kind = "file" }).OrderByDescending(group => group.Copies.Count).ThenByDescending(group => group.Similarity).ThenBy(group => group.Name, StringComparer.Ordinal).Select(group => group with { Copies = group.Copies.OrderBy(copy => copy.Project, StringComparer.Ordinal).ToArray() }).ToArray();
         if (output.Length > 300)
+        {
             notes.Add("only the first groups are listed");
+        }
+
         notes.Add("similarity compares code lines (comments, imports and namespaces ignored); evidence, not a verdict on what to merge");
         return new(output.Take(300).ToArray(), notes);
     }
     private string[] Normalize(string member, AnalysisRepository repository, string file)
     {
         if (_normalized.TryGetValue((member, file), out var cached))
+        {
             return cached;
+        }
+
         var lines = AnalysisRepository.Lines(repository.Read(file)).Where(line => !Comment.IsMatch(line) && !Import.IsMatch(line)).Select(line => Space.Replace(line, " ").Trim()).Where(line => line.Length > 0 && line is not ("{" or "}" or "};")).ToArray();
         _normalized.Add((member, file), lines);
         return lines;

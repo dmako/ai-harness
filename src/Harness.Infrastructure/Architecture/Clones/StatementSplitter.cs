@@ -13,16 +13,25 @@ internal sealed class StatementSplitter(bool go = false)
     internal void Add(string canonical, string raw, bool own, int line)
     {
         if (_key.Count is 0)
+        {
             _line = line;
+        }
+
         _key.Add(own ? "\u0001" : canonical);
         if (own)
+        {
             _own.Add(canonical);
+        }
+
         _raw.Add(raw);
     }
     internal void End()
     {
         if (_key.Count is 0)
+        {
             return;
+        }
+
         var idiom = Idiomatic(_key);
         var header = !idiom && (_key[^1] is "{" || Opens.Contains(_key[0]) || _key[0] is "using" && _key.Count > 1 && _key[1] is "(");
         var callee = Callee(_key);
@@ -44,7 +53,10 @@ internal sealed class StatementSplitter(bool go = false)
                 _literal.Push(literal);
                 Add(canonical, raw, own, line);
                 if (!literal)
+                {
                     End();
+                }
+
                 return;
             case "}":
                 if (_literal.TryPop(out var isLiteral) && isLiteral)
@@ -61,12 +73,21 @@ internal sealed class StatementSplitter(bool go = false)
     private bool Block()
     {
         if (_key.Count is 0)
+        {
             return true;
+        }
+
         var open = _key.Count(key => key is "(") - _key.Count(key => key is ")");
         if (open > 0 && !_key.Contains("=>", StringComparer.Ordinal) && !_key.Contains("func", StringComparer.Ordinal))
+        {
             return false;
+        }
+
         if (Opens.Contains(_key[0]) || _key[0] is "func")
+        {
             return true;
+        }
+
         return go ? _key.Contains("func", StringComparer.Ordinal) : _raw[^1] is ")" or "=>";
     }
     private static bool Idiomatic(List<string> key) => key.Count <= 2 || key[0] is "\u0001" && key[1] is "?." || key[0] switch
@@ -80,8 +101,13 @@ internal sealed class StatementSplitter(bool go = false)
     private static string Callee(List<string> key)
     {
         for (var index = 1; index < key.Count; index++)
+        {
             if (key[index] is "(" && !Opens.Contains(key[index - 1]) && !CloneLexer.Keywords.Contains(key[index - 1]) && Word(key[index - 1]))
+            {
                 return index >= 3 && key[index - 2] is "." ? key[index - 3] + "." + key[index - 1] : key[index - 1];
+            }
+        }
+
         return "";
     }
     private static bool Word(string token) => token.Length > 0 && (char.IsAsciiLetterOrDigit(token[^1]) || token[^1] is '_' or '>' or ')' or ']');

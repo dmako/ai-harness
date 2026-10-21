@@ -37,16 +37,27 @@ public static class ProjectOverview
         };
         live["state"] = state;
         if (detail.Length > 0)
+        {
             live["detail"] = detail;
+        }
+
         if (inspection.Head is { } head)
         {
             if (head.Branch.Length > 0)
+            {
                 live["branch"] = head.Branch;
+            }
+
             if (head.Commit.Length > 0)
+            {
                 live["commit"] = head.Commit;
+            }
         }
         if (state is not "ok")
+        {
             return live;
+        }
+
         try
         {
             using var database = HarnessDatabase.OpenReadOnly(inspection.Location.DatabasePath);
@@ -77,7 +88,10 @@ public static class ProjectOverview
                     var id = scores.GetInt64(0);
                     var score = answers.GetValueOrDefault(id);
                     if (!TaskParsing.IsTestFile(scores.GetString(1)))
+                    {
                         score = (score.Hits + scores.GetInt32(2), score.Changed + 1);
+                    }
+
                     answers[id] = score;
                 }
             }
@@ -87,10 +101,15 @@ public static class ProjectOverview
             var worktree = inspection.Worktrees.FirstOrDefault(tree => tree.Path == inspection.Location.Root);
             var sync = worktree is null ? null : SyncStore.LoadState(database, worktree.Id);
             if (sync is not null)
+            {
                 live["synced_at"] = sync.SyncedAt;
+            }
+
             var stale = SyncFreshness.Staleness(sync, inspection.Head?.Branch ?? "", inspection.Head?.Commit ?? "", inspection.Head?.Detached ?? false);
             if (stale.Length > 0)
+            {
                 live["stale"] = stale;
+            }
         }
         catch (Exception error) when (error is SqliteException or IOException or InvalidDataException or UnauthorizedAccessException) { /* Preserve the independent checks if optional observations are unavailable. */ }
         return live;

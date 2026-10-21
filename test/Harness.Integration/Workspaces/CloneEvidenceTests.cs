@@ -28,7 +28,10 @@ public sealed class CloneEvidenceTests
         using var fixture = await WorkspaceFixture.CreateAsync();
         var code = "namespace Example;\npublic class Widget\n{\n public int First() => 1;\n public int Second() => 2;\n public int Third() => 3;\n public int Fourth() => 4;\n public int Fifth() => 5;\n public int Sixth() => 6;\n public int Seventh() => 7;\n public int Eighth() => 8;\n}\n";
         foreach (var repo in fixture.Repositories.Take(2))
+        {
             repo.Write("Widget.cs", code);
+        }
+
         fixture.Repositories[0].Write("Core.csproj", "<Project><PropertyGroup><PackageId>Example.Core</PackageId></PropertyGroup></Project>");
         fixture.Repositories[1].Write("Host.csproj", "<Project><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><PackageReference Include=\"Example.Core\" Version=\"1\"/></ItemGroup></Project>");
         fixture.Repositories[2].Write("Derived.cs", "public class Widget : Example.Widget {}\n");
@@ -47,7 +50,10 @@ public sealed class CloneEvidenceTests
             result.Report.Groups.Where(group => group.Copied).Should().OnlyContain(group => group.Home!.MemberId == fixture.Members[0].Id);
         }
         else
+        {
             actual = await reader.ReadAsync(Token);
+        }
+
         var expected = await OracleAsync(new { mode = shared ? "shared" : "workspace", members = fixture.Members.Select(member => new { project = member.Name, project_id = member.Id, root = member.Root }), global = fixture.Global, workspace = "one", library = new Dictionary<string, bool> { [fixture.Members[0].Id] = true, [fixture.Members[1].Id] = false, [fixture.Members[2].Id] = true } });
         Equivalent(actual, expected);
         fixture.Hashes().Should().Equal(before);
@@ -66,7 +72,10 @@ public sealed class CloneEvidenceTests
         {
             fixture.Write("api.go", "api " + index.ToString(CultureInfo.InvariantCulture));
             if (index < 3)
+            {
                 fixture.Write("handler.go", "handler " + index.ToString(CultureInfo.InvariantCulture));
+            }
+
             fixture.Write("README.md", "docs " + index.ToString(CultureInfo.InvariantCulture));
             fixture.Write("models.g.cs", "generated " + index.ToString(CultureInfo.InvariantCulture));
             fixture.Write("api_test.go", "tests " + index.ToString(CultureInfo.InvariantCulture));
@@ -89,7 +98,10 @@ public sealed class CloneEvidenceTests
         var providers = new[] { new { id = "a", capability = Capabilities.ArchChangeCoupling, table = tables }, new { id = "b", capability = Capabilities.ArchChangeCoupling, table = new Dictionary<string, ProviderItem[]> { ["api.go"] = [new() { Path = "renamed.go", Count = 2, Confidence = 0.5 }] } } };
         await using var registry = new ProviderRegistry();
         foreach (var provider in providers)
+        {
             registry.Register(new Providers.ProviderRegistryTests.Fake(provider.id, [Capabilities.ArchChangeCoupling], execute: (request, _) => Task.FromResult(new ProviderResult { Items = provider.table.GetValueOrDefault(request.Query, []).Select(item => item with { Provider = provider.id, Tool = "fixture" }).ToArray() })));
+        }
+
         var partners = await ChangeCoupling.PartnersAsync(registry, "api.go", 10, Token);
         Equivalent(new { partners = partners.Partners, errors = partners.Errors }, await OracleAsync(new { mode = "partners", root = fixture.Root, file = "api.go", limit = 10, providers }));
         var hotspots = await ChangeCoupling.HotspotsAsync(repo, registry, 10, 2, Token);
@@ -168,7 +180,10 @@ public sealed class CloneEvidenceTests
         await fixture.GitAsync("add", ".");
         using var process = new Process { StartInfo = new("git") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true } };
         foreach (var arg in new[] { "-C", fixture.Root, "commit", "-m", "synthetic history" })
+        {
             process.StartInfo.ArgumentList.Add(arg);
+        }
+
         var stamp = date.ToString("O", CultureInfo.InvariantCulture);
         process.StartInfo.Environment["GIT_AUTHOR_DATE"] = stamp;
         process.StartInfo.Environment["GIT_COMMITTER_DATE"] = stamp;

@@ -18,7 +18,10 @@ public sealed class FileReadCache(Func<string, CancellationToken, Task<byte[]>> 
         _ = read.ContinueWith(completed => _ = completed.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         var lines = await read.WaitAsync(cancellationToken).ConfigureAwait(false);
         if (start < 1 || start > lines.Length)
+        {
             throw new IOException(path + ": line " + start.ToString(CultureInfo.InvariantCulture) + " outside the file");
+        }
+
         end = Math.Min(Math.Max(end, start), lines.Length);
         return string.Join('\n', lines[(start - 1)..end]);
     }
@@ -26,7 +29,10 @@ public sealed class FileReadCache(Func<string, CancellationToken, Task<byte[]>> 
     {
         var bytes = await load(path, token).ConfigureAwait(false);
         if (Interlocked.Add(ref _loadedBytes, bytes.LongLength) > maximumBytes)
+        {
             throw new InvalidDataException("Request file-read cache byte limit exceeded.");
+        }
+
         return Utf8.GetString(bytes).Split('\n');
     }
 }

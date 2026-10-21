@@ -12,9 +12,14 @@ public sealed partial class TaskStore
         for (var i = 0; i < defs.Length; i++)
         {
             if (defs[i].Id.Length is 0)
+            {
                 throw new ArgumentException(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"milestone {i + 1}: id is required"));
+            }
+
             if (!seen.Add(defs[i].Id))
+            {
                 throw new ArgumentException($"milestone {defs[i].Id} is defined twice");
+            }
         }
         var changed = 0;
         return Plan((c, t) =>
@@ -38,7 +43,10 @@ public sealed partial class TaskStore
                     if (same)
                     {
                         if (ordinal != i)
+                        {
                             Execute(c, t, "UPDATE milestones SET ordinal=$ordinal WHERE id=$id", ("$ordinal", i), ("$id", d.Id));
+                        }
+
                         continue;
                     }
                     changed++;
@@ -58,14 +66,18 @@ public sealed partial class TaskStore
         List<string> order = [];
         using (var command = Command(c, t, "SELECT id,title,goal,exit,notes FROM milestones ORDER BY ordinal,id"))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
             {
                 var d = new MilestoneDefinition(reader.GetString(0), reader.GetString(1), reader.GetString(2), System.Text.Json.JsonSerializer.Deserialize<string[]>(reader.GetString(3)) ?? [], reader.GetString(4));
                 byId[d.Id] = new(d, true, new Dictionary<string, int>(StringComparer.Ordinal));
                 order.Add(d.Id);
             }
+        }
+
         using (var command = Command(c, t, "SELECT milestone,status,COUNT(*),MIN(ordinal) FROM tasks WHERE milestone<>'' GROUP BY milestone,status ORDER BY MIN(ordinal)"))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
             {
                 var id = reader.GetString(0);
@@ -76,6 +88,8 @@ public sealed partial class TaskStore
                 }
                 ((Dictionary<string, int>)m.Tasks)[reader.GetString(1)] = reader.GetInt32(2);
             }
+        }
+
         return (IReadOnlyList<MilestoneProgress>)order.Select(id => byId[id]).ToArray();
     }, cancellationToken);
 }

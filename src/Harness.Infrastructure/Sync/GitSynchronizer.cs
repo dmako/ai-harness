@@ -21,14 +21,19 @@ public static class GitSynchronizer
             run = await SelectModeAsync(run, repository, head, options.Since, token).ConfigureAwait(false);
             var ignorer = new SyncIgnorer(options.Ignore);
             if (run.Mode is "full")
+            {
                 run = run with { Files = SyncFiles.Replace(database, worktree, repository.Root, ignorer.FilterPaths(await repository.ListFilesAsync(token).ConfigureAwait(false)), token) };
+            }
             else if (run.Head.Length > 0)
             {
                 var changes = ignorer.Filter(await repository.ChangesSinceAsync(run.Base, token).ConfigureAwait(false));
                 var candidates = changes.Where(change => change.Kind is not "deleted").Select(change => change.Path).ToList();
                 var deleted = changes.Where(change => change.Kind is "deleted" or "renamed").Select(change => change.Kind is "renamed" ? change.OldPath : change.Path).ToArray();
                 foreach (var path in ignorer.FilterPaths(previous?.Pending ?? []).Where(path => !candidates.Contains(path, StringComparer.Ordinal) && !deleted.Contains(path, StringComparer.Ordinal)))
+                {
                     candidates.Add(path);
+                }
+
                 run = run with { Changes = changes, Files = SyncFiles.Apply(database, worktree, repository.Root, candidates, deleted, token) };
             }
             var outcomes = await RefreshAsync(options, run, token).ConfigureAwait(false);
@@ -56,9 +61,15 @@ public static class GitSynchronizer
         {
             case "since":
                 if (since.Length is 0)
+                {
                     throw new InvalidDataException("--since needs a commit");
+                }
+
                 if (!await repository.HasCommitAsync(since, token).ConfigureAwait(false))
+                {
                     throw new InvalidDataException("--since " + since + ": commit not found in repository");
+                }
+
                 return run with { Base = since };
             case "full":
                 return run with { Reason = "requested" };

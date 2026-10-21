@@ -12,14 +12,20 @@ internal static class ToolMeasurements
         string Arg(string key) => arguments?.TryGetValue(key, out var v) is true && v.ValueKind is JsonValueKind.String ? v.GetString() ?? "" : "";
         var kind = Arg("kind");
         if (Arg("scope") is "workspace" || tool is "library_adoption" or "similar_concerns")
+        {
             kind = (kind + " [workspace " + (Arg("depth") is { Length: > 0 } depth ? depth : "light") + "]").Trim();
+        }
+
         var bytes = result?.Content.OfType<TextContentBlock>().Sum(b => Encoding.UTF8.GetByteCount(b.Text)) ?? 0;
         var error = exception?.Message ?? "";
         var empty = false;
         if (exception is null && result is not null)
         {
             if (result.IsError is true)
+            {
                 error = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "tool error";
+            }
+
             if (result.StructuredContent is { ValueKind: JsonValueKind.Object } content)
             {
                 var lists = content.EnumerateObject().Where(p => p.Value.ValueKind is JsonValueKind.Array).ToArray();

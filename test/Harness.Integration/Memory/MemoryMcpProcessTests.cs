@@ -16,7 +16,10 @@ public sealed class MemoryMcpProcessTests
         try
         {
             using (var database = HarnessDatabase.Open(Path.Combine(root, ".harness", "harness.db"), cancellationToken: Token))
+            {
                 database.SchemaVersion().Should().Be(19);
+            }
+
             await using var claude = await StartAsync(root, "claude-code");
             await using var codex = await StartAsync(root, "codex");
             var tools = await claude.ListToolsAsync(cancellationToken: Token);
@@ -57,7 +60,10 @@ public sealed class MemoryMcpProcessTests
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+        {
             directory = directory.Parent;
+        }
+
         directory.Should().NotBeNull();
 #if DEBUG
         const string Configuration = "Debug";

@@ -35,18 +35,34 @@ public sealed partial class WorkspaceEvidenceReader
         {
             var model = await StackAsync(member, token).ConfigureAwait(false);
             if (model.Stack is not { } stack)
+            {
                 continue;
+            }
+
             stacks.Add(member.Id, stack);
             if (stack.Runtime is { } runtime)
+            {
                 Row("runtime", runtime.Name)[member.Id] = [runtime.Major ?? ""];
+            }
+
             foreach (var framework in stack.Frameworks.Where(framework => !string.IsNullOrEmpty(framework.Major)))
+            {
                 Row("framework", framework.Name)[member.Id] = [framework.Major!];
+            }
+
             foreach (var use in await UsesAsync(model.Build, members.Where(peer => peer.Id != member.Id).ToArray(), token).ConfigureAwait(false))
+            {
                 if (use.Versions.Count > 0)
                 { Row("core", use.Package)[member.Id] = use.Versions; owners[use.Package] = use.MemberId; }
+            }
+
             if (model.Build is not null)
+            {
                 foreach (var unit in model.Build.Projects.Where(unit => !string.IsNullOrEmpty(unit.Package) && !string.IsNullOrEmpty(unit.Version)))
+                {
                     published[unit.Package!] = unit.Version!;
+                }
+            }
         }
         var output = rows.Select(row =>
         {
@@ -65,16 +81,24 @@ public sealed partial class WorkspaceEvidenceReader
     private async Task<IReadOnlyList<MemberPackageUse>> UsesAsync(ProjectBuild? build, IReadOnlyList<WorkspaceMember> others, CancellationToken token)
     {
         if (build is null)
+        {
             return [];
+        }
+
         List<MemberPackageUse> result = [];
         foreach (var member in others)
         {
             var peer = await StackAsync(member, token).ConfigureAwait(false);
             if (peer.Build is null)
+            {
                 continue;
+            }
+
             var published = peer.Build.Projects.Where(unit => !string.IsNullOrEmpty(unit.Package)).GroupBy(unit => unit.Package!, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Last().Version, StringComparer.Ordinal);
             foreach (var group in build.Projects.SelectMany(unit => unit.Packages).Where(package => published.ContainsKey(package.Name)).GroupBy(package => package.Name, StringComparer.Ordinal))
+            {
                 result.Add(new(group.Key, member.Title.Length > 0 ? member.Title : member.Name, member.Id, group.Where(package => !string.IsNullOrEmpty(package.Version)).Select(package => package.Version!).Distinct(StringComparer.Ordinal).Order(WorkspaceNameComparer.Instance).ToArray(), published[group.Key]));
+            }
         }
         return result.OrderBy(use => use.Package, WorkspaceNameComparer.Instance).ToArray();
     }
@@ -82,7 +106,10 @@ public sealed partial class WorkspaceEvidenceReader
     {
         token.ThrowIfCancellationRequested();
         if (_stacks.TryGetValue(member.Id, out var cached))
+        {
             return cached;
+        }
+
         (ProjectStack? Stack, ProjectBuild? Build) model = (null, null);
         try
         {

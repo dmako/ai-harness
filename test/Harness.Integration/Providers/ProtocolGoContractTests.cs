@@ -29,14 +29,20 @@ public sealed class ProtocolGoContractTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_PROTOCOL_ORACLE");
         if (string.IsNullOrWhiteSpace(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_PROTOCOL_ORACLE to Providers/protocol_oracle.go built with build_oracle.py --bridge.");
+        }
+
         var token = TestContext.Current.CancellationToken;
         using var fixture = new ProviderFixture();
         fixture.Write("harness_provider_info.json", scenario is "incompatible" ? """{"protocol":"harness-provider/2","name":"old"}""" : ProtocolProviderTests.Info);
         fixture.Write("code_symbol_search.json", ProtocolProviderTests.Answer);
         fixture.Write("package_info.json", """{"items":[],"text":"public class Result {}"}""");
         if (scenario is "structured")
+        {
             fixture.Write("code_symbol_search.result.json", """{"content":[{"type":"text","text":"ignored"}],"structuredContent":{"items":[{"kind":"symbol","name":"Structured","provider":"spoofed","tool":"find"}]}}""");
+        }
+
         if (scenario is "tool_error")
         {
             fixture.Write("code_symbol_search.json", """{"error":"corrupt index","hint":"rebuild"}""");
@@ -84,7 +90,11 @@ public sealed class ProtocolGoContractTests
         timeout.CancelAfter(TimeSpan.FromSeconds(40));
         try
         { await process.WaitForExitAsync(timeout.Token); }
-        finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        finally { if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
         process.ExitCode.Should().Be(0, await stderr);
         var expected = JsonNode.Parse(await stdout)!;
         var candidate = JsonNode.Parse(actual.GetRawText())!;
@@ -102,9 +112,13 @@ public sealed class ProtocolGoContractTests
                 if (key is "latency_ms")
                 { obj[key] = 0; continue; }
                 if (key is "detail" && value is JsonValue text && text.TryGetValue<string>(out var detail))
+                {
                     obj[key] = Regex.Replace(detail, @"pid \d+", "pid <PID>", RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
+                }
                 else if (value is not null)
+                {
                     Normalize(value);
+                }
             }
         }
         else if (node is JsonArray array)
@@ -112,7 +126,9 @@ public sealed class ProtocolGoContractTests
             foreach (var value in array)
             {
                 if (value is not null)
+                {
                     Normalize(value);
+                }
             }
         }
     }

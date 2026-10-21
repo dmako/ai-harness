@@ -15,13 +15,22 @@ internal sealed record SetupInvocation(string[] Arguments)
             {
                 var argument = Arguments[index];
                 if (argument is "--")
+                {
                     break;
+                }
+
                 var equals = argument.IndexOf('=', StringComparison.Ordinal);
                 var name = equals < 0 ? argument : argument[..equals];
                 if (name is "--project" or "-project")
+                {
                     return true;
+                }
+
                 if (equals < 0 && name is "--client" or "-client" or "--scope" or "-scope" or "--command" or "-command")
+                {
                     index++;
+                }
+
                 index++;
             }
             return false;

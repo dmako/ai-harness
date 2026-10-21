@@ -10,10 +10,16 @@ public static class EvidenceSnippets
     public static EvidenceSite? Parse(string evidence)
     {
         if (evidence.Contains(" → ", StringComparison.Ordinal) || evidence.StartsWith("memory ", StringComparison.Ordinal))
+        {
             return null;
+        }
+
         var match = Site.Match(evidence.Trim());
         if (!match.Success || match.Groups[2].Value.IndexOfAny(['.', '/']) < 0)
+        {
             return null;
+        }
+
         int.TryParse(match.Groups[3].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var line);
         return new(match.Groups[2].Value, line, Empty(match.Groups[4].Value), Empty(match.Groups[1].Value));
     }
@@ -28,12 +34,21 @@ public static class EvidenceSnippets
             return new(site) { Folder = true, Lines = entries.Length is 0 ? null : entries.Take(max).ToArray(), Truncated = entries.Length > max };
         }
         if (!File.Exists(file))
+        {
             throw new FileNotFoundException("no place in a file", site.Path);
+        }
+
         if (new FileInfo(file).Length > 2 * 1024 * 1024)
+        {
             throw new InvalidDataException(site.Path + ": too large or not text");
+        }
+
         var text = repository.Read(site.Path);
         if (repository.Notes.Any(note => note.StartsWith(site.Path + ":", StringComparison.Ordinal)) || Encoding.UTF8.GetByteCount(text) > 2 * 1024 * 1024 || text.AsSpan(0, Math.Min(text.Length, 8000)).Contains('\0'))
+        {
             throw new InvalidDataException(site.Path + ": too large or not text");
+        }
+
         var lines = text.TrimEnd('\n').Split('\n');
         var start = site.Line > 0 ? Math.Max(1, site.Line - 5) : 1;
         var end = site.Line > 0 ? (int)Math.Min(lines.Length, (long)site.Line + 5) : Math.Min(lines.Length, 20);
@@ -44,7 +59,10 @@ public static class EvidenceSnippets
         if (truncated)
         {
             if (site.Line > (long)start + max - 1)
+            {
                 start = Math.Max(1, site.Line - 5);
+            }
+
             end = (int)Math.Min(lines.Length, (long)start + max - 1);
         }
         start = Math.Clamp(start, 1, lines.Length + 1);

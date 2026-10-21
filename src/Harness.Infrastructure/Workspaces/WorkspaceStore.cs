@@ -20,9 +20,15 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
         file["workspaces"] ??= new JsonArray();
         var rows = file["workspaces"]!.AsArray();
         if (rows.Any(row => row is not JsonObject))
+        {
             throw new InvalidDataException("Workspaces must be an array of objects.");
+        }
+
         foreach (var row in rows.OfType<JsonObject>())
+        {
             _ = Read(row);
+        }
+
         return rows;
     }
     private static Workspace Read(JsonObject row) => new(row["id"]?.GetValue<string>() ?? "", row["name"]?.GetValue<string>() ?? "", row["title"]?.GetValue<string>() ?? "", row["members"]?.AsArray().Select(node => node!.GetValue<string>()).ToArray() ?? [], row["created"]?.GetValue<string>() ?? "");
@@ -34,7 +40,10 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
         await EditAsync(rows =>
         {
             if (rows.Any(row => row!["name"]!.GetValue<string>() == name))
+            {
                 throw new InvalidOperationException("workspace " + JsonSerializer.Serialize(name) + " already exists");
+            }
+
             var row = new JsonObject { ["id"] = "ws_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), ["name"] = name, ["members"] = new JsonArray(), ["created"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture) };
             rows.Add(row);
             result = Read(row);
@@ -62,7 +71,10 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
             var row = Row(rows, name);
             var members = row["members"]?.AsArray();
             if (members is null)
+            {
                 return;
+            }
+
             foreach (var member in members.Where(member => member!.GetValue<string>() == id).ToArray())
             { members.Remove(member); removed = true; }
         }, token).ConfigureAwait(false);
@@ -72,20 +84,39 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
     public async Task<Workspace> RenameAsync(string name, string newName, string? title, CancellationToken token = default)
     {
         if (newName.Trim().Length > 0)
+        {
             newName = NormalizeName(newName);
+        }
         else
+        {
             newName = "";
+        }
+
         title = NormalizeTitle(title);
         Workspace? result = null;
         await EditAsync(rows =>
         {
             var row = Row(rows, name);
             if (newName.Length > 0 && newName != name && rows.Any(row => row!["name"]!.GetValue<string>() == newName))
+            {
                 throw new InvalidOperationException("workspace " + JsonSerializer.Serialize(newName) + " already exists");
+            }
+
             if (newName.Length > 0)
+            {
                 row["name"] = newName;
+            }
+
             if (title is not null)
-            { if (title.Length is 0) row.Remove("title"); else row["title"] = title; }
+            { if (title.Length is 0)
+                {
+                    row.Remove("title");
+                }
+                else
+                {
+                    row["title"] = title;
+                }
+            }
             result = Read(row);
         }, token).ConfigureAwait(false);
         return result!;
@@ -107,7 +138,10 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
     {
         directory = Path.GetFullPath(directory);
         if (Directory.Exists(directory))
+        {
             directory = new DirectoryInfo(directory).ResolveLinkTarget(true)?.FullName ?? directory;
+        }
+
         return registry.Load()["projects"]!.AsArray().OfType<JsonObject>().Where(row => row["root"]?.GetValue<string>() is { } root && (root == directory || root.StartsWith(Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar, StringComparison.Ordinal))).ToArray();
     }
     private static JsonObject Row(JsonArray rows, string name) => rows.OfType<JsonObject>().FirstOrDefault(row => row["name"]?.GetValue<string>() == name) ?? throw new InvalidOperationException("no such workspace " + JsonSerializer.Serialize(name));
@@ -116,17 +150,26 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
     {
         name = name.Trim().ToLowerInvariant();
         if (!Name.IsMatch(name))
+        {
             throw new InvalidOperationException("workspace name " + JsonSerializer.Serialize(name) + ": use lowercase letters, digits, '.', '_' or '-' (max 64)");
+        }
+
         return name;
     }
     internal static string? NormalizeTitle(string? title)
     {
         if (title is null)
+        {
             return null;
+        }
+
         title = string.Join(' ', title.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         var length = title.EnumerateRunes().Count();
         if (length > 80)
+        {
             throw new InvalidOperationException($"display name is {length} characters (max 80)");
+        }
+
         return title;
     }
 }

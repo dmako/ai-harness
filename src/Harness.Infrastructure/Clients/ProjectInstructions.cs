@@ -12,7 +12,9 @@ public static class ProjectInstructions
         var agents = Path.Combine(root, AgentGuidance.FileName);
         var claude = Path.Combine(root, AgentGuidance.ClaudeFileName);
         if (File.Exists(claude) && !File.Exists(agents) && !codex)
+        {
             return [Ensure(claude, dryRun)];
+        }
         // Validate both before either is written, including a malformed existing import block.
         Ensure(agents, true);
         EnsureImport(claude, true);
@@ -22,7 +24,10 @@ public static class ProjectInstructions
     {
         var paths = new[] { Path.Combine(root, AgentGuidance.FileName), Path.Combine(root, AgentGuidance.ClaudeFileName) };
         foreach (var path in paths)
+        {
             Remove(path, true);
+        }
+
         return paths.Select(path => Remove(path, dryRun)).ToArray();
     }
     public static (bool Section, bool Reaches) ClaudeReaches(string root)
@@ -31,7 +36,10 @@ public static class ProjectInstructions
         var claude = Read(AgentGuidance.ClaudeFileName);
         var agents = Read(AgentGuidance.FileName);
         if (claude.Contains(AgentGuidance.Marker, StringComparison.Ordinal) && claude.Replace("\r\n", "\n", StringComparison.Ordinal).Contains(AgentGuidance.Body.Replace("\r\n", "\n", StringComparison.Ordinal), StringComparison.Ordinal))
+        {
             return (true, true);
+        }
+
         return agents.Contains(AgentGuidance.Marker, StringComparison.Ordinal) ? (true, claude.Replace("\r\n", "\n", StringComparison.Ordinal).Contains(AgentGuidance.ImportBlock, StringComparison.Ordinal) || AgentGuidance.ImportsItself(claude)) : (false, false);
     }
 }

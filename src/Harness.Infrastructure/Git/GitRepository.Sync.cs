@@ -22,10 +22,15 @@ public sealed partial record GitRepository
         {
             var field = fields[i++];
             if (field.Length < 4)
+            {
                 continue;
+            }
+
             paths.Add(field[3..]);
             if (field[0] is 'R' or 'C')
+            {
                 i++;
+            }
         }
         return paths;
     }
@@ -33,7 +38,10 @@ public sealed partial record GitRepository
     public async Task<IReadOnlyList<GitChange>> ChangesSinceAsync(string commit, CancellationToken token = default)
     {
         if (!await HasCommitAsync(commit, token).ConfigureAwait(false))
+        {
             throw new InvalidDataException(commit + ": commit not found in repository");
+        }
+
         var fields = SplitNul(await ReadGitAsync(["diff", "--name-status", "-z", "-M", "--no-ext-diff", commit, "--"], token).ConfigureAwait(false));
         List<GitChange> changes = [];
         var i = 0;
@@ -42,7 +50,10 @@ public sealed partial record GitRepository
             var status = fields[i++][0];
             var count = status is 'R' or 'C' ? 2 : 1;
             if (i + count > fields.Length)
+            {
                 throw new InvalidDataException("Git returned an incomplete name-status record.");
+            }
+
             changes.Add(status switch
             {
                 'R' => new("renamed", fields[i + 1], fields[i]),
@@ -58,12 +69,19 @@ public sealed partial record GitRepository
         foreach (var path in SplitNul(await ReadGitAsync(["ls-files", "-z", "--others", "--exclude-standard"], token).ConfigureAwait(false)))
         {
             if (deleted.Remove(path, out var index))
+            {
                 changes[index] = new("modified", path);
+            }
             else
+            {
                 added.Add(path);
+            }
         }
         if (added.Count > 0 && deleted.Count > 0)
+        {
             await PairRenamesAsync(commit, changes, deleted, added, token).ConfigureAwait(false);
+        }
+
         changes.AddRange(added.Select(path => new GitChange("added", path)));
         return changes;
     }
@@ -75,10 +93,15 @@ public sealed partial record GitRepository
         {
             var split = entry.IndexOf('\t', StringComparison.Ordinal);
             if (split < 0 || !deleted.ContainsKey(entry[(split + 1)..]))
+            {
                 continue;
+            }
+
             var metadata = entry[..split].Split(' ');
             if (metadata.Length is 3)
+            {
                 blobs[metadata[2]] = entry[(split + 1)..];
+            }
         }
         // Batch conservatively so long path lists fit Windows' command-line limit.
         List<string> remaining = [];
@@ -88,9 +111,13 @@ public sealed partial record GitRepository
             for (var i = 0; i < batch.Length; i++)
             {
                 if (i < hashes.Length && blobs.Remove(hashes[i], out var old))
+                {
                     changes[deleted[old]] = new("renamed", batch[i], old);
+                }
                 else
+                {
                     remaining.Add(batch[i]);
+                }
             }
         }
         added.Clear();
@@ -101,13 +128,18 @@ public sealed partial record GitRepository
     {
         var result = await RunAsync(Root, arguments, token).ConfigureAwait(false);
         if (result.Code is not 0)
+        {
             throw new IOException("git " + arguments[0] + ": " + result.Error.Trim());
+        }
+
         return result.Output;
     }
     private static string[] SplitNul(string output) => output.Split('\0', StringSplitOptions.RemoveEmptyEntries);
     private static void ValidateRevision(string value)
     {
         if (string.IsNullOrEmpty(value) || value[0] is '-' || value.Contains('\0', StringComparison.Ordinal))
+        {
             throw new InvalidDataException("Invalid Git revision.");
+        }
     }
 }

@@ -199,7 +199,11 @@ public sealed class McpTests
             {
                 try
                 { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
-                finally { if (cancellationToken.IsCancellationRequested) Cancelled.TrySetResult(); }
+                finally { if (cancellationToken.IsCancellationRequested)
+                    {
+                        Cancelled.TrySetResult();
+                    }
+                }
             }
             return _values.GetValueOrDefault(key);
         }

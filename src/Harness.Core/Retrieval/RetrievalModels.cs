@@ -105,7 +105,10 @@ public sealed record Candidate
         var name = item.Name ?? "";
         var split = name.LastIndexOfAny(['.', ':']);
         if (split >= 0)
+        {
             name = name[(split + 1)..];
+        }
+
         return (capability, item.Path ?? "", name) switch
         {
             (Capabilities.Callers or Capabilities.Impact or Capabilities.Flow, { Length: > 0 } path, { Length: > 0 }) => "code:" + path + "#" + name,

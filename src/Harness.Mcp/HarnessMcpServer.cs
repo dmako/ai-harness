@@ -1,22 +1,22 @@
-using Harness.Mcp.Workspaces;
-using Harness.Mcp.Architecture;
-using Harness.Core.Architecture;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text;
+using Harness.Core.Architecture;
+using Harness.Core.Memory;
 using Harness.Core.Projects;
 using Harness.Core.Providers;
-using Harness.Mcp.Providers;
-using Harness.Mcp.Context;
 using Harness.Core.Retrieval;
-using Harness.Core.Memory;
-using Harness.Mcp.Memory;
 using Harness.Core.Tasks;
+using Harness.Mcp.Architecture;
+using Harness.Mcp.Context;
+using Harness.Mcp.Memory;
+using Harness.Mcp.Providers;
 using Harness.Mcp.Tasks;
+using Harness.Mcp.Workspaces;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using ModelContextProtocol;
 
 namespace Harness.Mcp;
 
@@ -110,27 +110,54 @@ public static class HarnessMcpServer
             try
             {
                 if (parameters.Name is "architecture_findings" or "architecture_propose")
+                {
                     return session is Harness.Core.Findings.IFindingSession findings ? Success(await FindingsTools.CallAsync(parameters.Name, parameters.Arguments, findings, caller, cancellationToken)) : Error("finding session unavailable");
+                }
+
                 if (parameters.Name is "library_adoption" or "similar_concerns")
+                {
                     return workspaceTools is null ? Error("this project is not in a workspace; use 'harness workspace create' to add it") : Success(await workspaceTools.EvidenceAsync(parameters.Name, parameters.Arguments, cancellationToken));
+                }
+
                 if (parameters.Name is "change_coupling")
+                {
                     return Success(await (couplingTools ?? new CouplingTools(null, session as IChangeCouplingSession)).CallAsync(parameters.Arguments, cancellationToken));
+                }
+
                 if (parameters.Name is "get_context")
+                {
                     return Success(await (contextTools ?? new ContextTools(project: session as IContextProjectSession)).CallAsync(parameters.Arguments, cancellationToken));
+                }
+
                 if (ProviderTools.Handles(parameters.Name))
+                {
                     return Success(await (providerTools ?? new ProviderTools(project: session as IProviderProjectSession)).CallAsync(parameters.Name, parameters.Arguments, cancellationToken));
+                }
+
                 if (parameters.Name.StartsWith("task_", StringComparison.Ordinal))
+                {
                     return session is ITaskSession tasks ? Success(await TaskTools.CallAsync(parameters.Name, parameters.Arguments, tasks, session as IMemorySession, caller, cancellationToken)) : Error("task session unavailable");
+                }
+
                 if (session is not IMemorySession memory)
+                {
                     return Error("memory session unavailable");
+                }
+
                 return Success(await MemoryTools.CallAsync(parameters.Name, parameters.Arguments, memory, caller, cancellationToken));
             }
             catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
             {
                 if (parameters.Name is "architecture_findings" or "architecture_propose")
+                {
                     return Error("architecture analysis timed out while matching source evidence");
+                }
+
                 if (parameters.Name is "library_adoption" or "similar_concerns")
+                {
                     return Error("workspace analysis timed out while matching source evidence");
+                }
+
                 var kind = parameters.Name.StartsWith("task_", StringComparison.Ordinal) ? "task" : "memory";
                 return Error(kind + " content rejected: credential validation timed out");
             }
@@ -142,12 +169,21 @@ public static class HarnessMcpServer
 
         var key = parameters.Arguments!["key"].GetString()!;
         if (key.Length == 0)
+        {
             return Error("key must not be empty");
+        }
+
         if (key.EnumerateRunes().Count() > 256)
+        {
             return Error("key exceeds 256 characters");
+        }
+
         var value = parameters.Name == "state_put_test" ? parameters.Arguments["value"].GetString()! : null;
         if (value is not null && Encoding.UTF8.GetByteCount(value) > 64 * 1024)
+        {
             return Error("value exceeds 65536 bytes");
+        }
+
         try
         {
             if (value is not null)
@@ -159,7 +195,10 @@ public static class HarnessMcpServer
             var stored = await session.GetAsync(key, cancellationToken);
             SortedDictionary<string, object?> result = new(StringComparer.Ordinal) { ["key"] = key, ["found"] = stored is not null };
             if (!string.IsNullOrEmpty(stored))
+            {
                 result["value"] = stored;
+            }
+
             return Success(result);
         }
         catch (IOException exception)

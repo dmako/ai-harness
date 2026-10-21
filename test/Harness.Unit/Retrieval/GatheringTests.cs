@@ -1,5 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
@@ -135,7 +135,10 @@ public sealed class GatheringTests
         var gathered = await RetrievalGatherer.GatherAsync(new(registry), new("order templates"), Token);
         gathered.Candidates.Take(4).Should().OnlyContain(candidate => !candidate.Scores.ContainsKey("phrase"));
         foreach (var candidate in gathered.Candidates.Take(4))
+        {
             candidate.Scores["test"].Should().Be(1);
+        }
+
         gathered.Candidates[^1].Path.Should().Be("src/template.json");
         gathered.Candidates[^1].Scores["phrase"].Should().Be(1);
     }
@@ -207,14 +210,20 @@ public sealed class GatheringTests
         {
             Discoveries++;
             if (RejectMetadata)
+            {
                 throw new InvalidOperationException("excluded discovery");
+            }
+
             return Discover?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
         public IReadOnlyList<CapabilityInfo> Capabilities()
         {
             CapabilityReads++;
             if (RejectMetadata)
+            {
                 throw new InvalidOperationException("excluded capabilities");
+            }
+
             return new[] { Core.Providers.Capabilities.SymbolSearch, Core.Providers.Capabilities.Context, Core.Providers.Capabilities.Callers, Core.Providers.Capabilities.Impact, Core.Providers.Capabilities.FileSearch }.Select(capability => new CapabilityInfo(capability, name)).ToArray();
         }
         public Task<ProviderResult> ExecuteAsync(ProviderRequest request, CancellationToken cancellationToken = default)

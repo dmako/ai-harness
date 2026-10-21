@@ -14,7 +14,9 @@ internal sealed class NativeMemory : SafeHandleZeroOrMinusOneIsInvalid
     internal NativeMemory(string value, bool unicode = false) : base(true)
     {
         if (unicode)
+        {
             SetHandle(Marshal.StringToHGlobalUni(value));
+        }
         else
         {
             var bytes = System.Text.Encoding.UTF8.GetBytes(value + "\0");

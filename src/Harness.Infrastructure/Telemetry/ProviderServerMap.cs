@@ -1,6 +1,6 @@
 using System.Text;
-using System.Text.Json.Nodes;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Harness.Core.Providers;
 using Tomlyn;
@@ -22,7 +22,9 @@ public static class ProviderServerMap
         void Add(Dictionary<string, Server?>? table)
         {
             if (table is not null)
+            {
                 servers.AddRange(table.Select(pair => (pair.Key, pair.Value?.Command ?? "")));
+            }
         }
         ClientConfiguration? ReadJson(string path)
         {
@@ -42,9 +44,14 @@ public static class ProviderServerMap
         catch (Exception error) when (Optional(error)) { /* Individual malformed client files are optional. */ }
         Dictionary<string, string> result = new(StringComparer.Ordinal);
         foreach (var server in servers.Where(s => s.Name is not "harness"))
+        {
             foreach (var (name, config) in providers.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
                 if (server.Name == name || server.Name == name + "-mcp" || config.Command.Length > 0 && Path.GetFileName(Expand(server.Command)) == Path.GetFileName(Expand(config.Command)))
                 { result[server.Name] = name; break; }
+            }
+        }
+
         return result;
     }
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
@@ -55,7 +62,10 @@ public static class ProviderServerMap
     private static string ReadText(string path)
     {
         if (new FileInfo(path).Length > 4 * 1024 * 1024)
+        {
             throw new InvalidDataException("client configuration exceeds the read limit");
+        }
+
         return File.ReadAllText(path, Utf8);
     }
     private static string Expand(string command)

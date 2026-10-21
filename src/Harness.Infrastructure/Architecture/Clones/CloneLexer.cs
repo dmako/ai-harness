@@ -21,11 +21,18 @@ internal static class CloneLexer
         for (var index = at; index < tokens.Count; index++)
         {
             if (tokens[index].Kind is not 'p')
+            {
                 continue;
+            }
+
             if (tokens[index].Text == open)
+            {
                 depth++;
+            }
             else if (tokens[index].Text == close && --depth is 0)
+            {
                 return index;
+            }
         }
         return -1;
     }
@@ -48,7 +55,11 @@ internal static class CloneLexer
             {
                 index += 2;
                 while (index + 1 < source.Length && !(source[index] is '*' && source[index + 1] is '/'))
-                { if (source[index++] is '\n') line++; }
+                { if (source[index++] is '\n')
+                    {
+                        line++;
+                    }
+                }
                 index = Math.Min(source.Length, index + 2);
                 continue;
             }
@@ -66,7 +77,11 @@ internal static class CloneLexer
                 {
                     index += 3;
                     while (index + 2 < source.Length && !source.AsSpan(index, 3).SequenceEqual("\"\"\""))
-                    { if (source[index++] is '\n') line++; }
+                    { if (source[index++] is '\n')
+                        {
+                            line++;
+                        }
+                    }
                     index = Math.Min(source.Length, index + 3);
                 }
                 else
@@ -75,7 +90,11 @@ internal static class CloneLexer
                     while (index < source.Length)
                     {
                         if (source[index] is '\n')
-                        { line++; if (quote is not '`' && !verbatim) break; }
+                        { line++; if (quote is not '`' && !verbatim)
+                            {
+                                break;
+                            }
+                        }
                         if (source[index] is '\\' && !verbatim && quote is not '`')
                         { index = Math.Min(source.Length, index + 2); continue; }
                         if (source[index] == quote)
@@ -100,22 +119,32 @@ internal static class CloneLexer
                     if (source[index] is '\\')
                     { index = Math.Min(source.Length, index + 2); continue; }
                     if (source[index] is '[')
+                    {
                         inClass = true;
+                    }
                     else if (source[index] is ']')
+                    {
                         inClass = false;
+                    }
                     else if (source[index] is '/' && !inClass)
                     { index++; break; }
                     index++;
                 }
                 while (index < source.Length && Identifier(source[index]))
+                {
                     index++;
+                }
+
                 tokens.Add(new('s', source[start..index], firstLine));
                 continue;
             }
             if (char.IsAsciiDigit(character))
             {
                 while (index < source.Length && (Identifier(source[index]) || source[index] is '.'))
+                {
                     index++;
+                }
+
                 tokens.Add(new('n', source[start..index], line));
                 continue;
             }
@@ -123,7 +152,10 @@ internal static class CloneLexer
             {
                 index++;
                 while (index < source.Length && Identifier(source[index]))
+                {
                     index++;
+                }
+
                 tokens.Add(new('i', source[start..index].TrimStart('@'), line));
                 continue;
             }

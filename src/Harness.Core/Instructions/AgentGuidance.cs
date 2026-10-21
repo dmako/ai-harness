@@ -14,7 +14,10 @@ public static class AgentGuidance
     {
         var (start, end) = Block.Find(source);
         if (start >= 0)
+        {
             source = source[..start] + source[end..];
+        }
+
         return source.Split('\n').Any(line => line.Trim() is "@AGENTS.md" or "@./AGENTS.md");
     }
     public const string Body = """

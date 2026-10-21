@@ -22,16 +22,30 @@ internal static class EditOutput
             _ => "refused: " + change.Reason,
         };
         if (dryRun && change.Writes)
+        {
             message = "would " + message;
+        }
+
         if (change.Deleted)
+        {
             message += " (file deleted: nothing else was in it)";
+        }
+
         await output.WriteLineAsync(label + ": " + message);
         if (!change.Writes)
+        {
             return;
+        }
+
         foreach (var line in Diff(change.Before, change.After))
+        {
             await output.WriteLineAsync("    " + line);
+        }
+
         if (change.Backup.Length > 0)
+        {
             await output.WriteLineAsync("    backup: " + change.Backup);
+        }
     }
     internal static IEnumerable<string> Diff(string before, string after)
     {
@@ -39,10 +53,16 @@ internal static class EditOutput
         var b = after.Split('\n');
         var prefix = 0;
         while (prefix < a.Length && prefix < b.Length && a[prefix] == b[prefix])
+        {
             prefix++;
+        }
+
         var suffix = 0;
         while (suffix < a.Length - prefix && suffix < b.Length - prefix && a[^(suffix + 1)] == b[^(suffix + 1)])
+        {
             suffix++;
+        }
+
         return a[prefix..(a.Length - suffix)].Select(s => "- " + s).Concat(b[prefix..(b.Length - suffix)].Select(s => "+ " + s));
     }
 }

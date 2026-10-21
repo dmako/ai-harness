@@ -26,7 +26,10 @@ public static class RetrievalRanker
     {
         var weight = RoleWeight(candidate.Role);
         if (weight is 0)
+        {
             weight = 0.3;
+        }
+
         var score = weight;
         var tier = 1;
         List<string> why = ["role " + candidate.Role + " " + Format(weight, "F2")];
@@ -86,7 +89,10 @@ public static class RetrievalRanker
     private static string TieKey(Candidate candidate)
     {
         if (candidate.Provenance.Count is 0)
+        {
             return candidate.Id;
+        }
+
         var source = candidate.Provenance[0];
         return candidate.Id + string.Create(CultureInfo.InvariantCulture, $"|{source.Provider}|{source.Capability}|{source.Rank}");
     }

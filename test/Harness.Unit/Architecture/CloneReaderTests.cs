@@ -43,14 +43,19 @@ public sealed class CloneReaderTests
             ["test/FirstTests.cs"] = Raw,
         };
         foreach (var mode in new[] { "forms", "read", "findings" })
+        {
             yield return ["CSharpRawStringsAndGeneratedFiltering", csharp, mode];
+        }
+
         var javascript = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["web/a.ts"] = "export function load(value: string): string { const match = /a+[b]/g; const inner = (x) => { if (match.test(x)) { return value + x; } return ''; }; return inner(value); }",
             ["web/b.ts"] = "export function load(text: string): string { const match = /a+[b]/g; const inner = (x) => { if (match.test(x)) { return text + x; } return ''; }; return inner(text); }",
         };
         foreach (var mode in new[] { "forms", "read", "findings" })
+        {
             yield return ["TypeScriptClosuresAndRegex", javascript, mode];
+        }
     }
     [Theory]
     [MemberData(nameof(SourceCases))]
@@ -61,9 +66,13 @@ public sealed class CloneReaderTests
         var functions = extractor.Extract();
         object actual;
         if (mode is "findings")
+        {
             actual = new RepeatedCodeReader(tree.Repository()).Read();
+        }
         else if (mode is "forms")
+        {
             actual = functions.Select(function => new { function, canonical = function.Canonical, shape = function.Shape, signature = function.Signature, statements = function.Statements.Select(statement => new { key = statement.Key, own = statement.Own, raw = statement.Raw, line = statement.Line, size = statement.Size, idiom = statement.Idiom, header = statement.Header, work = statement.Work, callee = statement.Callee, data = statement.Data }) }).ToArray();
+        }
         else
         {
             var branches = extractor.Branches();
@@ -86,16 +95,30 @@ public sealed class CloneReaderTests
     private static string Difference(JsonNode? actual, JsonNode? expected, string path)
     {
         if (actual is JsonObject a && expected is JsonObject b)
+        {
             foreach (var key in a.Select(pair => pair.Key).Union(b.Select(pair => pair.Key), StringComparer.Ordinal))
+            {
                 if (!JsonNode.DeepEquals(a[key], b[key]))
+                {
                     return Difference(a[key], b[key], path + "." + key);
+                }
+            }
+        }
+
         if (actual is JsonArray aa && expected is JsonArray bb)
         {
             if (aa.Count != bb.Count)
+            {
                 return path + $": {aa.Count} items versus {bb.Count}";
+            }
+
             for (var index = 0; index < aa.Count; index++)
+            {
                 if (!JsonNode.DeepEquals(aa[index], bb[index]))
+                {
                     return Difference(aa[index], bb[index], path + "[" + index + "]");
+                }
+            }
         }
         return path + ": " + actual?.ToJsonString() + " versus " + expected?.ToJsonString();
     }
@@ -103,7 +126,10 @@ public sealed class CloneReaderTests
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+        {
             directory = directory.Parent;
+        }
+
         return directory?.FullName ?? throw new DirectoryNotFoundException("Harness fixture root");
     }
     [SuppressMessage("Security", "S4036:Searching OS commands in PATH is security-sensitive", Justification = "Explicit frozen oracle path runs without a shell.")]

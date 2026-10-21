@@ -23,11 +23,20 @@ public static class TaskParsing
         {
             var word = match.Value;
             if (word.Length < 3 || NotAName(text, match))
+            {
                 continue;
+            }
+
             if (LooksLikeCode(word))
-            { if (!code.Contains(word, StringComparer.Ordinal)) code.Add(word); }
+            { if (!code.Contains(word, StringComparer.Ordinal))
+                {
+                    code.Add(word);
+                }
+            }
             else if (NamedInProse(text, match) && !words.Contains(word, StringComparer.Ordinal))
+            {
                 words.Add(word);
+            }
         }
         return code.Take(5).Concat(words.Take(Math.Max(0, 5 - code.Count))).ToArray();
     }
@@ -50,7 +59,9 @@ public static class TaskParsing
                 {
                     phrases.Add(phrase);
                     if (phrases.Count is 3)
+                    {
                         break;
+                    }
                 }
             }
             previous = lower;
@@ -63,10 +74,16 @@ public static class TaskParsing
     public static IReadOnlyList<string> NamingVariants(string name)
     {
         if (!name.Contains('_', StringComparison.Ordinal) || name.Contains('.', StringComparison.Ordinal) || name == name.ToUpperInvariant())
+        {
             return [];
+        }
+
         var parts = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
+        {
             return [];
+        }
+
         var camel = parts[0].ToLowerInvariant() + string.Concat(parts.Skip(1).Select(part => Title(part.ToLowerInvariant())));
         return [camel, Title(camel)];
     }
@@ -75,7 +92,9 @@ public static class TaskParsing
         for (var i = phrase.Length - 1; i > 0; i--)
         {
             if (char.IsAsciiLetterUpper(phrase[i]))
+            {
                 return phrase[i..].ToLowerInvariant();
+            }
         }
         return phrase.ToLowerInvariant();
     }
@@ -89,7 +108,10 @@ public static class TaskParsing
         name = name.Split('(')[0];
         var split = name.LastIndexOfAny(['.', ':']);
         if (split <= 0)
+        {
             return "";
+        }
+
         var qualifier = name[..split].TrimEnd(':');
         return qualifier[(qualifier.LastIndexOfAny(['.', ':']) + 1)..];
     }
@@ -105,7 +127,10 @@ public static class TaskParsing
         var name = path[(path.LastIndexOf('/') + 1)..];
         var lower = name.ToLowerInvariant();
         if (lower.EndsWith("_test.go", StringComparison.Ordinal) || name.EndsWith("Tests.cs", StringComparison.Ordinal) || name.EndsWith("Test.cs", StringComparison.Ordinal) || name.EndsWith("Tests.csproj", StringComparison.Ordinal) || name.EndsWith("Test.csproj", StringComparison.Ordinal) || lower.Contains(".test.", StringComparison.Ordinal) || lower.Contains(".spec.", StringComparison.Ordinal) || lower.StartsWith("test_", StringComparison.Ordinal) && lower.EndsWith(".py", StringComparison.Ordinal) || lower.EndsWith("_test.py", StringComparison.Ordinal))
+        {
             return true;
+        }
+
         var slash = path.LastIndexOf('/');
         return slash >= 0 && path[..slash].ToLowerInvariant().Split('/').Any(segment => segment is "test" or "__tests__" || segment.EndsWith("tests", StringComparison.Ordinal) || segment.Contains(".tests.", StringComparison.Ordinal) || segment.EndsWith(".test", StringComparison.Ordinal) || segment.EndsWith("-test", StringComparison.Ordinal) || segment.EndsWith("_test", StringComparison.Ordinal));
     }
@@ -113,7 +138,10 @@ public static class TaskParsing
     private static bool NamedInProse(string text, Match match)
     {
         if (!char.IsAsciiLetterUpper(match.Value[0]) || LooksLikeCode(match.Value))
+        {
             return false;
+        }
+
         var before = text[..match.Index].TrimEnd(' ', '\t');
         return before.Length > 0 && !".!?\n\"'`(*-#>".Contains(before[^1], StringComparison.Ordinal);
     }

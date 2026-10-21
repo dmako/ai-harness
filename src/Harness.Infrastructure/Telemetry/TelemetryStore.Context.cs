@@ -39,6 +39,7 @@ public sealed partial class TelemetryStore
         {
             var outcomes = byCall.GetValueOrDefault(call.Key) ?? [];
             foreach (var pc in call.Select(u => (u.Provider, u.Capability)).Distinct())
+            {
                 foreach (var change in outcomes)
                 {
                     var key = (pc.Provider, pc.Capability, change.LanguageName);
@@ -55,17 +56,24 @@ public sealed partial class TelemetryStore
                     row.Changed.Add((call.Key, change.Path));
                     provider.Changed.Add((call.Key, change.Path));
                 }
+            }
+
             var changed = outcomes.ToLookup(o => o.Path, StringComparer.Ordinal);
             foreach (var unit in call)
+            {
                 foreach (var change in changed[unit.Path])
                 {
                     var row = rows[(unit.Provider, unit.Capability, change.LanguageName)];
                     row.Hits.Add((call.Key, unit.Path));
                     if (unit.Tier is 0)
+                    {
                         row.Tier0.Add((call.Key, unit.Path));
+                    }
+
                     row.Positions.Add(unit.Position);
                     providers[unit.Provider].Hits.Add((call.Key, unit.Path));
                 }
+            }
         }
         var result = rows.Select(pair =>
         {
@@ -101,11 +109,16 @@ public sealed partial class TelemetryStore
                 {
                     var next = DateTimeOffset.Parse(Text(ordered[i + 1][1]), System.Globalization.CultureInfo.InvariantCulture);
                     if (next < end)
+                    {
                         end = next;
+                    }
                 }
                 var touched = events.Where(e => e.At > at && e.At < end).GroupBy(e => e.Path, StringComparer.Ordinal).ToArray();
                 if (touched.Length is 0)
+                {
                     continue;
+                }
+
                 var paths = Query("SELECT DISTINCT path FROM context_units WHERE call_id=$id", ("$id", Long(ordered[i][0]))).Select(r => Text(r[0])).ToHashSet(StringComparer.Ordinal);
                 result.Calls++;
                 foreach (var group in touched)
@@ -113,9 +126,16 @@ public sealed partial class TelemetryStore
                     var edited = group.Any(e => e.Edited);
                     result.Touched++;
                     if (edited)
+                    {
                         result.Edited++;
+                    }
+
                     if (paths.Contains(group.Key))
-                    { result.Hits++; if (edited) result.EditHits++; }
+                    { result.Hits++; if (edited)
+                        {
+                            result.EditHits++;
+                        }
+                    }
                 }
             }
         }

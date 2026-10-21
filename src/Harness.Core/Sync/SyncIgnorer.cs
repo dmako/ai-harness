@@ -21,11 +21,20 @@ public sealed class SyncIgnorer
         foreach (var segment in path.Split('/'))
         {
             if (segment is "" or ".")
+            {
                 continue;
+            }
+
             if (segment is "..")
-            { if (segments.Count > 0) segments.RemoveAt(segments.Count - 1); }
+            { if (segments.Count > 0)
+                {
+                    segments.RemoveAt(segments.Count - 1);
+                }
+            }
             else
+            {
                 segments.Add(segment);
+            }
         }
         path = string.Join('/', segments);
         foreach (var pattern in _patterns)
@@ -34,12 +43,19 @@ public sealed class SyncIgnorer
             {
                 var directory = pattern[..^1];
                 if (path == directory || path.StartsWith(directory + "/", StringComparison.Ordinal))
+                {
                     return true;
+                }
+
                 if (!directory.Contains('/', StringComparison.Ordinal) && segments.Take(Math.Max(0, segments.Count - 1)).Any(segment => Matches(directory, segment)))
+                {
                     return true;
+                }
             }
             else if (Matches(pattern, pattern.Contains('/', StringComparison.Ordinal) ? path : segments.LastOrDefault() ?? ""))
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -71,13 +87,19 @@ public sealed class SyncIgnorer
                     break;
                 case '\\':
                     if (i == pattern.Length)
+                    {
                         return null;
+                    }
+
                     regex.Append(Regex.Escape(pattern[i++].ToString()));
                     break;
                 case '[':
                     var end = pattern.IndexOf(']', i);
                     if (end < 0)
+                    {
                         return null;
+                    }
+
                     regex.Append(pattern.AsSpan(i - 1, end - i + 2));
                     i = end + 1;
                     break;

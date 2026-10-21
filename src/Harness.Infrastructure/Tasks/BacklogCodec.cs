@@ -25,12 +25,18 @@ public static class BacklogCodec
             // the backlog contract without deserializing arbitrary CLR types.
             stream.Load(new FirstDocumentParser(parser));
             if (stream.Documents.Count is 0)
+            {
                 throw new InvalidDataException("unsupported backlog version 0 (want 1)");
+            }
+
             var root = Mapping(stream.Documents[0].RootNode, ["version", "milestones", "tasks"]);
             var versionText = Scalar(root.GetValueOrDefault("version"));
             var version = versionText.Length is 0 ? 0 : int.Parse(versionText, CultureInfo.InvariantCulture);
             if (version is not 1)
+            {
                 throw new InvalidDataException($"unsupported backlog version {version} (want 1)");
+            }
+
             var tasks = Sequence(root.GetValueOrDefault("tasks")).Select(node =>
             {
                 var d = Mapping(node, ["id", "milestone", "title", "type", "priority", "goal", "scope", "depends_on", "acceptance", "validation", "notes", "status"]);
@@ -67,26 +73,44 @@ public static class BacklogCodec
     private static Dictionary<string, YamlNode> Mapping(YamlNode? node, string[] allowed, HashSet<YamlNode> ancestors)
     {
         if (node is not YamlMappingNode map)
+        {
             throw new InvalidDataException("expected a mapping");
+        }
+
         if (!ancestors.Add(map))
+        {
             throw new InvalidDataException("recursive YAML merge");
+        }
+
         Dictionary<string, YamlNode> result = new(StringComparer.Ordinal);
         foreach (var (key, value) in map.Children)
         {
             var name = Scalar(key);
             if (name is "<<" && key is YamlScalarNode { Style: ScalarStyle.Plain })
+            {
                 continue;
+            }
+
             if (!allowed.Contains(name, StringComparer.Ordinal))
+            {
                 throw new InvalidDataException($"unknown field {TaskWorkflow.Quote(name)}");
+            }
+
             if (!result.TryAdd(name, value))
+            {
                 throw new InvalidDataException($"field {TaskWorkflow.Quote(name)} is defined twice");
+            }
         }
         if (map.Children.FirstOrDefault(kv => kv.Key is YamlScalarNode { Value: "<<", Style: ScalarStyle.Plain }).Value is { } merge)
         {
             IEnumerable<YamlNode> maps = merge is YamlSequenceNode sequence ? sequence.Children : [merge];
             foreach (var merged in maps)
+            {
                 foreach (var (key, value) in Mapping(merged, allowed, ancestors))
+                {
                     result.TryAdd(key, value);
+                }
+            }
         }
         ancestors.Remove(map);
         return result;
@@ -114,7 +138,10 @@ public static class BacklogCodec
         ArgumentNullException.ThrowIfNull(file);
         Dictionary<string, object> root = new() { ["version"] = file.Version };
         if (file.Milestones.Count is not 0)
+        {
             root["milestones"] = file.Milestones.Select(MilestoneMap).ToArray();
+        }
+
         root["tasks"] = file.Tasks.Select(DefinitionMap).ToArray();
         return Serialize(root);
     }
@@ -144,8 +171,16 @@ public static class BacklogCodec
         Add(map, "notes", d.Notes);
         return map;
     }
-    private static void Add(Dictionary<string, object> map, string key, string value) { if (value.Length is not 0) map[key] = value; }
-    private static void Add(Dictionary<string, object> map, string key, IReadOnlyList<string> value) { if (value.Count is not 0) map[key] = value; }
+    private static void Add(Dictionary<string, object> map, string key, string value) { if (value.Length is not 0)
+        {
+            map[key] = value;
+        }
+    }
+    private static void Add(Dictionary<string, object> map, string key, IReadOnlyList<string> value) { if (value.Count is not 0)
+        {
+            map[key] = value;
+        }
+    }
 
     private sealed class FirstDocumentParser(IParser inner) : IParser
     {

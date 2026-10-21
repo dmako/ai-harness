@@ -20,15 +20,24 @@ internal static class GraphifyWorker
     private static async Task<int> DispatchAsync(string directory, string[] args)
     {
         using (await LockAsync(directory))
+        {
             await File.AppendAllTextAsync(Path.Combine(directory, "calls.log"), new JsonArray(args.Select(arg => (JsonNode?)JsonValue.Create(arg)).ToArray()).ToJsonString() + "\n");
+        }
+
         if (args.Length is 0)
+        {
             return 2;
+        }
+
         switch (args[0])
         {
             case "ps":
                 // Readers share the fake's writer lease so Windows replacement never races an open fixture read.
                 using (await LockAsync(directory))
+                {
                     await Console.Out.WriteAsync((await ReadAsync(directory)).ToJsonString());
+                }
+
                 return 0;
             case "watch":
                 return await WatchAsync(directory, args);
@@ -38,7 +47,10 @@ internal static class GraphifyWorker
                     var sessions = await ReadAsync(directory);
                     var array = sessions["sessions"]!.AsArray();
                     foreach (var session in array.Where(node => node?["session_id"]?.GetValue<string>() == args[1]).ToArray())
+                    {
                         array.Remove(session);
+                    }
+
                     await WriteAsync(directory, sessions);
                     File.Delete(Path.Combine(directory, "descriptors", args[1] + ".json"));
                 }
@@ -74,7 +86,10 @@ internal static class GraphifyWorker
                 var sessions = await ReadAsync(directory);
                 var session = sessions["sessions"]!.AsArray().FirstOrDefault(node => node?["session_id"]?.GetValue<string>() == id);
                 if (session is null)
+                {
                     return 0;
+                }
+
                 var ready = !File.Exists(Path.Combine(directory, "never-ready")) && Stopwatch.GetElapsedTime(began) > TimeSpan.FromMilliseconds(250);
                 session["ready"] = ready;
                 session["lifecycle_state"] = ready ? "ready" : "loading";
@@ -89,14 +104,20 @@ internal static class GraphifyWorker
     {
         JsonObject sessions;
         using (await LockAsync(directory))
+        {
             sessions = await ReadAsync(directory);
+        }
+
         if (!sessions["sessions"]!.AsArray().Any(node => node?["session_id"]?.GetValue<string>() == Argument(args, "--instance")))
         { await Console.Out.WriteAsync("""{"success":false,"error":{"code":"session_unreachable","message":"no such session"},"items":[]}"""); return 1; }
         var symbol = Argument(args, "--symbol");
         var file = Path.Combine(directory, args[1] + (symbol.Length > 0 ? "-" + symbol : "") + ".json");
         var delay = Path.Combine(directory, "query.delay");
         if (File.Exists(delay))
+        {
             await Task.Delay(int.Parse(await File.ReadAllTextAsync(delay), CultureInfo.InvariantCulture));
+        }
+
         await Console.Out.WriteAsync(File.Exists(file) ? await File.ReadAllTextAsync(file) : """{"success":true,"items":[]}""");
         return 0;
     }

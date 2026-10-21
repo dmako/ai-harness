@@ -20,13 +20,25 @@ public static class MemoryViews
         Add(view, "superseded_by", memory.SupersededBy);
         Add(view, "supersede_reason", memory.SupersedeReason);
         if (memory.Confidence is { } confidence)
+        {
             view["confidence"] = confidence;
+        }
+
         if (memory.ValidFrom is { } from)
+        {
             view["valid_from"] = from.ToRfc3339();
+        }
+
         if (memory.ValidUntil is { } until)
+        {
             view["valid_until"] = until.ToRfc3339();
+        }
+
         if (memory.Overrides.Count > 0)
+        {
             view["overrides"] = memory.Overrides;
+        }
+
         return view;
     }
 
@@ -57,9 +69,15 @@ public static class MemoryViews
         ArgumentNullException.ThrowIfNull(detail);
         Dictionary<string, object?> result = new(StringComparer.Ordinal) { ["memory"] = Memory(detail.Memory), ["current"] = detail.Current };
         if (detail.History.Count > 0)
+        {
             result["history"] = detail.History.Select(Memory).ToArray();
+        }
+
         if (detail.Events.Count > 0)
+        {
             result["events"] = detail.Events.Select(Event).ToArray();
+        }
+
         return result;
     }
 
@@ -87,6 +105,8 @@ public static class MemoryViews
     {
         ArgumentNullException.ThrowIfNull(target);
         if (value.Length > 0)
+        {
             target[key] = value;
+        }
     }
 }

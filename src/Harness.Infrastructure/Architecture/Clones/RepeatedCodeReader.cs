@@ -19,7 +19,10 @@ public sealed class RepeatedCodeReader(AnalysisRepository repository)
         foreach (var finding in Checked(functions, provided ?? []))
         {
             if (finding.Kind is "duplicate" && finding.Evidence is { Count: 2 } evidence && groups.TryGetValue(PlaceId(evidence[0]), out var left) && groups.GetValueOrDefault(PlaceId(evidence[1])) == left)
+            {
                 continue;
+            }
+
             own.Add(finding);
         }
         var templates = CloneComparison.Templates(functions);
@@ -81,12 +84,20 @@ public sealed class RepeatedCodeReader(AnalysisRepository repository)
         var why = $"The same {Plural(sequence.Statements, "statement")} written out in {sequence.Places.Count} places ({List(names)}), each a change to make in all of them:\n" + string.Join('\n', text);
         var fix = "Extract them into one function the places call, passing what differs.";
         if (sequence.Holder is { } holder)
+        {
             fix = $"{holder.Name} ({holder.Path}:{holder.Line}) already does this: call it from the other places.";
+        }
         else if (sequence.Tokens <= 20 && !sequence.Data)
+        {
             fix = "A short run: extract it only if the places must stay the same; otherwise keep them.";
+        }
+
         var hash = 2166136261U;
         foreach (var value in Encoding.UTF8.GetBytes(sequence.Key))
+        {
             hash = unchecked((hash ^ value) * 16777619U);
+        }
+
         var differs = sequence.Places.Any(place => place.Differs?.Count > 0);
         return new() { Kind = "repeated-sequence", Level = "info", Key = ArchitectureAnalyzer.Key("repeated-sequence", [.. sequence.Places.Select(place => place.Function.Id).Order(StringComparer.Ordinal), hash.ToString("x", CultureInfo.InvariantCulture)]), Measure = sequence.Places.Count, Title = $"{Plural(sequence.Statements, "statement")} repeated in {sequence.Places.Count} places ({List(names)})", Why = why + (differs ? "\nThey differ in numbers only." : ""), Fix = fix, Project = Directory(sequence.Places[0].Function.Path), Evidence = sequence.Places.Select(place => $"{place.Function.Path}:{place.Line} ({place.Function.Name})" + (place.Differs is { Count: > 0 } values ? ": " + string.Join(", ", values) : "")).ToArray(), Source = ArchitectureAnalyzer.Harness("internal/clones"), Rank = (double)sequence.Tokens * sequence.Places.Count * sequence.Places.Select(place => Directory(place.Function.Path)).Distinct(StringComparer.Ordinal).Count() / (sequence.Tokens <= 20 && !sequence.Data ? 10 : 1), Basis = differs ? "heuristic" : "fact", Confidence = differs ? 0.9 : 0 };
     }
@@ -114,10 +125,16 @@ public sealed class RepeatedCodeReader(AnalysisRepository repository)
             var a = Locate(left);
             var b = Locate(right);
             if (a is null || b is null)
+            {
                 continue;
+            }
+
             var (similarity, copied) = CloneComparison.Check(a, b);
             if (!copied)
+            {
                 continue;
+            }
+
             output.Add(finding with { Confidence = similarity, Basis = similarity >= 1 ? "fact" : finding.Basis, Why = $"{finding.Source.Provider} pairs them; with their names kept their bodies are {(int)(similarity * 100)}% alike: a change to one likely needs the other." });
         }
         return output;
@@ -142,24 +159,36 @@ public sealed class RepeatedCodeReader(AnalysisRepository repository)
     public static async Task<ProviderArchitectureRead> ProviderDuplicatesAsync(IProviderRegistry? registry, CancellationToken token)
     {
         if (registry is null)
+        {
             return new([], false, []);
+        }
+
         List<ArchitectureFinding> found = [];
         HashSet<string> seen = new(StringComparer.Ordinal);
         var answered = false;
         foreach (var result in await registry.CallAsync(new(Capabilities.ArchDuplicates, Limit: 100), cancellationToken: token).ConfigureAwait(false))
         {
             if (result.Error is not null)
+            {
                 continue;
+            }
+
             answered = true;
             foreach (var item in result.Items)
             {
                 var related = item.Related;
                 if (related?.Path is not { Length: > 0 } path || item.Path is not { Length: > 0 } own || TaskParsing.IsTestFile(own) && TaskParsing.IsTestFile(path) || ChangeCoupling.Generated(own) || ChangeCoupling.Generated(path))
+                {
                     continue;
+                }
+
                 var ids = new[] { own + "#" + item.Name, path + "#" + related.Name }.Order(StringComparer.Ordinal).ToArray();
                 var key = ArchitectureAnalyzer.Key("duplicate", ids);
                 if (!seen.Add(key))
+                {
                     continue;
+                }
+
                 static string At(string file, string? name, int line) => file + (line > 0 ? ":" + line.ToString(CultureInfo.InvariantCulture) : "") + " (" + name + ")";
                 found.Add(new() { Kind = "duplicate", Level = "info", Key = key, Measure = 1, Title = item.Name == related.Name ? item.Name + " is written twice" : item.Name + " repeats " + related.Name, Why = $"{item.Provider} finds their code {(int)(item.Confidence * 100 + 0.5)}% alike: a change to one likely needs the other.", Fix = "Keep one and call it from the other place, or move it where both can use it.", Project = Directory(own), Evidence = [At(own, item.Name, item.StartLine), At(path, related.Name, related.StartLine)], Basis = "heuristic", Confidence = item.Confidence, Source = new(item.Provider, item.Tool.Length is 0 ? null : item.Tool) });
             }

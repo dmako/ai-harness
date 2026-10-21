@@ -25,7 +25,10 @@ public sealed class GenericGoContractTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_PROVIDER_ORACLE");
         if (string.IsNullOrWhiteSpace(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_PROVIDER_ORACLE to the bridge built by Providers/build_oracle.py.");
+        }
+
         var token = TestContext.Current.CancellationToken;
         using var fixture = new ProviderFixture();
         var capability = scenario switch
@@ -62,7 +65,10 @@ public sealed class GenericGoContractTests
         };
         fixture.Write("answer.json", body);
         if (scenario is "chain")
+        {
             fixture.Write("second.json", """[{"name":"Interface"}]""");
+        }
+
         var configuration = new ProviderConfiguration { Type = "mcp", Command = "dotnet", Args = [ProviderFixture.Worker, "normal", fixture.Root], TimeoutMs = 5000, Capabilities = new(StringComparer.Ordinal) { [capability] = mapping } };
         var request = new ProviderRequest(capability, "Service.A+(x) # 🧪", Limit: 2, Target: "Target.Last", Budget: 1024);
         await using var candidate = GenericMcpProvider.Build("fakeidx", configuration, fixture.Root, new ProviderProcessFactory());
@@ -80,7 +86,11 @@ public sealed class GenericGoContractTests
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
         { await process.WaitForExitAsync(timeout.Token); }
-        finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        finally { if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
         process.ExitCode.Should().Be(0, await stderr);
         using var expected = JsonDocument.Parse(await stdout);
         var actual = JsonSerializer.SerializeToElement(new { capabilities = candidate.Capabilities(), items = result.Items, summary = result.Summary, text = result.Text, truncated = result.Truncated, bytes = result.Bytes, error = result.Error?.Message ?? "" });

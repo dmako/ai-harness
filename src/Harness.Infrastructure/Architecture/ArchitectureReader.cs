@@ -30,30 +30,46 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
     {
         var build = await BuildAsync(current, token).ConfigureAwait(false);
         if (build is null)
+        {
             return new(null, ["no .NET, Go or TypeScript/JavaScript project found here"]);
+        }
+
         HashSet<string> consumed = new(StringComparer.Ordinal);
         List<string> notes = [];
         var complete = true;
         if (includeMembers)
+        {
             foreach (var member in members.Where(member => member.Id != current.Id))
+            {
                 try
                 {
                     var peer = await BuildAsync(member, token).ConfigureAwait(false);
                     if (peer is null)
+                    {
                         continue;
+                    }
+
                     consumed.UnionWith(peer.Projects.SelectMany(unit => unit.Packages).Select(package => package.Name));
                     var (repository, _) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
                     if (repository.Notes.Count > 0)
+                    {
                         complete = false;
+                    }
+
                     notes.AddRange(repository.Notes.Select(note => member.Name + ": " + note));
                 }
                 catch (Exception error) when (WorkspaceEvidenceReader.ReadError(error))
                 { complete = false; notes.Add(member.Name + ": " + error.Message.Split('\n')[0]); }
+            }
+        }
         // Unreadable peers cannot prove a published package unused.
         Func<string, bool>? used = includeMembers && complete && members.Count > 1 ? consumed.Contains : null;
         var architecture = ArchitectureAnalyzer.Analyze(build, used);
         if (rules is not null)
+        {
             architecture = architecture with { Findings = rules.Apply(architecture) };
+        }
+
         var (own, _) = await _evidence.RepositoryAsync(current, token).ConfigureAwait(false);
         notes.AddRange(own.Notes);
         return new(architecture, notes);
@@ -63,6 +79,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         List<SystemMember> inputs = [];
         List<string> notes = [];
         foreach (var member in members)
+        {
             try
             {
                 var (repository, _) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
@@ -70,6 +87,8 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
                 inputs.Add(new(member.Id, member.Title.Length > 0 ? member.Title : member.Name, member.Name, repository, build is not null && !build.Projects.Any(unit => unit.Kind is "entry")));
             }
             catch (Exception error) when (WorkspaceEvidenceReader.ReadError(error)) { notes.Add(member.Name + ": " + error.Message.Split('\n')[0]); }
+        }
+
         token.ThrowIfCancellationRequested();
         var system = new SystemReader(inputs).Read();
         var shared = await new WorkspaceDuplicateReader(members, _evidence).SharedAsync(workspace, levels, token).ConfigureAwait(false);
@@ -83,7 +102,10 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
     {
         token.ThrowIfCancellationRequested();
         if (_builds.TryGetValue(member.Id, out var build))
+        {
             return build;
+        }
+
         var (repository, ecosystem) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
         build = new BuildReader(repository, ecosystem).Read();
         _builds.Add(member.Id, build);
@@ -99,19 +121,30 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         void Add(IMemoryStore store, string? scope)
         {
             foreach (var memory in store.Search(query, token))
+            {
                 rules.Add(memory.Content, new(memory.Id, Scope: scope ?? memory.Scope.ToString(), Type: memory.Type));
+            }
         }
         if (own is not null)
+        {
             Add(own, null);
+        }
+
         if (levels is null)
+        {
             return rules;
+        }
+
         var workspaces = levels.Load();
         var scopes = workspaces.Where(workspace => projectId.Length > 0 && workspace.Members.Contains(projectId, StringComparer.Ordinal)).Select(workspace => new MemoryScope("workspace", workspace.Name)).Append(MemoryScope.User);
         foreach (var scope in scopes)
         {
             var path = levels.KnowledgePath(workspaces, scope);
             if (!File.Exists(path))
+            {
                 continue;
+            }
+
             try
             {
                 using var database = HarnessDatabase.OpenReadOnly(path);

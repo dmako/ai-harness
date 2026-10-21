@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Threading.Channels;
-using ModelContextProtocol.Protocol;
 using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 
 namespace Harness.Mcp;
 
@@ -41,7 +41,10 @@ internal sealed class CompatibleStdioTransport : ITransport
             var key = Id(id);
             _inflight.Remove(key);
             _batches.Remove(key);
-            if (_inflight.Count == 0) _empty.TrySetResult();
+            if (_inflight.Count == 0)
+            {
+                _empty.TrySetResult();
+            }
         }
     }
 
@@ -64,12 +67,22 @@ internal sealed class CompatibleStdioTransport : ITransport
                 if (_batches.TryGetValue(key, out var batch))
                 {
                     batch.Responses[key] = root.Clone();
-                    if (batch.Responses.Count != batch.Keys.Length) return;
+                    if (batch.Responses.Count != batch.Keys.Length)
+                    {
+                        return;
+                    }
+
                     completed = batch.Keys;
                     bytes = JsonSerializer.SerializeToUtf8Bytes(batch.Keys.Select(name => batch.Responses[name]).ToArray());
-                    foreach (var name in completed) _batches.Remove(name);
+                    foreach (var name in completed)
+                    {
+                        _batches.Remove(name);
+                    }
                 }
-                else completed = [key];
+                else
+                {
+                    completed = [key];
+                }
             }
         }
 
@@ -78,18 +91,35 @@ internal sealed class CompatibleStdioTransport : ITransport
         {
             foreach (var key in completed)
             {
-                if (!_inflight.TryGetValue(key, out var count)) continue;
-                if (count == 1) _inflight.Remove(key);
-                else _inflight[key] = count - 1;
+                if (!_inflight.TryGetValue(key, out var count))
+                {
+                    continue;
+                }
+
+                if (count == 1)
+                {
+                    _inflight.Remove(key);
+                }
+                else
+                {
+                    _inflight[key] = count - 1;
+                }
             }
 
-            if (_inflight.Count == 0) _empty.TrySetResult();
+            if (_inflight.Count == 0)
+            {
+                _empty.TrySetResult();
+            }
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         await _shutdown.CancelAsync();
         await _reader;
         _shutdown.Dispose();
@@ -109,9 +139,17 @@ internal sealed class CompatibleStdioTransport : ITransport
                 var count = await _input.ReadAsync(buffer, _shutdown.Token).AsTask().WaitAsync(_shutdown.Token);
                 if (count == 0)
                 {
-                    if (line.Length > 0 || oversized) await AcceptAsync(line.ToArray(), oversized);
+                    if (line.Length > 0 || oversized)
+                    {
+                        await AcceptAsync(line.ToArray(), oversized);
+                    }
+
                     Task empty;
-                    lock (_inflight) empty = _empty.Task;
+                    lock (_inflight)
+                    {
+                        empty = _empty.Task;
+                    }
+
                     try { await empty.WaitAsync(TimeSpan.FromSeconds(30), _shutdown.Token); }
                     catch (TimeoutException) { /* The SDK then cancels outstanding requests on disconnect. */ }
                     break;
@@ -120,7 +158,11 @@ internal sealed class CompatibleStdioTransport : ITransport
                 var start = 0;
                 for (var index = 0; index < count; index++)
                 {
-                    if (buffer[index] != (byte)'\n') continue;
+                    if (buffer[index] != (byte)'\n')
+                    {
+                        continue;
+                    }
+
                     Append(line, buffer.AsSpan(start, index - start + 1), ref oversized);
                     await AcceptAsync(line.ToArray(), oversized);
                     line.SetLength(0);
@@ -150,7 +192,10 @@ internal sealed class CompatibleStdioTransport : ITransport
             line.SetLength(0);
         }
 
-        if (!oversized) line.Write(part);
+        if (!oversized)
+        {
+            line.Write(part);
+        }
     }
 
     private async Task AcceptAsync(byte[] frame, bool oversized)
@@ -161,7 +206,11 @@ internal sealed class CompatibleStdioTransport : ITransport
             return;
         }
 
-        if (frame.All(value => value is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n')) return;
+        if (frame.All(value => value is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n'))
+        {
+            return;
+        }
+
         JsonDocument document;
         try { document = JsonDocument.Parse(frame, new JsonDocumentOptions { MaxDepth = 256 }); }
         catch (JsonException)
@@ -196,10 +245,16 @@ internal sealed class CompatibleStdioTransport : ITransport
                         throw new IOException("batch contains previously seen request IDs");
                     }
 
-                    foreach (var key in keys) _batches[key] = batch;
+                    foreach (var key in keys)
+                    {
+                        _batches[key] = batch;
+                    }
                 }
 
-                foreach (var message in messages) await ForwardAsync(message);
+                foreach (var message in messages)
+                {
+                    await ForwardAsync(message);
+                }
             }
             else if (!Valid(root))
             {
@@ -223,12 +278,20 @@ internal sealed class CompatibleStdioTransport : ITransport
             return;
         }
 
-        if (decoded is null) return;
+        if (decoded is null)
+        {
+            return;
+        }
+
         if (message.TryGetProperty("method", out _) && message.TryGetProperty("id", out var id))
         {
             lock (_inflight)
             {
-                if (_inflight.Count == 0) _empty = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (_inflight.Count == 0)
+                {
+                    _empty = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+
                 var key = Id(id);
                 _inflight[key] = _inflight.GetValueOrDefault(key) + 1;
             }
@@ -239,7 +302,11 @@ internal sealed class CompatibleStdioTransport : ITransport
 
     private static bool Valid(JsonElement message)
     {
-        if (message.ValueKind != JsonValueKind.Object || !message.TryGetProperty("jsonrpc", out var version) || version.ValueKind != JsonValueKind.String || version.GetString() != "2.0") return false;
+        if (message.ValueKind != JsonValueKind.Object || !message.TryGetProperty("jsonrpc", out var version) || version.ValueKind != JsonValueKind.String || version.GetString() != "2.0")
+        {
+            return false;
+        }
+
         var hasId = message.TryGetProperty("id", out var id);
         if (message.TryGetProperty("method", out var method))
         {

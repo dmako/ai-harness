@@ -16,14 +16,21 @@ public static class CloneContracts
         {
             var set = input.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
             if (set.Length >= 2)
+            {
                 keys[string.Join(' ', set)] = set;
+            }
         }
         for (var index = 0; index < operations.Count; index++)
         {
             for (var other = index + 1; other < operations.Count; other++)
+            {
                 Add(words[index].Intersect(words[other], StringComparer.Ordinal));
+            }
+
             foreach (var branch in branches.Where(branch => Supports(branch, words[index])))
+            {
                 Add(words[index].Intersect(branch.Words, StringComparer.Ordinal));
+            }
         }
         var partners = keys.Values.SelectMany(set => set.Select(word => (word, set))).GroupBy(pair => pair.word, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.SelectMany(pair => pair.set.Where(word => word != pair.word)).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
         List<CloneContract> output = [];
@@ -35,7 +42,9 @@ public static class CloneContracts
             var files = dispatch.Select(branch => branch.Path).Distinct(StringComparer.Ordinal).Count();
             var closed = set.All(word => partners[word].Count(other => !set.Contains(other, StringComparer.Ordinal)) <= 1);
             if (files >= 2 && applicable.Length >= 1 || files >= 1 && applicable.Length >= 2 || applicable.Length >= 3 && closed)
+            {
                 output.Add(new(set, applicable, evidence.Length is 0 ? null : evidence));
+            }
         }
         return output.Where(contract => !output.Any(other => other.Variants.Count > contract.Variants.Count && contract.Variants.All(word => other.Variants.Contains(word, StringComparer.Ordinal)) && other.Operations.Count >= contract.Operations.Count)).OrderByDescending(contract => contract.Operations.Count * 2 + (contract.Branches?.Count ?? 0)).ToArray();
     }
@@ -47,11 +56,17 @@ public static class CloneContracts
         {
             var words = NameWords(function.Name.Split('.')[^1]);
             if (words.Count < 2)
+            {
                 continue;
+            }
+
             for (var index = 0; index < words.Count; index++)
             {
                 if (Verbs.Contains(words[index]))
+                {
                     continue;
+                }
+
                 var stem = string.Join(' ', words.Select((word, number) => number == index ? "*" : word));
                 if (!byStem.TryGetValue(stem, out var members))
                 { members = []; byStem.Add(stem, members); }
@@ -64,15 +79,24 @@ public static class CloneContracts
         {
             var distinct = members.Select(member => member.Word).Distinct(StringComparer.Ordinal).Count();
             if (distinct < 2 || members.Count != distinct)
+            {
                 continue;
+            }
+
             var name = members[0].Function.Name.Split('.')[^1];
             var at = name.IndexOf(members[0].Word, StringComparison.OrdinalIgnoreCase);
             var stem = at < 0 ? name : name[..at] + "*" + name[(at + members[0].Word.Length)..];
             var kept = members.Where(member => !seen.Contains(member.Function.Id)).ToArray();
             if (kept.Length < 2)
+            {
                 continue;
+            }
+
             foreach (var member in kept)
+            {
                 seen.Add(member.Function.Id);
+            }
+
             output.Add(new(stem, kept.Select(member => member.Function).ToArray(), kept.ToDictionary(member => member.Function.Id, member => member.Word, StringComparer.Ordinal)));
         }
         return output;
@@ -88,7 +112,9 @@ public static class CloneContracts
             {
                 var word = current.ToString().ToLowerInvariant();
                 if (!StopWords.Contains(word) && !output.Contains(word, StringComparer.Ordinal))
+                {
                     output.Add(word);
+                }
             }
             current.Clear();
         }
@@ -96,13 +122,17 @@ public static class CloneContracts
         {
             var character = name[index];
             if (!char.IsLetter(character))
-                Flush();
-            else
             {
-                if (char.IsUpper(character) && index > 0 && (char.IsLower(name[index - 1]) || index + 1 < name.Length && char.IsLower(name[index + 1]) && char.IsUpper(name[index - 1])))
-                    Flush();
-                current.Append(character);
+                Flush();
+                continue;
             }
+
+            if (char.IsUpper(character) && index > 0 && (char.IsLower(name[index - 1]) || index + 1 < name.Length && char.IsLower(name[index + 1]) && char.IsUpper(name[index - 1])))
+            {
+                Flush();
+            }
+
+            current.Append(character);
         }
         Flush();
         return output;

@@ -15,7 +15,10 @@ public static class ChangeCoupling
     public static async Task<ChangePartners> PartnersAsync(IProviderRegistry? registry, string file, int limit, CancellationToken token)
     {
         if (registry is null)
+        {
             return new([], []);
+        }
+
         Dictionary<string, ChangePartner> byPath = new(StringComparer.Ordinal);
         List<string> errors = [];
         foreach (var result in await registry.CallAsync(new(Capabilities.ArchChangeCoupling, file, Limit: limit), cancellationToken: token).ConfigureAwait(false))
@@ -26,7 +29,9 @@ public static class ChangeCoupling
             {
                 var partner = new ChangePartner(item.Path!, item.Count, item.Confidence, item.Provider, item.Tool);
                 if (!byPath.TryGetValue(partner.Path, out var previous) || partner.Together > previous.Together)
+                {
                     byPath[partner.Path] = partner;
+                }
             }
         }
         var partners = byPath.Values.OrderByDescending(partner => partner.Together).ThenByDescending(partner => partner.Share).ThenBy(partner => partner.Path, StringComparer.Ordinal);
@@ -39,12 +44,15 @@ public static class ChangeCoupling
         var output = churn.Counts.Where(pair => Code(pair.Key) && !TaskParsing.IsTestFile(pair.Key) && !Generated(pair.Key) && pair.Value > 1 && files.Exists(pair.Key)).Select(pair => new ChangeHotspot(pair.Key, pair.Value)).OrderByDescending(hotspot => hotspot.Commits).ThenBy(hotspot => hotspot.Path, StringComparer.Ordinal).Take(Math.Max(0, limit)).ToArray();
         List<string> errors = [];
         if (registry is not null && partners > 0)
+        {
             for (var index = 0; index < output.Length; index++)
             {
                 var result = await PartnersAsync(registry, output[index].Path, partners, token).ConfigureAwait(false);
                 output[index] = output[index] with { Partners = result.Partners.Count is 0 ? null : result.Partners };
                 errors.AddRange(result.Errors.Where(error => !errors.Contains(error, StringComparer.Ordinal)));
             }
+        }
+
         return new(output, churn.Commits, errors);
     }
     public static async Task<ChangeCheck> CheckAsync(IProviderRegistry? registry, string root, IReadOnlyList<string> changed, CancellationToken token)

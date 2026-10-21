@@ -29,7 +29,10 @@ public sealed class GoContractTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_RETRIEVAL_ORACLE");
         if (string.IsNullOrEmpty(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_RETRIEVAL_ORACLE using Retrieval/build_oracle.py.");
+        }
+
         var token = TestContext.Current.CancellationToken;
         var items = new[] { Capabilities.SymbolSearch, Capabilities.TextSearch, Capabilities.FileSearch, Capabilities.Callers, Capabilities.References, Capabilities.Impact, Capabilities.Flow, Capabilities.Context, "custom.capability" }
             .Select((capability, i) => new ItemInput(new(capability, "graph", Evidence: i % 2 is 0 ? "exact" : null), i,
@@ -64,7 +67,9 @@ public sealed class GoContractTests
         {
             registry.Register(new GatheringTests.Fake(provider.ID, request => provider.Failure.Length > 0 ? throw new IOException(provider.Failure) : provider.Answers.GetValueOrDefault(request.Capability + "|" + request.Query) ?? []));
             if (provider.Excluded)
+            {
                 registry.ExcludeFromContext(provider.ID);
+            }
         }
         var normalized = items.Select(item => Candidate.FromItem(item.Info, item.Rank, item.Item)).ToArray();
         var merged = RetrievalMerger.Merge(candidates.Concat(normalized));

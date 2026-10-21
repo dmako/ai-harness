@@ -18,7 +18,10 @@ public sealed class TelemetryRecorder : IToolObserver, IContextObserver, IAsyncD
         Task Write(Action<TelemetryStore, CancellationToken> write)
         {
             if (!File.Exists(path))
+            {
                 return Task.CompletedTask;
+            }
+
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             using var db = HarnessDatabase.OpenExisting(path, options);
             write(new(db), timeout.Token);
@@ -31,10 +34,16 @@ public sealed class TelemetryRecorder : IToolObserver, IContextObserver, IAsyncD
         _providers.Subscribe("versions", e =>
         {
             if (!File.Exists(path) || _versions.Contains(e.Provider))
+            {
                 return Task.CompletedTask;
+            }
+
             var value = version?.Invoke(e.Provider) ?? "";
             if (value.Length is 0)
+            {
                 return Task.CompletedTask;
+            }
+
             using var db = HarnessDatabase.OpenExisting(path, options);
             db.PutDiagnostic("provider_version:" + e.Provider, Harness.Core.Memory.CredentialRedactor.Redact(value));
             _versions.Add(e.Provider);

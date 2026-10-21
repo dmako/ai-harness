@@ -219,7 +219,10 @@ internal sealed class ProviderFixture : IDisposable
         {
             var directory = new DirectoryInfo(AppContext.BaseDirectory);
             while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+            {
                 directory = directory.Parent;
+            }
+
             directory.Should().NotBeNull();
             return directory.FullName;
         }
@@ -238,7 +241,9 @@ internal sealed class ProviderFixture : IDisposable
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
         while (!File.Exists(Path.Combine(Root, name)))
+        {
             await Task.Delay(10, timeout.Token);
+        }
     }
     public static async Task GoneAsync(int pid)
     {
@@ -257,7 +262,9 @@ internal sealed class ProviderFixture : IDisposable
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
         while (!condition())
+        {
             await Task.Delay(10, timeout.Token);
+        }
     }
     public void Dispose() => Directory.Delete(Root, recursive: true);
 }

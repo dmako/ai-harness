@@ -14,7 +14,10 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
     public async Task<(AnalysisRepository Repository, EcosystemReader Ecosystem)> RepositoryAsync(WorkspaceMember member, CancellationToken token)
     {
         if (_repositories.TryGetValue(member.Id, out var cached))
+        {
             return cached;
+        }
+
         var repository = await AnalysisRepository.OpenAsync(member.Root, token).ConfigureAwait(false);
         var result = (repository, new EcosystemReader(repository));
         _repositories.Add(member.Id, result);
@@ -42,19 +45,32 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
                 var (count, namespaces, imports) = Imports(peerRepository, owner, roots);
                 var peerDeclarations = Declarations(peer, peerRepository);
                 if (references.Count > 0 || count > 0)
+                {
                     consumers.Add(new(peer.Name, NullIfEmpty(references), NullIfEmpty(namespaces), count, NullIfEmpty(imports)));
+                }
                 else if (peerRepository.Notes.Count is 0)
+                {
                     nonConsumers.Add(peer.Name);
+                }
+
                 foreach (var declared in peerDeclarations)
+                {
                     if (byName.TryGetValue(declared.Name, out var original) && twins.Count < 50)
+                    {
                         twins.Add(new(peer.Name, declared, original));
+                    }
+                }
+
                 notes.AddRange(peerRepository.Notes.Select(note => peer.Name + ": " + note));
             }
             catch (Exception error) when (ReadError(error)) { notes.Add(peer.Name + ": " + error.Message.Split('\n')[0]); }
         }
         notes.AddRange(repository.Notes.Select(note => member.Name + ": " + note));
         if (twins.Count is 50)
+        {
             notes.Add("only the first 50 possible local implementations are listed");
+        }
+
         notes.Add("evidence only: a consumer may use little of the library, and a type with the same name may be unrelated");
         return new(member.Name, offered.Select(package => package.Name).ToArray(), roots.Count is 0 ? null : roots, api.Count, consumers, nonConsumers, twins, notes);
     }
@@ -76,14 +92,19 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
             catch (Exception error) when (ReadError(error)) { /* An unreadable repository contributes no invented node or edge. */ }
         }
         foreach (var from in members.Where(member => _repositories.ContainsKey(member.Id)).Select(member => member.Id))
+        {
             foreach (var to in members.Where(member => member.Id != from && packages.TryGetValue(member.Id, out var offered) && offered.Count > 0).Select(member => member.Id))
             {
                 token.ThrowIfCancellationRequested();
                 var peer = _repositories[from];
                 var references = ManifestReferences(peer.Repository, peer.Ecosystem, packages[to]);
                 if (references.Count > 0)
+                {
                     edges.Add(new(from, to, references.Select(reference => reference.Matched!).Distinct(StringComparer.Ordinal).Order(WorkspaceNameComparer.Instance).ToArray(), references.Count, references));
+                }
             }
+        }
+
         return new(nodes, edges);
     }
     private IReadOnlyList<DeclaredType> Declarations(WorkspaceMember member, AnalysisRepository repository)
@@ -96,13 +117,20 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
     {
         List<ManifestReference> result = [];
         foreach (var file in repository.Files.Where(file => EcosystemReader.Of(file).Length > 0 && !EcosystemReader.Vendored(file)))
+        {
             foreach (var dependency in ecosystem.Dependencies(file))
+            {
                 foreach (var package in offered.Where(package => package.Ecosystem == EcosystemReader.Of(file) && package.Name.Equals(dependency.Name, StringComparison.OrdinalIgnoreCase)))
                 {
                     var reference = new ManifestReference(dependency.Path, dependency.Line, package.Name);
                     if (!result.Contains(reference))
+                    {
                         result.Add(reference);
+                    }
                 }
+            }
+        }
+
         return result;
     }
     private static (int Count, IReadOnlyList<string> Namespaces, IReadOnlyList<ManifestReference> Imports) Imports(AnalysisRepository repository, string ecosystem, IReadOnlyList<string> roots)
@@ -111,28 +139,45 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
         List<string> namespaces = [];
         List<ManifestReference> imports = [];
         if (ecosystem.Length is 0 || roots.Count is 0)
+        {
             return (count, namespaces, imports);
+        }
+
         var import = EcosystemReader.Rx(ecosystem switch { "NuGet" => @"using\s+(?:static\s+)?([A-Za-z_][\w.]*)", "Go modules" => "\"([^\"]+)\"", _ => "['\"]([^'\"]+)['\"]" });
         foreach (var file in repository.Files.Where(file => CodeFile(file, ecosystem) && !EcosystemReader.Vendored(file)))
         {
             var found = false;
             var lines = AnalysisRepository.Lines(repository.Read(file));
             for (var index = 0; index < lines.Length; index++)
+            {
                 foreach (var root in roots)
                 {
                     var text = ecosystem switch { "NuGet" => "using " + root, "Go modules" => '"' + root, _ => root };
                     if (!lines[index].Contains(text, StringComparison.Ordinal))
+                    {
                         continue;
+                    }
+
                     var match = import.Match(lines[index]);
                     var ns = match.Success && match.Groups[1].Value.StartsWith(root, StringComparison.Ordinal) ? match.Groups[1].Value : root;
                     if (!namespaces.Contains(ns, StringComparer.Ordinal))
+                    {
                         namespaces.Add(ns);
+                    }
+
                     if (!found && imports.Count < 5)
+                    {
                         imports.Add(new(file, index + 1, ns));
+                    }
+
                     found = true;
                 }
+            }
+
             if (found)
+            {
                 count++;
+            }
         }
         return (count, namespaces.Order(WorkspaceNameComparer.Instance).ToArray(), imports);
     }

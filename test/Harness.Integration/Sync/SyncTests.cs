@@ -25,7 +25,10 @@ public sealed class SyncTests
     public async Task SymlinkContentHashesTheLinkTextWithoutFollowingItsTarget()
     {
         if (OperatingSystem.IsWindows())
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Unix symlink fixture; Windows creation may require developer mode or privileges.");
+        }
+
         using var fixture = await SyncFixture.CreateAsync();
         File.CreateSymbolicLink(Path.Combine(fixture.Root, "link.cs"), "a.cs");
         await fixture.RunAsync();
@@ -161,7 +164,10 @@ public sealed class SyncTests
         partial.State.ProvidersStale.Should().BeTrue();
         partial.Files!.Providers.Single().Status.Should().Be("failed");
         using (var db = fixture.Database())
+        {
             SyncStore.RecentRuns(db, fixture.Worktree)[0].Status.Should().Be("partial");
+        }
+
         index.Failure = null;
         var retry = await fixture.RunAsync(options);
         retry.Files!.Files.Processed.Should().BeFalse();
@@ -327,7 +333,10 @@ public sealed class SyncTests
         {
             var call = Interlocked.Increment(ref _calls);
             if (call is 2)
+            {
                 Queued.TrySetResult();
+            }
+
             return DateTimeOffset.UtcNow.AddMinutes(call);
         }
     }
@@ -346,9 +355,15 @@ public sealed class SyncTests
             Requests.Add(request);
             Started?.TrySetResult();
             if (Delay)
+            {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
             if (Failure is not null)
+            {
                 throw Failure;
+            }
+
             return new(false, "refreshed fixture");
         }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -377,7 +392,10 @@ internal sealed class SyncFixture : IDisposable
             fixture.Write("a.cs", "a");
             fixture.Write("b.cs", "b");
             if (commit)
+            {
                 await fixture.CommitAsync("base");
+            }
+
             var initialized = await fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: TestContext.Current.CancellationToken);
             fixture.Worktree = initialized.Registration!.Worktree.Id;
             fixture.DatabasePath = initialized.Location.DatabasePath;
@@ -407,12 +425,18 @@ internal sealed class SyncFixture : IDisposable
     {
         using var process = new Process { StartInfo = new(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = DirectoryRoot } };
         foreach (var arg in args)
+        {
             process.StartInfo.ArgumentList.Add(arg);
+        }
+
         process.StartInfo.Environment["HARNESS_CONFIG_DIR"] = Global;
         process.StartInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
         process.StartInfo.Environment["GIT_CONFIG_GLOBAL"] = Path.Combine(DirectoryRoot, "absent.gitconfig");
         foreach (var name in new[] { "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE" })
+        {
             process.StartInfo.Environment.Remove(name);
+        }
+
         process.Start();
         var token = TestContext.Current.CancellationToken;
         var stdout = process.StandardOutput.ReadToEndAsync(token);
@@ -425,7 +449,10 @@ internal sealed class SyncFixture : IDisposable
     {
         Path.GetFullPath(DirectoryRoot).Should().StartWith(Path.GetFullPath(Path.GetTempPath()));
         foreach (var file in Directory.EnumerateFiles(DirectoryRoot, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }))
+        {
             File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
+        }
+
         Directory.Delete(DirectoryRoot, recursive: true);
     }
 }

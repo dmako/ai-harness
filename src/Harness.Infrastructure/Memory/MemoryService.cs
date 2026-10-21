@@ -1,6 +1,6 @@
 using Harness.Core.Memory;
-using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Projects;
+using Harness.Infrastructure.Storage;
 
 namespace Harness.Infrastructure.Memory;
 
@@ -30,14 +30,20 @@ public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>>
             var workspaces = levels.Load();
             var projectId = await ProjectIdAsync(cancellationToken);
             if (scope.Kind is "workspace" && projectId.Length is 0)
+            {
                 throw new InvalidOperationException("workspace memories need a registered project ('harness sync')");
+            }
+
             using var database = levels.OpenLevel(workspaces, scope, projectId, cancellationToken);
             return AtLevel(new MemoryStore(database).Put(input with { Scope = MemoryScope.Project }, cancellationToken), scope);
         }
         var project = new MemoryStore(await existingDatabase(cancellationToken));
         var result = project.Put(input, cancellationToken);
         if (result.Status is not "created")
+        {
             return result;
+        }
+
         using var opened = await LayersAsync(project, cancellationToken);
         List<string> overrides = [];
         foreach (var level in opened.Wider)
@@ -56,7 +62,10 @@ public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>>
     {
         ArgumentNullException.ThrowIfNull(input);
         if (string.IsNullOrWhiteSpace(input.SupersedeReason))
+        {
             throw new ArgumentException("reason is required: say why the old memory no longer holds");
+        }
+
         var project = new MemoryStore(await existingDatabase(cancellationToken));
         using var opened = await LayersAsync(project, cancellationToken);
         var located = opened.Layers.Find(id, cancellationToken);
@@ -64,11 +73,17 @@ public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>>
         if (located.Scope is { } scope)
         {
             if (input.Scope is not null && input.Scope != scope)
+            {
                 throw new InvalidOperationException($"{id} is a {scope} memory: supersede it at that level (scope {scope}), or store a project memory that overrides it");
+            }
+
             return AtLevel(store.Supersede(id, input with { Scope = MemoryScope.Project }, cancellationToken), scope);
         }
         if (input.Scope is { Wider: true })
+        {
             throw new InvalidOperationException($"a project memory moves to a wider level by promotion ('harness memory promote {id} --to {input.Scope}')");
+        }
+
         return store.Supersede(id, input, cancellationToken);
     }
 
@@ -114,14 +129,23 @@ public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>>
         using var opened = await LayersAsync(project, cancellationToken);
         var result = opened.Layers.Search(query with { Branch = currentBranch }, cancellationToken);
         if (result.Errors.Count > 0 && result.Memories.Count is 0)
+        {
             throw new IOException(string.Join('\n', result.Errors.Select(error => error.Scope + ": " + error.Error.Message)));
+        }
+
         var output = new MemorySearchResult(result.Memories, query.Scope?.ToString() ?? "", currentBranch,
             string.Join('\n', result.Errors.Select(error => error.Scope + ": " + error.Error.Message)));
         if (result.Memories.Count is not 0 || !query.Types.Contains("convention", StringComparer.Ordinal))
+        {
             return output;
+        }
+
         var words = ConventionWords(query.Text);
         if (words.Length is 0)
+        {
             return output;
+        }
+
         FoundMemory[] elsewhere = [];
         try
         {
@@ -131,7 +155,10 @@ public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>>
         catch (Exception exception) when (KnowledgeLevels.IsStorageError(exception)) { /* The undefined convention hint remains useful without other projects. */ }
         var hint = "No convention about this is defined for this project, its workspaces or the user. Ask the user which one holds and record it with memory_put type=convention (scope project, workspace:<name> or user)";
         if (elsewhere.Length > 0)
+        {
             hint += "; other projects follow the conventions listed under elsewhere, which may be adopted";
+        }
+
         return output with { Hint = hint + ".", Elsewhere = elsewhere };
     }
 
@@ -151,29 +178,44 @@ public sealed class MemoryService(Func<CancellationToken, Task<HarnessDatabase>>
     {
         ArgumentNullException.ThrowIfNull(scope);
         if (!scope.Wider)
+        {
             throw new ArgumentException("--to must be workspace:<name> or user");
+        }
+
         var database = await existingDatabase(cancellationToken);
         var project = ProjectStore.Load(database) ?? throw new InvalidOperationException("project is not registered ('harness init')");
         var store = new MemoryStore(database);
         var memory = store.Get(id, cancellationToken);
         if (!memory.Current(new MemoryTimestamp(DateTimeOffset.UtcNow)))
+        {
             throw new InvalidOperationException($"{id} is not current (superseded or retired)");
+        }
+
         if (memory.Scope != MemoryScope.Project)
+        {
             throw new InvalidOperationException($"{id} applies to {memory.Scope} only; promote project-wide memories");
+        }
+
         var workspaces = levels.Load();
         var others = levels.OtherProjects(project.Id, scope.Kind is "workspace" ? scope.Value : null);
         var holds = KnowledgeLevels.Across(others, other => other.Similar(memory.Type, memory.Content, cancellationToken).Select(similar => similar.Memory).ToArray(), cancellationToken);
         var name = levels.ProjectName(project.Id, project.Root);
         var reference = "promoted from " + name + ":" + id;
         if (holds.Count > 0)
+        {
             reference += "; also holds in " + string.Join(", ", holds.Select(found => found.Project + ":" + found.Memory.Id));
+        }
+
         using var wider = levels.OpenLevel(workspaces, scope, project.Id, cancellationToken);
         var result = new MemoryStore(wider).Put(new MemoryInput { Type = memory.Type, Content = memory.Content, Source = new MemorySource("user", reference, by), Force = force }, cancellationToken);
         if (result.Status is "needs_decision")
+        {
             return new MemoryPromotion(memory, scope.ToString(), holds, result.Status)
             {
                 SimilarAtLevel = result.Similar.Select(similar => similar.Memory.Id + " " + similar.Memory.Content).ToArray(),
             };
+        }
+
         store.Retire(id, by, "promoted to " + scope + " as " + result.Memory!.Id, cancellationToken);
         return new MemoryPromotion(memory, scope.ToString(), holds, result.Status, Retired: true, Memory: result.Memory with { Scope = scope });
     }

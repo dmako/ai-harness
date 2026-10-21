@@ -14,20 +14,32 @@ public sealed partial class CloneExtractor
         {
             var close = CloneLexer.Match(tokens, parameters);
             for (var index = parameters + 1; index < close; index++)
+            {
                 if (tokens[index].Kind is 'i' && !CloneLexer.Keywords.Contains(tokens[index].Text) && tokens[index + 1].Text is "," or ")" or "=" or ":" or "?" or "}")
+                {
                     locals.Add(tokens[index].Text);
+                }
+            }
         }
         else if (tokens[parameters].Kind is 'i')
+        {
             locals.Add(tokens[parameters].Text);
+        }
+
         for (var index = body; index <= end; index++)
         {
             var current = tokens[index];
             var previous = index > 0 ? tokens[index - 1] : new('p', "", 0);
             var next = index + 1 < tokens.Count ? tokens[index + 1] : new('p', "", 0);
             if (current.Kind is not 'i' || CloneLexer.Keywords.Contains(current.Text) || previous.Text is "." or "?.")
+            {
                 continue;
+            }
+
             if (previous.Kind is 'i' && previous.Text is "var" or "let" or "const" || CloneLexer.TypeLike(previous) && !CloneLexer.Keywords.Contains(previous.Text) && next.Text is "=" or ";" or "in" or "of" or ")" or "," || next.Text is "=>")
+            {
                 locals.Add(current.Text);
+            }
         }
         for (var index = body; index < end; index++)
         {
@@ -35,19 +47,28 @@ public sealed partial class CloneExtractor
             {
                 var close = CloneLexer.Match(tokens, index + 1);
                 if (close > 0)
+                {
                     locals.UnionWith(tokens.Skip(index + 2).Take(close - index - 2).Where(token => token.Kind is 'i').Select(token => token.Text));
+                }
             }
             if (tokens[index].Text is not "=>" || index is 0 || tokens[index - 1].Text is not ")")
+            {
                 continue;
+            }
+
             var depth = 0;
             for (var cursor = index - 1; cursor > body; cursor--)
             {
                 if (tokens[cursor].Text is ")")
+                {
                     depth++;
+                }
                 else if (tokens[cursor].Text is "(")
                 { if (--depth is 0) { break; } }
                 else if (tokens[cursor].Kind is 'i' && depth is 1)
+                {
                     locals.Add(tokens[cursor].Text);
+                }
             }
         }
         Dictionary<string, string> names = new(StringComparer.Ordinal);
@@ -59,7 +80,10 @@ public sealed partial class CloneExtractor
         {
             var token = tokens[index];
             if (lines && index > body && token.Line > tokens[index - 1].Line && open is 0 && !",(=+-*/&|?:<>!".Contains(tokens[index - 1].Text[^1], StringComparison.Ordinal) && !token.Text.StartsWith('.') && !token.Text.StartsWith('?') && token.Text is not ("=>" or "&&" or "||"))
+            {
                 splitter.End();
+            }
+
             switch (token.Text)
             {
                 case "(" or "[":
@@ -114,7 +138,10 @@ public sealed partial class CloneExtractor
     private static string LocalName(Dictionary<string, string> names, HashSet<string> locals, string name)
     {
         if (!locals.Contains(name) || name is "_")
+        {
             return name;
+        }
+
         if (!names.TryGetValue(name, out var local))
         { local = "L" + names.Count.ToString(CultureInfo.InvariantCulture); names.Add(name, local); }
         return local;

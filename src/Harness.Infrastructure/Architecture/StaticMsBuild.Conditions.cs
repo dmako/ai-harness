@@ -7,12 +7,21 @@ public sealed partial class StaticMsBuild
     private (bool Value, bool Known) Condition(Context context, string text, string directory)
     {
         if (text.Trim().Length is 0)
+        {
             return (true, true);
+        }
+
         if (text.Length > 8192)
+        {
             return (true, false);
+        }
+
         var tokens = Tokens(Property.Replace(Expand(context, text.Trim(), directory), ""));
         if (tokens.Count > 512)
+        {
             return (true, false);
+        }
+
         var parser = new ConditionParser(tokens, path => repository.Exists(repository.Relative(Path.GetFullPath(path.Length is 0 ? "." : path.Replace('\\', Path.DirectorySeparatorChar), directory))));
         var answer = parser.Or();
         return parser.Complete && answer.Known ? answer : (true, false);
@@ -57,7 +66,10 @@ public sealed partial class StaticMsBuild
         private (bool Value, bool Known) Not()
         {
             if (Peek is not "!")
+            {
                 return Compare();
+            }
+
             _index++;
             var value = Not();
             return (!value.Value, value.Known);
@@ -69,7 +81,10 @@ public sealed partial class StaticMsBuild
                 _index++;
                 var value = Or();
                 if (Peek is not ")")
+                {
                     return (value.Value, false);
+                }
+
                 _index++;
                 return value;
             }
@@ -78,21 +93,36 @@ public sealed partial class StaticMsBuild
                 _index += 2;
                 var argument = Operand();
                 if (Peek is ")")
+                {
                     _index++;
+                }
+
                 return (exists(argument), !argument.Contains("$(", StringComparison.Ordinal));
             }
             var left = Operand();
             var op = Peek;
             if (op is not ("==" or "!=" or "<" or ">" or "<=" or ">="))
+            {
                 return (left.Equals("true", StringComparison.OrdinalIgnoreCase), bool.TryParse(left, out _));
+            }
+
             _index++;
             var right = Operand();
             if (left.Contains("$(", StringComparison.Ordinal) || right.Contains("$(", StringComparison.Ordinal))
+            {
                 return (false, false);
+            }
+
             if (op is "==" or "!=")
+            {
                 return (left.Equals(right, StringComparison.OrdinalIgnoreCase) == (op is "=="), true);
+            }
+
             if (!double.TryParse(left.TrimStart('v', 'V'), NumberStyles.Float, CultureInfo.InvariantCulture, out var a) || !double.TryParse(right.TrimStart('v', 'V'), NumberStyles.Float, CultureInfo.InvariantCulture, out var b))
+            {
                 return (false, false);
+            }
+
             return (op switch { "<" => a < b, ">" => a > b, "<=" => a <= b, _ => a >= b }, true);
         }
         private string Operand()
@@ -129,15 +159,24 @@ public sealed partial class StaticMsBuild
                     do
                     {
                         if (text[i] is '(')
+                        {
                             depth++;
+                        }
+
                         if (text[i] is ')')
+                        {
                             depth--;
+                        }
+
                         i++;
                     } while (i < text.Length && depth > 0);
                     break;
                 default:
                     while (i < text.Length && !" \t\n\r'()=!<>".Contains(text[i], StringComparison.Ordinal))
+                    {
                         i++;
+                    }
+
                     break;
             }
             tokens.Add(text[start..i]);

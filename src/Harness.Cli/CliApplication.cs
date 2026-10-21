@@ -1,15 +1,15 @@
-using Harness.Cli.Workspaces;
-using Harness.Cli.Telemetry;
-using Harness.Cli.Setup;
-using Harness.Infrastructure.Projects;
 using Harness.Cli.Memory;
+using Harness.Cli.Setup;
 using Harness.Cli.Tasks;
+using Harness.Cli.Telemetry;
+using Harness.Cli.Workspaces;
+using Harness.Infrastructure.Projects;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Spectre.Console.Cli;
 using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace Harness.Cli;
 
@@ -149,7 +149,10 @@ public static class CliApplication
 
         var normalized = NormalizeLegacyFlags(args);
         if (normalized[0] is "workspace" or "workspaces" or "projects" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
+        {
             normalized = [normalized[0], "list", .. normalized[1..]];
+        }
+
         return normalized[0] switch
         {
             "-v" or "--version" => ["version", .. normalized[1..]],

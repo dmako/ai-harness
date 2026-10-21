@@ -43,15 +43,24 @@ public static class GraphifyApplication
         {
             var argument = args[i++];
             if (argument is "--")
+            {
                 return (options with { WatchArguments = args.Skip(i).ToArray() }, clean, false);
+            }
+
             var split = argument.IndexOf('=', StringComparison.Ordinal);
             var name = split >= 0 ? argument[..split] : argument;
             string Value()
             {
                 if (split >= 0)
+                {
                     return argument[(split + 1)..];
+                }
+
                 if (i >= args.Count)
+                {
                     throw new ArgumentException("missing value for " + name);
+                }
+
                 return args[i++];
             }
             switch (name)
@@ -85,21 +94,36 @@ public static class GraphifyApplication
         var sign = value.StartsWith('-') ? -1 : 1;
         var remaining = value.StartsWith('-') || value.StartsWith('+') ? value[1..] : value;
         if (remaining is "0")
+        {
             return TimeSpan.Zero;
+        }
+
         if (remaining.Length is 0)
+        {
             throw new ArgumentException("invalid idle duration: " + value);
+        }
+
         decimal nanoseconds = 0;
         while (remaining.Length > 0)
         {
             var match = System.Text.RegularExpressions.Regex.Match(remaining, @"^(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)", System.Text.RegularExpressions.RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
             if (!match.Success || !decimal.TryParse(match.Groups[1].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount))
+            {
                 throw new ArgumentException("invalid idle duration: " + value);
+            }
+
             var unit = match.Groups[2].Value switch { "h" => 3600000000000m, "m" => 60000000000m, "s" => 1000000000m, "ms" => 1000000m, "ns" => 1m, _ => 1000m };
             if (amount > long.MaxValue / unit)
+            {
                 throw new ArgumentException("idle duration is too large");
+            }
+
             nanoseconds += amount * unit;
             if (nanoseconds > long.MaxValue)
+            {
                 throw new ArgumentException("idle duration is too large");
+            }
+
             remaining = remaining[match.Length..];
         }
         return TimeSpan.FromTicks((long)(sign * nanoseconds / 100));

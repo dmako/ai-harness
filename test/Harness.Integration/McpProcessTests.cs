@@ -70,7 +70,10 @@ public sealed class McpProcessTests
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+        {
             directory = directory.Parent;
+        }
+
         directory.Should().NotBeNull();
 #if DEBUG
         const string Configuration = "Debug";

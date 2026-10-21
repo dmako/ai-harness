@@ -60,7 +60,10 @@ public sealed class FindingsProcessTests
         var goServer = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER");
         await using var original = !string.IsNullOrEmpty(goServer) ? await McpClient.CreateAsync(new StdioClientTransport(new() { Command = goServer, Arguments = ["mcp", "--project", fixture.Root], WorkingDirectory = fixture.Root, EnvironmentVariables = environment, InheritEnvironmentVariables = false }), cancellationToken: Token) : null;
         foreach (var args in new Dictionary<string, object?>[] { [], new() { ["full"] = true }, new() { ["kind"] = "boundary", ["snippets"] = true }, new() { ["area"] = "src/Domain" }, new() { ["key"] = key } })
+        {
             await CompareGoAsync(args);
+        }
+
         var duplicate = await CallAsync("architecture_propose", new() { ["kind"] = "by_design", ["finding"] = key, ["reason"] = "Another reason" });
         duplicate.GetProperty("status").GetString().Should().Be("exists");
         var id = proposed.GetProperty("proposal").GetProperty("id").GetString()!;
@@ -90,7 +93,10 @@ public sealed class FindingsProcessTests
         async Task CompareGoAsync(Dictionary<string, object?> args)
         {
             if (original is null)
+            {
                 return;
+            }
+
             var expected = await original.CallToolAsync("architecture_findings", args, cancellationToken: Token);
             expected.IsError.Should().BeNull(string.Join("; ", expected.Content.OfType<TextContentBlock>().Select(c => c.Text)));
             var actual = await CallAsync("architecture_findings", args);

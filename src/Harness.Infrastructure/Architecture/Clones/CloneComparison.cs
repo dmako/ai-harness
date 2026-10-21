@@ -20,7 +20,9 @@ public static class CloneComparison
             if (byCanonical.TryGetValue(key, out var previous))
             {
                 if (!Overrides(input[previous], input[index]))
+                {
                     groups.Join(previous, index, 1);
+                }
             }
             else
             { byCanonical.Add(key, index); first[index] = true; }
@@ -29,7 +31,9 @@ public static class CloneComparison
         {
             var (similarity, copied) = Check(input[left], input[right], options);
             if (copied)
+            {
                 groups.Join(left, right, similarity);
+            }
         }
         return groups.Sets().Select(indices => new CloneCopy(Sorted(indices.Select(index => input[index])), groups.Low(indices[0]))).OrderBy(copy => copy.Functions[0].Path, StringComparer.Ordinal).ThenBy(copy => copy.Functions[0].Line).ToArray();
     }
@@ -37,7 +41,10 @@ public static class CloneComparison
     {
         options ??= new();
         if (Nested(left, right) || Overrides(left, right) || Template(left, right) || OtherLogic(left, right))
+        {
             return (0, false);
+        }
+
         var similarity = Alike(left.Canonical, right.Canonical);
         var least = similarity >= 1 ? options.MinIdentical : options.MinNear;
         return (similarity, similarity >= options.Near && Math.Min(left.Tokens, right.Tokens) >= least);
@@ -50,16 +57,24 @@ public static class CloneComparison
         foreach (var (left, right) in Candidates(input, _ => true, function => function.Shape, 6, Math.Max(100, input.Length / 4)))
         {
             if (Nested(input[left], input[right]) || Overrides(input[left], input[right]) || Check(input[left], input[right], options).Copied)
+            {
                 continue;
+            }
+
             var similarity = Alike(input[left].Shape, input[right].Shape);
             if (similarity >= options.Shape)
+            {
                 groups.Join(left, right, similarity);
+            }
         }
         List<CloneTemplate> output = [];
         foreach (var indices in groups.Sets())
         {
             if (indices.Count < options.Repeated && indices.Any(index => input[index].Tokens < options.LongPair))
+            {
                 continue;
+            }
+
             var members = Sorted(indices.Select(index => input[index]));
             var uses = members.SelectMany(Names).GroupBy(name => name, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
             var differs = members.ToDictionary(function => function.Id, function =>
@@ -80,12 +95,20 @@ public static class CloneComparison
             var (leftStructure, leftPlain) = Kinds(left.Canonical, gap.LeftStart, gap.LeftEnd);
             var (rightStructure, rightPlain) = Kinds(right.Canonical, gap.RightStart, gap.RightEnd);
             if (leftStructure && rightStructure || shortBody && (leftStructure || rightStructure))
+            {
                 return true;
+            }
+
             if ((leftStructure || leftPlain) && (rightStructure || rightPlain))
+            {
                 plain.Add(string.Join(' ', left.Canonical.Skip(gap.LeftStart).Take(gap.LeftEnd - gap.LeftStart)) + "|" + string.Join(' ', right.Canonical.Skip(gap.RightStart).Take(gap.RightEnd - gap.RightStart)));
+            }
         }
         if (Gaps(left.Signature, right.Signature).Any(gap => gap.LeftStart < gap.LeftEnd && gap.RightStart < gap.RightEnd))
+        {
             return true;
+        }
+
         return plain.Count >= 2 || plain.Count is 1 && shortBody;
     }
     private static bool OtherLogic(CloneFunction left, CloneFunction right)
@@ -95,7 +118,9 @@ public static class CloneComparison
             var a = left.Canonical.Skip(gap.LeftStart).Take(gap.LeftEnd - gap.LeftStart).ToArray();
             var b = right.Canonical.Skip(gap.RightStart).Take(gap.RightEnd - gap.RightStart).ToArray();
             if (a.Length > 0 && b.Length > 0 && (a.Any(Logic.Contains) || b.Any(Logic.Contains)) || a.Length is 0 && b is ["!"] || b.Length is 0 && a is ["!"])
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -103,26 +128,42 @@ public static class CloneComparison
     internal static IReadOnlyList<Gap> Gaps(IReadOnlyList<string> left, IReadOnlyList<string> right)
     {
         if (left.SequenceEqual(right, StringComparer.Ordinal))
+        {
             return [];
+        }
+
         var lengths = Enumerable.Range(0, left.Count + 1).Select(_ => new int[right.Count + 1]).ToArray();
         for (var i = left.Count - 1; i >= 0; i--)
+        {
             for (var j = right.Count - 1; j >= 0; j--)
+            {
                 lengths[i][j] = left[i] == right[j] ? lengths[i + 1][j + 1] + 1 : Math.Max(lengths[i + 1][j], lengths[i][j + 1]);
+            }
+        }
+
         List<Gap> gaps = [];
         var a = 0;
         var b = 0;
         var startA = 0;
         var startB = 0;
         void Flush()
-        { if (startA < a || startB < b) gaps.Add(new(startA, a, startB, b)); }
+        { if (startA < a || startB < b)
+            {
+                gaps.Add(new(startA, a, startB, b));
+            }
+        }
         while (a < left.Count && b < right.Count)
         {
             if (left[a] == right[b])
             { Flush(); a++; b++; startA = a; startB = b; }
             else if (lengths[a + 1][b] >= lengths[a][b + 1])
+            {
                 a++;
+            }
             else
+            {
                 b++;
+            }
         }
         a = left.Count;
         b = right.Count;
@@ -134,13 +175,20 @@ public static class CloneComparison
         var structure = false;
         var plain = false;
         for (var index = start; index < end; index++)
+        {
             if (IsName(tokens[index]))
             {
                 if (Structural(tokens, index))
+                {
                     structure = true;
+                }
                 else
+                {
                     plain = true;
+                }
             }
+        }
+
         return (structure, plain);
     }
     internal static bool IsName(string token) => token.Length > 0 && CloneLexer.IdentifierStart(token[0]) && !CloneLexer.Keywords.Contains(token) && !CloneLexer.GoKeywords.Contains(token) && !Local(token);
@@ -157,13 +205,19 @@ public static class CloneComparison
     internal static double Alike(IReadOnlyList<string> left, IReadOnlyList<string> right)
     {
         if (left.SequenceEqual(right, StringComparer.Ordinal))
+        {
             return 1;
+        }
+
         var previous = new int[right.Count + 1];
         var current = new int[right.Count + 1];
         foreach (var token in left)
         {
             for (var index = 1; index <= right.Count; index++)
+            {
                 current[index] = token == right[index - 1] ? previous[index - 1] + 1 : Math.Max(previous[index], current[index - 1]);
+            }
+
             (previous, current) = (current, previous);
         }
         return 2.0 * previous[right.Count] / (left.Count + right.Count);
@@ -175,7 +229,10 @@ public static class CloneComparison
         for (var number = 0; number < input.Length; number++)
         {
             if (!use(number))
+            {
                 continue;
+            }
+
             var tokens = form(input[number]);
             HashSet<ulong> hashes = [];
             for (var start = 0; start + size <= tokens.Count; start++)
@@ -184,7 +241,10 @@ public static class CloneComparison
                 for (var offset = 0; offset < size; offset++)
                 {
                     foreach (var value in Encoding.UTF8.GetBytes(tokens[start + offset]))
+                    {
                         hash = unchecked((hash ^ value) * 1099511628211UL);
+                    }
+
                     hash = unchecked(hash * 1099511628211UL);
                 }
                 hashes.Add(hash);
@@ -201,17 +261,27 @@ public static class CloneComparison
         for (var left = 0; left < input.Length; left++)
         {
             if (sets[left] is not { } hashes)
+            {
                 continue;
+            }
+
             Dictionary<int, int> shared = [];
             foreach (var hash in hashes.Where(hash => index[hash].Count <= common))
+            {
                 foreach (var right in index[hash].Where(right => right > left))
+                {
                     shared[right] = shared.GetValueOrDefault(right) + 1;
+                }
+            }
+
             foreach (var (right, count) in shared)
             {
                 var a = form(input[left]).Count;
                 var b = form(input[right]).Count;
                 if (5L * Math.Min(a, b) >= 4L * Math.Max(a, b) && count >= 0.4 * (hashes.Count + sets[right]!.Count - count))
+                {
                     pairs.Add((left, right));
+                }
             }
         }
         return pairs.OrderBy(pair => pair.Left).ThenBy(pair => pair.Right).ToArray();

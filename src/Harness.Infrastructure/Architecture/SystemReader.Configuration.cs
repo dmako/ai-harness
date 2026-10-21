@@ -15,22 +15,34 @@ public sealed partial class SystemReader
     {
         var name = Path.GetFileName(file);
         if (name.StartsWith("appsettings", StringComparison.Ordinal) && name.EndsWith(".json", StringComparison.Ordinal))
+        {
             AppSettings(member, file);
+        }
         else if (name.StartsWith(".env", StringComparison.Ordinal))
+        {
             Environment(member, file);
+        }
         else if (EcosystemReader.Of(file).Length > 0 && !EcosystemReader.Vendored(file))
+        {
             Messaging(member, file);
+        }
         else if (Path.GetExtension(file) is ".ts" or ".tsx" or ".js" or ".jsx" or ".cs" && !file.Contains("node_modules/", StringComparison.Ordinal))
+        {
             Each(member, file, (line, text) =>
             {
                 foreach (var match in Topic.Matches(text).Select(match => match.Groups))
+                {
                     foreach (var link in _links.Values.Where(link => link.From == member.Id && link.Style is "messaging" && !link.What.Contains("topic " + match[1].Value, StringComparer.Ordinal)))
                     {
                         link.What.Add("topic " + match[1].Value);
                         if (link.Evidence.Count < 8)
+                        {
                             link.Evidence.Add(Place(member.Id, At(file, line)));
+                        }
                     }
+                }
             });
+        }
     }
     private void AppSettings(SystemMember member, string file)
     {
@@ -40,6 +52,7 @@ public sealed partial class SystemReader
         { document = JsonDocument.Parse(text.TrimStart('\uFEFF')); }
         catch (JsonException) { return; }
         using (document)
+        {
             Walk(document.RootElement, [], (keys, value) =>
             {
                 var key = string.Join('.', keys);
@@ -54,18 +67,30 @@ public sealed partial class SystemReader
                 {
                     var database = First(Database, value).ToLowerInvariant();
                     if (database.Length is 0)
+                    {
                         return;
+                    }
+
                     if (!_databases.TryGetValue(database, out var places))
                     { places = []; _databases.Add(database, places); }
                     if (!places.Any(place => place.Member == member.Id))
+                    {
                         places.Add((member.Id, LineOf("")));
+                    }
+
                     return;
                 }
                 if (Plumbing.IsMatch(Norm(key)) || !UrlHost.IsMatch(value) || !new[] { "url", "address", "endpoint", "host" }.Any(word => leaf.Contains(word, StringComparison.OrdinalIgnoreCase)))
+                {
                     return;
+                }
+
                 var host = First(UrlHost, value);
                 if (host is "+" or "*" or "0.0.0.0")
+                {
                     return;
+                }
+
                 var section = keys[0].Split('[')[0];
                 var target = MatchMember(section);
                 var basis = target is null ? null : "name";
@@ -78,17 +103,24 @@ public sealed partial class SystemReader
                 }
                 Link(new(member.Id, target, key.Contains("grpc", StringComparison.OrdinalIgnoreCase) ? "grpc" : "http") { What = [key], Evidence = [Place(member.Id, LineOf(value[..Math.Min(value.Length, 40)]))], Basis = basis });
             });
+        }
     }
     private void Environment(SystemMember member, string file) => Each(member, file, (line, text) =>
     {
         var match = EnvironmentUrl.Match(text);
         if (!match.Success || Plumbing.IsMatch(Norm(match.Groups[1].Value)))
+        {
             return;
+        }
+
         var key = match.Groups[1].Value;
         var value = match.Groups[2].Value;
         var host = First(UrlHost, value);
         if (host.Length is 0)
+        {
             return;
+        }
+
         var lower = (key + " " + value).ToLowerInvariant();
         if (lower.Contains("mqtt", StringComparison.Ordinal) || value.StartsWith("ws", StringComparison.Ordinal) && lower.Contains("broker", StringComparison.Ordinal))
         {
@@ -110,7 +142,10 @@ public sealed partial class SystemReader
             var name = dependency.Name.TrimStart('@').ToLowerInvariant();
             var broker = Brokers.FirstOrDefault(broker => name.StartsWith(broker.Match, StringComparison.Ordinal)).Broker;
             if (broker is null)
+            {
                 continue;
+            }
+
             var id = "broker:" + Norm(broker);
             Node(new(id, broker, "broker"));
             Link(new(member.Id, id, "messaging") { What = [(dependency.Name + " " + dependency.Version).Trim()], Evidence = [Place(member.Id, At(dependency.Path, dependency.Line))] });
@@ -119,8 +154,13 @@ public sealed partial class SystemReader
     private static string Display(string text)
     {
         foreach (var suffix in new[] { "Grpc", "GRPC", "Url", "Client", "Api" })
+        {
             if (text.Length > suffix.Length + 2 && text.EndsWith(suffix, StringComparison.Ordinal))
+            {
                 return text[..^suffix.Length];
+            }
+        }
+
         return text;
     }
     private static void Walk(JsonElement value, string[] keys, Action<string[], string> action)
@@ -129,7 +169,10 @@ public sealed partial class SystemReader
         {
             case JsonValueKind.Object:
                 foreach (var property in value.EnumerateObject())
+                {
                     Walk(property.Value, [.. keys, property.Name], action);
+                }
+
                 break;
             case JsonValueKind.Array:
                 var index = 0;

@@ -99,7 +99,10 @@ public sealed class ContextIntegrationTests
         using var parsed = JsonDocument.Parse(text);
         JsonElement.DeepEquals(parsed.RootElement, result.StructuredContent.Value).Should().BeTrue();
         foreach (var args in new[] { new Dictionary<string, object?>(), new() { ["task"] = " " }, new() { ["task"] = "x", ["path"] = "../outside" }, new() { ["task"] = "x", ["scope"] = "invalid" }, new() { ["task"] = "x", ["depth"] = "invalid" }, new() { ["task"] = "x", ["budget"] = "oops" }, new() { ["task"] = "x", ["tokens"] = int.MaxValue } })
+        {
             (await client.CallToolAsync("get_context", args, cancellationToken: Token)).IsError.Should().BeTrue();
+        }
+
         Directory.Exists(Path.Combine(fixture.Root, ".harness")).Should().BeFalse();
     }
 

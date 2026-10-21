@@ -117,7 +117,10 @@ internal sealed class WindowsProviderProcess : IProviderProcess
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) is not 0)
+        {
             return;
+        }
+
         try
         {
             _input.Dispose();
@@ -142,7 +145,9 @@ internal sealed class WindowsProviderProcess : IProviderProcess
     private static void Check(bool success)
     {
         if (!success)
+        {
             throw new Win32Exception(Marshal.GetLastPInvokeError());
+        }
     }
 
     internal static string Quote(string value)

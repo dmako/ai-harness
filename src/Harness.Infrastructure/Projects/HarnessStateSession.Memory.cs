@@ -19,14 +19,20 @@ public sealed partial class HarnessStateSession
     private Task<HarnessDatabase> ExistingMemoryDatabaseAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(location.DatabasePath))
+        {
             throw new IOException("project not initialized (run 'harness init'): " + location.DatabasePath);
+        }
+
         return DatabaseAsync(cancellationToken);
     }
 
     private async Task<string> CurrentMemoryBranchAsync(CancellationToken cancellationToken)
     {
         if (location.Repository is null)
+        {
             return "";
+        }
+
         try
         { return (await location.Repository.ReadHeadAsync(cancellationToken)).Branch; }
         catch (IOException) { return ""; }

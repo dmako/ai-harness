@@ -25,9 +25,14 @@ public sealed class FindingsToolsTests
         var group = output.GetProperty("groups")[0];
         group.GetProperty("findings").GetArrayLength().Should().Be(count);
         if (hidden > 0)
+        {
             group.GetProperty("marked_hidden").GetInt32().Should().Be(hidden);
+        }
         else
+        {
             group.TryGetProperty("marked_hidden", out _).Should().BeFalse();
+        }
+
         group.GetProperty("summary")[0].GetProperty("worst").GetString().Should().Be("problem");
     }
     [Theory]

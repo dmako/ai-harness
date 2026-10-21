@@ -50,18 +50,27 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
     public async ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default)
     {
         if (!probe)
+        {
             return _supervisor.Health();
+        }
+
         try
         {
             var client = await _supervisor.ClientAsync(cancellationToken).ConfigureAwait(false);
             var tools = (await client.ListToolsAsync(cancellationToken).ConfigureAwait(false)).Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
             var missing = _plans.OrderBy(pair => pair.Key, StringComparer.Ordinal).SelectMany(pair => pair.Value.Calls.Where(call => !tools.Contains(call.Mapping.Tool)).Select(call => pair.Key + " -> " + call.Mapping.Tool)).ToArray();
             if (missing.Length > 0)
+            {
                 return new("degraded", "mapped tools not offered by the server: " + string.Join(", ", missing), "correct providers." + Name + ".capabilities.<capability>.tool in the harness config");
+            }
+
             var health = _supervisor.Health();
             var detail = health.Detail + string.Create(CultureInfo.InvariantCulture, $"; {_plans.Count} capability mapping(s) verified");
             if (_configuration.Resolve is not null)
+            {
                 detail += "; project " + await ResolveProjectAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             return health with { Detail = detail };
         }
         catch (ProviderNotIndexedException error)
@@ -77,11 +86,17 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
     public async Task<ProviderResult> ExecuteAsync(ProviderRequest request, CancellationToken cancellationToken = default)
     {
         if (!_plans.TryGetValue(request.Capability, out var plan))
+        {
             throw new UnsupportedCapabilityException();
+        }
+
         var limit = request.Limit > 0 ? request.Limit : 20;
         var values = Values(request, limit);
         if (_configuration.Resolve is not null)
+        {
             values["project"] = await ResolveProjectAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         var output = new ProviderResult();
         var items = new List<ProviderItem>();
         var misses = new List<string>();
@@ -94,7 +109,10 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             var part = await ExecuteCallAsync(request, call, values, limit, cancellationToken).ConfigureAwait(false);
             output = output with { Bytes = checked(output.Bytes + part.Result.Bytes), TimedOut = output.TimedOut || part.Result.TimedOut };
             if (part.Miss)
+            {
                 allMatched &= part.Matched;
+            }
+
             if (part.Result.Error is { } error)
             {
                 if (plan.Calls.Count > 1)
@@ -114,10 +132,15 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
                 Summary = output.Summary ?? part.Result.Summary,
             };
             if (plan.Combine is "first")
+            {
                 break;
+            }
         }
         if (!answered && !(emptyOnMiss && allMatched && misses.Count > 0))
+        {
             output = output with { Error = Failure("", "no answer: " + string.Join("; ", misses)) };
+        }
+
         return output with { Items = items.Take(limit).ToArray(), Truncated = output.Truncated || items.Count > limit };
     }
 
@@ -143,11 +166,20 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         var text = McpMapping.Text(result);
         var output = new ProviderResult { Bytes = Encoding.UTF8.GetByteCount(text) };
         if (result.IsError is true)
+        {
             return new(output with { Error = McpMapping.ToolError(Name, mapping.Tool, result) }, true, call.Miss?.IsMatch(text) is true);
+        }
+
         if (call.Miss?.IsMatch(text) is true)
+        {
             return new(output with { Error = Failure(mapping.Tool, McpMapping.FirstLine(text)) }, true, true);
+        }
+
         if (request.Capability is Core.Providers.Capabilities.PackageInfo or Core.Providers.Capabilities.PackageTypeDefinition)
+        {
             return new(output with { Text = text });
+        }
+
         try
         {
             IReadOnlyList<McpMapping.Entry> entries;
@@ -162,26 +194,44 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             {
                 var body = McpMapping.Body(result);
                 if (request.Capability is Core.Providers.Capabilities.Overview)
+                {
                     return new(output with { Summary = body.ValueKind is JsonValueKind.Object ? body.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal) : new Dictionary<string, JsonElement> { ["result"] = body } });
+                }
+
                 var message = mapping.Error.Length > 0 ? McpMapping.String(McpMapping.Lookup(body, mapping.Error)) : "";
                 if (message.Length > 0)
+                {
                     return new(output with { Error = Failure(mapping.Tool, message) });
+                }
+
                 output = output with { Truncated = mapping.Truncated.Length > 0 && McpMapping.Lookup(body, mapping.Truncated).ValueKind is JsonValueKind.True };
                 var collected = McpMapping.Collect(body, mapping.Items);
                 if (!collected.Found)
+                {
                     return new(output with { Error = Failure(mapping.Tool, $"response has no list at \"{mapping.Items}\" (check providers.{Name}.capabilities.{request.Capability}.items)") });
+                }
+
                 entries = collected.Entries;
             }
             var items = new List<ProviderItem>();
             foreach (var entry in entries)
             {
                 if (call.Extraction is null && !McpMapping.Matches(entry, mapping.Where))
+                {
                     continue;
+                }
+
                 var item = McpMapping.Item(entry, fields, request.Capability, _root) with { Provider = Name, Tool = mapping.Tool };
                 if (!request.Covers(item.Path ?? ""))
+                {
                     continue;
+                }
+
                 if (items.Count == limit)
+                {
                     return new(output with { Items = items, Truncated = true });
+                }
+
                 items.Add(item);
             }
             return new(output with { Items = items });
@@ -210,13 +260,19 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             ["target_name"] = LastSegment(request.Target),
         };
         if (request.Budget > 0)
+        {
             values["budget"] = request.Budget.ToString(CultureInfo.InvariantCulture);
+        }
+
         if (request.Path.Length > 0)
         {
             var absolute = Path.GetFullPath(request.Path, _root);
             var relative = Path.GetRelativePath(_root, absolute);
             if (Path.IsPathRooted(relative) || relative is ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
                 throw new ArgumentException("Provider request path must stay inside the project root.", nameof(request));
+            }
+
             values["abs_path"] = absolute;
         }
         return values;
@@ -226,11 +282,17 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
     {
         var cached = Volatile.Read(ref _project);
         if (cached.Length > 0)
+        {
             return cached;
+        }
+
         var mapping = _configuration.Resolve!;
         var result = await _supervisor.CallToolAsync(mapping.Tool, McpMapping.Arguments(mapping.Args, new Dictionary<string, string> { ["root"] = _root }), cancellationToken).ConfigureAwait(false);
         if (result.IsError is true)
+        {
             throw McpMapping.ToolError(Name, mapping.Tool, result);
+        }
+
         var entries = McpMapping.Collect(McpMapping.Body(result), mapping.Items).Entries;
         foreach (var entry in entries)
         {
@@ -268,9 +330,15 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         var result = await _supervisor.CallToolAsync(mapping.Tool, arguments, cancellationToken).ConfigureAwait(false);
         var text = McpMapping.Text(result);
         if (Pattern(mapping.Skip)?.IsMatch(text) is true)
+        {
             return new(true, McpMapping.FirstLine(text));
+        }
+
         if (result.IsError is true)
+        {
             throw McpMapping.ToolError(Name, mapping.Tool, result);
+        }
+
         var detail = McpMapping.FirstLine(text);
         return new(false, mapping.Tool + ": " + (Encoding.UTF8.GetByteCount(detail) > 160 ? McpMapping.Utf8Prefix(detail, 157, "...") : detail));
     }

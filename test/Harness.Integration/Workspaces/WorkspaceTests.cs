@@ -77,7 +77,10 @@ public sealed class WorkspaceTests
         await using var search = new WorkspaceSearchSession(membership, current, (member, deep) =>
         {
             lock (built)
+            {
                 built.Add((member.Id, deep));
+            }
+
             var registry = new ProviderRegistry();
             registry.Register(new ProviderRegistryTests.Fake("live", [Capabilities.SymbolSearch], execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Name = "Widget", Path = "a.cs", Provider = "live" }] })));
             return registry;
@@ -107,9 +110,15 @@ public sealed class WorkspaceTests
         await session.PutMemoryAsync(new() { Type = "decision", Content = "Widget shared workspace rule", Scope = new("workspace", "one") }, Token);
         await session.PutMemoryAsync(new() { Type = "warning", Content = "Widget user rule", Scope = new("user", "") }, Token);
         await using (var other = await fixture.SessionAsync(2))
+        {
             await other.PutMemoryAsync(new() { Type = "decision", Content = "Widget unrelated workspace secret", Scope = new("workspace", "two") }, Token);
+        }
+
         await using (var beta = await fixture.SessionAsync(1))
+        {
             await beta.PutMemoryAsync(new() { Type = "decision", Content = "Widget path rule", Scope = new("path", "a.cs") }, Token);
+        }
+
         var created = 0;
         var disposed = 0;
         await using var current = new ProviderRegistry();
@@ -178,7 +187,10 @@ public sealed class WorkspaceTests
     {
         using var fixture = await WorkspaceFixture.CreateAsync();
         await using (var session = await fixture.SessionAsync(0))
+        {
             await session.ProposeMemoryAsync(new("warning", "Review workspace operations"), Token);
+        }
+
         using (var database = HarnessDatabase.Open(fixture.Members[0].DatabasePath, cancellationToken: Token))
         using (var connection = database.OpenConnection())
         using (var command = connection.CreateCommand())
@@ -231,7 +243,10 @@ public sealed class WorkspaceTests
         await using var search = new WorkspaceSearchSession(new(members[0], members), current, (member, _) =>
         {
             if (inaccessible && member.Id == members[2].Id)
+            {
                 throw new UnauthorizedAccessException("fixture repository configuration is inaccessible");
+            }
+
             var registry = new ProviderRegistry();
             registry.Register(new ProviderRegistryTests.Fake("slow", [Capabilities.SymbolSearch], execute: (_, _) => release.Task));
             return registry;
@@ -301,7 +316,10 @@ internal sealed class WorkspaceFixture : IDisposable
     public void Dispose()
     {
         foreach (var repo in Repositories)
+        {
             repo.Dispose();
+        }
+
         Directory.Delete(Global, recursive: true);
     }
 }

@@ -1,5 +1,5 @@
-using System.Text.Json;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using AwesomeAssertions;
 using Harness.Core.Projects;
 using Harness.Core.Providers;
@@ -72,7 +72,10 @@ public sealed class ProviderFacadeTests
         registry.Register(new Fake("nuget", [Capabilities.PackageTypeDefinition, Capabilities.PackageInfo], execute: (request, _) =>
         {
             if (request.Capability == Capabilities.PackageInfo)
+            {
                 return Task.FromResult(new ProviderResult { Error = new IOException("private feed unavailable") });
+            }
+
             request.Package.Should().Be("Foo");
             request.Version.Should().Be("1.2");
             request.Type.Should().Be("Result");
@@ -144,10 +147,16 @@ public sealed class ProviderFacadeTests
         await Call(tools, "provider_status");
         await Call(tools, "search_project", """{"query":"x"}""");
         await using (var recorder = new ProviderCallRecorder(location.DatabasePath))
+        {
             recorder.Observe(new() { Provider = "p" }, new(Capabilities.SymbolSearch));
+        }
+
         Directory.Exists(Path.Combine(fixture.Root, ".harness")).Should().BeFalse();
         using (var database = HarnessDatabase.Open(location.DatabasePath, cancellationToken: Token))
+        {
             database.SchemaVersion().Should().Be(19);
+        }
+
         await using (var recorder = new ProviderCallRecorder(location.DatabasePath))
         {
             recorder.Observe(new() { Provider = "p", Capability = Capabilities.SymbolSearch, Bytes = 12, Latency = TimeSpan.FromMilliseconds(10) }, new(Capabilities.SymbolSearch, "query"));

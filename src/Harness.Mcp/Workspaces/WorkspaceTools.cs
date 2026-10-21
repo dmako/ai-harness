@@ -28,15 +28,24 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
     {
         var depth = arguments?.TryGetValue("depth", out var mode) is true ? mode.GetString() ?? "" : "";
         if (depth is not ("" or "light" or "deep"))
+        {
             throw new ArgumentException("depth must be light or deep");
+        }
+
         var key = name is "library_adoption" ? "library" : "concern";
         var text = arguments?.TryGetValue(key, out var value) is true ? value.GetString() ?? "" : "";
         if (name is "similar_concerns" && string.IsNullOrWhiteSpace(text))
+        {
             throw new ArgumentException("concern must not be empty: describe it in words");
+        }
+
         return UseAsync<object>(async search =>
         {
             if (search is not IWorkspaceEvidenceSession evidence)
+            {
                 throw new InvalidOperationException("workspace evidence session unavailable");
+            }
+
             return name is "library_adoption"
                 ? await evidence.AdoptionAsync(text.Trim(), token).ConfigureAwait(false)
                 : await evidence.ConcernAsync(text, depth is "deep", token).ConfigureAwait(false);
@@ -53,7 +62,11 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             if (_current is null || _current.Membership.Current != membership.Current || !_current.Membership.Members.SequenceEqual(membership.Members))
             {
                 if (_current is { } old)
-                { old.Retired = true; if (old.Users is 0) retire = old; }
+                { old.Retired = true; if (old.Users is 0)
+                    {
+                        retire = old;
+                    }
+                }
                 _current = new(membership, create(membership));
                 _entries.Add(_current);
             }
@@ -63,7 +76,10 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         try
         {
             if (retire is not null)
+            {
                 await CloseAsync(retire).ConfigureAwait(false);
+            }
+
             return await action(entry.Search).ConfigureAwait(false);
         }
         finally
@@ -72,7 +88,9 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             lock (_gate)
             { entry.Users--; close = entry.Retired && entry.Users is 0; }
             if (close)
+            {
                 await CloseAsync(entry).ConfigureAwait(false);
+            }
         }
     }
     private async Task CloseAsync(Entry entry)
@@ -80,7 +98,10 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         lock (_gate)
         {
             if (entry.Disposing)
+            {
                 return;
+            }
+
             entry.Disposing = true;
         }
         try
@@ -89,7 +110,9 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         finally
         {
             lock (_gate)
+            {
                 _entries.Remove(entry);
+            }
         }
     }
     public async ValueTask DisposeAsync()
@@ -101,11 +124,17 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             _disposed = true;
             entries = _entries.ToArray();
             foreach (var entry in entries)
+            {
                 entry.Retired = true;
+            }
+
             idle = entries.Where(entry => entry.Users is 0).ToArray();
         }
         foreach (var entry in idle)
+        {
             await CloseAsync(entry).ConfigureAwait(false);
+        }
+
         await Task.WhenAll(entries.Select(entry => entry.Closed.Task)).ConfigureAwait(false);
     }
 
@@ -115,7 +144,10 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         var only = reference?.Project ?? "";
         path = reference?.Path.TrimEnd('/') ?? path;
         if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(path))
+        {
             throw new ArgumentException("path must be relative to the project root (<project>:<relative path>)");
+        }
+
         List<object> results = [], calls = [];
         List<string> errors = [], notes = [];
         var impact = kind is "impact" && only.Length is 0;
@@ -130,6 +162,7 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             notes.AddRange(answer.Notes);
         }
         else
+        {
             foreach (var capability in capabilities)
             {
                 var answer = await search.QueryAsync(new(capability, query, path, limit), deep, only, token).ConfigureAwait(false);
@@ -137,26 +170,45 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
                 AddUnique(errors, answer.Errors);
                 AddUnique(notes, answer.Notes);
                 if (debug)
+                {
                     calls.AddRange(answer.Calls.Select(call =>
                     {
                         var row = new Dictionary<string, object?> { ["provider"] = call.Project + "/" + call.Result.Provider, ["capability"] = call.Result.Capability, ["items"] = call.Result.Items.Count, ["latency_ms"] = (long)call.Result.Latency.TotalMilliseconds, ["bytes"] = 0 };
                         if (call.Result.Error is { } error)
+                        {
                             row["error"] = error.Message;
+                        }
+
                         return row;
                     }));
+                }
             }
+        }
+
         var stale = freshness is not null && (await freshness.ReadProviderProjectAsync(token).ConfigureAwait(false)).CrossBranch;
         var indexed = stale ? CapabilitiesOfCurrent(deep).Where(info => info.Freshness is "indexed").Select(info => info.Provider).ToHashSet(StringComparer.Ordinal) : [];
         foreach (var hit in hits.Where(hit => hit.Member.Id != search.Current.Id || !indexed.Contains(hit.Item.Provider)))
+        {
             results.Add(Item(hit, debug, impact));
+        }
+
         var head = (impact ? "workspace impact: " : "workspace: ") + string.Join(", ", search.Members.Select(member => member.Name)) + (deep ? " (deep)" : "");
         if (impact)
+        {
             head += "; " + Describe(home, query, search.Current.Name);
+        }
+
         var output = new Dictionary<string, object?> { ["query"] = query, ["results"] = results, ["note"] = string.Join("; ", new[] { head }.Concat(notes)) };
         if (errors.Count > 0)
+        {
             output["errors"] = errors;
+        }
+
         if (calls.Count > 0)
+        {
             output["calls"] = calls;
+        }
+
         return output;
     }, token);
 
@@ -172,15 +224,26 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             foreach (var hit in answer.Hits)
             {
                 if (hit.Member.Id == search.Current.Id || !seen.Add(hit.Member.Name + ":" + hit.Item.Path + "#" + hit.Item.Name))
+                {
                     continue;
+                }
+
                 var name = WorkspaceReferences.LastSegment(hit.Item.Name ?? "");
                 var score = 0;
                 if (names.Any(want => WorkspaceReferences.LastSegment(want).Length >= 4 && name.Contains(WorkspaceReferences.LastSegment(want), StringComparison.OrdinalIgnoreCase)))
+                {
                     score = 1;
+                }
+
                 if (names.Any(want => string.Equals(WorkspaceReferences.LastSegment(want), name, StringComparison.OrdinalIgnoreCase)))
+                {
                     score = 2;
+                }
+
                 if (score > 0)
+                {
                     hits.Add((hit, score));
+                }
             }
             AddUnique(notes, answer.Notes.Concat(answer.Errors));
         }
@@ -212,7 +275,9 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             if (!paths.TryGetValue(hit.Member.Id, out var files))
             { files = []; paths.Add(hit.Member.Id, files); }
             if (!files.Contains(hit.Item.Path ?? "", StringComparer.Ordinal))
+            {
                 files.Add(hit.Item.Path ?? "");
+            }
         }
         foreach (var member in search.Members.Where(member => members.ContainsKey(member.Id)))
         {
@@ -222,26 +287,39 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
             {
                 var row = new Dictionary<string, object?> { ["id"] = memory.Id, ["type"] = memory.Type, ["content"] = memory.Content };
                 if (memory.Scope.Kind is "path" && memory.Scope.Value.Length > 0)
+                {
                     row["path"] = memory.Scope.Value;
+                }
+
                 memories.Add(row);
                 group["memory"] = memories;
                 if (ContextJson.Size(output) > reserve)
                 {
                     memories.RemoveAt(memories.Count - 1);
                     if (memories.Count is 0)
+                    {
                         group.Remove("memory");
+                    }
+
                     dropped++;
                 }
             }
         }
         output = search.Members.Where(member => groups.ContainsKey(member.Id)).Select(member => (object)groups[member.Id]).ToList();
         if (dropped > 0)
+        {
             notes.Add($"workspace: {dropped} more match(es) or decision(s) did not fit in its share of the budget");
+        }
+
         return new ContextWorkspace(output, notes);
     }, token);
 
     private IReadOnlyList<CapabilityInfo> CapabilitiesOfCurrent(bool deep) => !deep && currentRegistry is IContextProviderRegistry context ? context.ContextCapabilities() : currentRegistry?.Capabilities() ?? [];
-    private static void AddUnique(List<string> destination, IEnumerable<string> values) { foreach (var value in values.Where(value => !destination.Contains(value, StringComparer.Ordinal))) destination.Add(value); }
+    private static void AddUnique(List<string> destination, IEnumerable<string> values) { foreach (var value in values.Where(value => !destination.Contains(value, StringComparer.Ordinal)))
+        {
+            destination.Add(value);
+        }
+    }
     private static Dictionary<string, object?> Item(WorkspaceHit hit, bool debug, bool impact)
     {
         var item = hit.Item;
@@ -251,18 +329,35 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         Add("path", item.Path);
         Add("snippet", item.Snippet);
         if (item.StartLine is not 0)
+        {
             row["start_line"] = item.StartLine;
+        }
+
         if (item.EndLine is not 0)
+        {
             row["end_line"] = item.EndLine;
+        }
+
         if (item.Depth is not 0)
+        {
             row["depth"] = item.Depth;
+        }
+
         if (debug)
-        { Add("qualified_name", item.QualifiedName); Add("tool", item.Tool); if (item.Score is not 0) row["score"] = item.Score; }
+        { Add("qualified_name", item.QualifiedName); Add("tool", item.Tool); if (item.Score is not 0)
+            {
+                row["score"] = item.Score;
+            }
+        }
         if (impact)
         { row["via"] = hit.Via; row["evidence"] = hit.Exact ? "exact" : "approximate"; }
         return row;
         void Add(string name, string? value)
-        { if (!string.IsNullOrEmpty(value)) row[name] = value; }
+        { if (!string.IsNullOrEmpty(value))
+            {
+                row[name] = value;
+            }
+        }
     }
     private static string Describe(SymbolHome home, string query, string current)
     {
@@ -271,9 +366,14 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         if (home.Path.Length > 0)
         {
             if (home.Namespace.Length > 0)
+            {
                 description += ", namespace " + home.Namespace;
+            }
+
             if (home.Package.Length > 0)
+            {
                 description += ", package " + home.Package;
+            }
         }
         return description + "; other members cannot resolve this symbol: their results are references to the name, package dependents, namespace users and name matches, approximate unless marked exact";
     }

@@ -19,7 +19,10 @@ public static class SyncStore
         using var command = Command(connection, null, "SELECT branch, head_commit, detached, dirty, dirty_paths, synced_at, pending, providers_stale FROM sync_state WHERE worktree_id=$wt", ("$wt", worktree));
         using var reader = command.ExecuteReader();
         if (!reader.Read())
+        {
             return null;
+        }
+
         IReadOnlyList<string> pending;
         try
         { pending = JsonSerializer.Deserialize<string[]>(reader.GetString(6)) ?? []; }
@@ -46,7 +49,10 @@ public static class SyncStore
         using var reader = command.ExecuteReader();
         Dictionary<string, string> hashes = new(StringComparer.Ordinal);
         while (reader.Read())
+        {
             hashes.Add(reader.GetString(0), reader.GetString(1));
+        }
+
         return hashes;
     }
 
@@ -57,7 +63,10 @@ public static class SyncStore
         using var reader = command.ExecuteReader();
         List<SyncRunRecord> records = [];
         while (reader.Read())
+        {
             records.Add(new(reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetString(3), Text(reader, 4), Text(reader, 5), Text(reader, 6), reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), JsonSerializer.Deserialize<ProviderOutcome[]>(reader.GetString(10), JsonOptions) ?? [], reader.GetString(11), Text(reader, 12)));
+        }
+
         return records;
     }
 
@@ -76,7 +85,10 @@ public static class SyncStore
         {
             var item = new Dictionary<string, string> { ["name"] = provider.Name, ["status"] = provider.Status };
             if (provider.Detail.Length > 0)
+            {
                 item["detail"] = provider.Detail;
+            }
+
             return item;
         });
         using var command = Command(connection, null, """
@@ -102,7 +114,10 @@ public static class SyncStore
         command.Transaction = transaction;
         command.CommandText = sql;
         foreach (var (name, value) in parameters)
+        {
             command.Parameters.AddWithValue(name, value);
+        }
+
         return command;
     }
     private static object Nullable(string value) => value.Length is 0 ? DBNull.Value : value;

@@ -21,7 +21,10 @@ public sealed partial class HarnessStateSession : IFindingSession
         var site = EvidenceSnippets.Parse(evidence);
         var member = group.Members.FirstOrDefault(m => m.Name == (site?.Member ?? ""));
         if (site is null || member is null)
+        {
             return Task.FromResult<EvidenceSnippet?>(null);
+        }
+
         try
         { return Task.FromResult<EvidenceSnippet?>(EvidenceSnippets.Read(new(member.Root, [], token), site, span, 30)); }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException) { return Task.FromResult<EvidenceSnippet?>(null); }

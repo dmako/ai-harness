@@ -32,7 +32,10 @@ public static class ArchitectureProviders
     public static async Task<ProviderArchitectureRead> CyclesAsync(IProviderRegistry? registry, CancellationToken token)
     {
         if (registry is null)
+        {
             return new([], false, ["no provider offers arch.cycles; file reference cycles remain available"]);
+        }
+
         var results = await registry.CallAsync(new(Capabilities.ArchCycles, Limit: 100), cancellationToken: token).ConfigureAwait(false);
         List<ArchitectureFinding> findings = [];
         List<string> notes = [];
@@ -43,6 +46,7 @@ public static class ArchitectureProviders
             { notes.Add(result.Provider + ": " + result.Error.Message.Split('\n')[0]); continue; }
             answered = true;
             foreach (var item in result.Items.Where(item => item.Members?.Count >= 2))
+            {
                 findings.Add(ArchitectureAnalyzer.Complete(new()
                 {
                     Kind = "cycle",
@@ -57,9 +61,13 @@ public static class ArchitectureProviders
                     Confidence = item.Confidence,
                     Source = new(item.Provider, item.Tool.Length is 0 ? null : item.Tool)
                 }));
+            }
         }
         if (results.Count is 0)
+        {
             notes.Add("no provider offers arch.cycles; file reference cycles remain available");
+        }
+
         return new(findings, answered, notes);
     }
 }

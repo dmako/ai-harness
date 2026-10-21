@@ -29,7 +29,10 @@ public sealed class EvidenceTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_ECOSYSTEM_ORACLE");
         if (string.IsNullOrEmpty(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_ECOSYSTEM_ORACLE using Ecosystem/build_oracle.py.");
+        }
+
         using var fixture = await WorkspaceFixture.CreateAsync();
         Seed(fixture, language);
         var before = fixture.Hashes();
@@ -37,9 +40,13 @@ public sealed class EvidenceTests
         var text = mode is "concern-empty" ? "the and" : "pdf invoice generation";
         object actual;
         if (mode is "adoption")
+        {
             actual = await reader.AdoptionAsync("alpha", Token);
+        }
         else if (mode is "dependencies")
+        {
             actual = await reader.DependenciesAsync(Token);
+        }
         else
         {
             await using var current = Registry();
@@ -99,7 +106,10 @@ public sealed class EvidenceTests
     private static void Seed(WorkspaceFixture fixture, string language)
     {
         if (language is "empty")
+        {
             return;
+        }
+
         var library = fixture.Repositories[0];
         var consumer = fixture.Repositories[1];
         if (language is "dotnet")

@@ -17,7 +17,10 @@ public sealed class SyncGoContractTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_SYNC_ORACLE");
         if (string.IsNullOrWhiteSpace(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_SYNC_ORACLE using Sync/build_oracle.py.");
+        }
+
         using var fixture = await SyncFixture.CreateAsync();
         var oracleDatabase = Path.Combine(fixture.DirectoryRoot, "oracle.db");
         var first = await CompareAsync();

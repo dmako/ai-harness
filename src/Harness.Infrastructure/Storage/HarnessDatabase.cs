@@ -68,7 +68,10 @@ public sealed class HarnessDatabase : IDisposable
     {
         var absolute = System.IO.Path.GetFullPath(path);
         if (!File.Exists(absolute))
+        {
             throw new FileNotFoundException("Database does not exist.", absolute);
+        }
+
         return new(absolute, options ?? new StorageOptions(), readOnly: false);
     }
 

@@ -26,7 +26,10 @@ public sealed class EcosystemReader(AnalysisRepository repository)
     public OfferedPackage Package(string path)
     {
         if (_packages.TryGetValue(path, out var cached))
+        {
             return cached;
+        }
+
         var ecosystem = Of(path);
         var result = ecosystem switch
         {
@@ -43,7 +46,10 @@ public sealed class EcosystemReader(AnalysisRepository repository)
         var name = Path.GetFileNameWithoutExtension(path);
         var xml = Build.Parse(path);
         if (xml is null)
+        {
             return new(name, "NuGet", false);
+        }
+
         var evaluated = Build.Evaluate(path);
         string Prop(string key) => evaluated.Properties.GetValueOrDefault(key, "").Trim() is var value && !value.Contains("$(", StringComparison.Ordinal) ? value : "";
         var sdk = xml.Attribute("Sdk")?.Value ?? "";
@@ -68,7 +74,10 @@ public sealed class EcosystemReader(AnalysisRepository repository)
     public IReadOnlyList<ManifestDependency> Dependencies(string path)
     {
         if (_dependencies.TryGetValue(path, out var cached))
+        {
             return cached;
+        }
+
         var result = Of(path) switch
         {
             "NuGet" when Path.GetExtension(path).ToUpperInvariant() is ".CSPROJ" or ".FSPROJ" or ".VBPROJ" => Build.Evaluate(path).Packages.Select(package =>
@@ -87,13 +96,19 @@ public sealed class EcosystemReader(AnalysisRepository repository)
     {
         using var document = Json(path);
         if (document is null || document.RootElement.ValueKind is not JsonValueKind.Object)
+        {
             return [];
+        }
+
         List<ManifestDependency> result = [];
         var lines = AnalysisRepository.Lines(repository.Read(path));
         foreach (var section in new[] { "dependencies", "devDependencies", "peerDependencies", "optionalDependencies" })
         {
             if (!document.RootElement.TryGetProperty(section, out var dependencies) || dependencies.ValueKind is not JsonValueKind.Object || dependencies.EnumerateObject().Any(item => item.Value.ValueKind is not JsonValueKind.String))
+            {
                 continue;
+            }
+
             var start = Math.Max(0, Array.FindIndex(lines, line => line.Contains('"' + section + '"', StringComparison.Ordinal)));
             foreach (var dependency in dependencies.EnumerateObject().OrderBy(item => item.Name, WorkspaceNameComparer.Instance))
             {
@@ -111,10 +126,15 @@ public sealed class EcosystemReader(AnalysisRepository repository)
             var packages = offered.Where(package => package.Ecosystem == ecosystem).Select(package => package.Name).ToArray();
             var roots = packages;
             if (ecosystem is "NuGet")
+            {
                 roots = repository.Files.Where(path => path.EndsWith(".cs", StringComparison.Ordinal) && !TaskParsing.IsTestFile(path)).Select(path => CSharpNamespace(repository.Read(path))).Where(ns => ns.Length > 0).Distinct(StringComparer.Ordinal)
                     .Select(ns => string.Join('.', ns.Split('.').Take(2))).Where(ns => packages.Length is 0 || packages.Any(package => package == ns || package.StartsWith(ns + ".", StringComparison.Ordinal))).Distinct(StringComparer.Ordinal).Order(WorkspaceNameComparer.Instance).Take(5).ToArray();
+            }
+
             if (roots.Length > 0)
+            {
                 return (roots, ecosystem);
+            }
         }
         return ([], "");
     }

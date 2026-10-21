@@ -25,7 +25,10 @@ public static class ContextJson
                 foreach (var property in element.EnumerateObject().OrderBy(property => property.Name, Utf8Comparer.Instance))
                 {
                     if (!first)
+                    {
                         output.Append(',');
+                    }
+
                     first = false;
                     String(property.Name, output);
                     output.Append(':');
@@ -55,11 +58,17 @@ public static class ContextJson
         {
             var escape = rune.Value switch { 34 => "\\\"", 92 => "\\\\", 8 => "\\b", 12 => "\\f", 10 => "\\n", 13 => "\\r", 9 => "\\t", _ => null };
             if (escape is not null)
+            {
                 output.Append(escape);
+            }
             else if (rune.Value is < 32 or 60 or 62 or 38 or 0x2028 or 0x2029)
+            {
                 output.Append("\\u").Append(rune.Value.ToString("x4", CultureInfo.InvariantCulture));
+            }
             else
+            {
                 output.Append(rune.ToString());
+            }
         }
         output.Append('"');
     }

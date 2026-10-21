@@ -52,9 +52,15 @@ internal static partial class TaskCliInput
         {
             var parts = value.Split('=', 2);
             if (parts.Length is not 2)
+            {
                 throw new TaskUsageException($"--acc {TaskWorkflow.Quote(value)}: want N=pass[:evidence]");
+            }
+
             if (!long.TryParse(parts[0].Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var index))
+            {
                 throw new TaskUsageException($"--acc {TaskWorkflow.Quote(value)}: {TaskWorkflow.Quote(parts[0])} is not a criterion number");
+            }
+
             var result = parts[1].Split(':', 2);
             reports.Add(new(index, result[0].Trim(), result.Length > 1 ? result[1].Trim() : ""));
         }
@@ -63,7 +69,10 @@ internal static partial class TaskCliInput
         {
             var parts = value.Split('=', 2);
             if (parts.Length is not 2)
+            {
                 throw new TaskUsageException($"--check {TaskWorkflow.Quote(value)}: want command=pass");
+            }
+
             checks.Add(new(parts[0], parts[1]));
         }
         return new(input.Summary, input.Commit, reports, checks.Count is 0 ? null : checks);
@@ -72,16 +81,25 @@ internal static partial class TaskCliInput
     public static TimeSpan Lease(string value)
     {
         if (value is "0" or "+0" or "-0")
+        {
             return TimeSpan.Zero;
+        }
+
         var negative = value.StartsWith('-');
         var input = negative || value.StartsWith('+') ? value[1..] : value;
         var matches = DurationPattern().Matches(input);
         if (matches.Count is 0 || string.Concat(matches.Select(m => m.Value)) != input)
+        {
             throw new TaskUsageException($"invalid value {TaskWorkflow.Quote(value)} for flag -lease: parse error");
+        }
+
         var ticks = matches.Sum(m => double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) * (m.Groups[2].Value switch
         { "h" => TimeSpan.TicksPerHour, "m" => TimeSpan.TicksPerMinute, "s" => TimeSpan.TicksPerSecond, "ms" => TimeSpan.TicksPerMillisecond, "us" or "µs" or "μs" => 10, _ => 0.01 }));
         if (!double.IsFinite(ticks) || ticks > long.MaxValue / 100d)
+        {
             throw new TaskUsageException($"invalid value {TaskWorkflow.Quote(value)} for flag -lease: parse error");
+        }
+
         return TimeSpan.FromTicks((long)(negative ? -Math.Ceiling(ticks) : Math.Ceiling(ticks)));
     }
     [GeneratedRegex(@"([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(ns|us|µs|μs|ms|s|m|h)", RegexOptions.CultureInvariant, 1000)]

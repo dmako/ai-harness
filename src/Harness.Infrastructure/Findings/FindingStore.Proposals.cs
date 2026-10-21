@@ -37,7 +37,10 @@ public sealed partial class FindingStore
             _ => "",
         };
         if (error.Length > 0)
+        {
             throw new ArgumentException(error);
+        }
+
         return database.WithTransaction((c, t) =>
         {
             if (p.FindingKey.Length > 0)
@@ -45,7 +48,9 @@ public sealed partial class FindingStore
                 using var existing = Command(c, t, "SELECT " + ProposalColumns + " FROM finding_proposals WHERE status='pending' AND kind=$kind AND scope=$scope AND finding_key=$key ORDER BY proposed_at LIMIT 1", ("$kind", p.Kind), ("$scope", p.Scope), ("$key", p.FindingKey));
                 using var r = existing.ExecuteReader();
                 if (r.Read())
+                {
                     return new FindingProposed(ReadProposal(r), true);
+                }
             }
             p = p with { Id = "apr_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), Status = "pending", ProposedAt = Stamp(), DecidedAt = "", DecidedBy = "", Note = "", Result = "" };
             Execute(c, t, """
@@ -61,7 +66,10 @@ public sealed partial class FindingStore
         using var r = command.ExecuteReader();
         List<FindingProposal> result = [];
         while (r.Read())
+        {
             result.Add(ReadProposal(r));
+        }
+
         return (IReadOnlyList<FindingProposal>)result;
     }, token);
     public FindingProposal GetProposal(string id, CancellationToken token = default) => database.ReadTransaction((c, t) =>
@@ -73,7 +81,10 @@ public sealed partial class FindingStore
     public FindingProposal Decide(string id, string status, string by, string note = "", string result = "", CancellationToken token = default)
     {
         if (status is not ("approved" or "rejected"))
+        {
             throw new ArgumentException("a proposal is approved or rejected");
+        }
+
         database.WithTransaction((c, t) =>
         {
             using var command = Command(c, t, "UPDATE finding_proposals SET status=$status,decided_by=$by,decided_at=$at,note=$note,result=$result WHERE id=$id AND status='pending'", ("$status", status), ("$by", by), ("$at", Stamp()), ("$note", note.Trim()), ("$result", result), ("$id", id));

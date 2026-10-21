@@ -23,7 +23,9 @@ public static class FileEditor
             root = System.IO.Path.Combine(root, part);
             FileSystemInfo item = Directory.Exists(root) ? new DirectoryInfo(root) : new FileInfo(root);
             if (item.LinkTarget is not null)
+            {
                 root = item.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? throw new IOException("Cannot resolve link: " + root);
+            }
         }
         return root;
     }
@@ -32,17 +34,26 @@ public static class FileEditor
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (stream.Length > MaximumBytes)
+        {
             throw new InvalidDataException("file exceeds the edit size limit");
+        }
+
         using var output = new MemoryStream();
         var buffer = new byte[8192];
         for (var read = stream.Read(buffer); read > 0; read = stream.Read(buffer))
         {
             if (output.Length + read > MaximumBytes)
+            {
                 throw new InvalidDataException("file exceeds the edit size limit");
+            }
+
             output.Write(buffer, 0, read);
         }
         if (output.Length > MaximumBytes)
+        {
             throw new InvalidDataException("file exceeds the edit size limit");
+        }
+
         return output.ToArray();
     }
     public static FileChange Apply(string path, Func<string, bool, TextEdit> edit, bool dryRun = false, bool backup = false, Func<string>? skipMissing = null, Func<string, bool>? empty = null)
@@ -54,20 +65,35 @@ public static class FileEditor
         { before = ReadBytes(real); }
         catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { before = null; }
         if (before is null && skipMissing?.Invoke() is { Length: > 0 } reason)
+        {
             return new(path, "skip", "", "", reason);
+        }
+
         var text = before is null ? "" : Utf8.GetString(before);
         var result = edit(text, before is not null);
         var change = new FileChange(path, result.Action, text, result.Text, Deleted: result.Action is "remove" && (empty?.Invoke(result.Text) ?? string.IsNullOrWhiteSpace(result.Text)));
         if (!change.Writes)
+        {
             return change;
+        }
+
         var bytes = Utf8.GetBytes(result.Text);
         if (bytes.Length > MaximumBytes)
+        {
             throw new InvalidDataException("edited file exceeds the edit size limit");
+        }
+
         if (dryRun)
+        {
             return change;
+        }
+
         Check(real, before);
         if (backup && before is not null)
+        {
             change = change with { Backup = Backup(real, before) };
+        }
+
         Check(real, before);
         if (change.Deleted)
         {
@@ -83,13 +109,23 @@ public static class FileEditor
             using (var stream = new FileStream(temporary, Options(mode)))
             { stream.Write(bytes); stream.Flush(flushToDisk: true); }
             if (!OperatingSystem.IsWindows())
+            {
                 File.SetUnixFileMode(temporary, mode);
+            }
+
             Check(real, before);
             if (!string.Equals(Resolve(path), real, StringComparison.Ordinal))
+            {
                 throw new IOException("file link changed while harness was editing it; nothing was written, retry");
+            }
+
             File.Move(temporary, real, overwrite: before is not null);
         }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        finally { if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
         return change;
     }
     private static void Check(string path, byte[]? expected)
@@ -99,7 +135,9 @@ public static class FileEditor
         { current = ReadBytes(path); }
         catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { current = null; }
         if (expected is null ? current is not null : current is null || !current.AsSpan().SequenceEqual(expected))
+        {
             throw new IOException("file changed while harness was editing it; nothing was written, retry");
+        }
     }
     private static string Backup(string path, byte[] bytes)
     {
@@ -117,7 +155,10 @@ public static class FileEditor
             using (stream)
             {
                 if (!OperatingSystem.IsWindows())
+                {
                     File.SetUnixFileMode(name, File.GetUnixFileMode(path));
+                }
+
                 stream.Write(bytes);
                 stream.Flush(flushToDisk: true);
                 return name;
@@ -129,7 +170,10 @@ public static class FileEditor
     {
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
         if (!OperatingSystem.IsWindows())
+        {
             options.UnixCreateMode = mode;
+        }
+
         return options;
     }
 }

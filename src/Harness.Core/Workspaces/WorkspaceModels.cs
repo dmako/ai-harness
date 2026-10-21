@@ -32,7 +32,10 @@ public static class WorkspaceReferences
     {
         var colon = text.IndexOf(':', StringComparison.Ordinal);
         if (colon <= 0 || !members.Any(member => member.Name == text[..colon]))
+        {
             return null;
+        }
+
         var path = text[(colon + 1)..];
         var hash = path.LastIndexOf('#');
         return hash < 0 ? new(text[..colon], path) : new(text[..colon], path[..hash], path[(hash + 1)..]);

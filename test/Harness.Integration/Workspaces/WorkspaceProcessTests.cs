@@ -95,7 +95,10 @@ public sealed class WorkspaceProcessTests
         context.StructuredContent!.Value.GetProperty("workspace")[0].GetProperty("project").GetString().Should().Be("beta");
         text.Should().NotContain("gamma");
         foreach (var repo in fixture.Repositories)
+        {
             File.Exists(Path.Combine(repo.Root, ".harness", "heavy-fixture", "harness_provider_info.args")).Should().BeFalse();
+        }
+
         var deep = await client.CallToolAsync("search_project", new Dictionary<string, object?> { ["query"] = "Widget", ["kind"] = "symbol", ["scope"] = "workspace", ["path"] = "beta:a.cs#Widget", ["depth"] = "deep" }, cancellationToken: Token);
         deep.IsError.Should().BeNull();
         deep.StructuredContent!.Value.GetProperty("results").EnumerateArray().Should().OnlyContain(item => item.GetProperty("project").GetString() == "beta");
@@ -108,7 +111,10 @@ public sealed class WorkspaceProcessTests
     {
         using var process = new Process { StartInfo = new("dotnet") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = fixture.Global } };
         foreach (var arg in new[] { Binary }.Concat(args))
+        {
             process.StartInfo.ArgumentList.Add(arg);
+        }
+
         process.StartInfo.Environment["HARNESS_CONFIG_DIR"] = fixture.Global;
         process.Start();
         var output = process.StandardOutput.ReadToEndAsync(Token);

@@ -25,7 +25,10 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
         command.Transaction = t;
         command.CommandText = sql;
         foreach (var (key, value) in args)
+        {
             command.Parameters.AddWithValue(key, value);
+        }
+
         return command;
     }
     internal static void Execute(SqliteConnection c, SqliteTransaction? t, string sql, params (string Key, object Value)[] args)
@@ -43,6 +46,7 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
     {
         var result = new StringBuilder("\"");
         foreach (var rune in value.EnumerateRunes())
+        {
             result.Append(rune.Value switch
             {
                 '"' => "\\\"",
@@ -60,6 +64,8 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
                 < 0x20 => "\\u" + rune.Value.ToString("x4", CultureInfo.InvariantCulture),
                 _ => rune.ToString(),
             });
+        }
+
         return result.Append('"').ToString();
     }
     public static IReadOnlyList<ArchitectureFinding> Merge(IEnumerable<ArchitectureFinding> findings)
@@ -67,6 +73,7 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
         List<ArchitectureFinding> result = [];
         Dictionary<string, int> positions = new(StringComparer.Ordinal);
         foreach (var f in findings.Select(f => ArchitectureAnalyzer.Complete(f)))
+        {
             if (positions.TryGetValue(f.Key, out var index))
             {
                 var old = result[index];
@@ -75,6 +82,8 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
             }
             else
             { positions.Add(f.Key, result.Count); result.Add(f); }
+        }
+
         return result;
     }
     public static int Severity(string level) => level switch { "problem" => 2, "warn" => 1, _ => 0 };
@@ -103,7 +112,10 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
         using var r = command.ExecuteReader();
         Dictionary<string, FindingMark> marks = new(StringComparer.Ordinal);
         while (r.Read())
+        {
             marks.Add(r.GetString(0), new() { State = r.GetString(1), Reason = r.GetString(2), Level = r.GetString(3), Measure = r.GetInt32(4), ReviewReason = r.GetString(5), MemoryId = r.GetString(6), TaskId = r.GetString(7), TaskProject = r.GetString(8), MarkedBy = r.GetString(9), MarkedAt = r.GetString(10), ProposedBy = r.GetString(11) });
+        }
+
         return marks;
     }
     public FindingTake Take(string commit, IEnumerable<ArchitectureFinding> findings, CancellationToken token = default)
@@ -121,7 +133,10 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
             if ((added + changed + gone is 0) && Convert.ToInt64(count.ExecuteScalar(), CultureInfo.InvariantCulture) > 0)
             {
                 foreach (var f in found)
+                {
                     Execute(c, t, "UPDATE findings SET finding=$data,last_seen=$now WHERE key=$key", ("$data", JsonSerializer.Serialize(f, Json)), ("$now", now), ("$key", f.Key));
+                }
+
                 return new FindingTake(null, [], found.Count);
             }
             Execute(c, t, "INSERT INTO finding_snapshots(commit_sha,taken_at,found,added,changed,gone) VALUES($commit,$now,$found,$added,$changed,$gone)", ("$commit", commit), ("$now", now), ("$found", found.Count), ("$added", added), ("$changed", changed), ("$gone", gone));
@@ -141,12 +156,18 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
                     """, ("$key", f.Key), ("$kind", f.Kind), ("$level", f.Level), ("$title", f.Title), ("$measure", f.Measure), ("$data", JsonSerializer.Serialize(f, Json)), ("$hash", Hash(f)), ("$status", status), ("$id", id), ("$first", first), ("$now", now));
             }
             foreach (var (key, _) in current.Where(row => !live.Contains(row.Key) && row.Value.Status is not "gone"))
+            {
                 Execute(c, t, "UPDATE findings SET status='gone',snapshot=$id WHERE key=$key", ("$id", id), ("$key", key));
+            }
+
             var marks = Marks(c, t);
             List<string> review = [];
             foreach (var f in found)
+            {
                 if (marks.TryGetValue(f.Key, out var mark) && mark.State is "by_design" && Grew(mark, f) is { Length: > 0 } why)
                 { Execute(c, t, "UPDATE finding_marks SET state='review',review_reason=$why WHERE key=$key", ("$why", why), ("$key", f.Key)); review.Add(f.Key); }
+            }
+
             return new FindingTake(new() { Id = id, Commit = commit, TakenAt = now, Found = found.Count, Added = added, Changed = changed, Gone = gone }, review.Order(StringComparer.Ordinal).ToArray(), found.Count);
         }, token);
     }
@@ -174,8 +195,12 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
         {
             var live = found.Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
             foreach (var (key, row) in rows.OrderBy(row => row.Key, StringComparer.Ordinal))
+            {
                 if (!live.Contains(key) && row.Status is "gone" && (row.Snapshot == latest.Id || marks.GetValueOrDefault(key)?.State is "task"))
+                {
                     result.Add(new(row.Finding) { Status = "gone", FirstSeen = row.First, Mark = marks.GetValueOrDefault(key) });
+                }
+            }
         }
         return ((IReadOnlyList<Finding>)result, latest);
     }, token);

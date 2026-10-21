@@ -128,7 +128,10 @@ public sealed class TaskExecutionTests
         try
         {
             for (var i = 0; i < 4; i++)
+            {
                 clients.Add(await StartAsync(state.Directory, "same-client"));
+            }
+
             var attempts = await Task.WhenAll(clients.Select(c => c.CallToolAsync("task_claim", new Dictionary<string, object?> { ["id"] = "T-1" }, cancellationToken: Token).AsTask()));
             var winnerIndex = Array.FindIndex(attempts, r => r.IsError is not true);
             attempts.Where(result => result.IsError is not true).Should().ContainSingle();
@@ -150,14 +153,21 @@ public sealed class TaskExecutionTests
             next.Count(r => r.StructuredContent!.Value.GetProperty("task").ValueKind is JsonValueKind.Null).Should().Be(3);
             state.Store.Events("T-2", Token).Where(item => item.Event is "claimed").Should().ContainSingle();
         }
-        finally { foreach (var client in clients) await client.DisposeAsync(); }
+        finally { foreach (var client in clients)
+            {
+                await client.DisposeAsync();
+            }
+        }
     }
 
     private static Task<McpClient> StartAsync(string root, string name)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+        {
             directory = directory.Parent;
+        }
+
         directory.Should().NotBeNull();
 #if DEBUG
         const string Configuration = "Debug";
@@ -181,7 +191,9 @@ public sealed class TaskExecutionTests
             command.CommandText = sql;
             using var reader = command.ExecuteReader();
             while (reader.Read())
+            {
                 rows.Add(Enumerable.Range(0, reader.FieldCount).Select(i => reader.IsDBNull(i) ? null : reader.GetValue(i)).ToArray());
+            }
         }
         return JsonSerializer.Serialize(rows);
     }

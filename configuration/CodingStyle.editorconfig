@@ -101,7 +101,8 @@ csharp_style_prefer_range_operator = true
 csharp_style_pattern_local_over_anonymous_function = true
 
 # Code block preferences
-csharp_prefer_braces = when_multiline
+csharp_prefer_braces = true:error
+dotnet_diagnostic.IDE0011.severity = error
 
 # Space preferences
 csharp_space_after_cast = false

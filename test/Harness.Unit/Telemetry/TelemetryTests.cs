@@ -146,7 +146,10 @@ public sealed class TelemetryTests
         using var tree = new ReaderTree([]);
         var path = Path.Combine(tree.Root, "state.db");
         await using (var missing = new TelemetryRecorder(path))
+        {
             missing.Observe(new ToolObservation(Now, "search_project", "", "codex", 1, 20, false));
+        }
+
         File.Exists(path).Should().BeFalse();
         using var db = HarnessDatabase.Open(path, cancellationToken: Token);
         await using (var recorder = new TelemetryRecorder(path, version: _ => "1.2.3"))
@@ -199,8 +202,13 @@ public sealed class TelemetryTests
         using var db = HarnessDatabase.Open(Path.Combine(tree.Root, "state.db"), cancellationToken: Token);
         var probes = 0;
         await using (var recorder = new TelemetryRecorder(db.Path, version: _ => Interlocked.Increment(ref probes) is 1 ? "" : "v2"))
+        {
             for (var i = 0; i < 3; i++)
+            {
                 recorder.Observe(new Harness.Core.Providers.ProviderResult { Provider = "fixture", Capability = "code.symbol_search" }, new("code.symbol_search"));
+            }
+        }
+
         probes.Should().Be(2);
         db.GetDiagnostic("provider_version:fixture").Should().Be("v2");
     }

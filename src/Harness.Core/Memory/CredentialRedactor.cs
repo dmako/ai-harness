@@ -19,7 +19,11 @@ public static class CredentialRedactor
     public static string Redact(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        foreach (var (pattern, replacement) in Rules) text = pattern.Replace(text, replacement);
+        foreach (var (pattern, replacement) in Rules)
+        {
+            text = pattern.Replace(text, replacement);
+        }
+
         return text;
     }
 

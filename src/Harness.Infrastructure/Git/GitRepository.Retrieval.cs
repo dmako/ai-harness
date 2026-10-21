@@ -9,7 +9,10 @@ public sealed partial record GitRepository
     public async Task<IReadOnlyList<RetrievalCommit>> RecentCommitsAsync(IReadOnlyList<string> paths, int limit, CancellationToken cancellationToken = default)
     {
         if (paths.Count is 0 || limit <= 0)
+        {
             return [];
+        }
+
         var output = await ReadGitAsync(["log", "-n", limit.ToString(CultureInfo.InvariantCulture), "--no-merges", "--format=%x1e%H%x1f%ct%x1f%s", "--name-only", "--", .. paths], cancellationToken).ConfigureAwait(false);
         var wanted = paths.ToHashSet(StringComparer.Ordinal);
         List<RetrievalCommit> commits = [];
@@ -21,7 +24,10 @@ public sealed partial record GitRepository
             var files = split < 0 ? "" : text[(split + 1)..];
             var fields = header.Split('\x1f');
             if (fields.Length is not 3)
+            {
                 continue;
+            }
+
             _ = long.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds);
             commits.Add(new(fields[0], fields[2], new MemoryTimestamp(DateTimeOffset.FromUnixTimeSeconds(seconds)), files.Split('\n').Select(path => path.Trim()).Where(wanted.Contains).ToArray()));
         }

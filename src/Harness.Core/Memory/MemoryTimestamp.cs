@@ -31,10 +31,16 @@ public readonly record struct MemoryTimestamp : IComparable<MemoryTimestamp>
         {
             var end = dot + 1;
             while (end < text.Length && char.IsAsciiDigit(text[end]))
+            {
                 end++;
+            }
+
             var fraction = text[(dot + 1)..end];
             if (fraction.Length is < 1 or > 9)
+            {
                 throw new FormatException("Invalid RFC3339 fraction.");
+            }
+
             nanoseconds = int.Parse(fraction.PadRight(9, '0'), CultureInfo.InvariantCulture);
             seconds = text[..dot] + text[end..];
         }
@@ -54,7 +60,10 @@ public readonly record struct MemoryTimestamp : IComparable<MemoryTimestamp>
     public string ToRfc3339Nano()
     {
         if (_nanoseconds is 0)
+        {
             return ToRfc3339();
+        }
+
         return _second.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + "." + _nanoseconds.ToString("D9", CultureInfo.InvariantCulture).TrimEnd('0') + "Z";
     }
 

@@ -1,10 +1,10 @@
 using System.ComponentModel;
 using Harness.Cli.Memory;
 using Harness.Core.Sync;
+using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Sync;
-using Harness.Infrastructure.Findings;
 using Harness.Providers.Packs;
 using Spectre.Console.Cli;
 
@@ -51,19 +51,36 @@ internal sealed class SyncCommand(ProjectLifecycle lifecycle, TextWriter output,
         };
         await output.WriteLineAsync($"Git       {head} ({suffix})");
         if (registration.Moved)
+        {
             await output.WriteLineAsync($"Note      project moved from {registration.PreviousRoot}; location updated");
+        }
+
         if (registration.Copied)
+        {
             await output.WriteLineAsync($"Note      copy of {registration.PreviousRoot}: new project id (copied from {registration.Project.CopiedFrom})");
+        }
+
         var dirty = result.State.Dirty ? $"dirty ({result.State.DirtyPaths} uncommitted path(s))" : "clean";
         await output.WriteLineAsync($"State     recorded {head}, working tree {dirty}");
         if (result.CoveredBy is not 0)
+        {
             await output.WriteLineAsync($"Files     already synced to this HEAD by a concurrent run (#{result.CoveredBy})");
+        }
         else if (result.Files is { } run)
+        {
             await PrintFilesAsync(run);
+        }
+
         foreach (var removed in result.Removed)
+        {
             await output.WriteLineAsync($"Removed   worktree {removed.Id} {removed.Path} (its git directory is gone)");
+        }
+
         foreach (var finding in result.Findings)
+        {
             await PrintFindingsAsync(finding);
+        }
+
         await output.WriteLineAsync("\nSynced.");
     }
 
@@ -79,7 +96,9 @@ internal sealed class SyncCommand(ProjectLifecycle lifecycle, TextWriter output,
         };
         await output.WriteLineAsync("Findings  " + finding.Where + ": " + description);
         if (finding.Result?.Review.Count is > 0)
+        {
             await output.WriteLineAsync($"          {finding.Result.Review.Count} marked by design grew and are back for review");
+        }
     }
 
     private async Task PrintFilesAsync(SyncRun run)
@@ -89,11 +108,19 @@ internal sealed class SyncCommand(ProjectLifecycle lifecycle, TextWriter output,
         await output.WriteLineAsync($"Files     {mode}: {files.Added.Count} added, {files.Changed.Count} changed, {files.Removed.Count} removed, {files.Unchanged} unchanged ({files.Hashed} read)");
         var paths = files.Added.Select(path => "+ " + path).Concat(files.Changed.Select(path => "~ " + path)).Concat(files.Removed.Select(path => "- " + path)).ToArray();
         foreach (var path in paths.Take(8))
+        {
             await output.WriteLineAsync("          " + path);
+        }
+
         if (paths.Length > 8)
+        {
             await output.WriteLineAsync($"          ... and {paths.Length - 8} more");
+        }
+
         foreach (var provider in run.Providers)
+        {
             await output.WriteLineAsync("Provider  " + provider.Name + ": " + provider.Status.Replace('_', ' ') + (provider.Detail.Length > 0 ? " — " + provider.Detail : ""));
+        }
     }
     private static string Describe(Core.Projects.WorktreeIdentity tree) => (tree.Detached, tree.Commit.Length) switch { (true, _) => "detached at " + Short(tree.Commit), (_, 0) => tree.Branch + " (no commits yet)", _ => tree.Branch + " at " + Short(tree.Commit) };
     private static string Short(string commit) => commit[..Math.Min(12, commit.Length)];

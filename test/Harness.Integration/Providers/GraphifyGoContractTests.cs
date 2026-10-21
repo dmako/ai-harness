@@ -24,16 +24,28 @@ public sealed class GraphifyGoContractTests
     {
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_GRAPHIFY_ORACLE");
         if (string.IsNullOrWhiteSpace(oracle))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_GRAPHIFY_ORACLE using Graphify/build_oracle.py; the fake CLI oracle currently uses the Windows worker apphost.");
+        }
+
         var token = TestContext.Current.CancellationToken;
         using var fixture = new GraphifyFixture();
         fixture.Ready("borrowed");
         if (scenario is "type_impact")
+        {
             fixture.Write("symbols.json", """{"success":true,"items":[{"id":"iface","label":"N.IService","declaration_kind":"interface"}]}""");
+        }
+
         if (scenario is "error")
+        {
             fixture.Write("symbols.json", """{"success":false,"error":{"code":"invalid_query","message":"fixture failure"},"items":[]}""");
+        }
+
         if (scenario is "impact")
+        {
             fixture.Write("callers-controller.json", """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Api.cs","line":7},"origin":{"id":"api","label":"N.Api.Execute()","declaration_kind":"method"}}]}""");
+        }
+
         var capability = scenario switch { "symbols" or "symbols_limit" or "error" => Capabilities.SymbolSearch, "references" => Capabilities.References, "impact" or "type_impact" => Capabilities.Impact, "unsupported" => Capabilities.TextSearch, _ => Capabilities.Callers };
         var query = scenario switch { "type_impact" => "IService", "symbols" or "symbols_limit" or "error" => "Save", _ => "IService.Save" };
         var request = new ProviderRequest(capability, query, scenario is "path" ? "elsewhere" : "", scenario is "symbols_limit" ? 1 : 20);
@@ -53,7 +65,11 @@ public sealed class GraphifyGoContractTests
         var error = process.StandardError.ReadToEndAsync(token);
         try
         { await process.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(30), token); }
-        finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        finally { if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
         process.ExitCode.Should().Be(0, await error);
         using var expected = JsonDocument.Parse(await output);
         JsonElement.DeepEquals(expected.RootElement, actual).Should().BeTrue($"Go: {expected.RootElement}\nC#: {actual}");

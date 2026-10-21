@@ -62,11 +62,19 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
                 Add(result, "git_branch", head.Branch);
                 Add(result, "git_commit", head.Commit);
                 if (head.Detached)
+                {
                     result["git_detached"] = true;
+                }
+
                 if (head.Unborn)
+                {
                     result["git_unborn"] = true;
+                }
+
                 if (repository.Linked)
+                {
                     result["git_linked_worktree"] = true;
+                }
             }
             catch (Exception exception) when (exception is IOException or InvalidDataException)
             {
@@ -173,7 +181,9 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
     private static void Add(Dictionary<string, object?> result, string key, string value)
     {
         if (value.Length > 0)
+        {
             result[key] = value;
+        }
     }
 
     private static Dictionary<string, object?> ReadSync(HarnessDatabase database, string worktree, GitHead? head, out bool crossBranch, bool includeRecentRuns = true)
@@ -182,7 +192,10 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         crossBranch = false;
         Dictionary<string, object?> result = new(StringComparer.Ordinal);
         if (includeRecentRuns)
+        {
             result["recent_runs"] = RecentRuns(database, worktree);
+        }
+
         using var connection = database.OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT branch, head_commit, detached, synced_at FROM sync_state WHERE worktree_id=$worktree";
@@ -214,7 +227,10 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
     {
         var dot = value.IndexOf('.', StringComparison.Ordinal);
         if (dot < 0)
+        {
             return value;
+        }
+
         var offset = value.AsSpan(dot + 1).IndexOfAny('Z', '+', '-');
         return offset < 0 ? value : value[..dot] + value[(dot + 1 + offset)..];
     }
@@ -242,7 +258,9 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
             foreach (var (column, key) in new[] { (2, "finished_at"), (4, "reason"), (5, "base_commit"), (6, "head_commit"), (12, "error") })
             {
                 if (!reader.IsDBNull(column))
+                {
                     Add(run, key, column == 2 ? JsonTime(reader.GetString(column)) : reader.GetString(column));
+                }
             }
 
             using var providers = System.Text.Json.JsonDocument.Parse(reader.GetString(10));
@@ -257,10 +275,16 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
     {
         var dot = value.IndexOf('.', StringComparison.Ordinal);
         if (dot < 0)
+        {
             return value;
+        }
+
         var offset = value.AsSpan(dot + 1).IndexOfAny('Z', '+', '-');
         if (offset < 0)
+        {
             return value;
+        }
+
         var suffix = dot + 1 + offset;
         var fraction = value[(dot + 1)..suffix].TrimEnd('0');
         return value[..dot] + (fraction.Length == 0 ? "" : "." + fraction) + value[suffix..];

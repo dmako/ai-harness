@@ -22,11 +22,17 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
     public EvaluatedProject Evaluate(string project)
     {
         if (repository.Evaluations.TryGetValue(project, out var cached))
+        {
             return cached;
+        }
+
         var first = Properties(project, "");
         var frameworks = Split(first.Properties.GetValueOrDefault("TargetFrameworks", ""));
         if (frameworks.Length is 0)
+        {
             frameworks = Split(first.Properties.GetValueOrDefault("TargetFramework", ""));
+        }
+
         var contexts = frameworks.Length is 0 ? new[] { first } : frameworks.Select(framework => Properties(project, framework)).ToArray();
         List<EvaluatedPackage> packages = [];
         List<EvaluatedReference> references = [];
@@ -38,17 +44,25 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             {
                 var existing = packages.FindIndex(p => p.Name.Equals(item.Name, StringComparison.OrdinalIgnoreCase) && p.Version == item.Version);
                 if (existing < 0)
+                {
                     packages.Add(item with { Frameworks = Add([], framework) });
+                }
                 else
+                {
                     packages[existing] = packages[existing] with { Frameworks = Add(packages[existing].Frameworks, framework), Conditional = packages[existing].Conditional || item.Conditional };
+                }
             }
             foreach (var item in rs)
             {
                 var existing = references.FindIndex(r => r.Path == item.Path);
                 if (existing < 0)
+                {
                     references.Add(item with { Frameworks = Add([], framework) });
+                }
                 else
+                {
                     references[existing] = references[existing] with { Frameworks = Add(references[existing].Frameworks, framework), Conditional = references[existing].Conditional || item.Conditional };
+                }
             }
         }
         var result = new EvaluatedProject(frameworks, contexts[0].Properties, contexts[0].Locations,
@@ -75,14 +89,22 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         }
         HashSet<string> seen = new(StringComparer.Ordinal);
         foreach (var file in new[] { Nearest("Directory.Build.props", directory), Nearest("Directory.Packages.props", directory), project, Nearest("Directory.Build.targets", directory) })
+        {
             if (file.Length > 0)
+            {
                 Walk(file, 0);
+            }
+        }
+
         return context;
 
         void Walk(string file, int depth)
         {
             if (depth > 8 || !seen.Add(file) || Parse(file) is not { } xml)
+            {
                 return;
+            }
+
             context.Order.Add((file, xml));
             var dir = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
             foreach (var element in xml.Elements())
@@ -91,13 +113,19 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                 {
                     case "PropertyGroup":
                         if (!Condition(context, Attr(element, "Condition"), dir).Value)
+                        {
                             break;
+                        }
+
                         foreach (var property in element.Elements())
                         {
                             var (value, known) = Condition(context, Attr(property, "Condition"), dir);
                             var name = property.Name.LocalName;
                             if (!value && known || context.Globals.Contains(name) || !known && context.Properties.GetValueOrDefault(name, "").Length > 0)
+                            {
                                 continue;
+                            }
+
                             context.Properties[name] = Expand(context, property.Value.Trim(), dir);
                             context.Locations[name] = file + ":" + ((IXmlLineInfo)property).LineNumber.ToString(CultureInfo.InvariantCulture);
                         }
@@ -108,9 +136,15 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                     case "ImportGroup":
                         var condition = Condition(context, Attr(element, "Condition"), dir);
                         if (!condition.Value && condition.Known)
+                        {
                             break;
+                        }
+
                         foreach (var import in element.Elements().Where(e => e.Name.LocalName is "Import"))
+                        {
                             Import(import, checkCondition: false);
+                        }
+
                         break;
                 }
             }
@@ -118,10 +152,15 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             {
                 var condition = Condition(context, Attr(element, "Condition"), dir);
                 if (checkCondition && !condition.Value && condition.Known)
+                {
                     return;
+                }
+
                 var path = ImportPath(context, Attr(element, "Project"), dir);
                 if (path.Length > 0)
+                {
                     Walk(path, depth + 1);
+                }
             }
         }
     }
@@ -137,12 +176,18 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             {
                 var condition = Condition(context, Attr(group, "Condition"), directory);
                 if (!condition.Value && condition.Known)
+                {
                     continue;
+                }
+
                 foreach (var item in group.Elements())
                 {
                     var childCondition = Condition(context, Attr(item, "Condition"), directory);
                     if (!childCondition.Value && childCondition.Known)
+                    {
                         continue;
+                    }
+
                     var conditional = !condition.Known || !childCondition.Known;
                     var at = file + ":" + ((IXmlLineInfo)item).LineNumber.ToString(CultureInfo.InvariantCulture);
                     var include = Expand(context, Attr(item, "Include"), directory);
@@ -153,19 +198,31 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                     {
                         case "PackageVersion":
                             if (include.Length > 0 || update.Length > 0)
+                            {
                                 central[include.Length > 0 ? include : update] = version;
+                            }
+
                             break;
                         case "PackageReference":
                             if (update.Length > 0)
                             {
                                 for (var i = 0; i < packages.Count; i++)
+                                {
                                     if (packages[i].Name.Equals(update, StringComparison.OrdinalIgnoreCase) && version.Length > 0)
+                                    {
                                         packages[i] = packages[i] with { Version = version };
+                                    }
+                                }
                             }
                             else if (remove.Length > 0)
+                            {
                                 packages.RemoveAll(package => package.Name.Equals(remove, StringComparison.OrdinalIgnoreCase));
+                            }
                             else
+                            {
                                 packages.AddRange(Split(include).Select(name => new EvaluatedPackage(name, version, at, [], conditional)));
+                            }
+
                             break;
                         case "ProjectReference":
                             foreach (var path in Split(include.Replace('\\', '/')))
@@ -179,9 +236,15 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                     {
                         var value = Attr(item, "Version");
                         if (value.Length is 0)
+                        {
                             value = Attr(item, "VersionOverride");
+                        }
+
                         foreach (var element in item.Elements().Where(e => e.Name.LocalName is "Version" or "VersionOverride"))
+                        {
                             value = element.Value.Trim();
+                        }
+
                         return Expand(context, value, directory);
                     }
                 }
@@ -196,7 +259,10 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
     internal XElement? Parse(string file)
     {
         if (_xml.TryGetValue(file, out var parsed))
+        {
             return parsed;
+        }
+
         try
         {
             using var reader = XmlReader.Create(new StringReader(repository.Read(file).TrimStart('\uFEFF')), new() { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
@@ -212,9 +278,15 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         {
             var relative = repository.Relative(Path.Combine(directory, name));
             if (repository.Exists(relative))
+            {
                 return relative;
+            }
+
             if (directory == repository.Root)
+            {
                 break;
+            }
+
             directory = Path.GetDirectoryName(directory)!;
         }
         return "";
@@ -229,7 +301,10 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         }
         path = Expand(context, path, directory).Replace('\\', Path.DirectorySeparatorChar);
         if (path.Length is 0 || path.Contains("$(", StringComparison.Ordinal) || path.IndexOfAny(['*', '?']) >= 0)
+        {
             return "";
+        }
+
         var relative = repository.Relative(Path.GetFullPath(path, directory));
         return repository.Exists(relative) ? relative : "";
     }
@@ -244,7 +319,10 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                 var name => context.Properties.GetValueOrDefault(name) ?? match.Value,
             });
             if (next == value)
+            {
                 break;
+            }
+
             value = next;
         }
         return value;

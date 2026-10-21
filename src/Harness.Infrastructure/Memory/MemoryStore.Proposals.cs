@@ -20,20 +20,26 @@ public sealed partial class MemoryStore
             {
                 var old = Get(connection, transaction, input.Supersedes);
                 if (old.SupersededBy.Length is not 0)
+                {
                     throw new InvalidOperationException($"{old.Id} is already superseded by {old.SupersededBy}");
+                }
             }
 
             var parameters = new (string Name, object? Value)[] { ("$type", normalized.Type), ("$kind", normalized.Scope!.Kind), ("$value", normalized.Scope.Value), ("$hash", hash) };
             using (var duplicate = Command(connection, transaction, "SELECT id FROM memories WHERE type=$type AND scope_kind=$kind AND scope_value=$value AND content_hash=$hash AND superseded_by IS NULL", parameters))
             {
                 if (duplicate.ExecuteScalar() is string memoryId)
+                {
                     return new MemoryProposalResult("already_memory", Memory: Get(connection, transaction, memoryId));
+                }
             }
 
             using (var duplicate = Command(connection, transaction, "SELECT id FROM memory_proposals WHERE type=$type AND scope_kind=$kind AND scope_value=$value AND content_hash=$hash AND status='pending'", parameters))
             {
                 if (duplicate.ExecuteScalar() is string proposalId)
+                {
                     return new MemoryProposalResult("already_proposed", GetProposal(connection, transaction, proposalId));
+                }
             }
 
             var now = Now();
@@ -51,9 +57,15 @@ public sealed partial class MemoryStore
     public IReadOnlyList<MemoryProposal> Proposals(string status = "", int limit = 50, CancellationToken cancellationToken = default)
     {
         if (status.Length is 0)
+        {
             status = "pending";
+        }
+
         if (status is not ("pending" or "approved" or "rejected" or "all"))
+        {
             throw new ArgumentException($"status must be pending, approved, rejected or all, got \"{status}\"");
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         using var connection = database.OpenConnection();
         using var command = Command(connection, null, "SELECT " + ProposalColumns + " FROM memory_proposals" + (status is "all" ? "" : " WHERE status=$status") + " ORDER BY created_at, id LIMIT $limit",
@@ -94,7 +106,10 @@ public sealed partial class MemoryStore
             EnsurePending(proposal);
             var supersedes = input.Supersedes;
             if (supersedes.Count is 0 && proposal.Supersedes.Length is not 0 && !input.KeepBoth)
+            {
                 supersedes = [proposal.Supersedes];
+            }
+
             var normalized = MemoryText.Validate(new MemoryInput
             {
                 Type = input.Type.Length is 0 ? proposal.Type : input.Type,
@@ -107,7 +122,10 @@ public sealed partial class MemoryStore
             });
             var result = Put(connection, transaction, normalized, cancellationToken);
             if (result.Status is "needs_decision")
+            {
                 return new MemoryApprovalResult(result.Status, proposal) { Similar = result.Similar };
+            }
+
             var by = input.By.Trim();
             Execute(connection, transaction, "UPDATE memory_proposals SET status='approved', decided_by=$by, decided_at=$stamp, decision_note=$note, memory_id=$memory WHERE id=$id",
                 ("$by", by.Length is 0 ? "unknown" : by), ("$stamp", Now().ToString()), ("$note", NullIfEmpty(input.Note.Trim())), ("$memory", result.Memory!.Id), ("$id", id));
@@ -128,7 +146,9 @@ public sealed partial class MemoryStore
     private static void EnsurePending(MemoryProposal proposal)
     {
         if (proposal.Status is not "pending")
+        {
             throw new InvalidOperationException($"proposal {proposal.Id} is already {proposal.Status}");
+        }
     }
 
     private static MemoryProposal GetProposal(SqliteConnection connection, SqliteTransaction transaction, string id)

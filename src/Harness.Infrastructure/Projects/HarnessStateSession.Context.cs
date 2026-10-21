@@ -14,7 +14,10 @@ public sealed partial class HarnessStateSession
         List<string> notes = [];
         var sources = new RetrievalSources(Branch: snapshot.Branch);
         if (location.Repository is { } repository)
+        {
             sources = sources with { RecentChanges = repository.RecentCommitsAsync };
+        }
+
         if (File.Exists(location.DatabasePath))
         {
             try
@@ -33,7 +36,10 @@ public sealed partial class HarnessStateSession
             { notes.Add("no project memory (run harness init to record decisions)"); }
         }
         else
+        {
             notes.Add("no project memory (run harness init to record decisions)");
+        }
+
         var reader = new RetrievalFileReader(location.Root);
         return new(sources, reader.ReadBodyAsync, path => Directory.Exists(Path.Combine(location.Root, path)), snapshot.Stale, snapshot.CrossBranch, notes)
         {

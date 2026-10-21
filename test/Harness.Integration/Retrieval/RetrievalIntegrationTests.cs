@@ -79,7 +79,10 @@ public sealed class RetrievalIntegrationTests
     public async Task UnixFileAndDirectoryLinksCannotEscapeTheRepository()
     {
         if (OperatingSystem.IsWindows())
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Unix symlink fixture; exercised in Linux validation.");
+        }
+
         using var fixture = await SyncFixture.CreateAsync();
         await File.WriteAllTextAsync(Path.Combine(fixture.DirectoryRoot, "outside.cs"), "outside", Token);
         File.CreateSymbolicLink(Path.Combine(fixture.Root, "escape.cs"), "../outside.cs");

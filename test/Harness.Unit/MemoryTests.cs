@@ -36,9 +36,15 @@ public sealed class MemoryTests
     {
         var target = MemoryScope.Parse("path:internal/storage/db.cs");
         foreach (var scope in new[] { "project", "workspace:home", "user", "path:internal/storage", "path:internal/storage/db.cs" })
+        {
             MemoryScope.Parse(scope).AppliesTo(target).Should().BeTrue();
+        }
+
         foreach (var scope in new[] { "path:internal/stor", "path:Internal/storage", "path:internal/git", "subsystem:auth", "branch:main" })
+        {
             MemoryScope.Parse(scope).AppliesTo(target).Should().BeFalse();
+        }
+
         MemoryScope.Parse("branch:main").AppliesTo(MemoryScope.Parse("branch:main")).Should().BeTrue();
         MemoryScope.Parse("branch:main").AppliesTo(MemoryScope.Parse("branch:Main")).Should().BeFalse();
     }
@@ -75,7 +81,10 @@ public sealed class MemoryTests
         FluentActions.Invoking(() => MemoryText.Validate(input with { Content = input.Content + "a" })).Should().ThrowExactly<ArgumentException>();
         FluentActions.Invoking(() => MemoryText.Validate(input with { Content = "\ud800" })).Should().ThrowExactly<EncoderFallbackException>();
         foreach (var confidence in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity, -0.1, 1.1 })
+        {
             FluentActions.Invoking(() => MemoryText.Validate(input with { Confidence = confidence })).Should().ThrowExactly<ArgumentException>();
+        }
+
         FluentActions.Invoking(() => MemoryText.Validate(input with { Scope = MemoryScope.User })).Should().ThrowExactly<ArgumentException>();
         FluentActions.Invoking(() => MemoryText.Validate(input with { Scope = MemoryScope.Parse("workspace:home") })).Should().ThrowExactly<ArgumentException>();
     }

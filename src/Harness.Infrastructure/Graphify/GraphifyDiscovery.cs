@@ -23,7 +23,10 @@ public static class GraphifyDiscovery
         var path = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(System.IO.Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
             .Select(directory => System.IO.Path.Combine(directory, name)).FirstOrDefault(File.Exists);
         if (path is not null)
+        {
             return System.IO.Path.GetFullPath(path);
+        }
+
         var tool = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet", "tools", name);
         return File.Exists(tool) ? tool : "graphify-csharp";
     }
@@ -32,17 +35,27 @@ public static class GraphifyDiscovery
     {
         var command = Command();
         if (!providers.TryGetValue("graphify-csharp", out var provider))
+        {
             return (command, []);
+        }
+
         var i = 0;
         while (i < provider.Args.Length)
         {
             var argument = provider.Args[i++];
             if (argument is "--")
+            {
                 return (command, provider.Args[i..]);
+            }
+
             if (argument is "--graphify" && i < provider.Args.Length)
+            {
                 command = provider.Args[i++];
+            }
             else if (argument.StartsWith("--graphify=", StringComparison.Ordinal))
+            {
                 command = argument["--graphify=".Length..];
+            }
         }
         return (command, []);
     }
@@ -54,7 +67,10 @@ public static class GraphifyDiscovery
         { entries = Directory.GetFileSystemEntries(root); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return new(); }
         if (entries.Any(path => !Directory.Exists(path) && IsInput(path)))
+        {
             return new(true);
+        }
+
         List<string> solutions = [], projects = [];
         void Walk(string directory, int depth)
         {
@@ -65,18 +81,27 @@ public static class GraphifyDiscovery
                     if (Directory.Exists(entry))
                     {
                         if (depth < 2 && KeepDirectory(entry))
+                        {
                             Walk(entry, depth + 1);
+                        }
                     }
                     else if (IsSolution(entry))
+                    {
                         solutions.Add(System.IO.Path.GetRelativePath(root, entry).Replace('\\', '/'));
+                    }
                     else if (System.IO.Path.GetExtension(entry).Equals(".csproj", StringComparison.OrdinalIgnoreCase))
+                    {
                         projects.Add(System.IO.Path.GetRelativePath(root, entry).Replace('\\', '/'));
+                    }
                 }
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException) { /* Unreadable folders are not input candidates. */ }
         }
         foreach (var entry in entries.Where(Directory.Exists).Where(KeepDirectory))
+        {
             Walk(entry, 1);
+        }
+
         var both = solutions.ToHashSet(StringComparer.OrdinalIgnoreCase);
         solutions.RemoveAll(path => path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) && both.Contains(path + "x"));
         var found = (solutions.Count > 0 ? solutions : projects).Order(StringComparer.Ordinal).ToArray();
@@ -86,12 +111,21 @@ public static class GraphifyDiscovery
     public static (IReadOnlyList<string> Arguments, string Description) WatchArguments(string root, IReadOnlyList<string> arguments)
     {
         if (arguments.Any(argument => argument is "--input" || argument.StartsWith("--input=", StringComparison.Ordinal)))
+        {
             return (arguments.ToArray(), "solution from the provider's args");
+        }
+
         var input = FindInput(root);
         if (input.AtRoot)
+        {
             return (arguments.ToArray(), input.Describe());
+        }
+
         if (input.Path.Length > 0)
+        {
             return ([.. arguments, "--input", System.IO.Path.Combine(root, input.Path.Replace('/', System.IO.Path.DirectorySeparatorChar))], input.Describe());
+        }
+
         var hint = input.Candidates is { Count: > 0 } ? ": set [providers.graphify-csharp] args = [\"--\", \"--input\", \"" + input.Candidates[0] + "\"] in .harness/config.toml" : "";
         throw new InvalidDataException(input.Describe() + hint);
     }

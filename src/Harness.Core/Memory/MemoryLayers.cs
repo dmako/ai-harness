@@ -17,7 +17,9 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
         if (project is not null)
         {
             foreach (var memory in project.Search(query, cancellationToken))
+            {
                 Add(memory);
+            }
         }
 
         var widerQuery = query with { Branch = "" };
@@ -44,7 +46,10 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
 
         IEnumerable<MemoryRecord> sorted = output;
         if (query.Scope is not null && string.IsNullOrWhiteSpace(query.Text))
+        {
             sorted = output.OrderByDescending(memory => memory.Scope.Specificity);
+        }
+
         return new LayeredMemories(sorted.Take(query.Limit <= 0 ? 20 : query.Limit).ToArray(), errors);
 
         void Add(MemoryRecord memory)
@@ -85,12 +90,17 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
     private MemoryRecord? Overriding(int level, MemoryRecord memory, CancellationToken cancellationToken)
     {
         if (project is not null && Similar(project) is { } projectMemory)
+        {
             return projectMemory;
+        }
+
         for (var index = 0; index < level; index++)
         {
             var narrower = wider[index];
             if (Similar(narrower.Store) is { } found)
+            {
                 return found with { Scope = narrower.Scope };
+            }
         }
 
         return null;

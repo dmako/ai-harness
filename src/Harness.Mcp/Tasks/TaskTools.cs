@@ -31,7 +31,9 @@ internal static class TaskTools
                 {
                     var trail = await session.TaskEventsAsync(id, token);
                     if (trail.Count > 0)
+                    {
                         output["events"] = trail.Select(TaskViews.Event).ToArray();
+                    }
                 }
                 return output;
             case "task_claim":
@@ -51,7 +53,10 @@ internal static class TaskTools
                 { throw new InvalidTaskCompletionException(exception.Message + ". Fix the gaps, or use task_update (status review/blocked, with a note) if the task cannot be finished.", exception); }
                 Dictionary<string, object?> result = new() { ["task"] = TaskViews.Task(completed.Task), ["hint"] = "Record durable decisions from this task with memory_put, then take the next task with task_next." };
                 if (completed.Unlocked.Count > 0)
+                {
                     result["unlocked"] = completed.Unlocked;
+                }
+
                 var proposals = Items(values, "proposals");
                 if (proposals.Length > 0)
                 {
@@ -62,12 +67,17 @@ internal static class TaskTools
                         try
                         {
                             if (memory is null)
+                            {
                                 throw new InvalidOperationException("memory session unavailable");
+                            }
+
                             var source = Text(proposal, "source_ref");
                             var created = await memory.ProposeMemoryAsync(new(MemoryText.ParseType(Text(proposal, "type")), Text(proposal, "content"), MemoryScope.Parse(Text(proposal, "scope")),
                                 new("agent", string.IsNullOrWhiteSpace(source) ? "task:" + id : source, caller), Text(proposal, "rationale"), Text(proposal, "supersedes").Trim()), token);
                             if (created.Proposal is not null)
+                            {
                                 proposed.Add(MemoryViews.Proposal(created.Proposal));
+                            }
                         }
                         catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
                         { errors.Add("memory content rejected: credential validation timed out"); }
@@ -75,9 +85,15 @@ internal static class TaskTools
                         { errors.Add(exception.Message); }
                     }
                     if (proposed.Count > 0)
+                    {
                         result["proposals"] = proposed;
+                    }
+
                     if (errors.Count > 0)
+                    {
                         result["proposal_errors"] = errors;
+                    }
+
                     result["hint"] = "Proposals wait for the user's approval (memory_proposals); take the next task with task_next.";
                 }
                 return result;
@@ -114,7 +130,10 @@ internal static class TaskTools
     private static long Integer(JsonElement values, string key, string input)
     {
         if (!values.TryGetProperty(key, out var value))
+        {
             return 0;
+        }
+
         var number = value.GetDouble();
         if (number >= 9223372036854775808d || number <= -9223372036854775808d)
         {

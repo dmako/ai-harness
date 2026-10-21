@@ -21,9 +21,15 @@ public sealed partial class TaskStore
         d.Validate();
         var (existing, _) = LoadGraph(c, t);
         if (existing.Contains(d.Id))
+        {
             throw new InvalidOperationException($"{d.Id}: task already exists");
+        }
+
         if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+        {
             throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
+        }
+
         using var ordinal = Command(c, t, "SELECT COALESCE(MAX(ordinal),-1)+1 FROM tasks");
         Insert(c, t, d, Convert.ToInt32(ordinal.ExecuteScalar(), CultureInfo.InvariantCulture), origin.Source, Stamp(), "created", origin.By, origin.Detail);
         ReplaceDependencies(c, t, d);
@@ -37,7 +43,10 @@ public sealed partial class TaskStore
     {
         prefix = prefix.Trim();
         if (prefix.EndsWith('-'))
+        {
             prefix = prefix[..^1];
+        }
+
         prefix = prefix.ToUpperInvariant();
         if (prefix.Length is 0)
         {
@@ -45,7 +54,10 @@ public sealed partial class TaskStore
             prefix = latest.ExecuteScalar() is string id ? id.Split('-')[0] : "TASK";
         }
         if (!PrefixPattern().IsMatch(prefix))
+        {
             throw new ArgumentException($"invalid id prefix {TaskWorkflow.Quote(prefix)} (want capital letters and digits, e.g. TASK)");
+        }
+
         using var command = Command(c, t, "SELECT id FROM tasks WHERE id LIKE $prefix", ("$prefix", prefix + "-%"));
         using var reader = command.ExecuteReader();
         long max = 0;
@@ -54,7 +66,10 @@ public sealed partial class TaskStore
         {
             var digits = reader.GetString(0)[(prefix.Length + 1)..];
             if (!long.TryParse(digits, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var number))
+            {
                 continue;
+            }
+
             max = Math.Max(max, number);
             width = Math.Max(width, digits.Length);
         }
@@ -68,7 +83,10 @@ public sealed partial class TaskStore
         Refresh(c, t);
         var current = Get(c, t, id);
         if (TaskWorkflow.HoldsClaim(current.Status))
+        {
             Authorize(current, actor);
+        }
+
         Transition(c, t, current, status, actor, reason, Stamp());
         return Get(c, t, id);
     }, cancellationToken);
@@ -77,7 +95,10 @@ public sealed partial class TaskStore
     {
         var current = Get(c, t, id);
         if (current.Status is not ("blocked" or "deferred"))
+        {
             throw new InvalidOperationException($"{id}: not blocked or deferred (status {current.Status})");
+        }
+
         var stamp = Stamp();
         Execute(c, t, "UPDATE tasks SET status='backlog',blocked_reason=NULL,updated_at=$stamp WHERE id=$id", ("$stamp", stamp), ("$id", id));
         AddEvent(c, t, id, current.Status is "blocked" ? "unblocked" : "resumed", current.Status, "backlog", actor.AuditName, note, stamp);
@@ -88,21 +109,38 @@ public sealed partial class TaskStore
     private static void Authorize(TaskRecord task, TaskActor actor)
     {
         if (actor.Privileged)
+        {
             return;
+        }
+
         if (!TaskWorkflow.HoldsClaim(task.Status))
+        {
             throw new InvalidOperationException($"{task.Id}: no active claim (status {task.Status}); claim it first");
+        }
+
         if (actor.Token.Length is 0 || actor.Token != task.ClaimToken)
+        {
             throw new InvalidOperationException($"{task.Id}: claim token does not match the task's current claim");
+        }
     }
 
     private void Transition(SqliteConnection c, SqliteTransaction t, TaskRecord current, string to, TaskActor actor, string reason, string stamp)
     {
         if (to is "done")
+        {
             throw new InvalidOperationException($"{current.Id}: use complete to finish a task (it records evidence)");
+        }
+
         if (to is "claimed")
+        {
             throw new InvalidOperationException($"{current.Id}: use claim to claim a task");
+        }
+
         if (!TaskWorkflow.CanTransition(current.Status, to))
+        {
             throw new InvalidOperationException($"{current.Id}: status transition not allowed: {current.Status} -> {to}");
+        }
+
         switch (to)
         {
             case "ready" or "backlog":
@@ -111,7 +149,10 @@ public sealed partial class TaskStore
                 break;
             case "blocked" or "deferred":
                 if (string.IsNullOrWhiteSpace(reason))
+                {
                     throw new ArgumentException($"{current.Id}: {(to is "blocked" ? "blocking" : "deferring")} requires a reason");
+                }
+
                 ClearClaim(c, t, current.Id, to, stamp);
                 Execute(c, t, "UPDATE tasks SET blocked_reason=$reason WHERE id=$id", ("$reason", CredentialRedactor.Redact(reason)), ("$id", current.Id));
                 break;

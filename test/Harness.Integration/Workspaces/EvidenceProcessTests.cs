@@ -23,16 +23,22 @@ public sealed class EvidenceProcessTests
         fixture.Repositories[1].Write("Use.cs", "using Acme.Core;\n");
         fixture.Repositories[2].Write("Local.cs", "public class PdfInvoiceGenerator {}\npublic static class Extensions {}\n");
         foreach (var repo in fixture.Repositories)
+        {
             repo.Write(".harness/config.toml", """
                 [providers.heavy]
                 type = 'harness'
                 command = 'missing-ecosystem-heavy-fixture'
                 context = false
                 """);
+        }
+
         await fixture.Store.CreateAsync("one", Token);
         await fixture.Store.JoinAsync("one", fixture.Members.Select(member => member.Id).ToArray(), Token);
         await using (var session = await fixture.SessionAsync(1))
+        {
             await session.PutMemoryAsync(new() { Type = "decision", Content = "PDF invoice generation requires deterministic rendering", Source = new MemorySource("user", "TASK-0020 fixture", "fixture") }, Token);
+        }
+
         var foreignHash = Hash(fixture.Members[1].DatabasePath);
         var binary = Path.Combine(ProviderFixture.RepositoryRoot, "src", "Harness.Cli", "bin", Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name, "net10.0", "harness.dll");
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
@@ -71,7 +77,10 @@ public sealed class EvidenceProcessTests
             ("similar_concerns", new Dictionary<string, object?> { ["concern"] = " " }),
             ("similar_concerns", new Dictionary<string, object?> { ["concern"] = "pdf", ["depth"] = "invalid" }),
         })
+        {
             (await client.CallToolAsync(name, args, cancellationToken: Token)).IsError.Should().BeTrue();
+        }
+
         Hash(fixture.Members[1].DatabasePath).Should().Be(foreignHash);
     }
     private static string Hash(string path)

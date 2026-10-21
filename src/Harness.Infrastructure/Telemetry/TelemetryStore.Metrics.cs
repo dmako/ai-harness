@@ -37,7 +37,10 @@ public sealed partial class TelemetryStore
         var hook = Query("SELECT COUNT(*),COUNT(DISTINCT session_id),MAX(at) FROM tool_events WHERE at >= $from", ("$from", from))[0];
         report.Hooks = new() { Events = Int(hook[0]), Sessions = Int(hook[1]), Last = hook[2] as string, Clients = Query("SELECT DISTINCT client FROM tool_events WHERE at >= $from ORDER BY client", ("$from", from)).Select(r => Text(r[0])).ToArray() };
         if (report.Hooks.Clients?.Count is 0)
+        {
             report.Hooks.Clients = null;
+        }
+
         report.Tools = Query("SELECT tool,kind,client,duration_ms,response_bytes,empty,error IS NOT NULL,at FROM tool_calls WHERE at >= $from ORDER BY at", ("$from", from))
             .GroupBy(r => (Tool: Text(r[0]), Kind: Text(r[1]))).Select(g =>
             {
@@ -65,7 +68,10 @@ public sealed partial class TelemetryStore
     public IReadOnlyList<ProviderBypass>? Bypasses(DateTimeOffset since, IReadOnlyDictionary<string, string> servers)
     {
         if (servers.Count is 0)
+        {
             return null;
+        }
+
         var rows = Query("SELECT mcp_server,mcp_tool,COUNT(*),MAX(at) FROM tool_events WHERE kind='mcp' AND at >= $from GROUP BY mcp_server,mcp_tool", ("$from", Stamp(since)))
             .Where(r => servers.ContainsKey(Text(r[0]))).Select(r => new ProviderBypass { Server = Text(r[0]), Provider = servers[Text(r[0])], Tool = Text(r[1]), Calls = Int(r[2]), Last = Text(r[3]) }).OrderByDescending(r => r.Calls).ThenBy(r => r.Server + r.Tool, StringComparer.Ordinal).ToArray();
         return rows.Length is 0 ? null : rows;
@@ -74,7 +80,10 @@ public sealed partial class TelemetryStore
     {
         List<string> days = [];
         for (var day = since.UtcDateTime.Date; day <= now.UtcDateTime; day = day.AddDays(1))
+        {
             days.Add(day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        }
+
         return Query("SELECT provider,capability,at,duration_ms,error IS NOT NULL OR timeout=1 FROM provider_calls WHERE at >= $from ORDER BY id", ("$from", Stamp(since)))
             .GroupBy(r => (Provider: Text(r[0]), Capability: Text(r[1]))).Select(g =>
             {
@@ -89,9 +98,14 @@ public sealed partial class TelemetryStore
                     {
                         d.Calls++;
                         if (failed)
+                        {
                             d.Errors++;
+                        }
+
                         if (slow)
+                        {
                             d.Slow++;
+                        }
                     }
                     trend.LastCall = at;
                     trend.CallsAfterError++;

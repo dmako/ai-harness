@@ -28,13 +28,18 @@ public sealed class GraphifySessionTests
         object Row(string id, string root, int pid) => new { session_id = id, process_id = pid, repository_root = root, reachability = "stale" };
         fixture.Write("sessions.json", JsonSerializer.Serialize(new { sessions = new[] { Row("dead", fixture.Root, 999999), Row("deleted", gone, 999999), Row("other", other, 999999), Row("live", fixture.Root, Environment.ProcessId), Row("changed", fixture.Root, 999999), Row("unknown", fixture.Root, 0), Row("../unsafe", fixture.Root, 999999) } }));
         foreach (var id in new[] { "dead", "deleted", "other", "live", "changed", "unknown" })
+        {
             await File.WriteAllTextAsync(Path.Combine(fixture.Descriptors, id + ".json"), JsonSerializer.Serialize(new { session_id = id, process_id = id switch { "live" or "changed" => Environment.ProcessId, "unknown" => 0, _ => 999999 } }), Token);
+        }
+
         await using var manager = fixture.Manager();
         (await manager.CleanAsync(Token)).Should().Be(2);
         File.Exists(Path.Combine(fixture.Descriptors, "dead.json")).Should().BeFalse();
         File.Exists(Path.Combine(fixture.Descriptors, "deleted.json")).Should().BeFalse();
         foreach (var id in new[] { "other", "live", "changed", "unknown" })
+        {
             File.Exists(Path.Combine(fixture.Descriptors, id + ".json")).Should().BeTrue(id);
+        }
     }
 
     [Fact]
@@ -131,7 +136,10 @@ public sealed class GraphifySessionTests
     public async Task ConcurrentCompanionsSerializeStartupAndPreserveSharedOwnershipRecords()
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Companion fake apphost is Windows-built.");
+        }
+
         using var fixture = new GraphifyFixture();
         await using var manager = fixture.Manager();
         var clients = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => McpProcessClient.StartAsync(new ProviderProcessFactory(), HostOptions(fixture), Token)));
@@ -144,7 +152,11 @@ public sealed class GraphifySessionTests
             session.StartedBy.Should().StartWith("harness (harness-graphify pid ");
             fixture.Records()["sessions"]![session.Id]!["last_query"].Should().NotBeNull();
         }
-        finally { foreach (var client in clients) await client.DisposeAsync(); }
+        finally { foreach (var client in clients)
+            {
+                await client.DisposeAsync();
+            }
+        }
         var warm = (await manager.ListAsync(false, Token)).Single();
         GraphifySessionManager.ProcessAlive(warm.Pid).Should().BeTrue(manager.LastLog());
         await manager.StopAsync(warm.Id, Token);
@@ -155,7 +167,10 @@ public sealed class GraphifySessionTests
     public async Task CompanionDisconnectLeavesWarmProcessAliveAndAnotherCompanionReusesIt()
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Companion fake apphost is Windows-built; portable manager lifecycle is exercised separately on Unix.");
+        }
+
         using var fixture = new GraphifyFixture();
         await using var manager = fixture.Manager();
         var options = HostOptions(fixture);
@@ -170,7 +185,9 @@ public sealed class GraphifySessionTests
         await using (var client = await McpProcessClient.StartAsync(new ProviderProcessFactory(), HostOptions(fixture, stopOnExit: true), Token))
         {
             foreach (var tool in new[] { "code_references", "code_impact" })
+            {
                 (await client.CallToolAsync(tool, new Dictionary<string, object?> { ["query"] = "IService.Save" }, Token)).IsError.Should().NotBeTrue();
+            }
         }
         GraphifySessionManager.ProcessAlive(warm.Pid).Should().BeTrue("a reused session belongs to its original owner");
         fixture.Calls().Count(call => call[0] is "watch").Should().Be(1);

@@ -945,9 +945,18 @@ internal static class GoUnicode
         {
             var middle = low + ((high - low) / 2);
             var range = LowerRanges[middle];
-            if (scalar < range.First) high = middle - 1;
-            else if (scalar > range.Last) low = middle + 1;
-            else return (scalar - range.First) % range.Stride is 0 ? new Rune(scalar + range.Delta) : rune;
+            if (scalar < range.First)
+            {
+                high = middle - 1;
+            }
+            else if (scalar > range.Last)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                return (scalar - range.First) % range.Stride is 0 ? new Rune(scalar + range.Delta) : rune;
+            }
         }
 
         return rune;
@@ -962,9 +971,18 @@ internal static class GoUnicode
         {
             var middle = low + ((high - low) / 2);
             var range = WordRanges[middle];
-            if (scalar < range.First) high = middle - 1;
-            else if (scalar > range.Last) low = middle + 1;
-            else return true;
+            if (scalar < range.First)
+            {
+                high = middle - 1;
+            }
+            else if (scalar > range.Last)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                return true;
+            }
         }
 
         return false;

@@ -1,5 +1,5 @@
-using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -27,9 +27,14 @@ internal static class McpMapping
             using var body = JsonDocument.Parse(text);
             var message = String(Lookup(body.RootElement, "error"));
             if (message.Length is 0)
+            {
                 message = String(Lookup(body.RootElement, "message"));
+            }
+
             if (message.Length > 0)
+            {
                 return new(provider, CredentialRedactor.Redact(message), tool, CredentialRedactor.Redact(String(Lookup(body.RootElement, "hint"))));
+            }
         }
         catch (JsonException) { /* Plain-text tool failures are also valid MCP. */ }
         return new(provider, text.Length is 0 ? "tool reported an error without details" : CredentialRedactor.Redact(Utf8Prefix(text, 500, "…")), tool);
@@ -38,7 +43,10 @@ internal static class McpMapping
     internal static JsonElement Body(CallToolResult result)
     {
         if (result.StructuredContent is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } structured)
+        {
             return structured.Clone();
+        }
+
         var text = Text(result).Trim();
         try
         { return JsonSerializer.Deserialize<JsonElement>(text); }
@@ -64,7 +72,10 @@ internal static class McpMapping
                 var name = text[1..^1];
                 var replacement = values.GetValueOrDefault(name, "");
                 if (replacement.Length > 0)
+                {
                     result[key] = name is "limit" or "limit_more" or "budget" ? long.Parse(replacement, CultureInfo.InvariantCulture) : replacement;
+                }
+
                 continue;
             }
             var skip = false;
@@ -72,12 +83,17 @@ internal static class McpMapping
             {
                 var placeholder = "{" + name + "}";
                 if (!text.Contains(placeholder, StringComparison.Ordinal))
+                {
                     continue;
+                }
+
                 skip |= replacement.Length is 0;
                 text = text.Replace(placeholder, replacement, StringComparison.Ordinal);
             }
             if (!skip)
+            {
                 result[key] = text;
+            }
         }
         return result;
     }
@@ -85,15 +101,24 @@ internal static class McpMapping
     internal static JsonElement Lookup(JsonElement value, string path)
     {
         if (path.Length is 0)
+        {
             return value;
+        }
+
         foreach (var part in path.Split('.'))
         {
             if (value.ValueKind is JsonValueKind.Object && value.TryGetProperty(part, out var property))
+            {
                 value = property;
+            }
             else if (value.ValueKind is JsonValueKind.Array && int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) && index >= 0 && index < value.GetArrayLength())
+            {
                 value = value[index];
+            }
             else
+            {
                 return default;
+            }
         }
         return value;
     }
@@ -101,7 +126,10 @@ internal static class McpMapping
     internal static (IReadOnlyList<Entry> Entries, bool Found) Collect(JsonElement value, string path)
     {
         if (path.Length is 0)
+        {
             return value.ValueKind is JsonValueKind.Array ? (value.EnumerateArray().Select(item => new Entry(item)).ToArray(), true) : ([], false);
+        }
+
         var current = new List<Entry> { new(value) };
         var parts = path.Split('.');
         for (var i = 0; i < parts.Length; i++)
@@ -112,7 +140,9 @@ internal static class McpMapping
             foreach (var entry in current)
             {
                 if (part != "*")
+                {
                     next.Add(new(Lookup(entry.Value, part), entry.Key));
+                }
                 else if (entry.Value.ValueKind is JsonValueKind.Array)
                 {
                     expanded = true;
@@ -126,11 +156,17 @@ internal static class McpMapping
             }
             current = next;
             if (expanded && current.Count is 0)
+            {
                 return ([], true);
+            }
+
             if (i == parts.Length - 1)
             {
                 if (part == "*")
+                {
                     return (current, true);
+                }
+
                 return (current.Where(entry => entry.Value.ValueKind is JsonValueKind.Array).SelectMany(entry => entry.Value.EnumerateArray().Select(item => new Entry(item, entry.Key))).ToArray(), current.Any(entry => entry.Value.ValueKind is JsonValueKind.Array));
             }
         }
@@ -144,7 +180,10 @@ internal static class McpMapping
         if (pair.Value.ValueKind is JsonValueKind.Number)
         {
             if (got.ValueKind is JsonValueKind.Number)
+            {
                 return got.GetDouble().Equals(pair.Value.GetDouble());
+            }
+
             return got.ValueKind is JsonValueKind.String && double.TryParse(got.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && number.Equals(pair.Value.GetDouble());
         }
         return got.ValueKind is JsonValueKind.Undefined ? pair.Value.ValueKind is JsonValueKind.Null : JsonElement.DeepEquals(got, pair.Value);
@@ -157,13 +196,20 @@ internal static class McpMapping
         var path = Relative(String(Get("path")), root);
         var name = String(Get("name"));
         if (kind is "file" && name.Length is 0 && path.Length > 0)
+        {
             name = Path.GetFileName(path);
+        }
+
         if (entry.Value.ValueKind is JsonValueKind.String && mapping.Fields.Count is 0)
         {
             if (kind is "file")
+            {
                 path = Relative(entry.Value.GetString()!, root);
+            }
             else
+            {
                 name = entry.Value.GetString()!;
+            }
         }
         var relatedName = String(Get("related_name"));
         var relatedPath = Relative(String(Get("related_path")), root);
@@ -196,18 +242,25 @@ internal static class McpMapping
     {
         var names = pattern.GetGroupNames().Where(name => !int.TryParse(name, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)).ToArray();
         foreach (Match match in pattern.Matches(text))
+        {
             yield return new(JsonSerializer.SerializeToElement(names.ToDictionary(name => name, name => WebUtility.HtmlDecode(match.Groups[name].Value), StringComparer.Ordinal)));
+        }
     }
 
     internal static string Relative(string path, string root)
     {
         if (path.Length is 0)
+        {
             return "";
+        }
+
         if (Path.IsPathFullyQualified(path))
         {
             var relative = Path.GetRelativePath(root, path);
             if (!relative.StartsWith("..", StringComparison.Ordinal))
+            {
                 path = relative;
+            }
         }
         path = path.StartsWith("./", StringComparison.Ordinal) ? path[2..] : path;
         return path.Replace(Path.DirectorySeparatorChar, '/');
@@ -232,9 +285,15 @@ internal static class McpMapping
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(text);
         if (bytes.Length <= limit)
+        {
             return text;
+        }
+
         while (limit > 0 && (bytes[limit] & 0xc0) == 0x80)
+        {
             limit--;
+        }
+
         return System.Text.Encoding.UTF8.GetString(bytes, 0, limit) + suffix;
     }
     private static string Kind(string capability) => capability switch

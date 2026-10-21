@@ -20,7 +20,10 @@ public sealed class KnowledgeLevelTests
         var results = KnowledgeLevels.Across([new KnowledgeProject("p1", "legacy", directory.Path, path)], store => store.Search(new MemoryQuery(), Token), Token);
         results.Should().BeEmpty();
         using (var database = HarnessDatabase.OpenReadOnly(path))
+        {
             database.SchemaVersion().Should().Be(4);
+        }
+
         File.ReadAllBytes(path).Should().Equal(before);
         DatabaseBackups.List(path).Should().BeEmpty();
     }
@@ -34,7 +37,10 @@ public sealed class KnowledgeLevelTests
         var levels = new KnowledgeLevels(Path.Combine(directory.Path, "config.toml"), new MachineRegistry(Path.Combine(directory.Path, "projects.json")));
         var path = levels.KnowledgePath(workspaces, MemoryScope.Parse("workspace:home"));
         using (var workspace = HarnessDatabase.Open(path, cancellationToken: Token))
+        {
             workspace.SchemaVersion().Should().Be(19);
+        }
+
         Directory.CreateDirectory(Path.Combine(directory.Path, "knowledge", "user.db"));
         using var project = HarnessDatabase.Open(Path.Combine(directory.Path, "project.db"), cancellationToken: Token);
         var failure = FluentActions.Invoking(() => levels.OpenLayers(new MemoryStore(project), "p1", Token)).Should().Throw<Exception>().Which;

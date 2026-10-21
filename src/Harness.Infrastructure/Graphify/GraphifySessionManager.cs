@@ -44,7 +44,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         get
         {
             if (_options.SessionDirectory.Length > 0)
+            {
                 return Path.GetFullPath(_options.SessionDirectory);
+            }
+
             var folder = OperatingSystem.IsWindows() ? Environment.SpecialFolder.LocalApplicationData : Environment.SpecialFolder.ApplicationData;
             return Path.Combine(Environment.GetFolderPath(folder), "Graphify.CSharp", "sessions");
         }
@@ -84,7 +87,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
                 catch (Exception readError) when (readError is IOException or OperationCanceledException or InvalidDataException) { /* Observe both readers after termination. */ }
                 cancellationToken.ThrowIfCancellationRequested();
                 if (deadline.IsCancellationRequested)
+                {
                     throw new TimeoutException("graphify command timed out", error);
+                }
+
                 throw;
             }
         }
@@ -94,7 +100,9 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
     {
         byte[] bytes;
         if (!recent)
+        {
             bytes = await RunAsync(["ps", "--json"], cancellationToken).ConfigureAwait(false);
+        }
         else
         {
             await _listGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -119,9 +127,15 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
             var starting = records["starting"]![root];
             var by = record?["started_by"]?.GetValue<string>() ?? "";
             if (record is null && starting?["pid"]?.GetValue<int>() == row.ProcessId)
+            {
                 by = starting["by"]?.GetValue<string>() ?? "";
+            }
+
             lock (_observations)
+            {
                 _pids[row.SessionId] = row.ProcessId;
+            }
+
             sessions.Add(new() { Id = row.SessionId, Pid = row.ProcessId, Reachable = row.Reachability is "reachable", State = row.LifecycleState, Ready = row.Ready, Stage = row.Stage, Root = root, Input = row.InputPath, MemoryBytes = row.WorkingSetBytes, UptimeMs = row.UptimeMs, StartedBy = by, LastQuery = record?["last_query"]?.GetValue<string>() ?? "", DiscoveryIncomplete = record?["discovery_incomplete"]?.GetValue<string>() ?? "", LoadTookMs = records["load_ms"]![root]?.GetValue<long>() ?? 0 });
         }
         return sessions.OrderBy(session => session.Root, StringComparer.Ordinal).ThenBy(session => session.Id, StringComparer.Ordinal).ToArray();
@@ -132,10 +146,16 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(OperatingSystem.IsWindows() ? Root.ToUpperInvariant() : Root)));
         await using var lease = await GraphifyRecords.LockAsync(Path.Combine(Path.GetDirectoryName(_recordsPath)!, "graphify-start-" + key + ".lock"), TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
         if ((await ListAsync(false, cancellationToken).ConfigureAwait(false)).Any(session => session.Reachable && GraphifyDiscovery.PathComparer.Equals(session.Root, Root)))
+        {
             return null;
+        }
+
         var pending = _records.Load()["starting"]![Root];
         if (pending?["pid"]?.GetValue<int>() is { } pid && ProcessAlive(pid))
+        {
             return null;
+        }
+
         var (arguments, _) = GraphifyDiscovery.WatchArguments(Root, _options.WatchArguments);
         var log = LogPath();
         StorageFiles.CreateDirectory(Path.GetDirectoryName(log)!);
@@ -163,26 +183,41 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         foreach (var session in await ListAsync(false, cancellationToken).ConfigureAwait(false))
         {
             if (session.Reachable || ProcessAlive(session.Pid) || session.Id.Length is 0 || session.Id is "." or ".." || session.Id.IndexOfAny(['/', '\\', ':', '\0']) >= 0)
+            {
                 continue;
+            }
+
             if (!GraphifyDiscovery.PathComparer.Equals(session.Root, Root) && Directory.Exists(session.Root))
+            {
                 continue;
+            }
+
             var path = Path.Combine(SessionDirectory, session.Id + ".json");
             try
             {
                 var before = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
                 using var data = JsonDocument.Parse(before);
                 if (data.RootElement.GetProperty("session_id").GetString() != session.Id || data.RootElement.GetProperty("process_id").GetInt32() != session.Pid || ProcessAlive(session.Pid))
+                {
                     continue;
+                }
+
                 var current = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
                 if (!before.AsSpan().SequenceEqual(current))
+                {
                     continue;
+                }
+
                 File.Delete(path);
                 removed++;
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or InvalidOperationException) { /* A changed, busy or unverifiable descriptor is preserved. */ }
         }
         if (removed > 0)
+        {
             await ChangedAsync().ConfigureAwait(false);
+        }
+
         return removed;
     }
 
@@ -193,7 +228,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         foreach (var session in sessions)
         {
             if (session.StartedBy.Length is 0 || !session.Reachable || !DateTimeOffset.TryParse(session.LastQuery, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at) || _clock.GetUtcNow() - at < idle)
+            {
                 continue;
+            }
+
             try
             { await StopAsync(session.Id, cancellationToken).ConfigureAwait(false); stopped.Add(session.Id); }
             catch (IOException) { /* Other sessions can still be swept. */ }
@@ -202,7 +240,9 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         await _records.UpdateAsync(records =>
         {
             foreach (var id in records["sessions"]!.AsObject().Select(pair => pair.Key).Where(id => !live.Contains(id)).ToArray())
+            {
                 records["sessions"]!.AsObject().Remove(id);
+            }
         }, cancellationToken).ConfigureAwait(false);
         return stopped;
     }
@@ -214,7 +254,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         {
             var now = _clock.GetUtcNow();
             if (_touched.TryGetValue(id, out var at) && now - at < TimeSpan.FromMinutes(1))
+            {
                 return Task.CompletedTask;
+            }
+
             _touched[id] = now;
             pid = _pids.GetValueOrDefault(id);
         }
@@ -235,7 +278,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         lock (_observations)
         {
             if (_discovery.TryGetValue(id, out var last) && last == reason)
+            {
                 return Task.CompletedTask;
+            }
+
             _discovery[id] = reason;
         }
         return _records.UpdateAsync(records =>
@@ -244,9 +290,13 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
             if (record is null)
             { record = new(); records["sessions"]![id] = record; }
             if (reason.Length is 0)
+            {
                 record.Remove("discovery_incomplete");
+            }
             else
+            {
                 record["discovery_incomplete"] = reason;
+            }
         }, cancellationToken);
     }
 
@@ -257,7 +307,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         {
             using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             if (file.Length > 8192)
+            {
                 file.Seek(-8192, SeekOrigin.End);
+            }
+
             using var reader = new StreamReader(file);
             var tail = reader.ReadToEnd().Trim();
             return tail.Length is 0 ? "see " + path : CredentialRedactor.Redact(tail.Split('\n')[^1]);
@@ -269,7 +322,10 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
     public static bool ProcessAlive(int pid)
     {
         if (pid <= 0)
+        {
             return true; // Unknown identity cannot authorize descriptor removal.
+        }
+
         try
         { using var process = Process.GetProcessById(pid); return !process.HasExited; }
         catch (ArgumentException) { return false; }

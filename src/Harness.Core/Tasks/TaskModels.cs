@@ -33,17 +33,34 @@ public sealed record TaskDefinition
     public void Validate()
     {
         if (!TaskWorkflow.ValidId(Id))
+        {
             throw new ArgumentException($"invalid task id {TaskWorkflow.Quote(Id)} (want e.g. HAR-0024)");
+        }
+
         if (Title.Length is 0)
+        {
             throw new ArgumentException($"{Id}: title is required");
+        }
+
         if (!TaskWorkflow.Types.Contains(Type, StringComparer.Ordinal))
+        {
             throw new ArgumentException($"{Id}: invalid type {TaskWorkflow.Quote(Type)} (want one of {string.Join(", ", TaskWorkflow.Types)})");
+        }
+
         if (TaskWorkflow.PriorityRank(Priority) is 4)
+        {
             throw new ArgumentException($"{Id}: invalid priority {TaskWorkflow.Quote(Priority)} (want low, medium, high or critical)");
+        }
+
         if (DependsOn.Contains(Id, StringComparer.Ordinal))
+        {
             throw new ArgumentException($"{Id}: depends on itself");
+        }
+
         if (Status is not ("" or "backlog" or "ready" or "done" or "blocked"))
+        {
             throw new ArgumentException($"{Id}: initial status {TaskWorkflow.Quote(Status)} not allowed in a backlog file (use backlog, done or blocked)");
+        }
     }
 }
 

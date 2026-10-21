@@ -18,13 +18,19 @@ public static class DeclarationReader
         {
             var regex = Path.GetExtension(file).ToUpperInvariant() switch { ".CS" => CSharp, ".GO" => Go, ".TS" or ".TSX" or ".JS" or ".MJS" => TypeScript, _ => null };
             if (regex is null || TaskParsing.IsTestFile(file) || EcosystemReader.Vendored(file) || file.EndsWith(".d.ts", StringComparison.Ordinal))
+            {
                 continue;
+            }
+
             var lines = AnalysisRepository.Lines(repository.Read(file));
             for (var index = 0; index < lines.Length; index++)
             {
                 var match = regex.Match(lines[index]);
                 if (!match.Success)
+                {
                     continue;
+                }
+
                 var kind = string.Join(' ', match.Groups[1].Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
                 var name = match.Groups[2].Value;
                 List<string> bases = [];
@@ -37,9 +43,14 @@ public static class DeclarationReader
                 {
                     var rest = lines[index][match.Length..];
                     if (regex == CSharp && CSharpBases.Match(rest) is { Success: true } cs)
+                    {
                         bases.AddRange(BaseNames(cs.Groups[1].Value));
+                    }
+
                     if (regex == TypeScript)
+                    {
                         bases.AddRange(TypeScriptBases.Matches(rest).SelectMany(ts => BaseNames(ts.Groups[1].Value.Replace("implements", ",", StringComparison.Ordinal).Replace("extends", ",", StringComparison.Ordinal))));
+                    }
                 }
                 result.Add(new(name, kind, file, index + 1, bases.Count is 0 ? null : bases));
             }
@@ -52,6 +63,7 @@ public static class DeclarationReader
         var depth = 0;
         var start = 0;
         for (var index = 0; index < list.Length; index++)
+        {
             switch (list[index])
             {
                 case '<' or '(':
@@ -65,6 +77,8 @@ public static class DeclarationReader
                     start = index + 1;
                     break;
             }
+        }
+
         Add(list[start..]);
         return result;
         void Add(string text)
@@ -72,10 +86,15 @@ public static class DeclarationReader
             text = text.Trim();
             var end = text.IndexOfAny(['<', '(', ' ']);
             if (end >= 0)
+            {
                 text = text[..end];
+            }
+
             text = text[(text.LastIndexOf('.') + 1)..];
             if (text.Length > 0 && text is not ("implements" or "extends"))
+            {
                 result.Add(text);
+            }
         }
     }
 }

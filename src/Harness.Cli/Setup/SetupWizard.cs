@@ -22,7 +22,10 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
     public WizardResult Handle(string key)
     {
         if (key is "q" or "escape" or "cancel")
+        {
             return WizardResult.Cancel;
+        }
+
         if (key is "b" or "left" or "backspace")
         {
             Step = Math.Max(0, Step - 1);
@@ -30,7 +33,10 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
             return WizardResult.Continue;
         }
         if (Reviewing)
+        {
             return key is "enter" or "y" ? WizardResult.Apply : WizardResult.Continue;
+        }
+
         var items = Steps[Step].Items;
         switch (key)
         {
@@ -42,7 +48,10 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
                 break;
             case " " or "x":
                 if (items.Count > 0)
+                {
                     items[Cursor].Want = !items[Cursor].Want;
+                }
+
                 break;
             case "enter" or "right":
                 Step++;
@@ -62,7 +71,9 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
             await output.WriteLineAsync((item.Change < 0 ? "Removing " : "Installing ") + item.Label);
             var result = await item.Apply(item.Change > 0);
             if (result is not 0)
+            {
                 code = result;
+            }
         }
         return code;
     }
@@ -75,22 +86,34 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
         {
             var changes = Changes.ToArray();
             if (changes.Length is 0)
+            {
                 await Line("  Nothing to change.");
+            }
+
             foreach (var item in changes)
+            {
                 await Line($"  {(item.Change > 0 ? "+ install" : "- remove ")}  {item.Label,-28} {item.Where}");
+            }
+
             await Line("enter apply · b back · q cancel");
             return;
         }
         var step = Steps[Step];
         await Line("  " + step.Note);
         if (step.Items.Count is 0)
+        {
             await Line("  (nothing to set up here)");
+        }
+
         for (var i = 0; i < step.Items.Count; i++)
         {
             var item = step.Items[i];
             var state = item.Installed ? "installed" : "not installed";
             if (item.Change is not 0)
+            {
                 state += item.Change > 0 ? " → install" : " → remove";
+            }
+
             await Line($"{(i == Cursor ? "> " : "  ")}{(item.Want ? "[x]" : "[ ]")} {item.Label,-28} {state,-26} {item.Where}");
         }
         await Line("↑/↓ move · space toggle · enter next · b back · q cancel");
@@ -101,7 +124,9 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
         {
             await output.WriteLineAsync(step.Title + ":");
             foreach (var item in step.Items)
+            {
                 await output.WriteLineAsync($"  {item.Label,-28} {(item.Installed ? "installed" : "not installed"),-16} {item.Where}");
+            }
         }
         await output.WriteLineAsync("\nRun it in a terminal to choose, or use the flags (" + Title + " --help).");
     }
@@ -137,7 +162,10 @@ internal class SetupTerminal
                 await output.WriteAsync("\x1b[H\x1b[2J");
                 await wizard.RenderAsync(output, Console.WindowWidth);
                 while (!Console.KeyAvailable)
+                {
                     await Task.Delay(25, token);
+                }
+
                 result = wizard.Handle(ReadKey());
             }
         }

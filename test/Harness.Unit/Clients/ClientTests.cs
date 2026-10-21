@@ -4,9 +4,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
+using Harness.Cli.Setup;
 using Harness.Core.Instructions;
 using Harness.Infrastructure.Clients;
-using Harness.Cli.Setup;
 using Xunit;
 
 namespace Harness.Unit.Clients;
@@ -47,7 +47,10 @@ public sealed class ClientTests
         Directory.CreateDirectory(Path.GetDirectoryName(target.Path)!);
         await File.WriteAllTextAsync(target.Path, original, new UTF8Encoding(false), Token);
         if (update)
+        {
             configuration.Install(target, new("/old/harness", ["mcp"]));
+        }
+
         var before = FileEditor.Read(target.Path);
         var spec = new ServerSpec("/path with spaces/λ/harness", ["mcp", "--project", "/project with space"]);
         var expected = await OracleAsync(new { mode = "install", client, scope, root = tree.Root, claudeDir = tree.Claude, codexDir = tree.Codex, spec.Command, args = spec.Args });
@@ -88,11 +91,17 @@ public sealed class ClientTests
             await File.WriteAllTextAsync(Path.Combine(tree.Root, "CLAUDE.md"), "# My guidance\r\n" + suffix, Token);
         }
         if (existing is "agents" or "both")
+        {
             await File.WriteAllTextAsync(Path.Combine(tree.Root, "AGENTS.md"), "# Agents\r\n", Token);
+        }
+
         var expected = await OracleAsync(new { mode = "instructions", root = tree.Root, codex });
         var actual = ProjectInstructions.Project(tree.Root, codex, true);
         for (var i = 0; i < actual.Count; i++)
+        {
             actual[i].After.Should().Be(expected![i]!["After"]!.GetValue<string>(), existing);
+        }
+
         ProjectInstructions.Project(tree.Root, codex);
         ProjectInstructions.Project(tree.Root, codex).All(c => c.Action is "unchanged" or "absent").Should().BeTrue();
         ProjectInstructions.ClaudeReaches(tree.Root).Should().Be((true, true));
@@ -158,7 +167,10 @@ public sealed class ClientTests
         var invalid = () => FileEditor.Apply(path, (_, _) => new("after", "update"));
         invalid.Should().Throw<DecoderFallbackException>();
         if (OperatingSystem.IsWindows())
+        {
             return;
+        }
+
         File.WriteAllText(path, "before");
         File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.GroupWrite);
         var link = Path.Combine(tree.Root, "link");
@@ -226,7 +238,10 @@ public sealed class ClientTests
         var target = config.Targets("claude-code", "user", tree.Root)[0];
         List<string> backups = [];
         for (var i = 0; i < 12; i++)
+        {
             backups.Add(config.Install(target, new("harness", ["mcp", i.ToString(System.Globalization.CultureInfo.InvariantCulture)])).Backup);
+        }
+
         backups.Should().OnlyHaveUniqueItems();
         config.Install(config.Targets("claude-code", "project", tree.Root)[0], new("harness", ["mcp"]));
         config.Install(config.Targets("claude-code", "local", tree.Root)[0], new("harness", ["mcp"]));

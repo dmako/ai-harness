@@ -25,7 +25,10 @@ public sealed class KnowledgeLevels(string globalConfigurationPath, MachineRegis
         { file = JsonNode.Parse(File.ReadAllText(path, StrictUtf8))?.AsObject() ?? throw new InvalidDataException("Workspace list is null."); }
         catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException) { return []; }
         if (file["workspaces"] is null)
+        {
             return [];
+        }
+
         return file["workspaces"]!.AsArray().Select(node =>
         {
             var workspace = node!.AsObject();
@@ -40,14 +43,23 @@ public sealed class KnowledgeLevels(string globalConfigurationPath, MachineRegis
         ArgumentNullException.ThrowIfNull(scope);
         var directory = Path.Combine(_directory, "knowledge");
         if (scope.Kind is "user")
+        {
             return Path.Combine(directory, "user.db");
+        }
+
         if (scope.Kind is not "workspace")
+        {
             throw new ArgumentException($"{scope} is not a workspace or user scope");
+        }
+
         var workspace = workspaces.FirstOrDefault(workspace => workspace.Name == scope.Value)
             ?? throw new InvalidOperationException($"workspace \"{scope.Value}\": no such workspace");
         // Workspace IDs are filenames, never paths supplied by a corrupt machine file.
         if (workspace.Id.Length is 0 || workspace.Id.IndexOfAny(['/', '\\', ':']) >= 0 || workspace.Id is "." or "..")
+        {
             throw new InvalidDataException("Invalid workspace identifier in workspace list.");
+        }
+
         return Path.Combine(directory, "workspace-" + workspace.Id + ".db");
     }
 
@@ -58,7 +70,9 @@ public sealed class KnowledgeLevels(string globalConfigurationPath, MachineRegis
             var workspace = workspaces.FirstOrDefault(workspace => workspace.Name == scope.Value)
                 ?? throw new InvalidOperationException($"workspace \"{scope.Value}\": no such workspace ('harness workspace list')");
             if (projectId.Length is not 0 && !workspace.Members.Contains(projectId, StringComparer.Ordinal))
+            {
                 throw new InvalidOperationException($"this project is not a member of workspace \"{workspace.Name}\" ('harness workspace join {workspace.Name}')");
+            }
         }
         return HarnessDatabase.Open(KnowledgePath(workspaces, scope), cancellationToken: cancellationToken);
     }
@@ -152,7 +166,10 @@ public sealed class OpenKnowledgeLayers(MemoryStore project) : IDisposable
     public void Dispose()
     {
         foreach (var database in _databases)
+        {
             database.Dispose();
+        }
+
         _databases.Clear();
         _levels.Clear();
     }

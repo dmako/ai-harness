@@ -22,7 +22,9 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
         {
             var build = reader.Read();
             if (build.Projects.Count > 0)
+            {
                 return build;
+            }
         }
         return null;
     }
@@ -44,7 +46,10 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
                 catch (XmlException) { paths = []; }
             }
             else
+            {
                 paths = AnalysisRepository.Lines(repository.Read(file)).Select(line => SolutionProject.Match(line.Trim())).Where(match => match.Success && Path.GetExtension(match.Groups[1].Value).Equals(".csproj", StringComparison.OrdinalIgnoreCase)).Select(match => match.Groups[1].Value);
+            }
+
             foreach (var path in paths)
             {
                 var relative = Join(Directory(file), path.Replace('\\', '/'));
@@ -70,10 +75,16 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             var offered = ecosystem.DotnetPackage(file);
             var version = Prop("PackageVersion");
             if (version.Length is 0)
+            {
                 version = Prop("Version");
+            }
+
             var unit = new BuildUnit { Name = name, Path = file, Kind = xml is null ? "library" : kind, Package = xml is not null && offered.Published ? offered.Name : null, Version = xml is not null && offered.Published ? Empty(version) : null };
             if (included.TryGetValue(file, out var solutionPaths))
+            {
                 unit.Solutions.AddRange(solutionPaths);
+            }
+
             foreach (var reference in evaluated.References.DistinctBy(reference => reference.Path, StringComparer.Ordinal))
             { unit.References.Add(reference.Path); (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[reference.Path] = reference.At; }
             unit.Packages.AddRange(evaluated.Packages.Select(package => new BuildPackage(package.Name, Empty(package.Version), package.Frameworks.Count is 0 ? null : package.Frameworks, package.Conditional, package.Unresolved)));
@@ -104,30 +115,44 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
                 {
                     package = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(1) ?? "";
                     if (package is "main")
+                    {
                         unit.Kind = "entry";
+                    }
+
                     continue;
                 }
                 if (line.StartsWith("import (", StringComparison.Ordinal))
                 { block = true; continue; }
                 if (block && line is ")")
+                {
                     break;
+                }
+
                 if (block || line.StartsWith("import ", StringComparison.Ordinal))
                 {
                     var import = GoImport.Match(line);
                     if (!import.Success)
+                    {
                         continue;
+                    }
+
                     var path = import.Groups[1].Value;
                     if (module.Length > 0 && (path == module || path.StartsWith(module + "/", StringComparison.Ordinal)))
                     {
                         var target = path[module.Length..].TrimStart('/');
                         if (target.Length is 0)
+                        {
                             target = ".";
+                        }
+
                         if (target != dir && !unit.References.Contains(target, StringComparer.Ordinal))
                         { unit.References.Add(target); (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[target] = file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture); }
                         var internalAt = ("/" + target + "/").LastIndexOf("/internal/", StringComparison.Ordinal);
                         var parent = internalAt < 0 ? "" : ("/" + target + "/")[..internalAt].Trim('/');
                         if (target != dir && parent.Length > 0 && dir != parent && !dir.StartsWith(parent + "/", StringComparison.Ordinal))
+                        {
                             internals.Add(new() { Kind = "internal-import", Level = "problem", Title = dir + " imports " + target + " from outside its tree", Why = "Go allows an internal package to be imported only from below the folder that holds internal/; this does not build.", Fix = "Move the importing package below the internal package's parent, or move the package out of internal/.", Project = dir, Evidence = [file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture)], Key = ArchitectureAnalyzer.Key("internal-import", dir, target) });
+                        }
                     }
                     else if (path.Split('/')[0].Contains('.', StringComparison.Ordinal))
                     {
@@ -136,7 +161,9 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
                     }
                 }
                 else if (package.Length > 0 && new[] { "func ", "type ", "var ", "const " }.Any(prefix => line.StartsWith(prefix, StringComparison.Ordinal)))
+                {
                     break;
+                }
             }
         }
         foreach (var unit in units.Values)
@@ -145,7 +172,9 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             unit.References.Sort(WorkspaceNameComparer.Instance);
             var name = Path.GetFileName(unit.Path);
             if (unit.Kind is "library" && (name.EndsWith("test", StringComparison.Ordinal) || name is "testutil" or "testhelpers"))
+            {
                 unit.Kind = "test";
+            }
         }
         return new("go", "package", [], units.Values.OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray()) { Extra = internals };
     }

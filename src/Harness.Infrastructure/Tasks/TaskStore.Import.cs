@@ -14,18 +14,31 @@ public sealed partial class TaskStore
         {
             d.Validate();
             if (!seen.Add(d.Id))
+            {
                 throw new ArgumentException($"task {d.Id} is defined twice");
+            }
         }
         return Plan((c, t) =>
             {
                 var (existing, edges) = LoadGraph(c, t);
                 foreach (var d in defs)
+                {
                     edges[d.Id] = d.DependsOn;
+                }
+
                 foreach (var d in defs)
+                {
                     if (d.DependsOn.FirstOrDefault(dep => !seen.Contains(dep) && !existing.Contains(dep)) is { } missing)
+                    {
                         throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
+                    }
+                }
+
                 if (FindCycle(edges) is { } cycle)
+                {
                     throw new ArgumentException("dependency cycle: " + string.Join(" -> ", cycle));
+                }
+
                 var stamp = Stamp();
                 List<string> added = [], updated = [], unchanged = [];
                 for (var i = 0; i < defs.Length; i++)
@@ -35,12 +48,19 @@ public sealed partial class TaskStore
                     if (!existing.Contains(d.Id))
                     { Insert(c, t, d, i, source, stamp, "imported", "import", source); added.Add(d.Id); }
                     else if (UpdateDefinition(c, t, d, i, source, stamp))
+                    {
                         updated.Add(d.Id);
+                    }
                     else
+                    {
                         unchanged.Add(d.Id);
+                    }
                 }
                 foreach (var d in defs)
+                {
                     ReplaceDependencies(c, t, d);
+                }
+
                 return new TaskImportResult(added, updated, unchanged, existing.Where(id => !seen.Contains(id)).Order(StringComparer.Ordinal).ToArray(), RecomputeReadiness(c, t));
             }, dryRun, cancellationToken);
     }
@@ -51,20 +71,34 @@ public sealed partial class TaskStore
         Dictionary<string, IReadOnlyList<string>> edges = new(StringComparer.Ordinal);
         using (var command = Command(c, t, "SELECT id FROM tasks"))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
+            {
                 existing.Add(reader.GetString(0));
+            }
+        }
+
         Dictionary<string, List<string>> lists = new(StringComparer.Ordinal);
         using (var command = Command(c, t, "SELECT task_id,depends_on FROM task_dependencies"))
         using (var reader = command.ExecuteReader())
+        {
             while (reader.Read())
             {
                 var id = reader.GetString(0);
                 if (!lists.TryGetValue(id, out var deps))
+                {
                     lists[id] = deps = [];
+                }
+
                 deps.Add(reader.GetString(1));
             }
+        }
+
         foreach (var (id, deps) in lists)
+        {
             edges[id] = deps;
+        }
+
         return (existing, edges);
     }
 
@@ -76,7 +110,10 @@ public sealed partial class TaskStore
         foreach (var node in edges.Keys.Order(StringComparer.Ordinal))
         {
             if (colors.GetValueOrDefault(node) is not 0)
+            {
                 continue;
+            }
+
             Stack<(string Node, bool Exit)> pending = new();
             pending.Push((node, false));
             while (pending.TryPop(out var entry))
@@ -84,15 +121,25 @@ public sealed partial class TaskStore
                 if (entry.Exit)
                 { colors[entry.Node] = 2; path.RemoveAt(path.Count - 1); continue; }
                 if (colors.GetValueOrDefault(entry.Node) is 2)
+                {
                     continue;
+                }
+
                 if (colors.GetValueOrDefault(entry.Node) is 1)
+                {
                     return [.. path.Skip(path.IndexOf(entry.Node)), entry.Node];
+                }
+
                 colors[entry.Node] = 1;
                 path.Add(entry.Node);
                 pending.Push((entry.Node, true));
                 if (edges.TryGetValue(entry.Node, out var deps))
+                {
                     foreach (var dep in deps.OrderDescending(StringComparer.Ordinal))
+                    {
                         pending.Push((dep, false));
+                    }
+                }
             }
         }
         return null;
@@ -109,7 +156,10 @@ public sealed partial class TaskStore
             ("$blocked", status is "blocked" ? "imported as blocked" : null), ("$summary", status is "done" ? "imported as done from " + source : null),
             ("$by", status is "done" ? "import" : null), ("$done", status is "done" ? stamp : null), ("$source", source), ("$ordinal", ordinal), ("$stamp", stamp));
         for (var i = 0; i < d.Acceptance.Count; i++)
+        {
             InsertCriterion(c, t, d.Id, i + 1, d.Acceptance[i], status is "done" ? "n/a" : "pending", status is "done" ? "imported as done; see completion notes" : "");
+        }
+
         AddEvent(c, t, d.Id, kind, "", status, actor, detail, stamp);
     }
 
@@ -126,7 +176,10 @@ public sealed partial class TaskStore
         if (same)
         {
             if (cur.Ordinal != ordinal)
+            {
                 Execute(c, t, "UPDATE tasks SET ordinal=$ordinal WHERE id=$id", ("$ordinal", ordinal), ("$id", d.Id));
+            }
+
             return false;
         }
         Execute(c, t, """
@@ -150,6 +203,8 @@ public sealed partial class TaskStore
     {
         Execute(c, t, "DELETE FROM task_dependencies WHERE task_id=$id", ("$id", d.Id));
         foreach (var dep in d.DependsOn)
+        {
             Execute(c, t, "INSERT INTO task_dependencies(task_id,depends_on) VALUES($id,$dep)", ("$id", d.Id), ("$dep", dep));
+        }
     }
 }

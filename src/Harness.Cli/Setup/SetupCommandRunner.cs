@@ -1,6 +1,6 @@
-using Harness.Cli.Memory;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Harness.Cli.Memory;
 using Harness.Core.Instructions;
 using Harness.Infrastructure.Clients;
 using Harness.Infrastructure.Git;
@@ -16,11 +16,20 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
     public Task<int> UninstallAsync(UninstallSettings settings, CancellationToken token) => GuardAsync("uninstall", async () =>
     {
         if (settings.DeleteData && !settings.All)
+        {
             return await UsageAsync("uninstall", "--delete-data only goes with --all");
+        }
+
         if (settings.DeleteData && !invocation.ExplicitProject)
+        {
             return await UsageAsync("uninstall", "--delete-data needs an explicit --project <repository>");
+        }
+
         if (invocation.Bare)
+        {
             return await WizardAsync("harness uninstall", settings.Project, token);
+        }
+
         return settings.All ? await UninstallAllAsync(settings, token) : await EntriesAsync(settings, null, token);
     });
     public Task<int> InstructionsAsync(InstructionsSettings settings, CancellationToken token) => GuardAsync("instructions", async () =>
@@ -33,13 +42,18 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
             await EditOutput.PrintAsync(output, Path.GetRelativePath(root, change.Path), words, change, settings.DryRun);
         }
         if (settings.DryRun)
+        {
             await DryRunAsync();
+        }
+
         return 0;
     });
     private async Task<int> InstallFlagsAsync(InstallSettings settings, CancellationToken token)
     {
         if (settings.Scope is "all")
+        {
             return await UsageAsync("install", "choose one --scope (user, project or local)");
+        }
         // Validate the selected clients/scopes before inspecting an executable.
         Clients.Targets(settings.Client, settings.Scope, "");
         var spec = Executable(settings.Command);
@@ -64,9 +78,14 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
             { failed = true; await output.WriteLineAsync(label + ": error: " + exception.Message); }
         }
         if (settings.DryRun)
+        {
             await DryRunAsync();
+        }
         else if (spec is not null && !failed)
+        {
             await output.WriteLineAsync("\nRestart Claude Code / Codex sessions to pick up changes.");
+        }
+
         return failed ? 1 : 0;
     }
     private static async Task<string> RootAsync(string directory, string scope, CancellationToken token)
@@ -84,16 +103,26 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
             command = Environment.ProcessPath ?? throw new IOException("cannot locate the running executable");
             var entryPoint = Environment.GetCommandLineArgs()[0];
             if (Path.GetFileNameWithoutExtension(command).Equals("dotnet", StringComparison.OrdinalIgnoreCase) && Path.GetExtension(entryPoint).Equals(".dll", StringComparison.OrdinalIgnoreCase))
+            {
                 args = [Path.GetFullPath(entryPoint), "mcp"];
+            }
             else
+            {
                 command = FileEditor.Resolve(command);
+            }
+
             var relative = Path.GetRelativePath(Path.GetTempPath(), command);
             if (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+            {
                 throw new IOException("this binary (" + command + ") is a temporary build; install it first or pass --command");
+            }
         }
         command = Path.GetFullPath(command);
         if (!ClientConfiguration.Executable(command))
+        {
             throw new IOException(command + " is not an executable file");
+        }
+
         return new(command, args);
     }
     internal string HomeRelative(string command)
@@ -124,44 +153,73 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
         var code = await EntriesAsync(new ClientSettings { Client = "all", Scope = repository is null ? "user" : "all", Project = settings.Project, DryRun = settings.DryRun }, null, token);
         await output.WriteLineAsync("\n== Hooks");
         if (await ApplyRemovalsAsync(SetupCleanup.ClientHooks(_paths, repository?.Root, settings.DryRun), new("harness hook", "installed, unchanged", "not installed, nothing to remove"), settings.DryRun) is not 0)
+        {
             code = 1;
+        }
+
         if (repository is not null)
         {
             if (await ApplyRemovalsAsync(await SetupCleanup.GitHooksAsync(repository, settings.DryRun, token), new("harness hook block", "installed", "not installed"), settings.DryRun) is not 0)
+            {
                 code = 1;
+            }
+
             await output.WriteLineAsync("\n== Agent instructions");
             var result = await InstructionsAsync(new() { Project = repository.Root, Remove = true, DryRun = settings.DryRun }, token);
             if (result is not 0)
+            {
                 code = result;
+            }
         }
         await output.WriteLineAsync("\n== Shell completion");
         if (await ApplyRemovalsAsync(await SetupCleanup.CompletionsAsync(_paths.Home, settings.DryRun, token), new("harness completion", "installed", "not installed"), settings.DryRun, onlyChanges: true) is not 0)
+        {
             code = 1;
+        }
+
         await output.WriteLineAsync("\n== Project data");
         if (repository is null)
+        {
             await output.WriteLineAsync("not in a Git repository: no project data here");
+        }
         else
         {
             var directory = Path.GetFullPath(Path.Combine(repository.StateRoot, ".harness"));
             if (!settings.DeleteData)
+            {
                 await output.WriteLineAsync("kept " + directory + " (add --delete-data to remove it)");
+            }
             else if (settings.DryRun)
+            {
                 await output.WriteLineAsync("would delete " + directory + " and forget the project");
+            }
             else
             {
                 // Never follow a substituted state-directory link during recursive removal.
                 if (FileEditor.Resolve(directory) != directory || Path.GetDirectoryName(directory) != Path.GetFullPath(repository.StateRoot))
+                {
                     throw new IOException("refusing to delete a redirected project data directory");
+                }
+
                 if (Directory.Exists(directory))
+                {
                     Directory.Delete(directory, recursive: true);
+                }
+
                 foreach (var project in lifecycle.Registry.Load()["projects"]!.AsArray().OfType<JsonObject>().Where(p => p["root"]?.GetValue<string>() == repository.StateRoot))
+                {
                     await lifecycle.Registry.ForgetAsync(project["id"]!.GetValue<string>(), token);
+                }
+
                 await output.WriteLineAsync("deleted " + directory + " and forgot the project");
             }
         }
         await output.WriteLineAsync("\nThe binaries stay: delete harness (and harness-graphify) from your PATH to finish.");
         if (settings.DryRun)
+        {
             await DryRunAsync();
+        }
+
         return code;
     }
     private async Task<int> ApplyRemovalsAsync(IEnumerable<SetupCleanup.Removal> removals, EditWords words, bool dryRun, bool onlyChanges = false)
@@ -173,7 +231,9 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
             {
                 var change = removal.Apply();
                 if (!onlyChanges || change.Writes)
+                {
                     await EditOutput.PrintAsync(output, change.Path, words, change, dryRun);
+                }
             }
             catch (Exception exception) when (EditError(exception))
             { code = 1; await output.WriteLineAsync(removal.Path + ": error: " + exception.Message); }

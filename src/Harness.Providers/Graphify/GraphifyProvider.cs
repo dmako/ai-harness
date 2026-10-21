@@ -42,7 +42,10 @@ public sealed class GraphifyProvider : IProvider
         lock (_gate)
         {
             if (_warming || _closed)
+            {
                 return;
+            }
+
             _warming = true;
             _warm = WarmAsync();
         }
@@ -60,9 +63,14 @@ public sealed class GraphifyProvider : IProvider
             try
             {
                 if (ReadSession().Length > 0 || _watch is not null)
+                {
                     return;
+                }
+
                 if ((await MineAsync(linked.Token).ConfigureAwait(false)).Count is 0)
+                {
                     await StartAsync(linked.Token).ConfigureAwait(false);
+                }
             }
             finally { _ensureGate.Release(); }
         }
@@ -73,7 +81,10 @@ public sealed class GraphifyProvider : IProvider
     {
         var watch = await _sessions.StartAsync(token).ConfigureAwait(false);
         if (watch is null)
+        {
             return;
+        }
+
         _watch = watch;
         _load = WatchLoadAsync(watch);
     }
@@ -99,7 +110,10 @@ public sealed class GraphifyProvider : IProvider
     private async Task<string> EnsureAsync(CancellationToken token)
     {
         if (ReadSession() is { Length: > 0 } cached)
+        {
             return cached;
+        }
+
         using var deadline = new CancellationTokenSource(_options.ReadyWait);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token, _lifetime.Token);
         GraphifySession? last = null;
@@ -112,46 +126,74 @@ public sealed class GraphifyProvider : IProvider
             {
                 ObjectDisposedException.ThrowIf(_closed, this);
                 if (ReadSession() is { Length: > 0 } current)
+                {
                     return current;
+                }
+
                 last = Pick(await MineAsync(linked.Token).ConfigureAwait(false));
                 if (last is { Ready: true })
                 {
                     if (_watch?.Id == last.Pid)
+                    {
                         await _sessions.NoteLoadedAsync(last.UptimeMs, linked.Token).ConfigureAwait(false);
+                    }
+
                     lock (_gate)
+                    {
                         _session = last.Id;
+                    }
+
                     return last.Id;
                 }
                 if (last is null && _watch is null)
+                {
                     await StartAsync(linked.Token).ConfigureAwait(false);
+                }
+
                 if (_watch is { Completion.IsCompleted: true })
                 { _watch = null; throw new IOException("graphify-csharp watch exited: " + _sessions.LastLog()); }
                 await Task.Delay(TimeSpan.FromMilliseconds(100), linked.Token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (deadline.IsCancellationRequested && !token.IsCancellationRequested && !_lifetime.IsCancellationRequested) { throw new IOException(Loading(last)); }
-        finally { if (entered) _ensureGate.Release(); }
+        finally { if (entered)
+            {
+                _ensureGate.Release();
+            }
+        }
     }
 
     public async ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default)
     {
         if (ReadSession() is { Length: > 0 } id)
+        {
             return new("ready", "warm session " + Short(id));
+        }
+
         string input;
         try
         { input = _sessions.InputDescription(); }
         catch (Exception error) when (Failure(error)) { return new("unavailable", Safe(error.Message), "choose the solution graphify loads"); }
         if (!probe)
+        {
             return new("idle", "starts on first use (" + input + ")");
+        }
+
         try
         {
             var all = await _sessions.ListAsync(false, cancellationToken).ConfigureAwait(false);
             var mine = Mine(all);
             var stale = all.Count(session => !session.Reachable && (session.Root == _sessions.Root || !Directory.Exists(session.Root)));
             if (stale > 0)
+            {
                 return new("degraded", stale + " stale graphify session(s) (process gone) for this or a deleted root", "harness-graphify --clean --root " + _sessions.Root);
+            }
+
             if (mine.Length > 1)
+            {
                 return new("degraded", mine.Length + " warm sessions for this project; one is enough", string.Join("; ", mine.Where(session => session.Id != Pick(mine)!.Id).Select(session => "graphify-csharp stop " + Short(session.Id))));
+            }
+
             return Pick(mine) switch
             {
                 null => new("idle", "no warm session; the first query starts one (compiles the " + input + ")"),
@@ -209,7 +251,9 @@ public sealed class GraphifyProvider : IProvider
                 bytes += count;
                 truncated |= response.Page?.HasMore is true;
                 foreach (var edge in DecodeItems<Edge>(response).Where(edge => request.Covers(edge.Location?.File ?? "")))
+                {
                     items.Add(new() { Kind = verb is "usages" ? "match" : "symbol", Name = ShortName(edge.Origin?.Label ?? ""), QualifiedName = edge.Origin?.Label, Label = edge.Relation, Path = edge.Location?.File, StartLine = edge.Location?.Line ?? 0, Snippet = "-> " + ShortName(symbol.Label), Provider = Name, Tool = "query " + verb });
+                }
             }
         }
         catch (Exception error) when (Failure(error)) { return new() { Bytes = bytes + ((error as GraphifyQueryException)?.Bytes ?? 0), Items = items, Truncated = truncated, Error = Error(verb, error) }; }
@@ -238,14 +282,26 @@ public sealed class GraphifyProvider : IProvider
                     {
                         var origin = edge.Origin;
                         if (origin is { Id.Length: > 0 } && !seen.Add(origin.Id))
+                        {
                             continue;
+                        }
+
                         if (origin is { Id.Length: > 0 })
+                        {
                             next.Add((origin.Id, TypeKinds.Contains(origin.DeclarationKind)));
+                        }
+
                         var location = origin?.Location is { File.Length: > 0 } definition ? definition : edge.Location;
                         if (location is not { File.Length: > 0 } || !request.Covers(location.File))
+                        {
                             continue;
+                        }
+
                         if (items.Count == limit)
+                        {
                             return new() { Items = items, Bytes = bytes, Truncated = true };
+                        }
+
                         var label = string.IsNullOrEmpty(origin?.Label) ? request.Query : origin.Label;
                         items.Add(new() { Kind = "symbol", Name = ShortName(label), QualifiedName = origin?.Label, Label = edge.Relation.Length is 0 ? "calls" : edge.Relation, Path = location.File, StartLine = location.Line, Depth = depth, Provider = Name, Tool = "query " + verb });
                     }
@@ -277,7 +333,10 @@ public sealed class GraphifyProvider : IProvider
                 if (response.Success)
                 {
                     if (response.Scope?.InputDiscoveryComplete is { } complete)
+                    {
                         await _sessions.NoteDiscoveryAsync(id, complete ? "" : DiscoveryReason((response.Diagnostics ?? []).Select(diagnostic => diagnostic.Message)), token).ConfigureAwait(false);
+                    }
+
                     return (response, bytes);
                 }
                 error = new IOException(response.Error is { } failure ? failure.Code + ": " + failure.Message : "query failed");
@@ -287,18 +346,29 @@ public sealed class GraphifyProvider : IProvider
             {
                 retried = true;
                 lock (_gate)
-                { if (_session == id) _session = ""; }
+                { if (_session == id)
+                    {
+                        _session = "";
+                    }
+                }
                 continue;
             }
             throw new GraphifyQueryException(verb, bytes, error);
         }
     }
 
-    public ValueTask DisposeAsync() { lock (_gate) return new(_close ??= CloseAsync()); }
+    public ValueTask DisposeAsync() { lock (_gate)
+        {
+            return new(_close ??= CloseAsync());
+        }
+    }
     private async Task CloseAsync()
     {
         lock (_gate)
+        {
             _closed = true;
+        }
+
         await _lifetime.CancelAsync().ConfigureAwait(false);
         await _warm.ConfigureAwait(false);
         await _ensureGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
@@ -306,13 +376,19 @@ public sealed class GraphifyProvider : IProvider
         {
             await _load.ConfigureAwait(false);
             if (_watch is not { } watch || !_options.StopOnExit)
+            {
                 return;
+            }
+
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             try
             {
                 var owned = (await _sessions.ListAsync(false, deadline.Token).ConfigureAwait(false)).FirstOrDefault(session => session.Pid == watch.Id);
                 if (owned is not null)
+                {
                     await _sessions.StopAsync(owned.Id, deadline.Token).ConfigureAwait(false);
+                }
+
                 await watch.Completion.WaitAsync(TimeSpan.FromSeconds(3), deadline.Token).ConfigureAwait(false);
             }
             catch (Exception error) when (Failure(error) || error is OperationCanceledException) { watch.Kill(); await watch.Completion.WaitAsync(TimeSpan.FromSeconds(3), CancellationToken.None).ConfigureAwait(false); }
@@ -320,7 +396,11 @@ public sealed class GraphifyProvider : IProvider
         finally { _watch = null; _ensureGate.Release(); _ensureGate.Dispose(); _lifetime.Dispose(); }
     }
 
-    private string ReadSession() { lock (_gate) return _session; }
+    private string ReadSession() { lock (_gate)
+        {
+            return _session;
+        }
+    }
     private async Task<IReadOnlyList<GraphifySession>> MineAsync(CancellationToken token) => Mine(await _sessions.ListAsync(false, token).ConfigureAwait(false));
     private GraphifySession[] Mine(IReadOnlyList<GraphifySession> sessions) => sessions.Where(session => session.Reachable && string.Equals(session.Root, _sessions.Root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)).ToArray();
     private static GraphifySession? Pick(IReadOnlyList<GraphifySession> sessions) => sessions.FirstOrDefault(session => session.Ready) ?? (sessions.Count > 0 ? sessions[0] : null);
@@ -337,16 +417,31 @@ public sealed class GraphifyProvider : IProvider
         List<string> parts = [];
         var loading = "loading" + (session.Stage.Length > 0 ? " (" + session.Stage + ")" : "");
         if (session.Remaining() > TimeSpan.Zero)
+        {
             loading += ", about " + Seconds(session.Remaining()) + " left";
+        }
+
         parts.Add((session.Reachable, session.Ready) switch { (false, _) => "not reachable (process gone)", (_, true) => "ready", _ => loading });
         if (session.MemoryBytes > 0)
+        {
             parts.Add(((double)session.MemoryBytes / (1L << 30)).ToString("F1", CultureInfo.InvariantCulture) + " GB");
+        }
+
         if (session.UptimeMs > 0)
+        {
             parts.Add("up " + Age(TimeSpan.FromMilliseconds(session.UptimeMs)));
+        }
+
         if (DateTimeOffset.TryParse(session.LastQuery, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at))
+        {
             parts.Add("queried " + Age(DateTimeOffset.UtcNow - at) + " ago");
+        }
+
         if (session.DiscoveryIncomplete.Length > 0)
+        {
             parts.Add("discovery incomplete (" + session.DiscoveryIncomplete + "): queries run slow");
+        }
+
         parts.Add(session.StartedBy.Length > 0 ? "started by " + session.StartedBy : "started outside harness");
         return string.Join(", ", parts);
     }
@@ -361,10 +456,16 @@ public sealed class GraphifyProvider : IProvider
     {
         var diagnostic = diagnostics.FirstOrDefault(text => text.Contains("discovery", StringComparison.Ordinal) || text.Contains("provenance", StringComparison.Ordinal));
         if (diagnostic is null)
+        {
             return "graphify gave no reason";
+        }
+
         var match = Regex.Match(diagnostic, @"([\w.\-]+\.(?:targets|props))'", RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
         if (match.Success)
+        {
             return match.Groups[1].Value + " adds items graphify cannot trace";
+        }
+
         return diagnostic.Length > 160 ? diagnostic[..160] + "…" : diagnostic;
     }
     private static IEnumerable<T> DecodeItems<T>(Response response) where T : class
@@ -376,7 +477,9 @@ public sealed class GraphifyProvider : IProvider
             { decoded = item.Deserialize<T>(JsonOptions); }
             catch (JsonException) { continue; }
             if (decoded is not null)
+            {
                 yield return decoded;
+            }
         }
     }
     private sealed record Location(string File = "", int Line = 0);

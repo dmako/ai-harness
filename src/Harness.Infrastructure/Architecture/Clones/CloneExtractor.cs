@@ -18,20 +18,30 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
     public IReadOnlyList<CloneFunction> Extract()
     {
         if (_functions is not null)
+        {
             return _functions;
+        }
+
         List<CloneFunction> functions = [];
         List<(string Path, List<CodeToken> Tokens)> go = [];
         foreach (var file in repository.Files.Where(Reads))
         {
             var text = repository.Read(file);
             if (Encoding.UTF8.GetByteCount(text) > 1024 * 1024)
+            {
                 continue;
+            }
+
             var language = Language(file);
             var tokens = CloneLexer.Tokenize(text, language);
             if (language is "go")
+            {
                 go.Add((file, tokens));
+            }
             else
+            {
                 functions.AddRange(CFunctions(file, language, tokens));
+            }
         }
         foreach (var file in go)
         {
@@ -61,18 +71,26 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
         {
             var end = CloneLexer.Match(tokens, body);
             if (end < 0)
+            {
                 return;
+            }
+
             var overrides = false;
             List<string> result = [];
             for (var index = name - 1; index >= 0 && index >= name - 12 && !";{}],()=".Contains(tokens[index].Text, StringComparison.Ordinal); index--)
             {
                 overrides |= tokens[index].Text is "override";
                 if (!CloneLexer.Modifiers.Contains(tokens[index].Text))
+                {
                     result.Insert(0, tokens[index].Text);
+                }
             }
             var close = tokens[parameters].Text is "(" ? CloneLexer.Match(tokens, parameters) : parameters;
             if (language is "ts" && close + 1 < body && tokens[close + 1].Text is ":")
+            {
                 result = tokens.Skip(close + 2).Take(body - close - 2).TakeWhile(token => token.Text is not "=>").Select(token => token.Text).ToList();
+            }
+
             var signature = new List<string> { string.Concat(result), "|" };
             signature.AddRange(tokens[parameters].Text is "(" ? ParameterTypes(tokens.GetRange(parameters + 1, close - parameters - 1), language) : ["?"]);
             declarations.Add(new(new() { Path = path, Name = tokens[name].Text, Line = tokens[name].Line, End = tokens[end].Line, Language = language, Override = overrides, Signature = signature }, parameters, body, end));
@@ -83,31 +101,48 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             if (token.Kind is 'i' && tokens[index + 1].Text is "(" && !CloneLexer.Control.Contains(token.Text) && !CloneLexer.Keywords.Contains(token.Text))
             {
                 if (index > 0 && (tokens[index - 1].Text is "." or "?." or "new" || CloneLexer.Declares.Contains(tokens[index - 1].Text)))
+                {
                     continue;
+                }
+
                 var declaration = index is 0 || language is "ts" || CloneLexer.TypeLike(tokens[index - 1]);
                 var close = CloneLexer.Match(tokens, index + 1);
                 if (!declaration || close < 0)
+                {
                     continue;
+                }
+
                 for (var cursor = close + 1; cursor < tokens.Count && cursor < close + 60; cursor++)
                 {
                     var current = tokens[cursor];
                     if (current.Kind is 'p' && current.Text is ";" or "=>" or "=" or "}" or ",")
+                    {
                         break;
+                    }
+
                     if (current.Kind is 'p' && current.Text is "(" && CloneLexer.Match(tokens, cursor) is var end && end > 0)
                     { cursor = end; continue; }
                     if (current.Kind is 'p' && current.Text is "{")
                     {
                         if (language is "cs" || cursor == close + 1 || tokens[close + 1].Text is ":")
+                        {
                             Add(index, index + 1, cursor);
+                        }
+
                         break;
                     }
                     if (language is "ts" && cursor == close + 1 && current.Text is not ":")
+                    {
                         break;
+                    }
                 }
                 continue;
             }
             if (token.Text is not "=>" || tokens[index + 1].Text is not "{" || language is not "ts")
+            {
                 continue;
+            }
+
             var before = index - 1;
             var parameters = -1;
             if (before >= 0 && tokens[before].Text is ")")
@@ -116,18 +151,30 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
                 for (; before >= 0; before--)
                 {
                     if (tokens[before].Text is ")")
+                    {
                         depth++;
+                    }
                     else if (tokens[before].Text is "(" && --depth is 0)
+                    {
                         break;
+                    }
                 }
                 parameters = before--;
             }
             else if (before >= 0 && tokens[before].Kind is 'i')
+            {
                 parameters = before--;
+            }
+
             if (before >= 0 && tokens[before].Text is "async")
+            {
                 before--;
+            }
+
             if (before >= 1 && tokens[before].Text is "=" or ":" && tokens[before - 1].Kind is 'i' && parameters >= 0)
+            {
                 Add(before - 1, parameters, index + 1);
+            }
         }
         var locals = declarations.Select(declaration => Forms(tokens, declaration.Parameters, declaration.Body, declaration.End, null, language is "ts").Locals).ToArray();
         List<CloneFunction> output = [];
@@ -135,8 +182,13 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
         {
             Dictionary<string, string> captured = new(StringComparer.Ordinal);
             foreach (var outer in declarations.Select((value, index) => (value, index)).Where(pair => pair.value != declaration && pair.value.Body < declaration.Body && declaration.End <= pair.value.End).OrderBy(pair => pair.value.Body))
+            {
                 foreach (var local in locals[outer.index])
+                {
                     captured[local] = outer.value.Function.Name + "@" + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture) + ".";
+                }
+            }
+
             var forms = Forms(tokens, declaration.Parameters, declaration.Body, declaration.End, captured, language is "ts");
             output.Add(declaration.Function with { Canonical = forms.Canonical, Shape = forms.Shape, Statements = forms.Statements, Data = tokens.Skip(declaration.Body).Take(declaration.End - declaration.Body).Any(token => token.Kind is 'n' && token.Text is not "0" and not "1" || token.Kind is 's' && token.Text.EnumerateRunes().Count() > 3) });
         }
@@ -149,14 +201,20 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
         void Flush()
         {
             if (current.Count is 0)
+            {
                 return;
+            }
+
             if (language is "ts")
             {
                 var colon = current.FindIndex(token => token.Text is ":");
                 output.Add(colon < 0 ? "?" : string.Concat(current.Skip(colon + 1).Select(token => token.Text)));
             }
             else
+            {
                 output.Add(string.Concat(current.Take(current[^1].Kind is 'i' ? current.Count - 1 : current.Count).Where(token => token.Kind is not 'i' || token.Text is not ("this" or "ref" or "out" or "in" or "params" or "scoped")).Select(token => token.Text)));
+            }
+
             current.Clear();
         }
         var depth = 0;
@@ -186,13 +244,20 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
                     break;
             }
             if (attribute > 0)
+            {
                 continue;
+            }
+
             if (depth is 0 && token.Text is ",")
             { Flush(); defaultValue = false; }
             else if (depth is 0 && token.Text is "=")
+            {
                 defaultValue = true;
+            }
             else if (!defaultValue)
+            {
                 current.Add(token);
+            }
         }
         Flush();
         return output.ToArray();

@@ -1,5 +1,5 @@
-using Harness.Mcp.Workspaces;
 using Harness.Core.Retrieval;
+using Harness.Mcp.Workspaces;
 
 namespace Harness.Mcp.Context;
 
@@ -22,18 +22,27 @@ public static class ContextRenderer
         var notes = (project?.Notes ?? []).Concat(gathered.Notes).Concat(workspace?.Notes ?? []).ToList();
         var specified = request.Tokens > 0 ? ContextBudget.FromTokens(request.Tokens).Bytes : request.Budget;
         if (specified is > 0 and < 1000)
+        {
             notes.Add("budget raised to the minimum, 1000 bytes");
+        }
+
         var stale = project?.Stale ?? "";
         var candidates = gathered.Candidates;
         if (project?.CrossBranch is true)
         {
             var kept = candidates.Where(candidate => candidate.Source is not "code" || candidate.Freshness is not "indexed").ToArray();
             if (kept.Length < candidates.Count)
+            {
                 stale += "; indexed code results were withheld until then";
+            }
+
             candidates = kept;
         }
         if (project?.IsDirectory is { } directory)
+        {
             candidates = candidates.Where(candidate => candidate.Source is not "code" || candidate.Role is not "file" || !directory(candidate.Path)).ToArray();
+        }
+
         var merged = RetrievalMerger.Merge(candidates);
         var errors = gathered.Errors.ToList();
         var diagnosticsTruncated = false;
@@ -45,15 +54,23 @@ public static class ContextRenderer
             empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
         }
         if (ContextJson.Size(empty) + 100 > full)
+        {
             throw new ArgumentException("task metadata exceeds the context budget; raise the budget or shorten the task");
+        }
+
         var envelope = EnvelopeSize(empty, notes);
         while (envelope + 200 > full && (errors.Count > 0 || notes.Count > 0))
         {
             diagnosticsTruncated = true;
             if (errors.Count > 0)
+            {
                 errors.RemoveAt(errors.Count - 1);
+            }
             else
+            {
                 notes.RemoveAt(notes.Count - 1);
+            }
+
             empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
             envelope = EnvelopeSize(empty, notes);
         }
@@ -77,22 +94,35 @@ public static class ContextRenderer
             {
                 debugTruncated = true;
                 if (debugEntries > 0)
+                {
                     debugEntries -= Math.Max(1, debugEntries / 4);
+                }
                 else
+                {
                     calls -= Math.Max(1, calls / 4);
+                }
+
                 continue;
             }
             if (errors.Count > 0 || notes.Count > 0)
             {
                 diagnosticsTruncated = true;
                 if (errors.Count > 0)
+                {
                     errors.RemoveAt(errors.Count - 1);
+                }
                 else
+                {
                     notes.RemoveAt(notes.Count - 1);
+                }
+
                 continue;
             }
             if (packed.Units.Count is 0)
+            {
                 throw new ArgumentException("task metadata exceeds the context budget; raise the budget or shorten the task");
+            }
+
             var rejected = packed.Rejected.Prepend(packed.Units[^1].Ranked).ToArray();
             packed = packed with { Units = packed.Units.Take(packed.Units.Count - 1).ToArray(), Omitted = packed.Omitted + 1, Rejected = rejected };
         }
@@ -104,7 +134,9 @@ public static class ContextRenderer
             foreach (var unit in packed.Units)
             {
                 if (unit.Ranked.Candidate.Source is "code")
+                {
                     ContextWire.AddCode(output, unit, request.Debug);
+                }
                 else
                 {
                     var key = unit.Ranked.Candidate.Source is "memory" ? "memory" : "changes";
@@ -117,12 +149,21 @@ public static class ContextRenderer
             if (packed.Omitted > 0)
             { output["omitted"] = packed.Omitted; messages.Add(ContextPacker.OmissionNote(packed.Omitted, full)); }
             if (debugTruncated)
+            {
                 messages.Add("debug details truncated to fit the budget");
+            }
+
             if (diagnosticsTruncated)
+            {
                 messages.Add("additional diagnostics omitted to fit the budget");
+            }
+
             ContextWire.Add(output, "note", string.Join("; ", messages));
             if (request.Debug)
+            {
                 output["debug"] = ContextWire.Debug(gathered, merged.Folded, packed, calls, debugEntries);
+            }
+
             ContextFindings.Add(output, project?.Findings ?? [], full);
             return output;
         }
@@ -132,7 +173,10 @@ public static class ContextRenderer
     private static void RecordContext(ContextProject? project, string task, PackedContext packed)
     {
         if (project?.RecordContext is not { } observe)
+        {
             return;
+        }
+
         var units = packed.Units.Where(u => u.Ranked.Candidate.Source is "code" && u.Ranked.Candidate.Path.Length > 0).SelectMany((unit, position) => unit.Ranked.Candidate.Provenance.Select(p => new Harness.Core.Telemetry.ContextUnitObservation(unit.Ranked.Candidate.Path, unit.Ranked.Candidate.Name, unit.Ranked.Candidate.Role, p.Provider, p.Capability, p.Rank, position, unit.Ranked.Tier, unit.Body.Length > 0))).ToArray();
         try
         { observe(new("", "", task, packed.Budget.Bytes, packed.Used, units)); }
@@ -143,11 +187,20 @@ public static class ContextRenderer
     {
         var output = new Dictionary<string, object?> { ["task"] = task, ["code"] = new List<Dictionary<string, object?>>(), ["used_bytes"] = 0, ["budget_bytes"] = 0 };
         if (workspace is { Count: > 0 })
+        {
             output["workspace"] = workspace;
+        }
+
         if (symbols.Count > 0)
+        {
             output["symbols"] = symbols;
+        }
+
         if (errors.Count > 0)
+        {
             output["errors"] = errors;
+        }
+
         ContextWire.Add(output, "stale", stale);
         return output;
     }
@@ -168,7 +221,10 @@ public static class ContextRenderer
     private static string Measured(Dictionary<string, object?> output)
     {
         for (var i = 0; i < 4; i++)
+        {
             output["used_bytes"] = ContextJson.Size(output);
+        }
+
         return ContextJson.Serialize(output);
     }
 }

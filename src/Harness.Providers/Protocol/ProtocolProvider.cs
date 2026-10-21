@@ -58,7 +58,10 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
     public async ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default)
     {
         if (!probe)
+        {
             return _supervisor.Health();
+        }
+
         try
         {
             var info = await HandshakeAsync(cancellationToken).ConfigureAwait(false);
@@ -79,21 +82,32 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
         catch (Exception error) when (IsProviderFailure(error))
         { return new() { Error = new ProviderException(Name, "handshake failed: " + Safe(error.Message), innerException: error), TimedOut = error is TimeoutException }; }
         if (!(info.Capabilities ?? []).Any(cap => cap.Capability == request.Capability))
+        {
             return new() { Error = new UnsupportedCapabilityException() };
+        }
+
         var tool = ProviderProtocol.ToolFor(request.Capability);
         var bytes = 0;
         try
         {
             var arguments = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (var (key, value) in new Dictionary<string, object?> { ["query"] = request.Query, ["path"] = request.Path, ["limit"] = request.Limit, ["target"] = request.Target, ["budget"] = request.Budget, ["package"] = request.Package, ["version"] = request.Version, ["type"] = request.Type })
+            {
                 if (value is not ("" or 0))
+                {
                     arguments[key] = value;
+                }
+            }
+
             var client = await _supervisor.ClientAsync(cancellationToken).ConfigureAwait(false);
             var result = await client.CallToolAsync(tool, arguments, cancellationToken).ConfigureAwait(false);
             bytes = Encoding.UTF8.GetByteCount(McpMapping.Text(result));
             var response = Decode<ProtocolResponse>(result, tool);
             if ((response.Items ?? []).Any(item => item is null))
+            {
                 throw new InvalidDataException("unexpected response: null item");
+            }
+
             var items = (response.Items ?? []).Select(item => item with { Provider = Name, Tool = string.IsNullOrEmpty(item.Tool) ? tool : item.Tool }).ToArray();
             return new()
             {
@@ -112,12 +126,21 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
     {
         var info = await HandshakeAsync(cancellationToken).ConfigureAwait(false);
         if (!info.Refresh)
+        {
             return new(true, "provider keeps no index");
+        }
+
         var arguments = new Dictionary<string, object?>(StringComparer.Ordinal);
         if (request.Full)
+        {
             arguments["full"] = true;
+        }
+
         if (request.Changed is { Count: > 0 })
+        {
             arguments["changed"] = request.Changed;
+        }
+
         var client = await _supervisor.ClientAsync(cancellationToken).ConfigureAwait(false);
         return Decode<RefreshResult>(await client.CallToolAsync(ProviderProtocol.RefreshTool, arguments, cancellationToken).ConfigureAwait(false), ProviderProtocol.RefreshTool);
     }
@@ -126,13 +149,18 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
     public ValueTask DisposeAsync()
     {
         lock (_closeGate)
+        {
             return new(_closeTask ??= CloseAsync());
+        }
     }
 
     private async Task CloseAsync()
     {
         lock (_closeGate)
+        {
             _closed = true;
+        }
+
         try
         { await _supervisor.DisposeAsync().ConfigureAwait(false); }
         finally
@@ -146,14 +174,23 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
     private async Task<ProviderInfo> HandshakeAsync(CancellationToken cancellationToken)
     {
         lock (_closeGate)
+        {
             ObjectDisposedException.ThrowIf(_closed, this);
+        }
+
         await _handshake.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (_info is not null)
+            {
                 return _info;
+            }
+
             if (_infoError is not null && _clock.GetUtcNow() - _tried < TimeSpan.FromSeconds(30))
+            {
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(_infoError).Throw();
+            }
+
             _tried = _clock.GetUtcNow();
             _infoError = null;
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -163,9 +200,15 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
                 var client = await _supervisor.ClientAsync(linked.Token).ConfigureAwait(false);
                 var info = Decode<ProviderInfo>(await client.CallToolAsync(ProviderProtocol.InfoTool, new Dictionary<string, object?>(), linked.Token).ConfigureAwait(false), ProviderProtocol.InfoTool);
                 if (!ProviderProtocol.Compatible(info.Protocol ?? ""))
+                {
                     throw new InvalidDataException("speaks " + JsonSerializer.Serialize(info.Protocol) + "; harness needs " + ProviderProtocol.Version);
+                }
+
                 if ((info.Capabilities ?? []).Any(cap => cap is null || string.IsNullOrEmpty(cap.Capability)))
+                {
                     throw new InvalidDataException("unexpected response: capability name is missing");
+                }
+
                 _infoError = null;
                 return _info = info;
             }
@@ -183,7 +226,10 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
     private T Decode<T>(CallToolResult result, string tool)
     {
         if (result.IsError is true)
+        {
             throw McpMapping.ToolError(Name, tool, result);
+        }
+
         try
         {
             var body = result.StructuredContent is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } structured ? structured : JsonSerializer.Deserialize<JsonElement>(McpMapping.Text(result).Trim());

@@ -25,7 +25,10 @@ public sealed partial class HarnessStateSession
     {
         var result = await TaskOperationAsync(s => s.Complete(id, actor, input, cancellationToken), cancellationToken).ConfigureAwait(false);
         if (input.Commit.Length > 0 && location.Repository is { } repository && _database is { } database && _registration is { } registration)
+        {
             await Harness.Infrastructure.Telemetry.TelemetryStore.ResolveBestEffortAsync(database, repository, registration.Worktree.Id, input.Commit, "task", cancellationToken).ConfigureAwait(false);
+        }
+
         return result;
     }
     public Task<TaskProposal> ProposeTaskAsync(TaskDefinition definition, string reason, string by, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Propose(definition, reason, by, cancellationToken), cancellationToken);

@@ -1,10 +1,10 @@
 using System.ComponentModel;
-using Harness.Cli.Memory;
-using Harness.Infrastructure.Configuration;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Harness.Cli.Memory;
 using Harness.Core.Reports;
 using Harness.Core.Telemetry;
+using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Telemetry;
@@ -63,21 +63,31 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
     {
         List<LocalReport> reports = [];
         if (settings is ReportSettings { All: true })
+        {
             reports.AddRange(lifecycle.Registry.Load()["projects"]!.AsArray().OfType<JsonObject>().Select(project => RegisteredReport(project, settings.Days, now)));
+        }
         else
         {
             var location = await lifecycle.LocateAsync(settings.Project, cancellationToken: token);
             reports.Add(Read(location.DatabasePath, location.Root, settings.Days, now));
         }
         if (settings.Json)
+        {
             await output.WriteLineAsync(JsonSerializer.Serialize(new { projects = reports }, TelemetryJson.Options));
+        }
         else
+        {
             for (var i = 0; i < reports.Count; i++)
             {
                 if (i > 0)
+                {
                     await output.WriteLineAsync();
+                }
+
                 await ReportText.ReportAsync(output, reports[i]);
             }
+        }
+
         return 0;
     }
     private LocalReport RegisteredReport(JsonObject project, int days, DateTimeOffset now)
@@ -94,13 +104,23 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
         var store = new TelemetryStore(db);
         object result = verb is "metrics" ? store.Metrics(now.AddDays(-settings.Days)) : store.ContextStats(now.AddDays(-settings.Days));
         if (result is MetricsReport metricsResult)
+        {
             metricsResult.Bypasses = store.Bypasses(now.AddDays(-settings.Days), ProviderServerMap.Read(own.Root, own.Configuration.Value.Providers));
+        }
+
         if (settings.Json)
+        {
             await output.WriteLineAsync(JsonSerializer.Serialize(result, TelemetryJson.Options));
+        }
         else if (result is MetricsReport metrics)
+        {
             await ReportText.MetricsAsync(output, metrics, settings.Days);
+        }
         else
+        {
             await ReportText.ContextAsync(output, (ContextStatistics)result, settings.Days);
+        }
+
         return 0;
     }
     private LocalReport Read(string path, string root, int days, DateTimeOffset now)

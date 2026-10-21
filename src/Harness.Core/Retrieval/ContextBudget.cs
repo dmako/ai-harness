@@ -40,14 +40,20 @@ public static class ContextPacker
                 unit = unit with { Reference = Reference(candidate) };
                 var (body, clipped, reason) = await BodyAsync(item, budget, read, cancellationToken).ConfigureAwait(false);
                 if (reason.Length > 0)
+                {
                     unit = unit with { BodyNote = reason };
+                }
                 else if ((long)bodies + Bytes(body) > softLimit)
+                {
                     unit = unit with { BodyNote = string.Create(CultureInfo.InvariantCulture, $"reference only: bodies reached the soft limit ({bodies} of {softLimit} bytes)") };
+                }
                 else
                 {
                     var withBody = unit with { Body = body, Clipped = clipped };
                     if ((long)used + Cost(withBody) > budget.Bytes)
+                    {
                         unit = unit with { BodyNote = "reference only: the body would exceed the budget" };
+                    }
                     else
                     { unit = withBody; bodies += Bytes(body); }
                 }
@@ -56,7 +62,9 @@ public static class ContextPacker
             {
                 var previous = units.Find(previous => previous.Body.Length > 0 && previous.Body.Contains(candidate.Text, StringComparison.Ordinal));
                 if (previous is not null)
+                {
                     unit = unit with { Reference = "see " + previous.Reference };
+                }
             }
             unit = unit with { Cost = Cost(unit) };
             if ((long)used + unit.Cost > budget.Bytes)
@@ -70,10 +78,16 @@ public static class ContextPacker
         int Cost(ContextUnit unit)
         {
             if (budget.Cost is not null)
+            {
                 return budget.Cost(unit, units);
+            }
+
             var candidate = unit.Ranked.Candidate;
             if (candidate.Source is "code")
+            {
                 return Bytes(unit.Reference) + Bytes(unit.Body);
+            }
+
             return Bytes(unit.Reference.Length > 0 ? unit.Reference : candidate.Text) + Bytes(candidate.Role) + 4;
         }
     }
@@ -88,7 +102,9 @@ public static class ContextPacker
         {
             location += ":" + candidate.StartLine.ToString(CultureInfo.InvariantCulture);
             if (candidate.EndLine > candidate.StartLine)
+            {
                 location += "-" + candidate.EndLine.ToString(CultureInfo.InvariantCulture);
+            }
         }
         return (candidate.Name.Length > 0 ? candidate.Name : candidate.Role) + " " + location;
     }
@@ -104,11 +120,20 @@ public static class ContextPacker
             catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested) { /* Retain the known snippet if a body cannot be loaded. */ }
         }
         if (text.Length is 0)
+        {
             return ("", false, "reference only: no body known");
+        }
+
         if (Bytes(text) <= budget.MaxBody)
+        {
             return (text, false, "");
+        }
+
         if (ranked.Tier is 0)
+        {
             return (Clip(text, budget.MaxBody), true, "");
+        }
+
         return ("", false, string.Create(CultureInfo.InvariantCulture, $"reference only: body {Bytes(text)} bytes over the {budget.MaxBody}-byte maximum"));
     }
 
@@ -123,7 +148,10 @@ public static class ContextPacker
             var next = newline < 0 ? text.Length : newline + 1;
             var bytes = Encoding.UTF8.GetByteCount(text.AsSpan(end, next - end));
             if ((long)length + bytes + Bytes(Marker) > maximum)
+            {
                 break;
+            }
+
             length += bytes;
             end = next;
         }

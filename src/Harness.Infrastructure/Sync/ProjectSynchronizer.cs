@@ -18,7 +18,10 @@ public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider
         options ??= new();
         var location = await lifecycle.LocateAsync(directory, cancellationToken: token).ConfigureAwait(false);
         if (!location.Initialized)
+        {
             throw new InvalidDataException("project not initialized; run 'harness init'");
+        }
+
         var repository = location.Repository!;
         var time = clock ?? TimeProvider.System;
         var started = time.GetUtcNow();
@@ -31,7 +34,10 @@ public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider
         var covered = options.Mode is "" or "incremental" ? SyncStore.SyncedSince(database, worktree, started, head.Commit) : 0;
         SyncRun? run = null;
         if (covered is 0)
+        {
             run = await GitSynchronizer.RunAsync(database, repository, worktree, options with { Ignore = location.Configuration.Value.Sync.Ignore.Concat(options.Ignore).ToArray() }, time, token).ConfigureAwait(false);
+        }
+
         var state = run?.State ?? SyncStore.LoadState(database, worktree) ?? throw new InvalidDataException("load sync state: no recorded state");
         var removed = RemoveGoneWorktrees(database, worktree, token);
         try
@@ -48,7 +54,10 @@ public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider
     {
         var gone = ProjectStore.Worktrees(database).Where(tree => tree.Id != current && Missing(tree.GitDir)).ToArray();
         if (gone.Length is 0)
+        {
             return gone;
+        }
+
         database.WithTransaction((connection, transaction) =>
         {
             foreach (var tree in gone)

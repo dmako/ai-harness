@@ -6,10 +6,16 @@ public static class WorktreeSyncLock
     {
         // Never recreate a Git directory removed/pruned while a hook was queued.
         if (!Directory.Exists(gitDirectory))
+        {
             throw new DirectoryNotFoundException("The worktree Git directory no longer exists.");
+        }
+
         var options = new FileStreamOptions { Mode = FileMode.OpenOrCreate, Access = FileAccess.ReadWrite, Share = FileShare.None };
         if (!OperatingSystem.IsWindows())
+        {
             options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
         while (true)
         {
             token.ThrowIfCancellationRequested();

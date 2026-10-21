@@ -233,7 +233,10 @@ public sealed class GenericMcpTests
     {
         var executable = Environment.GetEnvironmentVariable("HARNESS_REAL_CODEBASE_MEMORY");
         if (string.IsNullOrWhiteSpace(executable))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_REAL_CODEBASE_MEMORY to the installed codebase-memory-mcp executable for an isolated real-provider smoke test.");
+        }
+
         using var fixture = new ProviderFixture();
         var config = Path.Combine(fixture.Root, "config.toml");
         await File.WriteAllTextAsync(config, "[providers.\"codebase-memory\"]\n", Token);
@@ -251,6 +254,8 @@ public sealed class GenericMcpTests
         health.State.Should().Be("degraded");
         var receipt = Environment.GetEnvironmentVariable("HARNESS_PROVIDER_SMOKE_RECEIPT");
         if (!string.IsNullOrWhiteSpace(receipt))
+        {
             await File.WriteAllTextAsync(receipt, JsonSerializer.Serialize(new { provider = client.ServerVersion, tools = tools.Count, state = health.State, isolated_home = true }), Token);
+        }
     }
 }

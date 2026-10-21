@@ -11,7 +11,10 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
         var limit = request.Limit <= 0 ? 10 : request.Limit;
         List<string> notes = [];
         if (registry is null || !registry.Capabilities().Any(capability => capability.Capability == Capabilities.ArchChangeCoupling))
+        {
             notes.Add("no provider offers arch.change_coupling (ripwire does): partners are unknown");
+        }
+
         var report = new ChangeCouplingReport();
         IReadOnlyList<string> errors;
         if (request.File.Length > 0)
@@ -27,19 +30,27 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
             if (changed is null || changed.Count is 0)
             {
                 if (location.Repository is null)
+                {
                     throw new InvalidOperationException("not a Git repository: name the changed files");
+                }
+
                 changed = await location.Repository.DirtyPathsAsync(token).ConfigureAwait(false);
             }
             var result = await ChangeCoupling.CheckAsync(registry, location.Root, changed, token).ConfigureAwait(false);
             report = report with { Changed = changed.Count is 0 ? null : changed, Missing = result.Missing.Count is 0 ? null : result.Missing };
             errors = result.Errors;
             if (result.Missing.Count is 0 && changed.Count > 0)
+            {
                 notes.Add("no usual partner is left out");
+            }
         }
         else
         {
             if (location.Repository is null)
+            {
                 throw new InvalidOperationException("hotspots need a Git repository");
+            }
+
             var result = await ChangeCoupling.HotspotsAsync(location.Repository, registry, limit, 3, token).ConfigureAwait(false);
             report = report with { Hotspots = result.Hotspots.Count is 0 ? null : result.Hotspots, Commits = result.Commits };
             errors = result.Errors;

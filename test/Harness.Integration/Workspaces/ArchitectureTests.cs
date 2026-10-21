@@ -24,11 +24,20 @@ public sealed class ArchitectureTests
         var levels = new KnowledgeLevels(fixture.Lifecycle.GlobalConfigurationPath, fixture.Lifecycle.Registry);
         var workspaces = levels.Load();
         using (var own = HarnessDatabase.Open(fixture.Members[0].DatabasePath, cancellationToken: Token))
+        {
             new MemoryStore(own).Put(new() { Type = "constraint", Content = "group Domain = *.Core; forbid: Domain -> *.WebApi", Source = new(Ref: "architecture fixture") }, Token);
+        }
+
         using (var workspace = levels.OpenLevel(workspaces, new("workspace", "one"), fixture.Members[0].Id, Token))
+        {
             new MemoryStore(workspace).Put(new() { Type = "decision", Content = "group Domain = *.Other; only: Domain -> *.Models", Source = new(Ref: "workspace fixture") }, Token);
+        }
+
         using (var user = levels.OpenLevel(workspaces, MemoryScope.User, fixture.Members[0].Id, Token))
+        {
             new MemoryStore(user).Put(new() { Type = "convention", Content = "layers: WebApi > Core > Models", Source = new(Ref: "user fixture") }, Token);
+        }
+
         var hashes = fixture.Hashes();
         using var read = HarnessDatabase.OpenReadOnly(fixture.Members[0].DatabasePath);
         var rules = ArchitectureReader.RulesFor(new MemoryStore(read), levels, fixture.Members[0].Id, Token);

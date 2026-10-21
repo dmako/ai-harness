@@ -28,7 +28,10 @@ public sealed partial record GitRepository
         try
         {
             if (!File.Exists(attributes))
+            {
                 await File.WriteAllTextAsync(attributes, "*.cs diff=csharp\n*.go diff=golang\n*.java diff=java\n*.kt diff=kotlin\n*.py diff=python\n*.rs diff=rust\n*.php diff=php\n*.rb diff=ruby\n*.c diff=cpp\n*.h diff=cpp\n*.cpp diff=cpp\n*.hpp diff=cpp\n*.m diff=objc\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+            }
+
             prefix = ["-c", "core.attributesFile=" + attributes];
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { /* Git's repository/default hunk patterns remain available. */ }

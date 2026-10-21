@@ -26,7 +26,10 @@ internal static class MemoryTools
                 }, cancellationToken));
             case "memory_supersede":
                 if (string.IsNullOrWhiteSpace(args.String("reason")))
+                {
                     throw new ArgumentException("reason is required: say why the old memory no longer holds");
+                }
+
                 return Put(await session.SupersedeMemoryAsync(args.String("id"), new MemoryInput
                 {
                     Type = args.String("type").Length is 0 ? "" : MemoryText.ParseType(args.String("type")),
@@ -42,7 +45,10 @@ internal static class MemoryTools
             case "constraints_current":
             case "decisions_for":
                 if (name is "decisions_for" && string.IsNullOrWhiteSpace(args.String("scope")))
+                {
                     throw new ArgumentException("scope is required (project (default), path:<dir or file>, subsystem:<name> or branch:<name>)");
+                }
+
                 var types = name switch
                 {
                     "goals_current" => ["goal"],
@@ -65,18 +71,30 @@ internal static class MemoryTools
                 MemoryViews.Add(output, "note", list.Note);
                 MemoryViews.Add(output, "hint", list.Hint);
                 if (list.Elsewhere.Count > 0)
+                {
                     output["elsewhere"] = list.Elsewhere.Select(MemoryViews.Found).ToArray();
+                }
+
                 return output;
             case "memory_propose":
                 var proposed = await session.ProposeMemoryAsync(new MemoryProposalInput(MemoryText.ParseType(args.String("type")), args.String("content"), MemoryScope.Parse(args.String("scope")),
                     new MemorySource("agent", args.String("source_ref"), caller), args.String("rationale"), args.String("supersedes").Trim()), cancellationToken);
                 Dictionary<string, object?> proposalOutput = new(StringComparer.Ordinal) { ["status"] = proposed.Status };
                 if (proposed.Memory is not null)
+                {
                     proposalOutput["memory"] = MemoryViews.Memory(proposed.Memory);
+                }
+
                 if (proposed.Proposal is not null)
+                {
                     proposalOutput["proposal"] = MemoryViews.Proposal(proposed.Proposal);
+                }
+
                 if (proposed.Related.Count > 0)
+                {
                     proposalOutput["related"] = proposed.Related.Select(MemoryViews.Similar).ToArray();
+                }
+
                 proposalOutput["hint"] = proposed.Status switch
                 {
                     "proposed" => "Waiting for the user's approval; mention it to them." + (proposed.Related.Count > 0 ? " It resembles current memories (related); approving may supersede one." : ""),
@@ -94,7 +112,10 @@ internal static class MemoryTools
                     return new { status = "rejected", proposal = MemoryViews.Proposal(rejected) };
                 }
                 if (!action.Equals("approve", StringComparison.OrdinalIgnoreCase))
+                {
                     throw new ArgumentException("action must be approve or reject");
+                }
+
                 var reviewed = await session.ApproveMemoryAsync(args.String("id"), new MemoryApprovalInput
                 {
                     Type = args.String("type").Length is 0 ? "" : MemoryText.ParseType(args.String("type")),
@@ -107,11 +128,20 @@ internal static class MemoryTools
                 }, cancellationToken);
                 Dictionary<string, object?> reviewOutput = new(StringComparer.Ordinal) { ["status"] = reviewed.Status, ["proposal"] = MemoryViews.Proposal(reviewed.Proposal) };
                 if (reviewed.Memory is not null)
+                {
                     reviewOutput["memory"] = MemoryViews.Memory(reviewed.Memory);
+                }
+
                 if (reviewed.Similar.Count > 0)
+                {
                     reviewOutput["similar"] = reviewed.Similar.Select(MemoryViews.Similar).ToArray();
+                }
+
                 if (reviewed.Status is "needs_decision")
+                {
                     reviewOutput["hint"] = "Not stored yet: it resembles current memories. Ask the user whether it replaces one (approve again with supersedes=[id]) or is separate (keep_both=true).";
+                }
+
                 return reviewOutput;
             default:
                 throw new InvalidOperationException("Unknown memory tool.");
@@ -122,11 +152,20 @@ internal static class MemoryTools
     {
         Dictionary<string, object?> output = new(StringComparer.Ordinal) { ["status"] = result.Status };
         if (result.Memory is not null)
+        {
             output["memory"] = MemoryViews.Memory(result.Memory);
+        }
+
         if (result.Similar.Count > 0)
+        {
             output["similar"] = result.Similar.Select(MemoryViews.Similar).ToArray();
+        }
+
         if (result.Superseded.Count > 0)
+        {
             output["superseded"] = result.Superseded;
+        }
+
         var hint = result.Status switch
         {
             "needs_decision" => "Nothing stored: similar memories exist. If this replaces one, call memory_supersede with its id; if it says the same thing, do nothing; if it is genuinely different, call memory_put again with force=true.",
@@ -140,11 +179,17 @@ internal static class MemoryTools
     private static MemoryTimestamp? Expiry(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             return null;
+        }
+
         try
         {
             if (DateTimeOffset.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var day))
+            {
                 return new MemoryTimestamp(day);
+            }
+
             return MemoryTimestamp.Parse(value);
         }
         catch (FormatException) { throw new ArgumentException($"valid_until must be RFC 3339 (2026-01-31T12:00:00Z) or a date (2026-01-31), got {JsonSerializer.Serialize(value)}"); }
@@ -158,16 +203,24 @@ internal static class MemoryTools
         public int Integer(string name)
         {
             if (values is null || !values.TryGetValue(name, out var value))
+            {
                 return 0;
+            }
+
             var number = value.GetDouble();
             // The Go SDK decodes its argument map through float64, then the typed int field.
             if (number >= 9223372036854775808d || number <= -9223372036854775808d)
             {
                 var formatted = number.ToString("G", CultureInfo.InvariantCulture);
                 if (Math.Abs(number) < 1e21)
+                {
                     formatted = decimal.Parse(formatted, NumberStyles.Float, CultureInfo.InvariantCulture).ToString("0", CultureInfo.InvariantCulture);
+                }
                 else
+                {
                     formatted = formatted.Replace('E', 'e');
+                }
+
                 var input = tool is "memory_search" ? "memorySearchInput" : "memoryProposalsInput";
                 throw new ArgumentException($"json: cannot unmarshal number {formatted}}} overflows into Go struct field server.{input}.{name} of type int");
             }

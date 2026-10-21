@@ -14,21 +14,35 @@ internal static class MemoryArguments
         var given = arguments ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         var hint = "\nexpected arguments: required " + (required.Length is 0 ? "nothing" : string.Join(", ", required)) + (optional.Length is 0 ? "" : "; optional " + string.Join(", ", optional));
         if (given.ContainsKey("path") && tool.Name is "memory_put" or "memory_propose" or "memory_search")
+        {
             hint = "\npath: use scope \"path:<dir or file>\" (not path)" + hint;
+        }
+
         if (tool.Name is "task_complete")
+        {
             hint += "\nacceptance: [{\"index\": 1, \"result\": \"pass\", \"evidence\": \"...\"}] (one per criterion; [] when the task has none); validation: [\"go test ./...\"] or [{\"command\": \"...\", \"result\": \"pass\"}]";
+        }
+
         const string Prefix = "validating \"arguments\": validating root: ";
         var missing = required.Where(name => !given.ContainsKey(name)).ToArray();
         if (missing.Length > 0)
+        {
             return Prefix + "required: missing properties: " + JsonSerializer.Serialize(missing) + hint;
+        }
+
         var extra = given.Keys.Except(properties, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         if (extra.Length > 0)
+        {
             return Prefix + "unexpected additional properties " + JsonSerializer.Serialize(extra) + hint;
+        }
+
         foreach (var name in given.Keys.Order(StringComparer.Ordinal))
         {
             var error = Check(propertiesSchema.GetProperty(name), given[name], "/properties/" + name);
             if (error is not null)
+            {
                 return Prefix + error + hint;
+            }
         }
         return null;
     }
@@ -43,7 +57,10 @@ internal static class MemoryArguments
             {
                 var error = Check(variant, value, path + "/anyOf/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 if (error is null)
+                {
                     return null;
+                }
+
                 errors.Add(error);
                 index++;
             }
@@ -72,7 +89,9 @@ internal static class MemoryArguments
             {
                 var error = Check(schema.GetProperty("items"), item, path + "/items");
                 if (error is not null)
+                {
                     return "validating " + path + ": " + error;
+                }
             }
         }
         if (value.ValueKind is JsonValueKind.Object)
@@ -81,17 +100,25 @@ internal static class MemoryArguments
             var fields = value.EnumerateObject().Select(x => x.Name).ToArray();
             var missing = required.Except(fields, StringComparer.Ordinal).ToArray();
             if (missing.Length is not 0)
+            {
                 return $"validating {path}: required: missing properties: {JsonSerializer.Serialize(missing)}";
+            }
+
             var properties = schema.GetProperty("properties");
             var allowedNames = properties.EnumerateObject().Select(p => p.Name).ToArray();
             var extra = fields.Except(allowedNames, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
             if (extra.Length is not 0)
+            {
                 return $"validating {path}: unexpected additional properties {JsonSerializer.Serialize(extra)}";
+            }
+
             foreach (var name in fields.Order(StringComparer.Ordinal))
             {
                 var error = Check(properties.GetProperty(name), value.GetProperty(name), path + "/properties/" + name);
                 if (error is not null)
+                {
                     return "validating " + path + ": " + error;
+                }
             }
         }
         return null;

@@ -1,5 +1,5 @@
-using AwesomeAssertions;
 using System.Diagnostics.CodeAnalysis;
+using AwesomeAssertions;
 using Harness.Core.Providers;
 using Harness.Infrastructure.Processes;
 using Harness.Providers.Mcp;
@@ -53,7 +53,9 @@ public sealed class McpSupervisorTests
         supervisor.Health().Detail.Should().Contain("restarted 1 time(s)");
         await supervisor.DisposeAsync();
         foreach (var id in factory.Ids)
+        {
             await ProviderFixture.GoneAsync(id);
+        }
     }
 
     [Fact]
@@ -114,7 +116,15 @@ public sealed class McpSupervisorTests
     {
         private readonly object _gate = new();
         private DateTimeOffset _now = DateTimeOffset.UtcNow;
-        public override DateTimeOffset GetUtcNow() { lock (_gate) return _now; }
-        public void Advance(TimeSpan time) { lock (_gate) _now += time; }
+        public override DateTimeOffset GetUtcNow() { lock (_gate)
+            {
+                return _now;
+            }
+        }
+        public void Advance(TimeSpan time) { lock (_gate)
+            {
+                _now += time;
+            }
+        }
     }
 }

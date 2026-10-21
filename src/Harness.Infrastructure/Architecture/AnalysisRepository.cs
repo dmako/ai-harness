@@ -23,14 +23,20 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
     {
         token.ThrowIfCancellationRequested();
         if (_text.TryGetValue(relative, out var cached))
+        {
             return cached;
+        }
+
         var text = "";
         try
         {
             var path = Resolve(relative);
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             if (stream.Length > 4 * 1024 * 1024)
+            {
                 throw new InvalidDataException("analysis file exceeds the 4 MiB read limit");
+            }
+
             using var output = new MemoryStream();
             var buffer = new byte[8192];
             int count;
@@ -38,7 +44,10 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
             {
                 token.ThrowIfCancellationRequested();
                 if (output.Length + count > 4 * 1024 * 1024)
+                {
                     throw new InvalidDataException("analysis file exceeds the 4 MiB read limit");
+                }
+
                 output.Write(buffer.AsSpan(0, count));
             }
             PhysicalReads++;
@@ -52,19 +61,30 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
     internal string Resolve(string relative)
     {
         if (Path.IsPathRooted(relative) || relative.Length is 0)
+        {
             throw new InvalidDataException("analysis path must be relative to the repository");
+        }
+
         var full = Path.GetFullPath(Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar)));
         if (!Within(full))
+        {
             throw new InvalidDataException("analysis path leaves the repository");
+        }
+
         var actual = Root;
         foreach (var segment in Path.GetRelativePath(Root, full).Split(Path.DirectorySeparatorChar))
         {
             actual = Path.Combine(actual, segment);
             FileSystemInfo entry = Directory.Exists(actual) ? new DirectoryInfo(actual) : new FileInfo(actual);
             if (entry.LinkTarget is not null)
+            {
                 actual = entry.ResolveLinkTarget(true)?.FullName ?? throw new IOException("cannot resolve analysis path link");
+            }
+
             if (!Within(actual))
+            {
                 throw new InvalidDataException("analysis path link leaves the repository");
+            }
         }
         return actual;
     }

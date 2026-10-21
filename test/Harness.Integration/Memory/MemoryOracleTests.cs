@@ -21,7 +21,9 @@ public sealed class MemoryOracleTests
         {
             // Punctuation/space normalization is not relevant to these cased letters.
             if (MemoryText.Normalize(entry.Key) != entry.Value!.GetValue<string>())
+            {
                 mismatches.Add(entry.Key);
+            }
         }
         mismatches.Should().BeEmpty();
     }
@@ -48,7 +50,9 @@ public sealed class MemoryOracleTests
             var expected = fixture.Value!.GetValue<string>();
             CredentialRedactor.Redact(fixture.Key).Should().Be(expected);
             if (expected != fixture.Key)
+            {
                 FluentActions.Invoking(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = fixture.Key })).Should().ThrowExactly<ArgumentException>();
+            }
         }
     }
 
@@ -158,7 +162,10 @@ public sealed class MemoryOracleTests
     {
         var executable = Environment.GetEnvironmentVariable("HARNESS_GO_MEMORY_ORACLE");
         if (string.IsNullOrWhiteSpace(executable))
+        {
             throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_MEMORY_ORACLE to the bridge built by Memory/Go/build-oracle.ps1.");
+        }
+
         File.Exists(executable).Should().BeTrue();
         return executable;
     }

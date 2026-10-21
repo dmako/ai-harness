@@ -16,18 +16,27 @@ public static class KnowledgeDrift
     public static IReadOnlyList<ArchitectureFinding> Read(AnalysisRepository repository, IReadOnlyList<MemoryRecord> memories, CancellationToken token = default)
     {
         if (memories.Count is 0 || repository.Files.Count is 0)
+        {
             return [];
+        }
+
         var files = repository.Files.ToHashSet(StringComparer.Ordinal);
         HashSet<string> dirs = new(StringComparer.Ordinal);
         var top = files.Select(f => f.Split('/')[0]).ToHashSet(StringComparer.Ordinal);
         foreach (var f in files)
+        {
             for (var dir = Path.GetDirectoryName(f)?.Replace('\\', '/'); !string.IsNullOrEmpty(dir) && dirs.Add(dir); dir = Path.GetDirectoryName(dir)?.Replace('\\', '/'))
             { /* Collect every ancestor once. */ }
+        }
+
         bool Exists(string p)
         {
             p = p.TrimEnd('/');
             if (p.StartsWith("./", StringComparison.Ordinal))
+            {
                 p = p[2..];
+            }
+
             return files.Contains(p) || dirs.Contains(p);
         }
         List<string>? corpus = null;
@@ -49,7 +58,10 @@ public static class KnowledgeDrift
                 foreach (var rune in content.EnumerateRunes())
                 {
                     if (size + rune.Utf8SequenceLength > 160)
+                    {
                         break;
+                    }
+
                     clipped.Append(rune);
                     size += rune.Utf8SequenceLength;
                 }
@@ -61,21 +73,33 @@ public static class KnowledgeDrift
         {
             token.ThrowIfCancellationRequested();
             if (m.Scope.Kind is "path" && m.Scope.Value.Length > 0 && !Exists(m.Scope.Value))
+            {
                 Add(m, m.Scope.Value, "scoped to a path no file of the repository is under now", "fact", 0);
+            }
+
             HashSet<string> seen = new(StringComparer.Ordinal);
             foreach (Match match in PathLike.Matches(m.Content))
             {
                 var p = match.Groups[1].Value.TrimEnd('.', ',', ';', ':', ')');
                 if (seen.Contains(p) || p.Split('/').All(s => s.StartsWith('.')) || p.Contains("://", StringComparison.Ordinal) || !top.Contains(p.Split('/')[0]) && !SourceExtensions.Contains(Path.GetExtension(p)))
+                {
                     continue;
+                }
+
                 seen.Add(p);
                 if (Exists(p))
+                {
                     continue;
+                }
+
                 var dot = p.LastIndexOf('.');
                 if (dot > p.LastIndexOf('/') && Exists(p[..dot]) && CodeName.IsMatch(p[(dot + 1)..]))
                 {
                     if (!Contains(p[(dot + 1)..]))
+                    {
                         Add(m, p, "quotes a code name that appears nowhere in the repository now", "heuristic", .7);
+                    }
+
                     continue;
                 }
                 Add(m, p, "names a path that is not in the repository now", "fact", 0);
@@ -84,12 +108,20 @@ public static class KnowledgeDrift
             {
                 var name = match.Groups[1].Value.Trim();
                 if (name.EndsWith("()", StringComparison.Ordinal))
+                {
                     name = name[..^2];
+                }
+
                 if (seen.Contains(name) || name.Length < 4 || !CodeName.IsMatch(name) || !name.Contains('.', StringComparison.Ordinal) && !name.Contains('_', StringComparison.Ordinal) && !name.Any(char.IsUpper))
+                {
                     continue;
+                }
+
                 seen.Add(name);
                 if (name.Split('.').Any(part => part.Length >= 3 && !Contains(part)))
+                {
                     Add(m, name, "quotes a code name that appears nowhere in the repository now", "heuristic", .7);
+                }
             }
         }
         return result;

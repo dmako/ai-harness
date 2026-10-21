@@ -22,15 +22,25 @@ public static class RetrievalGatherer
             {
                 await CodeAsync(registry, phrases, token).ConfigureAwait(false);
                 if (!TaskParsing.TaskAboutTests(task.Text))
+                {
                     foreach (var candidate in _candidates.Where(candidate => candidate.Source is "code" && TaskParsing.IsTestFile(candidate.Path)))
+                    {
                         candidate.Scores["test"] = 1;
+                    }
+                }
             }
             token.ThrowIfCancellationRequested();
             if (sources.Memory is not null)
+            {
                 await MemoriesAsync(token).ConfigureAwait(false);
+            }
+
             token.ThrowIfCancellationRequested();
             if (sources.RecentChanges is not null)
+            {
                 await ChangesAsync(token).ConfigureAwait(false);
+            }
+
             token.ThrowIfCancellationRequested();
             return new(_candidates, _symbols, phrases, _errors, _notes, _calls);
         }
@@ -48,7 +58,10 @@ public static class RetrievalGatherer
                 await BoundedAsync(Task.Run(() => context is null ? registry.DiscoverAsync(linked.Token) : context.DiscoverContextAsync(linked.Token), CancellationToken.None), linked.Token).ConfigureAwait(false);
                 var capabilities = await BoundedAsync(Task.Run(() => context is null ? registry.Capabilities() : context.ContextCapabilities(), linked.Token), linked.Token).ConfigureAwait(false);
                 foreach (var info in capabilities)
+                {
                     information[info.Provider + "\0" + info.Capability] = info;
+                }
+
                 await AskAsync(Capabilities.SymbolSearch, task.Text, loose: true).ConfigureAwait(false);
                 await AskAsync(Capabilities.Context, task.Text).ConfigureAwait(false);
                 foreach (var symbol in _symbols)
@@ -60,7 +73,9 @@ public static class RetrievalGatherer
                         await AskAsync(Capabilities.SymbolSearch, name, name).ConfigureAwait(false);
                         Qualify(before, name);
                         if (_candidates.Skip(before).Any(candidate => candidate.Scores.GetValueOrDefault("name") is 1))
+                        {
                             defined.Add(name);
+                        }
                     }
                     foreach (var name in defined)
                     {
@@ -75,7 +90,9 @@ public static class RetrievalGatherer
                     await AskAsync(Capabilities.FileSearch, phrase, phrase: phrase).ConfigureAwait(false);
                     var head = TaskParsing.HeadNoun(phrase);
                     if (_candidates.Count == before && head.Length >= 4)
+                    {
                         await AskAsync(Capabilities.FileSearch, head, phrase: head).ConfigureAwait(false);
+                    }
                 }
             }
             catch (OperationCanceledException) when (linked.IsCancellationRequested) { token.ThrowIfCancellationRequested(); }
@@ -83,13 +100,18 @@ public static class RetrievalGatherer
             finally
             {
                 if (deadline.IsCancellationRequested)
+                {
                     Add(_notes, "code search stopped after " + Duration(duration) + "; the answer may miss code (a provider was slow)");
+                }
             }
 
             async Task AskAsync(string capability, string query, string name = "", string phrase = "", bool loose = false)
             {
                 if (linked.IsCancellationRequested)
+                {
                     return;
+                }
+
                 var before = _candidates.Count;
                 // The registry bounds each adapter and returns completed peers when the shared deadline expires.
                 var results = await registry.CallAsync(new(capability, query, task.Path, task.Limit > 0 ? task.Limit : 10), provider => failed.Contains(provider) || context?.InContext(provider) is false, linked.Token).ConfigureAwait(false);
@@ -100,7 +122,10 @@ public static class RetrievalGatherer
                     {
                         failed.Add(result.Provider);
                         if (!linked.IsCancellationRequested)
+                        {
                             Add(error is ProviderNotIndexedException ? _notes : _errors, CredentialRedactor.Redact(error.Message));
+                        }
+
                         continue;
                     }
                     var info = information.GetValueOrDefault(result.Provider + "\0" + result.Capability) ?? new CapabilityInfo(result.Capability, "");
@@ -109,18 +134,31 @@ public static class RetrievalGatherer
                         var item = result.Items[i];
                         var candidate = Candidate.FromItem(info with { Capability = result.Capability }, i, item);
                         if (name.Length > 0 && TaskParsing.LastName(item.Name ?? "") == TaskParsing.LastName(name))
+                        {
                             candidate.Scores["name"] = 1;
+                        }
+
                         if (loose)
+                        {
                             candidate.Scores["loose"] = 1;
+                        }
+
                         var filename = candidate.Path[(candidate.Path.LastIndexOf('/') + 1)..];
                         if (phrase.Length > 0 && (candidate.Name + " " + filename).Contains(phrase, StringComparison.OrdinalIgnoreCase))
+                        {
                             candidate.Scores["phrase"] = 1;
+                        }
+
                         _candidates.Add(candidate);
                     }
                 }
                 if (_candidates.Skip(before).Count(candidate => candidate.Scores.GetValueOrDefault("phrase") is 1) > 3)
+                {
                     foreach (var candidate in _candidates.Skip(before))
+                    {
                         candidate.Scores.Remove("phrase");
+                    }
+                }
             }
         }
 
@@ -128,9 +166,14 @@ public static class RetrievalGatherer
         {
             var qualifier = TaskParsing.Qualifier(name);
             if (qualifier.Length is 0 || !_candidates.Skip(from).Any(candidate => candidate.Scores.GetValueOrDefault("name") is 1 && TaskParsing.InQualifier(candidate, qualifier)))
+            {
                 return;
+            }
+
             foreach (var candidate in _candidates.Skip(from).Where(candidate => candidate.Scores.GetValueOrDefault("name") is 1 && !TaskParsing.InQualifier(candidate, qualifier)))
+            {
                 candidate.Scores["name"] = 0.3;
+            }
         }
 
         private async Task MemoriesAsync(CancellationToken token)
@@ -138,17 +181,26 @@ public static class RetrievalGatherer
             Dictionary<string, int> seen = new(StringComparer.Ordinal);
             string[] types = ["decision", "convention", "warning", "constraint"];
             foreach (var path in Paths(10))
+            {
                 foreach (var memory in await SearchAsync(new() { Types = types, Scope = new("path", path), Branch = sources.Branch, Limit = 20 }).ConfigureAwait(false))
+                {
                     AddMemory(memory, ScopeScore(memory.Scope, path), "memory (applies to " + path + ")");
+                }
+            }
+
             var words = TaskParsing.ContentWords(task.Text);
             if (words.Length > 0)
             {
                 var matches = await SearchAsync(new() { Text = words, Types = types, Limit = 10 }).ConfigureAwait(false);
                 for (var i = 0; i < matches.Count; i++)
+                {
                     AddMemory(matches[i], 0.6 / (1 + i), "memory (matches the task)");
+                }
             }
             foreach (var goal in await SearchAsync(new() { Types = ["goal"], Limit = 5 }).ConfigureAwait(false))
+            {
                 AddMemory(goal, 0.2, "memory (project goal)");
+            }
 
             async Task<IReadOnlyList<MemoryRecord>> SearchAsync(MemoryQuery query)
             {
@@ -156,7 +208,10 @@ public static class RetrievalGatherer
                 {
                     var result = await sources.Memory!(query, token).ConfigureAwait(false);
                     foreach (var error in result.Errors)
+                    {
                         Add(_errors, "memory: " + CredentialRedactor.Redact(error));
+                    }
+
                     return result.Memories;
                 }
                 catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
@@ -182,13 +237,19 @@ public static class RetrievalGatherer
             {
                 var commits = await sources.RecentChanges!(paths, 5, token).ConfigureAwait(false);
                 for (var i = 0; i < commits.Count; i++)
+                {
                     foreach (var path in commits[i].Paths)
+                    {
                         _candidates.Add(Candidate.FromCommit(commits[i], path, 1d / (1 + i)));
+                    }
+                }
             }
             catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
             {
                 if (paths.Length > 0)
+                {
                     Add(_errors, "git: " + CredentialRedactor.Redact(error.Message));
+                }
             }
         }
         private string[] Paths(int count) => _candidates.Select((candidate, position) => (candidate, position)).Where(pair => pair.candidate.Source is "code" && pair.candidate.Path.Length > 0)
@@ -196,7 +257,11 @@ public static class RetrievalGatherer
             .OrderBy(pair => FirstRank(pair.candidate)).ThenBy(pair => pair.position).Take(count).Select(pair => pair.candidate.Path).ToArray();
         private static int FirstRank(Candidate candidate) => candidate.Provenance.Count > 0 ? candidate.Provenance[0].Rank : 0;
         private static double ScopeScore(MemoryScope scope, string path) => scope.Kind switch { "path" => scope.Value == path ? 1 : 0.8, "subsystem" or "branch" => 0.6, "workspace" => 0.25, "user" => 0.2, _ => 0.3 };
-        private static void Add(List<string> values, string value) { if (!values.Contains(value, StringComparer.Ordinal)) values.Add(value); }
+        private static void Add(List<string> values, string value) { if (!values.Contains(value, StringComparer.Ordinal))
+            {
+                values.Add(value);
+            }
+        }
         private static string Duration(TimeSpan duration) => duration.TotalSeconds >= 1 ? duration.TotalSeconds.ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture) + "s" : duration.TotalMilliseconds.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) + "ms";
         private static async Task BoundedAsync(Task operation, CancellationToken token)
         {

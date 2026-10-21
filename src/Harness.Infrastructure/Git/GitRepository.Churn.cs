@@ -10,7 +10,10 @@ public sealed partial record GitRepository
     {
         var result = await RunAsync(Root, ["log", "--no-merges", "--since=" + since.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture), "--format=%x1e", "--name-only"], token).ConfigureAwait(false);
         if (result.Code is not 0)
+        {
             throw new IOException("read Git churn: " + result.Error.Trim());
+        }
+
         Dictionary<string, int> counts = new(StringComparer.Ordinal);
         var commits = 0;
         foreach (var record in result.Output.Split('\u001e'))
@@ -19,7 +22,9 @@ public sealed partial record GitRepository
             foreach (var path in record.Split('\n').Select(path => path.Trim()).Where(path => path.Length > 0))
             { counts[path] = counts.GetValueOrDefault(path) + 1; seen = true; }
             if (seen)
+            {
                 commits++;
+            }
         }
         return new(counts, commits);
     }

@@ -36,7 +36,10 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
         var counts = languages.Select(language => (Language: language, Count: files.Count(file => Language(Path.GetExtension(file)) == language))).ToArray();
         var best = counts.OrderByDescending(row => row.Count).First();
         if (best.Count is 0)
+        {
             return null;
+        }
+
         var stack = best.Language switch
         {
             "C#" => Dotnet(files),
@@ -53,18 +56,31 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
         foreach (var file in files.Where(file => Path.GetExtension(file) is ".csproj"))
         {
             if (TaskParsing.IsTestFile(file) || file.Contains("example", StringComparison.OrdinalIgnoreCase) || ecosystem.DotnetTest(file))
+            {
                 continue;
+            }
+
             var host = AnalysisRepository.Lines(repository.Read(file)).Select(line => SdkAttribute.Match(line).Groups[1].Value).Any(name => name.EndsWith(".Web", StringComparison.Ordinal) || name.EndsWith(".Worker", StringComparison.Ordinal)) ? 2 : 0;
             if (host is 2)
+            {
                 packages["Microsoft.AspNetCore"] = ("", "");
+            }
+
             var evaluated = ecosystem.Build.Evaluate(file);
             if (host is 0 && evaluated.Properties.GetValueOrDefault("OutputType", "").Equals("exe", StringComparison.OrdinalIgnoreCase))
+            {
                 host = 1;
+            }
+
             var at = evaluated.PropertyLocations.GetValueOrDefault("TargetFrameworks") ?? evaluated.PropertyLocations.GetValueOrDefault("TargetFramework", "");
             targets.AddRange(evaluated.Frameworks.Select(framework => (framework, at, host)));
             foreach (var package in evaluated.Packages)
+            {
                 if (!packages.TryGetValue(package.Name, out var old) || old.Version.Length is 0)
+                {
                     packages[package.Name] = (package.Unresolved ? "" : package.Version, package.At);
+                }
+            }
         }
         StackPart? runtime = null;
         var net = EcosystemReader.Rx(@"^net(\d+)\.(\d+)$");
@@ -83,12 +99,16 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
                     { highest = numeric; runtime = Part(".NET", version, match.Groups[2].Value is "0" ? match.Groups[1].Value : version, target.At); }
                 }
                 else if (standard.Match(target.Framework) is { Success: true } std && runtime is null)
+                {
                     runtime = Part(".NET Standard", std.Groups[1].Value, std.Groups[1].Value, target.At);
+                }
             }
         }
         List<StackPart> frameworks = [];
         foreach (var framework in DotnetFrameworks)
+        {
             foreach (var name in packages.Keys.OrderByDescending(name => name == framework.Package).ThenBy(name => name, WorkspaceNameComparer.Instance))
+            {
                 if (name == framework.Package || name.StartsWith(framework.Package + ".", StringComparison.Ordinal))
                 {
                     var value = packages[name];
@@ -96,6 +116,9 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
                     frameworks.Add(Part(framework.Name, version, Major(version), value.At));
                     break;
                 }
+            }
+        }
+
         return new("C#", runtime, frameworks, "");
     }
     private ProjectStack Node(IReadOnlyList<string> files, string language)
@@ -103,36 +126,59 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
         using var document = ecosystem.Json("package.json");
         var root = document?.RootElement ?? default;
         if (ObjectHas(root, "devDependencies", "typescript") || files.Contains("tsconfig.json", StringComparer.Ordinal))
+        {
             language = "TypeScript";
+        }
+
         var dependencies = ecosystem.Dependencies("package.json");
         var frameworks = JsFrameworks.Select(framework => (Framework: framework, Dependency: dependencies.FirstOrDefault(d => d.Name == framework.Package))).Where(row => row.Dependency is not null).Select(row => Part(row.Framework.Name, row.Dependency!.Version, Major(row.Dependency.Version), row.Dependency.Path + ":" + row.Dependency.Line.ToString(CultureInfo.InvariantCulture))).ToList();
         if (frameworks.FirstOrDefault()?.Name is "Next.js")
+        {
             frameworks.RemoveAll(framework => framework.Name is "React");
+        }
+
         StackPart? runtime = null;
         var engine = ObjectString(root, "engines", "node");
         if (Number.Match(engine) is { Success: true } number)
+        {
             runtime = Part("Node", engine, number.Value.Split('.')[0], LineOf("package.json", "\"node\""));
+        }
+
         foreach (var file in new[] { ".nvmrc", ".node-version" })
         {
             if (runtime is not null || !files.Contains(file, StringComparer.Ordinal))
+            {
                 continue;
+            }
+
             var value = repository.Read(file).Trim().TrimStart('v').Trim();
             if (Number.IsMatch(value) && !value.Contains("lts", StringComparison.Ordinal))
+            {
                 runtime = Part("Node", value, Major(value), file);
+            }
         }
         foreach (var file in files.Where(file => Path.GetFileName(file).StartsWith("dockerfile", StringComparison.OrdinalIgnoreCase)))
         {
             if (runtime is not null)
+            {
                 break;
+            }
+
             Dictionary<string, string> arguments = new(StringComparer.Ordinal);
             foreach (var (line, index) in AnalysisRepository.Lines(repository.Read(file)).Select((line, index) => (line, index + 1)))
             {
                 var arg = DockerArgument.Match(line);
                 if (arg.Success)
+                {
                     arguments[arg.Groups[1].Value] = arg.Groups[2].Value;
+                }
+
                 var from = DockerFromNode.Match(line);
                 if (!from.Success)
+                {
                     continue;
+                }
+
                 var tag = EnvironmentVariable.Replace(from.Groups[1].Value, match => arguments.GetValueOrDefault(match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value, ""));
                 var version = Number.Match(tag).Value;
                 if (version.Length > 0)
@@ -145,11 +191,14 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
     {
         StackPart? runtime = null;
         foreach (var (line, index) in AnalysisRepository.Lines(repository.Read("go.mod")).Select((line, index) => (line.Trim(), index + 1)))
+        {
             if (runtime is null && line.StartsWith("go ", StringComparison.Ordinal))
             {
                 var version = line[3..].Trim();
                 runtime = Part("Go", version, string.Join('.', version.Split('.').Take(2)), "go.mod:" + index.ToString(CultureInfo.InvariantCulture));
             }
+        }
+
         var dependencies = ecosystem.Dependencies("go.mod");
         var frameworks = GoFrameworks.SelectMany(framework => dependencies.Where(dependency => dependency.Name.StartsWith(framework.Package, StringComparison.Ordinal)).Select(dependency => Part(framework.Name, dependency.Version, Major(dependency.Version), dependency.Path + ":" + dependency.Line.ToString(CultureInfo.InvariantCulture)))).ToArray();
         return new("Go", runtime, frameworks, "");
@@ -163,13 +212,24 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
         {
             var trimmed = line.Trim();
             if (!line.StartsWith(' ') && trimmed.EndsWith(':'))
+            {
                 section = trimmed[..^1];
+            }
+
             if (section is "environment" && trimmed.StartsWith("sdk:", StringComparison.Ordinal) && Number.IsMatch(trimmed))
+            {
                 runtime = Part("Dart", trimmed[4..].Trim(' ', '"', '\''), Major(trimmed), "pubspec.yaml:" + index.ToString(CultureInfo.InvariantCulture));
+            }
+
             if (section is "environment" && trimmed.StartsWith("flutter:", StringComparison.Ordinal))
+            {
                 frameworks.Add(Part("Flutter", trimmed[8..].Trim(' ', '"', '\''), Major(trimmed), "pubspec.yaml:" + index.ToString(CultureInfo.InvariantCulture)));
+            }
+
             if (section is "dependencies" && trimmed is "flutter:" && frameworks.Count is 0)
+            {
                 frameworks.Add(Part("Flutter", "", "", "pubspec.yaml:" + index.ToString(CultureInfo.InvariantCulture)));
+            }
         }
         return new("Dart", runtime, frameworks, "");
     }
@@ -188,17 +248,27 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
     private static string Badge(ProjectStack stack)
     {
         if (stack.Language is "Go" && stack.Runtime is { } go)
+        {
             return "Go " + go.Major;
+        }
+
         List<string> parts = [stack.Language];
         var framework = stack.Frameworks.FirstOrDefault(f => f.Name is not ("Vite" or "EF Core" or "ASP.NET Core" or "MediatR") && !f.Name.StartsWith("gRPC", StringComparison.Ordinal));
         if (framework is not null)
+        {
             parts.Add((framework.Name + " " + framework.Major).Trim());
+        }
+
         if (stack.Runtime is { } runtime)
         {
             if (runtime.Name == stack.Language)
+            {
                 parts[0] = (stack.Language + " " + runtime.Major).Trim();
+            }
             else
+            {
                 parts.Add((runtime.Name + " " + runtime.Major).Trim());
+            }
         }
         return string.Join(" · ", parts);
     }

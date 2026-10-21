@@ -150,7 +150,9 @@ public sealed class ProposalStoreTests
             command.CommandText = sql;
             using var reader = command.ExecuteReader();
             while (reader.Read())
+            {
                 rows.Add(Enumerable.Range(0, reader.FieldCount).Select(index => reader.IsDBNull(index) ? null : reader.GetValue(index)).ToArray());
+            }
         }
         return JsonSerializer.Serialize(rows);
     }

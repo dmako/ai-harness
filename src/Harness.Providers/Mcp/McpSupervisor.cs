@@ -30,14 +30,17 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
     private Task? _closeTask;
     private readonly List<McpProcessClient> _retired = [];
 
-    public string ServerVersion { get { lock (_gate) return _current?.ServerVersion ?? ""; } }
+    public string ServerVersion { get { lock (_gate) { return _current?.ServerVersion ?? ""; } } }
 
     public async Task<McpProcessClient> ClientAsync(CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
             if (_current is { Alive: true } current)
+            {
                 return current;
+            }
+
             ObjectDisposedException.ThrowIf(_closed, this);
         }
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
@@ -49,7 +52,10 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
             {
                 ObjectDisposedException.ThrowIf(_closed, this);
                 if (_current is { Alive: true } current)
+                {
                     return current;
+                }
+
                 old = _current;
                 if (old is not null)
                 {
@@ -58,7 +64,10 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
                 }
             }
             if (old is not null)
+            {
                 await old.DisposeAsync().ConfigureAwait(false);
+            }
+
             lock (_gate)
             { CheckGate(); }
             McpProcessClient started;
@@ -71,7 +80,9 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
                 lock (_gate)
                 {
                     if (!_closed && !cancellationToken.IsCancellationRequested)
+                    {
                         Fail(error);
+                    }
                 }
                 throw;
             }
@@ -109,7 +120,9 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
     public ValueTask DisposeAsync()
     {
         lock (_gate)
+        {
             return new(_closeTask ??= CloseAsync());
+        }
     }
 
     private async Task CloseAsync()
@@ -117,7 +130,10 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
         lock (_gate)
         {
             if (_closed)
+            {
                 return;
+            }
+
             _closed = true;
         }
         await _lifetime.CancelAsync().ConfigureAwait(false);
@@ -138,7 +154,10 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
         lock (_gate)
         {
             if (_current != client || _closed)
+            {
                 return;
+            }
+
             _current = null;
             _retired.Add(client);
             Fail(new IOException(options.Name + ": provider process exited; stderr: " + client.StderrTail(3)));
@@ -156,16 +175,23 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
     private void Prune()
     {
         while (_failures.TryPeek(out var at) && _clock.GetUtcNow() - at >= _policy.Window)
+        {
             _failures.Dequeue();
+        }
     }
 
     private void CheckGate()
     {
         Prune();
         if (_failures.Count >= _policy.MaxFailures)
+        {
             throw new IOException(string.Create(CultureInfo.InvariantCulture, $"{options.Name} failed {_failures.Count} times in {_policy.Window}; not retrying until {_failures.Peek().Add(_policy.Window):HH:mm:ss}. Last error: {_lastError?.Message}"));
+        }
+
         if (_clock.GetUtcNow() < _nextAttempt)
+        {
             throw new IOException(options.Name + " is restarting after a failure. Last error: " + _lastError?.Message);
+        }
     }
 
     private void Fail(Exception error)

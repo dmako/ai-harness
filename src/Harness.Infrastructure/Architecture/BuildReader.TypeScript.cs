@@ -27,32 +27,52 @@ public sealed partial class BuildReader
         List<string> globs = [.. root.Workspaces];
         var inPackages = false;
         if (repository.Exists("pnpm-workspace.yaml"))
+        {
             foreach (var line in AnalysisRepository.Lines(repository.Read("pnpm-workspace.yaml")))
             {
                 var text = line.Trim();
                 if (text.StartsWith("packages:", StringComparison.Ordinal))
+                {
                     inPackages = true;
+                }
                 else if (inPackages && text.StartsWith("- ", StringComparison.Ordinal))
+                {
                     globs.Add(text[2..].Trim().Trim('\'', '"'));
+                }
                 else if (inPackages && text.Length > 0 && !text.StartsWith('#'))
+                {
                     inPackages = false;
+                }
             }
+        }
+
         var noun = globs.Count > 0 ? "package" : "folder";
         List<TsUnit> units = [];
         if (noun is "package")
+        {
             foreach (var file in repository.Files.Where(file => files.Contains(file) && file != "package.json" && Path.GetFileName(file) is "package.json" && globs.Any(glob => Glob(glob, Directory(file)))))
             {
                 var package = ReadPackage(file);
                 if (package.Name.Length is 0)
+                {
                     continue;
+                }
+
                 var dir = Directory(file);
                 var kind = dir.StartsWith("apps/", StringComparison.Ordinal) || package.Private && package.Main.Length is 0 && !package.Bin ? "entry" : "library";
                 if (TestDirectories.Contains(Path.GetFileName(dir)))
+                {
                     kind = "test";
+                }
+
                 units.Add(new(new() { Name = package.Name, Path = file, Kind = kind, Package = package.Private ? null : package.Name, Version = package.Private ? null : Empty(package.Version) }, dir, false, package));
             }
+        }
         else
+        {
             units = FolderUnits(code, root);
+        }
+
         var aliases = Aliases();
         var byName = noun is "package" ? units.ToDictionary(unit => unit.Build.Name, StringComparer.Ordinal) : new Dictionary<string, TsUnit>(StringComparer.Ordinal);
         Dictionary<(string From, string To), List<string>> deeps = [];
@@ -60,21 +80,32 @@ public sealed partial class BuildReader
         {
             var from = UnitOf(file);
             if (from is null || TsTest(file) && from.Build.Kind is not "test")
+            {
                 continue;
+            }
+
             var lines = AnalysisRepository.Lines(repository.Read(file));
             for (var index = 0; index < lines.Length; index++)
             {
                 var line = lines[index].Trim();
                 if (line.StartsWith("//", StringComparison.Ordinal) || line.StartsWith('*'))
+                {
                     continue;
+                }
+
                 foreach (var import in Imports.Matches(lines[index]).Select(match => match.Groups))
                 {
                     var (target, bare) = Resolve(import[1].Value, file, aliases, files);
                     TsUnit? to = null;
                     if (target.Length > 0)
+                    {
                         to = UnitOf(target);
+                    }
                     else if (bare.Length > 0 && !byName.TryGetValue(bare, out to) && !bare.StartsWith("node:", StringComparison.Ordinal))
+                    {
                         from.Npm.Add(bare);
+                    }
+
                     if (to is not null && to != from)
                     {
                         Reference(from.Build, to.Build.Path, file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture));
@@ -87,7 +118,9 @@ public sealed partial class BuildReader
                                 if (!deeps.TryGetValue(key, out var places))
                                 { places = []; deeps.Add(key, places); }
                                 if (places.Count < 3)
+                                {
                                     places.Add(file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture) + " " + import[1].Value);
+                                }
                             }
                         }
                     }
@@ -97,17 +130,26 @@ public sealed partial class BuildReader
         foreach (var unit in units)
         {
             if (noun is "package")
+            {
                 foreach (var section in unit.Package.Dependencies)
+                {
                     foreach (var name in section.Keys)
                     {
                         if (byName.TryGetValue(name, out var to))
                         {
                             if (to != unit)
+                            {
                                 Reference(unit.Build, to.Build.Path, LineOf(unit.Build.Path, '"' + name + '"'));
+                            }
                         }
                         else
+                        {
                             unit.Npm.Add(name);
+                        }
                     }
+                }
+            }
+
             var source = noun is "package" ? unit.Package : root;
             unit.Build.Packages.AddRange(unit.Npm.Order(WorkspaceNameComparer.Instance).Select(name => new BuildPackage(name, Empty(PackageVersion(source, name) is { Length: > 0 } version ? version : PackageVersion(root, name)))));
             unit.Build.References.Sort(WorkspaceNameComparer.Instance);
@@ -142,7 +184,10 @@ public sealed partial class BuildReader
             var under = code.Where(file => Under(file, source, out _)).Select(file => { _ = Under(file, source, out var relative); return relative; }).ToArray();
             var next = under.Where(file => file.Contains('/', StringComparison.Ordinal)).GroupBy(file => file.Split('/')[0], StringComparer.Ordinal).Where(group => group.Count() * 10 >= under.Length * 9 && !Containers.Contains(group.Key) && !TestDirectories.Contains(group.Key)).Select(group => group.Key).LastOrDefault();
             if (next is null || under.Length is 0)
+            {
                 break;
+            }
+
             source = Join(source.Length is 0 ? "." : source, next);
         }
         var dirs = code.Where(file => Under(file, source, out _)).Select(file =>
@@ -153,10 +198,16 @@ public sealed partial class BuildReader
         }).Where(dir => dir.Length > 0).Distinct(StringComparer.Ordinal).Order(WorkspaceNameComparer.Instance);
         var rootName = Path.GetFileName(source);
         if (source.Length is 0)
+        {
             rootName = root.Name.Length is 0 ? "root" : root.Name;
+        }
+
         List<TsUnit> units = [new(new() { Name = rootName, Path = source.Length is 0 ? "." : source, Kind = "entry" }, "", true, root)];
         foreach (var dir in dirs)
+        {
             units.Add(new(new() { Name = dir, Path = Join(source.Length is 0 ? "." : source, dir), Kind = TestDirectories.Contains(Path.GetFileName(dir)) ? "test" : "library" }, Join(source.Length is 0 ? "." : source, dir), false, root));
+        }
+
         return units;
     }
     private PackageInfo ReadPackage(string file)
@@ -169,9 +220,14 @@ public sealed partial class BuildReader
         if (root.ValueKind is JsonValueKind.Object && root.TryGetProperty("workspaces", out var ws))
         {
             if (ws.ValueKind is JsonValueKind.Object)
+            {
                 _ = ws.TryGetProperty("packages", out ws);
+            }
+
             if (ws.ValueKind is JsonValueKind.Array)
+            {
                 workspaces.AddRange(ws.EnumerateArray().Where(item => item.ValueKind is JsonValueKind.String).Select(item => item.GetString()!));
+            }
         }
         return new(Text("name"), Text("version"), root.ValueKind is JsonValueKind.Object && root.TryGetProperty("private", out var priv) && priv.ValueKind is JsonValueKind.True, Text("main"), root.ValueKind is JsonValueKind.Object && root.TryGetProperty("bin", out _), [Section("dependencies"), Section("devDependencies"), Section("peerDependencies")], workspaces);
     }
@@ -184,43 +240,63 @@ public sealed partial class BuildReader
             {
                 using var document = JsonDocument.Parse(repository.Read(file), new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
                 if (!document.RootElement.TryGetProperty("compilerOptions", out var options) || options.ValueKind is not JsonValueKind.Object)
+                {
                     continue;
+                }
+
                 var baseUrl = options.TryGetProperty("baseUrl", out var value) && value.ValueKind is JsonValueKind.String ? value.GetString()! : "";
                 var directory = Join(Directory(file), baseUrl.Length is 0 ? "." : baseUrl);
                 if (options.TryGetProperty("paths", out var paths) && paths.ValueKind is JsonValueKind.Object)
+                {
                     foreach (var property in paths.EnumerateObject().Where(property => property.Value.ValueKind is JsonValueKind.Array && property.Value.GetArrayLength() > 0 && property.Value[0].ValueKind is JsonValueKind.String))
                     {
                         var path = property.Value[0].GetString()!;
                         aliases.Add((property.Name.TrimEnd('*'), Join(directory, path.TrimEnd('*')).TrimEnd('/') + (path.EndsWith('*') || path.EndsWith('/') ? "/" : "")));
                     }
+                }
+
                 if (baseUrl.Length > 0)
+                {
                     aliases.Add(("", directory.TrimEnd('/') + "/"));
+                }
             }
             catch (JsonException) { /* Unreadable alias configuration supplies no resolution evidence. */ }
         }
         foreach (var file in repository.Files.Where(file => !TsGenerated(file) && Path.GetFileName(file).StartsWith("vite.config.", StringComparison.Ordinal)))
+        {
             foreach (var groups in ViteAlias.Matches(repository.Read(file)).Select(match => match.Groups))
+            {
                 aliases.Add((groups[1].Value.TrimEnd('/') + "/", Join(Directory(file), groups[2].Value) + "/"));
+            }
+        }
+
         return aliases.OrderByDescending(alias => alias.Prefix.Length).ToList();
     }
     private (string Target, string Bare) Resolve(string spec, string from, IReadOnlyList<(string Prefix, string Directory)> aliases, HashSet<string> files)
     {
         if (spec.StartsWith('.'))
+        {
             return (Exists(Join(Directory(from), spec), files), "");
+        }
+
         foreach (var alias in aliases)
         {
             if (alias.Prefix.Length is 0)
             {
                 var target = Exists(Join(alias.Directory, spec), files);
                 if (target.Length > 0)
+                {
                     return (target, "");
+                }
             }
             else if (spec == alias.Prefix.TrimEnd('/') || spec.StartsWith(alias.Prefix, StringComparison.Ordinal))
             {
                 var rest = spec[alias.Prefix.TrimEnd('/').Length..].TrimStart('/');
                 var target = Exists(Join(alias.Directory, rest.Length is 0 ? "." : rest), files);
                 if (target.Length > 0)
+                {
                     return (target, "");
+                }
             }
         }
         var parts = spec.Split('/');
@@ -229,9 +305,15 @@ public sealed partial class BuildReader
     private static string Exists(string path, HashSet<string> files)
     {
         if (files.Contains(path))
+        {
             return path[..(path.Length - Path.GetExtension(path).Length)];
+        }
+
         if (TsCodeExtensions.Append(".d.ts").Any(extension => files.Contains(path + extension) || files.Contains(path + "/index" + extension)))
+        {
             return path;
+        }
+
         var ext = Path.GetExtension(path);
         var stem = path[..(path.Length - ext.Length)];
         return ext is ".js" or ".jsx" && (files.Contains(stem + ".ts") || files.Contains(stem + ".tsx")) ? stem : "";
@@ -244,7 +326,10 @@ public sealed partial class BuildReader
     private static void Reference(BuildUnit unit, string to, string at)
     {
         if (unit.References.Contains(to, StringComparer.Ordinal))
+        {
             return;
+        }
+
         unit.References.Add(to);
         (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[to] = at;
     }
@@ -253,16 +338,25 @@ public sealed partial class BuildReader
     {
         relative = file.StartsWith(directory + "/", StringComparison.Ordinal) ? file[(directory.Length + 1)..] : "";
         if (directory is "" or ".")
+        {
             relative = file;
+        }
+
         return directory is "" or "." || relative.Length > 0;
     }
     private static bool Glob(string glob, string directory)
     {
         if (glob.StartsWith("./", StringComparison.Ordinal))
+        {
             glob = glob[2..];
+        }
+
         glob = glob.TrimEnd('/');
         if (glob.EndsWith("/**", StringComparison.Ordinal))
+        {
             return directory.StartsWith(glob[..^2], StringComparison.Ordinal);
+        }
+
         var pattern = "^" + Regex.Escape(glob).Replace("\\*", "[^/]*", StringComparison.Ordinal).Replace("\\?", "[^/]", StringComparison.Ordinal) + "$";
         return Regex.IsMatch(directory, pattern, RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
     }

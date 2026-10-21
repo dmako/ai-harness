@@ -22,7 +22,10 @@ internal sealed class BoundedFrameStream(Stream inner, int limit, Action oversiz
     protected override void Dispose(bool disposing)
     {
         if (disposing)
+        {
             inner.Dispose();
+        }
+
         base.Dispose(disposing);
     }
     private int Check(ReadOnlySpan<byte> buffer)

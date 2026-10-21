@@ -1,6 +1,6 @@
-using System.Text.Json.Nodes;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Harness.Core.Projects;
 using Harness.Infrastructure.Storage;
 
@@ -68,7 +68,10 @@ public sealed class MachineRegistry(string path)
         var projects = registry["projects"]!.AsArray();
         var rows = projects.OfType<JsonObject>().Where(row => row["id"]?.GetValue<string>() == id).ToArray();
         foreach (var row in rows)
+        {
             projects.Remove(row);
+        }
+
         return rows.Length > 0;
     }, token);
 
@@ -76,7 +79,10 @@ public sealed class MachineRegistry(string path)
     {
         name = name?.Trim();
         if (name is { Length: > 0 } && !System.Text.RegularExpressions.Regex.IsMatch(name, @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", System.Text.RegularExpressions.RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1)))
+        {
             throw new InvalidOperationException("short name " + JsonSerializer.Serialize(name) + ": use letters, digits, '.', '_' or '-' (max 64)");
+        }
+
         title = Harness.Infrastructure.Workspaces.WorkspaceStore.NormalizeTitle(title);
         JsonObject? result = null;
         await Harness.Infrastructure.Workspaces.AtomicMachineFile.UpdateAsync(path, Load, registry =>
@@ -84,9 +90,25 @@ public sealed class MachineRegistry(string path)
             var row = registry["projects"]!.AsArray().OfType<JsonObject>().FirstOrDefault(row => row["id"]?.GetValue<string>() == id)
                 ?? throw new InvalidOperationException("project " + id + " is not registered on this machine");
             if (name is not null)
-            { if (name.Length is 0) row.Remove("name"); else row["name"] = name; }
+            { if (name.Length is 0)
+                {
+                    row.Remove("name");
+                }
+                else
+                {
+                    row["name"] = name;
+                }
+            }
             if (title is not null)
-            { if (title.Length is 0) row.Remove("title"); else row["title"] = title; }
+            { if (title.Length is 0)
+                {
+                    row.Remove("title");
+                }
+                else
+                {
+                    row["title"] = title;
+                }
+            }
             result = (JsonObject)row.DeepClone();
             return true;
         }, token).ConfigureAwait(false);

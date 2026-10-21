@@ -1,16 +1,16 @@
-using Harness.Mcp.Workspaces;
-using Harness.Infrastructure.Workspaces;
-using Harness.Infrastructure.Configuration;
 using System.Diagnostics.CodeAnalysis;
 using Harness.Core.Projects;
-using Harness.Infrastructure.Projects;
+using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Graphify;
-using Harness.Providers.Registry;
-using Harness.Mcp;
 using Harness.Infrastructure.Processes;
-using Harness.Providers.Packs;
+using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Providers;
 using Harness.Infrastructure.Telemetry;
+using Harness.Infrastructure.Workspaces;
+using Harness.Mcp;
+using Harness.Mcp.Workspaces;
+using Harness.Providers.Packs;
+using Harness.Providers.Registry;
 using Microsoft.Extensions.Logging;
 using Spectre.Console.Cli;
 
@@ -58,7 +58,9 @@ internal sealed class McpCommand(ProjectLifecycle lifecycle, BuildInformation in
         {
             var candidate = GraphifyDiscovery.FindInput(root);
             if (candidate.AtRoot || candidate.Path.Length > 0 || candidate.Candidates is { Count: > 0 })
+            {
                 return [.. languages, "csharp"];
+            }
         }
         return languages;
     }

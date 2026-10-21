@@ -28,7 +28,10 @@ public static class RetrievalMerger
         {
             var candidate = output[i];
             if (candidate.Source is not "code" || candidate.Role is "definition" || candidate.StartLine is 0 || candidate.EndLine > candidate.StartLine || !definitions.TryGetValue(candidate.Path, out var spans))
+            {
                 continue;
+            }
+
             foreach (var (definition, index) in spans.Where(span => span.index != i && candidate.StartLine >= span.candidate.StartLine && candidate.StartLine <= span.candidate.EndLine))
             {
                 var target = output[index];
@@ -44,7 +47,10 @@ public static class RetrievalMerger
     private static Candidate Combine(Candidate first, Candidate next)
     {
         foreach (var (name, score) in next.Scores.Where(pair => pair.Value > first.Scores.GetValueOrDefault(pair.Key)))
+        {
             first.Scores[name] = score;
+        }
+
         var result = first with
         {
             Provenance = first.Provenance.Concat(next.Provenance).Distinct().ToArray(),
@@ -54,13 +60,25 @@ public static class RetrievalMerger
             Freshness = next.Freshness is "live" ? "live" : first.Freshness,
         };
         if (result.Text.Length is 0 && next.Text.Length > 0)
+        {
             result = result with { Text = next.Text, Size = next.Size, SizeEstimated = next.SizeEstimated };
+        }
+
         if (result.EndLine is 0 && next.EndLine > 0)
+        {
             result = result with { EndLine = next.EndLine, Size = result.SizeEstimated || result.Size is 0 ? next.Size : result.Size, SizeEstimated = result.SizeEstimated || result.Size is 0 ? next.SizeEstimated : result.SizeEstimated };
+        }
+
         if (next.Depth > 0 && (result.Depth is 0 || next.Depth < result.Depth) && result.Role == next.Role)
+        {
             result = result with { Depth = next.Depth };
+        }
+
         if (RetrievalRanker.RoleWeight(next.Role) > RetrievalRanker.RoleWeight(result.Role))
+        {
             result = result with { Role = next.Role };
+        }
+
         return result;
     }
 }
