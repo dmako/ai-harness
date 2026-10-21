@@ -1,5 +1,6 @@
-using System.Text.Json;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Providers;
 using Harness.Providers.Registry;
 using Xunit;
@@ -19,11 +20,11 @@ public sealed class ProviderRegistryTests
         var count = 0;
         Task<ProviderResult> Execute(ProviderRequest request, CancellationToken token)
         {
-            Assert.Equal("needle", request.Query);
-            Assert.Equal("src", request.Path);
-            Assert.Equal(2, request.Limit);
-            Assert.Equal(800, request.Budget);
-            Assert.Equal("destination", request.Target);
+            request.Query.Should().Be("needle");
+            request.Path.Should().Be("src");
+            request.Limit.Should().Be(2);
+            request.Budget.Should().Be(800);
+            request.Target.Should().Be("destination");
             return RunAsync();
             async Task<ProviderResult> RunAsync()
             {
@@ -41,16 +42,16 @@ public sealed class ProviderRegistryTests
         var observed = new List<ProviderResult>();
         registry.SetObserver((result, _) => observed.Add(result));
         var results = await registry.CallAsync(new(Capabilities.TextSearch, "needle", "src", 2, "destination", 800), cancellationToken: Token);
-        Assert.Equal(["z", "a"], results.Select(result => result.Provider));
-        Assert.Equal(results, observed);
-        Assert.All(results, result =>
+        results.Select(result => result.Provider).Should().Equal("z", "a");
+        observed.Should().Equal(results);
+        results.Should().AllSatisfy(result =>
         {
-            Assert.Null(result.Error);
-            Assert.Equal(Capabilities.TextSearch, result.Capability);
-            Assert.True(result.Truncated);
-            Assert.Equal(73, result.Bytes);
-            Assert.Equal("origin", result.Items[0].Provider);
-            Assert.Equal("search", result.Items[0].Tool);
+            result.Error.Should().BeNull();
+            result.Capability.Should().Be(Capabilities.TextSearch);
+            result.Truncated.Should().BeTrue();
+            result.Bytes.Should().Be(73);
+            result.Items[0].Provider.Should().Be("origin");
+            result.Items[0].Tool.Should().Be("search");
         });
     }
 
@@ -67,12 +68,12 @@ public sealed class ProviderRegistryTests
         registry.Register(new Fake("ignores", [Capabilities.TextSearch], (_, _) => release.Task));
         var results = await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token).WaitAsync(TimeSpan.FromSeconds(5), Token);
         release.SetException(new InvalidOperationException("late fault is observed"));
-        Assert.Null(results[0].Error);
-        Assert.Same(hint, results[1].Error);
-        Assert.Equal("failure (lookup): boom — try y", results[1].Error!.Message);
-        Assert.IsType<ProviderNotIndexedException>(results[2].Error);
-        Assert.Equal("kept", results[2].Items[0].Name);
-        Assert.All(results.Skip(3), result => { Assert.True(result.TimedOut); Assert.NotNull(result.Error); });
+        results[0].Error.Should().BeNull();
+        results[1].Error.Should().BeSameAs(hint);
+        results[1].Error!.Message.Should().Be("failure (lookup): boom — try y");
+        results[2].Error.Should().BeOfType<ProviderNotIndexedException>();
+        results[2].Items[0].Name.Should().Be("kept");
+        results.Skip(3).Should().AllSatisfy(result => { result.TimedOut.Should().BeTrue(); result.Error.Should().NotBeNull(); });
     }
 
     [Fact]
@@ -85,9 +86,9 @@ public sealed class ProviderRegistryTests
         var call = registry.CallAsync(new(Capabilities.Context), cancellationToken: cancellation.Token);
         await started.Task.WaitAsync(Token);
         await cancellation.CancelAsync();
-        var result = Assert.Single(await call.WaitAsync(TimeSpan.FromSeconds(5), Token));
-        Assert.False(result.TimedOut);
-        Assert.IsType<ProviderException>(result.Error);
+        var result = (await call.WaitAsync(TimeSpan.FromSeconds(5), Token)).Should().ContainSingle().Which;
+        result.TimedOut.Should().BeFalse();
+        result.Error.Should().BeOfType<ProviderException>();
     }
 
     [Fact]
@@ -99,29 +100,29 @@ public sealed class ProviderRegistryTests
         registry.Register(z);
         registry.Register(a);
         registry.ExcludeFromContext("z");
-        Assert.False(registry.InContext("z"));
-        Assert.True(registry.InContext("a"));
-        Assert.Equal(["code.symbol_search/z", "code.text_search/a", "code.text_search/z"], registry.Capabilities().Select(info => info.Capability + "/" + info.Provider));
-        Assert.Equal(["z"], registry.IndexedProviders());
+        registry.InContext("z").Should().BeFalse();
+        registry.InContext("a").Should().BeTrue();
+        registry.Capabilities().Select(info => info.Capability + "/" + info.Provider).Should().Equal("code.symbol_search/z", "code.text_search/a", "code.text_search/z");
+        registry.IndexedProviders().Should().Equal("z");
         var results = await registry.CallAsync(new(Capabilities.TextSearch), name => !registry.InContext(name), Token);
-        Assert.Equal("a", Assert.Single(results).Provider);
-        Assert.Equal(0, z.Calls);
-        Assert.Equal(0, a.Probes);
+        results.Should().ContainSingle().Which.Provider.Should().Be("a");
+        z.Calls.Should().Be(0);
+        a.Probes.Should().Be(0);
         await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token);
-        Assert.Equal(1, z.Calls);
+        z.Calls.Should().Be(1);
     }
 
     [Fact]
     public async Task EmptyRegistryAndUnsupportedCapabilitiesDoNoWork()
     {
         await using var registry = new ProviderRegistry();
-        Assert.Empty(await registry.CallAsync(new(Capabilities.FileSearch), cancellationToken: Token));
-        Assert.Empty(registry.Capabilities());
+        (await registry.CallAsync(new(Capabilities.FileSearch), cancellationToken: Token)).Should().BeEmpty();
+        registry.Capabilities().Should().BeEmpty();
         var provider = new Fake("a", [Capabilities.TextSearch]);
         registry.Register(provider);
-        Assert.Empty(await registry.CallAsync(new(Capabilities.Flow), cancellationToken: Token));
-        Assert.Equal(0, provider.Calls);
-        Assert.Equal(0, provider.Probes);
+        (await registry.CallAsync(new(Capabilities.Flow), cancellationToken: Token)).Should().BeEmpty();
+        provider.Calls.Should().Be(0);
+        provider.Probes.Should().Be(0);
     }
 
     [Fact]
@@ -134,9 +135,9 @@ public sealed class ProviderRegistryTests
             Bytes = 100,
         })));
         registry.SetPathFilter(path => path.StartsWith(".claude/worktrees/", StringComparison.Ordinal));
-        registry.SetObserver((result, _) => { Assert.Equal(2, result.Items.Count); Assert.Equal(100, result.Bytes); });
-        var result = Assert.Single(await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token));
-        Assert.Equal(["src/a.cs", null], result.Items.Select(item => item.Path));
+        registry.SetObserver((result, _) => { result.Items.Count.Should().Be(2); result.Bytes.Should().Be(100); });
+        var result = (await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token)).Should().ContainSingle().Which;
+        result.Items.Select(item => item.Path).Should().Equal("src/a.cs", null);
     }
 
     [Fact]
@@ -148,9 +149,9 @@ public sealed class ProviderRegistryTests
         var skipped = new Fake("skipped", [Capabilities.Overview]);
         registry.Register(skipped);
         var (structure, errors) = await registry.OverviewAsync(name => name == "skipped", Token);
-        Assert.Equal("project", structure["a"]!["name"].GetString());
-        Assert.Equal(["error: first"], errors);
-        Assert.Equal(1, skipped.Calls);
+        structure["a"]!["name"].GetString().Should().Be("project");
+        errors.Should().Equal("error: first");
+        skipped.Calls.Should().Be(1);
     }
 
     [Fact]
@@ -161,14 +162,14 @@ public sealed class ProviderRegistryTests
         var b = new Fake("b", []) { CloseError = new IOException("second") };
         registry.Register(a);
         registry.Register(b);
-        Assert.Equal(0, a.Discoveries);
+        a.Discoveries.Should().Be(0);
         await registry.WarmAsync();
-        Assert.Equal(1, a.Discoveries);
-        Assert.Equal(1, b.Discoveries);
-        var error = await Assert.ThrowsAsync<IOException>(() => registry.DisposeAsync().AsTask());
-        Assert.Equal("first", error.Message);
-        Assert.Equal(1, a.Closes);
-        Assert.Equal(1, b.Closes);
+        a.Discoveries.Should().Be(1);
+        b.Discoveries.Should().Be(1);
+        var error = (await FluentActions.Awaiting(() => registry.DisposeAsync().AsTask()).Should().ThrowExactlyAsync<IOException>()).Which;
+        error.Message.Should().Be("first");
+        a.Closes.Should().Be(1);
+        b.Closes.Should().Be(1);
     }
 
     internal class Fake(string name, string[] capabilities, Func<ProviderRequest, CancellationToken, Task<ProviderResult>>? execute = null, string freshness = "live", string latency = "low", string health = "ready") : IProvider, IVersionedProvider

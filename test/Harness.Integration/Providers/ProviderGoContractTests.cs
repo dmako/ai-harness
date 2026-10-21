@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Providers;
 using Harness.Providers.Registry;
 using Xunit;
@@ -65,7 +66,7 @@ public sealed class ProviderGoContractTests
             _ => throw new ArgumentOutOfRangeException(nameof(section)),
         };
         var actual = JsonSerializer.SerializeToElement(value);
-        Assert.True(JsonElement.DeepEquals(expected.RootElement.GetProperty(section), actual), $"Go/{section}: {expected.RootElement.GetProperty(section)}\nC#/{section}: {actual}");
+        JsonElement.DeepEquals(expected.RootElement.GetProperty(section), actual).Should().BeTrue($"Go/{section}: {expected.RootElement.GetProperty(section)}\nC#/{section}: {actual}");
     }
 
     private static Fake Provider(string name, string[] capabilities) => new(name, capabilities, (request, _) =>

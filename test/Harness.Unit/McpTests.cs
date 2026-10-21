@@ -1,9 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Pipelines;
-using System.Text.Json.Nodes;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using AwesomeAssertions;
 using Harness.Core.Projects;
 using Harness.Mcp;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,41 +22,41 @@ public sealed class McpTests
     public async Task PingDoesNotTouchSessionAndSuccessHasMatchingStructuredAndTextContent()
     {
         await using var session = new FakeSession();
-        var result = await Call("ping", "{}", session);
-        Assert.Equal(0, session.Calls);
-        Assert.Null(result.IsError);
-        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content));
-        Assert.Equal(result.StructuredContent!.Value.GetRawText(), text.Text);
-        Assert.Equal("pong", result.StructuredContent.Value.GetProperty("message").GetString());
+        var result = await Call("ping", """{}""", session);
+        session.Calls.Should().Be(0);
+        result.IsError.Should().BeNull();
+        var text = result.Content.Should().ContainSingle().Which.Should().BeOfType<TextContentBlock>().Which;
+        text.Text.Should().Be(result.StructuredContent!.Value.GetRawText());
+        result.StructuredContent.Value.GetProperty("message").GetString().Should().Be("pong");
     }
 
     [Theory]
-    [InlineData("state_get_test", "{}", "required: missing properties")]
-    [InlineData("state_put_test", "{\"key\":\"x\"}", "required: missing properties")]
-    [InlineData("ping", "{\"unexpected\":true}", "unexpected additional properties")]
-    [InlineData("state_get_test", "{\"key\":1}", "want \"string\"")]
-    [InlineData("state_get_test", "{\"key\":null}", "want \"string\"")]
-    [InlineData("state_get_test", "{\"key\":\"\"}", "key must not be empty")]
+    [InlineData("state_get_test", """{}""", "required: missing properties")]
+    [InlineData("state_put_test", """{"key":"x"}""", "required: missing properties")]
+    [InlineData("ping", """{"unexpected":true}""", "unexpected additional properties")]
+    [InlineData("state_get_test", """{"key":1}""", "want \"string\"")]
+    [InlineData("state_get_test", """{"key":null}""", "want \"string\"")]
+    [InlineData("state_get_test", """{"key":""}""", "key must not be empty")]
     public async Task InvalidArgumentsAreToolErrorsBeforeStorage(string tool, string arguments, string message)
     {
         await using var session = new FakeSession();
         var result = await Call(tool, arguments, session);
-        Assert.True(result.IsError);
-        Assert.Null(result.StructuredContent);
-        Assert.Contains(message, Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text, StringComparison.Ordinal);
-        Assert.Equal(0, session.Calls);
+        result.IsError.Should().BeTrue();
+        result.StructuredContent.Should().BeNull();
+        result.Content.Should().ContainSingle().Which.Should().BeOfType<TextContentBlock>().Which.Text.Should().Contain(message);
+        session.Calls.Should().Be(0);
     }
 
     [Fact]
     public async Task SchemaErrorsRedactCredentialLikeValuesBeforeReturningDiagnostics()
     {
         await using var session = new FakeSession();
-        var result = await Call("memory_put", "{\"type\":\"fact\",\"content\":\"safe statement\",\"force\":\"API_KEY=synthetic-fixture\"}", session);
-        Assert.True(result.IsError);
-        var error = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
-        Assert.Contains("[redacted]", error, StringComparison.Ordinal);
-        Assert.DoesNotContain("synthetic-fixture", error, StringComparison.Ordinal);
-        Assert.Equal(0, session.Calls);
+        var result = await Call("memory_put", """{"type":"fact","content":"safe statement","force":"API_KEY=synthetic-fixture"}""", session);
+        result.IsError.Should().BeTrue();
+        var error = result.Content.Should().ContainSingle().Which.Should().BeOfType<TextContentBlock>().Which.Text;
+        error.Should().Contain("[redacted]");
+        error.Should().NotContain("synthetic-fixture");
+        session.Calls.Should().Be(0);
     }
 
     [Fact]
@@ -65,13 +66,13 @@ public sealed class McpTests
         var key = string.Concat(Enumerable.Repeat("🧪", 256));
         var value = new string('ž', 32768);
         var result = await Call("state_put_test", JsonSerializer.Serialize(new { key, value }), session);
-        Assert.Null(result.IsError);
-        Assert.True((await Call("state_put_test", JsonSerializer.Serialize(new { key, value = value + "x" }), session)).IsError);
-        Assert.True((await Call("state_get_test", JsonSerializer.Serialize(new { key = key + "🧪" }), session)).IsError);
-        Assert.Null((await Call("state_put_test", "{\"key\":\"empty\",\"value\":\"\"}", session)).IsError);
-        result = await Call("state_get_test", "{\"key\":\"empty\"}", session);
-        Assert.True(result.StructuredContent!.Value.GetProperty("found").GetBoolean());
-        Assert.False(result.StructuredContent.Value.TryGetProperty("value", out _));
+        result.IsError.Should().BeNull();
+        (await Call("state_put_test", JsonSerializer.Serialize(new { key, value = value + "x" }), session)).IsError.Should().BeTrue();
+        (await Call("state_get_test", JsonSerializer.Serialize(new { key = key + "🧪" }), session)).IsError.Should().BeTrue();
+        (await Call("state_put_test", """{"key":"empty","value":""}""", session)).IsError.Should().BeNull();
+        result = await Call("state_get_test", """{"key":"empty"}""", session);
+        result.StructuredContent!.Value.GetProperty("found").GetBoolean().Should().BeTrue();
+        result.StructuredContent.Value.TryGetProperty("value", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -79,10 +80,10 @@ public sealed class McpTests
     {
         await using var session = new FakeSession { Wait = true };
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var operation = HarnessMcpServer.CallAsync(new CallToolRequestParams { Name = "state_get_test", Arguments = Arguments("{\"key\":\"wait\"}") }, session, Runtime, cancellation.Token).AsTask();
+        var operation = HarnessMcpServer.CallAsync(new CallToolRequestParams { Name = "state_get_test", Arguments = Arguments("""{"key":"wait"}""") }, session, Runtime, cancellation.Token).AsTask();
         await session.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
         await cancellation.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        await FluentActions.Awaiting(() => operation).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -112,14 +113,14 @@ public sealed class McpTests
                     Method = "notifications/cancelled",
                     Params = new JsonObject { ["requestId"] = 42 },
                 }, TestContext.Current.CancellationToken);
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+                await FluentActions.Awaiting(() => operation).Should().ThrowAsync<OperationCanceledException>();
                 await session.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                Assert.Equal("pong", (await client.CallToolAsync("ping", cancellationToken: TestContext.Current.CancellationToken)).StructuredContent!.Value.GetProperty("message").GetString());
+                (await client.CallToolAsync("ping", cancellationToken: TestContext.Current.CancellationToken)).StructuredContent!.Value.GetProperty("message").GetString().Should().Be("pong");
             }
 
             await toServer.Writer.CompleteAsync(); // Stream transport leaves caller-owned streams open; this is stdin EOF.
             await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-            Assert.True(session.Disposed);
+            session.Disposed.Should().BeTrue();
         }
         finally
         {
@@ -144,18 +145,18 @@ public sealed class McpTests
         await using var session = new FakeSession();
         await HarnessMcpServer.RunAsync(source, destination, session, Runtime, NullLoggerFactory.Instance, cancellationToken: TestContext.Current.CancellationToken)
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.True(session.Disposed);
-        Assert.True(source.CanRead);
-        Assert.True(destination.CanWrite);
+        session.Disposed.Should().BeTrue();
+        source.CanRead.Should().BeTrue();
+        destination.CanWrite.Should().BeTrue();
         var messages = Encoding.UTF8.GetString(destination.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonSerializer.Deserialize<JsonElement>(line)).ToArray();
-        Assert.Contains(messages, message => message.GetProperty("id").GetInt32() == 2 && message.TryGetProperty("result", out _));
-        Assert.Contains(messages, message => message.GetProperty("id").GetInt32() == 3 && message.TryGetProperty("result", out _));
+        messages.Where(message => message.GetProperty("id").GetInt32() == 2 && message.TryGetProperty("result", out _)).Should().NotBeEmpty();
+        messages.Where(message => message.GetProperty("id").GetInt32() == 3 && message.TryGetProperty("result", out _)).Should().NotBeEmpty();
     }
 
     [Fact]
     public async Task FramingRejectsMalformedOversizedAndStructuralErrorsAndContinues()
     {
-        var input = "{nope\n42\n{\"jsonrpc\":\"1.0\",\"id\":5,\"method\":\"ping\"}\n[]\n" + new string('x', CompatibleStdioTransport.MaximumFrameBytes + 1) + "\n";
+        var input = string.Join('\n', "{nope", "42", """{"jsonrpc":"1.0","id":5,"method":"ping"}""", """[]""", "") + new string('x', CompatibleStdioTransport.MaximumFrameBytes + 1) + "\n";
         using var source = new MemoryStream(Encoding.UTF8.GetBytes(input));
         using var destination = new MemoryStream();
         await using (var transport = new CompatibleStdioTransport(source, destination))
@@ -164,9 +165,9 @@ public sealed class McpTests
         }
 
         var responses = Encoding.UTF8.GetString(destination.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonSerializer.Deserialize<JsonElement>(line)).ToArray();
-        Assert.Equal([-32700, -32600, -32600, -32600, -32700], responses.Select(message => message.GetProperty("error").GetProperty("code").GetInt32()));
-        Assert.Equal(5, responses[2].GetProperty("id").GetInt32());
-        Assert.Null(responses[0].GetProperty("id").Deserialize<int?>());
+        responses.Select(message => message.GetProperty("error").GetProperty("code").GetInt32()).Should().Equal(-32700, -32600, -32600, -32600, -32700);
+        responses[2].GetProperty("id").GetInt32().Should().Be(5);
+        responses[0].GetProperty("id").Deserialize<int?>().Should().BeNull();
     }
 
     private static ValueTask<CallToolResult> Call(string tool, string json, FakeSession session) => HarnessMcpServer.CallAsync(

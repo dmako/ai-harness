@@ -1,3 +1,4 @@
+using AwesomeAssertions;
 using Harness.Core.Tasks;
 using Xunit;
 
@@ -21,9 +22,9 @@ public sealed class TaskWorkflowTests
         };
         foreach (var from in TaskWorkflow.Statuses)
             foreach (var to in TaskWorkflow.Statuses)
-                Assert.Equal(expected[from].Contains(to, StringComparer.Ordinal), TaskWorkflow.CanTransition(from, to));
-        Assert.Equal("in_progress", TaskWorkflow.ParseStatus(" IN_PROGRESS "));
-        Assert.False(TaskWorkflow.HoldsClaim("deferred"));
-        Assert.True(TaskWorkflow.HoldsClaim("review"));
+                TaskWorkflow.CanTransition(from, to).Should().Be(expected[from].Contains(to, StringComparer.Ordinal));
+        TaskWorkflow.ParseStatus(" IN_PROGRESS ").Should().Be("in_progress");
+        TaskWorkflow.HoldsClaim("deferred").Should().BeFalse();
+        TaskWorkflow.HoldsClaim("review").Should().BeTrue();
     }
 }

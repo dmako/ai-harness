@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AwesomeAssertions;
 using Harness.Infrastructure.Storage;
 using ModelContextProtocol.Client;
 using Xunit;
@@ -20,40 +21,44 @@ public sealed class McpProcessTests
             environment["HARNESS_CONFIG_DIR"] = Path.Combine(root, "config");
             var options = new StdioClientTransportOptions
             {
-                Command = "dotnet", Arguments = [binary, "mcp", "--project", root], WorkingDirectory = root,
-                EnvironmentVariables = environment, InheritEnvironmentVariables = false, StandardErrorLines = errors.Enqueue,
+                Command = "dotnet",
+                Arguments = [binary, "mcp", "--project", root],
+                WorkingDirectory = root,
+                EnvironmentVariables = environment,
+                InheritEnvironmentVariables = false,
+                StandardErrorLines = errors.Enqueue,
                 ShutdownTimeout = TimeSpan.FromSeconds(10),
             };
             var path = Path.Combine(root, ".harness", "harness.db");
             await using (var client = await McpClient.CreateAsync(new StdioClientTransport(options), cancellationToken: TestContext.Current.CancellationToken))
             {
-                Assert.Equal("harness", client.ServerInfo.Name);
+                client.ServerInfo.Name.Should().Be("harness");
                 var ping = await client.CallToolAsync("ping", cancellationToken: TestContext.Current.CancellationToken);
-                Assert.Equal("pong", ping.StructuredContent!.Value.GetProperty("message").GetString());
-                Assert.False(File.Exists(path));
+                ping.StructuredContent!.Value.GetProperty("message").GetString().Should().Be("pong");
+                File.Exists(path).Should().BeFalse();
                 var diagnostics = await client.CallToolAsync("diagnostics", cancellationToken: TestContext.Current.CancellationToken);
-                Assert.True(diagnostics.StructuredContent!.Value.TryGetProperty("db_error", out _));
-                Assert.False(Directory.Exists(Path.Combine(root, ".harness")));
+                diagnostics.StructuredContent!.Value.TryGetProperty("db_error", out _).Should().BeTrue();
+                Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
                 var put = await client.CallToolAsync("state_put_test", new Dictionary<string, object?>(StringComparer.Ordinal) { ["key"] = "Unicode 🧪", ["value"] = "žluťoučký" }, cancellationToken: TestContext.Current.CancellationToken);
-                Assert.Null(put.IsError);
+                put.IsError.Should().BeNull();
             }
 
             using (var exclusive = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             {
-                Assert.True(exclusive.Length > 0);
+                (exclusive.Length > 0).Should().BeTrue();
             }
 
             await using (var client = await McpClient.CreateAsync(new StdioClientTransport(options), cancellationToken: TestContext.Current.CancellationToken))
             {
                 var read = await client.CallToolAsync("state_get_test", new Dictionary<string, object?>(StringComparer.Ordinal) { ["key"] = "Unicode 🧪" }, cancellationToken: TestContext.Current.CancellationToken);
-                Assert.True(read.StructuredContent!.Value.GetProperty("found").GetBoolean());
-                Assert.Equal("žluťoučký", read.StructuredContent.Value.GetProperty("value").GetString());
+                read.StructuredContent!.Value.GetProperty("found").GetBoolean().Should().BeTrue();
+                read.StructuredContent.Value.GetProperty("value").GetString().Should().Be("žluťoučký");
             }
 
             using var database = HarnessDatabase.OpenReadOnly(path);
-            Assert.Equal(19, database.SchemaVersion());
-            Assert.Equal("žluťoučký", database.GetDiagnostic("Unicode 🧪"));
-            Assert.DoesNotContain(errors, line => line.Contains("Unhandled exception", StringComparison.Ordinal));
+            database.SchemaVersion().Should().Be(19);
+            database.GetDiagnostic("Unicode 🧪").Should().Be("žluťoučký");
+            errors.Should().NotContain(line => line.Contains("Unhandled exception", StringComparison.Ordinal));
         }
         finally
         {
@@ -64,8 +69,9 @@ public sealed class McpProcessTests
     private static string Binary()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx"))) directory = directory.Parent;
-        Assert.NotNull(directory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
+            directory = directory.Parent;
+        directory.Should().NotBeNull();
 #if DEBUG
         const string Configuration = "Debug";
 #else

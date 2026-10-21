@@ -1,3 +1,4 @@
+using AwesomeAssertions;
 using Harness.Infrastructure.Configuration;
 using Xunit;
 
@@ -10,11 +11,11 @@ public sealed class ConfigurationTests
     {
         var path = Path.Combine(Path.GetTempPath(), "harness-config-" + Guid.NewGuid().ToString("N"));
         var loaded = ConfigurationLoader.LoadFiles(Path.Combine(path, "global"), Path.Combine(path, "project"));
-        Assert.Equal(Path.Combine(".harness", "harness.db"), loaded.Value.Storage.DbPath);
-        Assert.Equal(5000, loaded.Value.Storage.BusyTimeoutMs);
-        Assert.Equal("info", loaded.Value.Log.Level);
-        Assert.Empty(loaded.Sources.Global);
-        Assert.False(Directory.Exists(path));
+        loaded.Value.Storage.DbPath.Should().Be(Path.Combine(".harness", "harness.db"));
+        loaded.Value.Storage.BusyTimeoutMs.Should().Be(5000);
+        loaded.Value.Log.Level.Should().Be("info");
+        loaded.Sources.Global.Should().BeEmpty();
+        Directory.Exists(path).Should().BeFalse();
     }
 
     [Theory]
@@ -24,9 +25,9 @@ public sealed class ConfigurationTests
     public void GlobalPathUsesGoOperatingSystemConventions(string platform, string variable, string suffix)
     {
         var folder = Path.Combine(Path.GetTempPath(), "config-home");
-        Assert.Equal(Path.Combine(folder, suffix.Replace('/', Path.DirectorySeparatorChar), "config.toml"), ConfigurationPaths.GlobalPath(platform, key => key == variable ? folder : null));
-        Assert.Equal(Path.Combine(folder, "config.toml"), ConfigurationPaths.GlobalPath(platform, key => key == "HARNESS_CONFIG_DIR" ? folder : null));
-        Assert.Throws<InvalidOperationException>(() => ConfigurationPaths.GlobalPath(platform, _ => null));
+        ConfigurationPaths.GlobalPath(platform, key => key == variable ? folder : null).Should().Be(Path.Combine(folder, suffix.Replace('/', Path.DirectorySeparatorChar), "config.toml"));
+        ConfigurationPaths.GlobalPath(platform, key => key == "HARNESS_CONFIG_DIR" ? folder : null).Should().Be(Path.Combine(folder, "config.toml"));
+        FluentActions.Invoking(() => ConfigurationPaths.GlobalPath(platform, _ => null)).Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
@@ -57,18 +58,18 @@ public sealed class ConfigurationTests
             tool = "custom"
             """);
         var loaded = ConfigurationLoader.LoadFiles(directory.Global, directory.Project);
-        Assert.Equal(123, loaded.Value.Storage.BusyTimeoutMs);
-        Assert.Equal("data/state.db", loaded.Value.Storage.DbPath);
-        Assert.Equal("debug", loaded.Value.Log.Level);
+        loaded.Value.Storage.BusyTimeoutMs.Should().Be(123);
+        loaded.Value.Storage.DbPath.Should().Be("data/state.db");
+        loaded.Value.Log.Level.Should().Be("debug");
         var provider = loaded.Value.Providers["rg-fd"];
-        Assert.Equal("project", provider.Command);
-        Assert.Equal(0, provider.TimeoutMs);
-        Assert.Empty(provider.Only);
-        Assert.Empty(provider.Args);
-        Assert.False(provider.InContext());
-        Assert.Equal("custom", provider.Capabilities["code.text_search"].Tool);
-        Assert.True(provider.Capabilities.ContainsKey("code.file_search"));
-        Assert.Equal("kept", loaded.Value.Providers["other"].Command);
+        provider.Command.Should().Be("project");
+        provider.TimeoutMs.Should().Be(0);
+        provider.Only.Should().BeEmpty();
+        provider.Args.Should().BeEmpty();
+        provider.InContext().Should().BeFalse();
+        provider.Capabilities["code.text_search"].Tool.Should().Be("custom");
+        provider.Capabilities.ContainsKey("code.file_search").Should().BeTrue();
+        loaded.Value.Providers["other"].Command.Should().Be("kept");
     }
 
     [Theory]
@@ -91,25 +92,25 @@ public sealed class ConfigurationTests
         using var directory = new ConfigurationDirectory();
         File.WriteAllText(directory.Global, content);
         File.WriteAllText(directory.Project, "[log]\nlevel = 'info'");
-        var error = Assert.Throws<InvalidDataException>(() => ConfigurationLoader.LoadFiles(directory.Global, directory.Project));
-        Assert.Contains(directory.Global, error.Message, StringComparison.Ordinal);
+        var error = FluentActions.Invoking(() => ConfigurationLoader.LoadFiles(directory.Global, directory.Project)).Should().ThrowExactly<InvalidDataException>().Which;
+        error.Message.Should().Contain(directory.Global);
     }
 
     [Fact]
     public void EveryFrozenPackLoadsAndMalformedUtf8IsRejected()
     {
         using var directory = new ConfigurationDirectory();
-        Assert.Equal(5, ConfigurationLoader.Packs.Count);
+        ConfigurationLoader.Packs.Count.Should().Be(5);
         foreach (var pack in ConfigurationLoader.Packs)
         {
             File.WriteAllText(directory.Project, $"[providers.\"{pack}\"]\n");
             var provider = ConfigurationLoader.LoadFiles("", directory.Project).Value.Providers[pack];
-            Assert.Equal(pack, provider.Pack);
-            Assert.NotEmpty(provider.Command);
+            provider.Pack.Should().Be(pack);
+            provider.Command.Should().NotBeEmpty();
         }
 
         File.WriteAllBytes(directory.Project, [0xff, 0xfe, 0x01]);
-        Assert.Throws<InvalidDataException>(() => ConfigurationLoader.LoadFiles("", directory.Project));
+        FluentActions.Invoking(() => ConfigurationLoader.LoadFiles("", directory.Project)).Should().ThrowExactly<InvalidDataException>();
     }
 
     private sealed class ConfigurationDirectory : IDisposable

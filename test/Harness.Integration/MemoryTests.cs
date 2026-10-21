@@ -1,3 +1,4 @@
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Storage;
@@ -17,27 +18,27 @@ public sealed class MemoryTests
         {
             var store = new MemoryStore(database, clock);
             var result = store.Put(new MemoryInput { Type = "decision", Content = "Use SQLite for all harness state.", Source = new MemorySource("user", "HAR-0003", "claude-code 2.1"), Confidence = 0.9, ValidFrom = MemoryTimestamp.Parse("2020-01-01T00:00:00.123456789Z") }, cancellationToken: TestContext.Current.CancellationToken);
-            Assert.Equal("created", result.Status);
+            result.Status.Should().Be("created");
             id = result.Memory!.Id;
-            Assert.Matches("^mem_[0-9a-f]{16}$", id);
+            id.Should().MatchRegex("^mem_[0-9a-f]{16}$");
             var created = result.Memory.CreatedAt;
             clock.Advance();
             var again = store.Put(new MemoryInput { Type = "decision", Content = " use SQLITE for all harness state !", Source = new MemorySource(Ref: "review", By: "codex") }, cancellationToken: TestContext.Current.CancellationToken);
-            Assert.Equal("duplicate", again.Status);
-            Assert.Equal(id, again.Memory!.Id);
-            Assert.Equal(created, again.Memory.CreatedAt);
-            Assert.True(again.Memory.UpdatedAt > created);
-            Assert.Equal(new MemorySource("user", "HAR-0003", "claude-code 2.1"), again.Memory.Source);
+            again.Status.Should().Be("duplicate");
+            again.Memory!.Id.Should().Be(id);
+            again.Memory.CreatedAt.Should().Be(created);
+            (again.Memory.UpdatedAt > created).Should().BeTrue();
+            again.Memory.Source.Should().Be(new MemorySource("user", "HAR-0003", "claude-code 2.1"));
             var events = store.Events(id, cancellationToken: TestContext.Current.CancellationToken);
-            Assert.Equal(["created", "reaffirmed"], events.Select(item => item.Event));
-            Assert.Equal("codex", events[1].Actor);
-            Assert.Equal("review", events[1].Detail);
+            events.Select(item => item.Event).Should().Equal("created", "reaffirmed");
+            events[1].Actor.Should().Be("codex");
+            events[1].Detail.Should().Be("review");
         }
 
         using var reopened = HarnessDatabase.Open(state.Path, cancellationToken: TestContext.Current.CancellationToken);
         var memory = new MemoryStore(reopened).Get(id, TestContext.Current.CancellationToken);
-        Assert.Equal(0.9, memory.Confidence);
-        Assert.Equal("2020-01-01T00:00:00.123456789Z", memory.ValidFrom!.Value.ToString());
+        memory.Confidence.Should().Be(0.9);
+        memory.ValidFrom!.Value.ToString().Should().Be("2020-01-01T00:00:00.123456789Z");
     }
 
     [Fact]
@@ -48,19 +49,19 @@ public sealed class MemoryTests
         var clock = new Clock();
         var store = new MemoryStore(database, clock);
         var expired = store.Put(Input("Freeze deploys during the migration") with { ValidUntil = clock.At }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal("duplicate", store.Put(Input("Freeze deploys during the migration"), cancellationToken: TestContext.Current.CancellationToken).Status);
-        Assert.Empty(store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(expired.Memory!.Id, Assert.Single(store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken)).Id);
+        store.Put(Input("Freeze deploys during the migration"), cancellationToken: TestContext.Current.CancellationToken).Status.Should().Be("duplicate");
+        store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Should().BeEmpty();
+        store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Should().ContainSingle().Which.Id.Should().Be(expired.Memory!.Id);
         var future = store.Put(Input("Store project memory in the SQLite project database.") with { ValidFrom = MemoryTimestamp.Parse("2099-01-01T00:00:00Z") }, cancellationToken: TestContext.Current.CancellationToken);
         var near = store.Put(Input("Project memory is stored in the project SQLite database"), cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal("needs_decision", near.Status);
-        Assert.Null(near.Memory);
-        Assert.Equal(future.Memory!.Id, Assert.Single(near.Similar).Memory.Id);
-        Assert.Equal(2, store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Count);
-        Assert.Equal("created", store.Put(Input("Project memory is stored in the project SQLite database") with { Force = true }, cancellationToken: TestContext.Current.CancellationToken).Status);
-        Assert.Equal("created", store.Put(Input("Store project memory in the SQLite project database.") with { Scope = MemoryScope.Parse("subsystem:cli"), Force = true }, cancellationToken: TestContext.Current.CancellationToken).Status);
-        Assert.Equal("created", store.Put(Input("Store project memory in the SQLite project database.") with { Type = "warning" }, cancellationToken: TestContext.Current.CancellationToken).Status);
-        Assert.Throws<ArgumentException>(() => store.Put(Input("x") with { ValidFrom = clock.At, ValidUntil = clock.At }, cancellationToken: TestContext.Current.CancellationToken));
+        near.Status.Should().Be("needs_decision");
+        near.Memory.Should().BeNull();
+        near.Similar.Should().ContainSingle().Which.Memory.Id.Should().Be(future.Memory!.Id);
+        store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Count.Should().Be(2);
+        store.Put(Input("Project memory is stored in the project SQLite database") with { Force = true }, cancellationToken: TestContext.Current.CancellationToken).Status.Should().Be("created");
+        store.Put(Input("Store project memory in the SQLite project database.") with { Scope = MemoryScope.Parse("subsystem:cli"), Force = true }, cancellationToken: TestContext.Current.CancellationToken).Status.Should().Be("created");
+        store.Put(Input("Store project memory in the SQLite project database.") with { Type = "warning" }, cancellationToken: TestContext.Current.CancellationToken).Status.Should().Be("created");
+        FluentActions.Invoking(() => store.Put(Input("x") with { ValidFrom = clock.At, ValidUntil = clock.At }, cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<ArgumentException>();
     }
 
     [Fact]
@@ -76,32 +77,32 @@ public sealed class MemoryTests
         clock.Advance();
         var third = store.Supersede(second.Id, new MemoryInput { Content = second.Content, SupersedeReason = "reconfirmed", Source = new MemorySource(By: "claude") }, cancellationToken: TestContext.Current.CancellationToken).Memory!;
         foreach (var id in new[] { first.Id, second.Id, third.Id })
-            Assert.Equal([first.Id, second.Id, third.Id], store.History(id, cancellationToken: TestContext.Current.CancellationToken).Select(memory => memory.Id));
-        Assert.Equal(third.Id, Assert.Single(store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken)).Id);
+            store.History(id, cancellationToken: TestContext.Current.CancellationToken).Select(memory => memory.Id).Should().Equal(first.Id, second.Id, third.Id);
+        store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Should().ContainSingle().Which.Id.Should().Be(third.Id);
         var detail = store.Details(first.Id, history: true, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.False(detail.Current);
-        Assert.Equal(3, detail.History.Count);
-        Assert.Equal("codex", detail.Events[1].Actor);
-        Assert.Equal(second.Id, detail.Events[1].RelatedId);
-        Assert.Equal("comments needed", detail.Events[1].Detail);
-        Assert.Throws<InvalidOperationException>(() => store.Supersede(first.Id, Input("again"), cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Throws<KeyNotFoundException>(() => store.Put(Input("invalid predecessor") with { Supersedes = [third.Id, "missing"] }, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal("", store.Get(third.Id, cancellationToken: TestContext.Current.CancellationToken).SupersededBy);
-        Assert.Single(store.Events(third.Id, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Throws<ArgumentException>(() => store.Retire(third.Id, "human:test", " ", cancellationToken: TestContext.Current.CancellationToken));
+        detail.Current.Should().BeFalse();
+        detail.History.Count.Should().Be(3);
+        detail.Events[1].Actor.Should().Be("codex");
+        detail.Events[1].RelatedId.Should().Be(second.Id);
+        detail.Events[1].Detail.Should().Be("comments needed");
+        FluentActions.Invoking(() => store.Supersede(first.Id, Input("again"), cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<InvalidOperationException>();
+        FluentActions.Invoking(() => store.Put(Input("invalid predecessor") with { Supersedes = [third.Id, "missing"] }, cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<KeyNotFoundException>();
+        store.Get(third.Id, cancellationToken: TestContext.Current.CancellationToken).SupersededBy.Should().Be("");
+        store.Events(third.Id, cancellationToken: TestContext.Current.CancellationToken).Should().ContainSingle();
+        FluentActions.Invoking(() => store.Retire(third.Id, "human:test", " ", cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<ArgumentException>();
         clock.Advance();
         var retired = store.Retire(third.Id, "human:test", "unused now", cancellationToken: TestContext.Current.CancellationToken);
-        Assert.False(retired.Current(clock.At));
-        Assert.Empty(store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(3, store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Count);
-        Assert.Equal(new MemoryEvent("retired", "", "human:test", "unused now", clock.At), store.Events(third.Id, cancellationToken: TestContext.Current.CancellationToken)[1]);
-        Assert.Throws<InvalidOperationException>(() => store.Retire(third.Id, "human:test", "again", cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal("duplicate", store.Put(Input(third.Content), cancellationToken: TestContext.Current.CancellationToken).Status);
-        Assert.False(store.Get(third.Id, cancellationToken: TestContext.Current.CancellationToken).Current(clock.At));
+        retired.Current(clock.At).Should().BeFalse();
+        store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Should().BeEmpty();
+        store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Count.Should().Be(3);
+        store.Events(third.Id, cancellationToken: TestContext.Current.CancellationToken)[1].Should().Be(new MemoryEvent("retired", "", "human:test", "unused now", clock.At));
+        FluentActions.Invoking(() => store.Retire(third.Id, "human:test", "again", cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<InvalidOperationException>();
+        store.Put(Input(third.Content), cancellationToken: TestContext.Current.CancellationToken).Status.Should().Be("duplicate");
+        store.Get(third.Id, cancellationToken: TestContext.Current.CancellationToken).Current(clock.At).Should().BeFalse();
         using var connection = database.OpenConnection();
         using var check = connection.CreateCommand();
         check.CommandText = "PRAGMA foreign_key_check";
-        Assert.Null(check.ExecuteScalar());
+        check.ExecuteScalar().Should().BeNull();
     }
 
     [Fact]
@@ -119,18 +120,19 @@ public sealed class MemoryTests
         store.Put(Input("Ship the GUI") with { Type = "goal" }, cancellationToken: TestContext.Current.CancellationToken);
         store.Put(Input("No network in tests") with { Type = "constraint" }, cancellationToken: TestContext.Current.CancellationToken);
         clock.Advance();
-        for (var index = 0; index < 6; index++) store.Put(Input($"General rule number {index} about naming consistently") with { Force = true }, cancellationToken: TestContext.Current.CancellationToken);
+        for (var index = 0; index < 6; index++)
+            store.Put(Input($"General rule number {index} about naming consistently") with { Force = true }, cancellationToken: TestContext.Current.CancellationToken);
         var query = new MemoryQuery { Scope = MemoryScope.Parse("path:internal/storage/nested/db.cs"), Branch = "m16", Limit = 2 };
-        Assert.Equal([deep.Id, path.Id], store.Search(query, cancellationToken: TestContext.Current.CancellationToken).Select(memory => memory.Id));
+        store.Search(query, cancellationToken: TestContext.Current.CancellationToken).Select(memory => memory.Id).Should().Equal(deep.Id, path.Id);
         var applying = store.Applying(query.Scope.ToString(), "m16", cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Single(applying.Goals);
-        Assert.Single(applying.Constraints);
-        Assert.Contains(applying.Decisions, memory => memory.Scope.Kind is "branch");
-        Assert.DoesNotContain(store.Applying(query.Scope.ToString(), "main", cancellationToken: TestContext.Current.CancellationToken).Decisions, memory => memory.Scope.Kind is "branch");
-        Assert.Contains(store.Search(new MemoryQuery { Text = "migration" }, cancellationToken: TestContext.Current.CancellationToken), memory => memory.Id == path.Id);
-        Assert.Empty(store.Search(new MemoryQuery { Text = "!!!" }, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Empty(store.Search(new MemoryQuery { Text = "\"; DROP TABLE memories; --" }, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(12, store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Count);
+        applying.Goals.Should().ContainSingle();
+        applying.Constraints.Should().ContainSingle();
+        applying.Decisions.Where(memory => memory.Scope.Kind is "branch").Should().NotBeEmpty();
+        store.Applying(query.Scope.ToString(), "main", cancellationToken: TestContext.Current.CancellationToken).Decisions.Where(memory => memory.Scope.Kind is "branch").Should().BeEmpty();
+        store.Search(new MemoryQuery { Text = "migration" }, cancellationToken: TestContext.Current.CancellationToken).Should().Contain(memory => memory.Id == path.Id);
+        store.Search(new MemoryQuery { Text = "!!!" }, cancellationToken: TestContext.Current.CancellationToken).Should().BeEmpty();
+        store.Search(new MemoryQuery { Text = "\"; DROP TABLE memories; --" }, cancellationToken: TestContext.Current.CancellationToken).Should().BeEmpty();
+        store.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Count.Should().Be(12);
     }
 
     [Fact]
@@ -151,23 +153,23 @@ public sealed class MemoryTests
         var projectRule = projectStore.Put(Input("Store project memory in the SQLite project database.") with { Scope = MemoryScope.Parse("branch:other") }, cancellationToken: TestContext.Current.CancellationToken).Memory!;
         var layers = new MemoryLayers(projectStore, [new MemoryLevel(scope, workspaceStore), new MemoryLevel(MemoryScope.User, userStore)]);
         var result = layers.Search(new MemoryQuery { Scope = MemoryScope.Parse("path:src/api"), Branch = "main" }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Empty(result.Errors);
-        var only = Assert.Single(result.Memories);
-        Assert.Equal(projectRule.Id, only.Id);
-        Assert.Equal([workspaceRule.Id + " (workspace:home)", userRule.Id + " (user)"], only.Overrides);
-        Assert.Equal("branch:other", only.Scope.ToString());
-        Assert.Equal(3, layers.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Memories.Count);
-        Assert.Same(userStore, layers.Find(userRule.Id, cancellationToken: TestContext.Current.CancellationToken).Store);
-        Assert.Equal(MemoryScope.User, layers.Find(userRule.Id, cancellationToken: TestContext.Current.CancellationToken).Scope);
-        Assert.Same(workspaceStore, layers.Level(scope));
-        Assert.Null(layers.Level(MemoryScope.Parse("workspace:missing")));
+        result.Errors.Should().BeEmpty();
+        var only = result.Memories.Should().ContainSingle().Which;
+        only.Id.Should().Be(projectRule.Id);
+        only.Overrides.Should().Equal(workspaceRule.Id + " (workspace:home)", userRule.Id + " (user)");
+        only.Scope.ToString().Should().Be("branch:other");
+        layers.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Memories.Count.Should().Be(3);
+        layers.Find(userRule.Id, cancellationToken: TestContext.Current.CancellationToken).Store.Should().BeSameAs(userStore);
+        layers.Find(userRule.Id, cancellationToken: TestContext.Current.CancellationToken).Scope.Should().Be(MemoryScope.User);
+        layers.Level(scope).Should().BeSameAs(workspaceStore);
+        layers.Level(MemoryScope.Parse("workspace:missing")).Should().BeNull();
         projectStore.Retire(projectRule.Id, "human:test", "obsolete", cancellationToken: TestContext.Current.CancellationToken);
-        var afterRetirement = Assert.Single(layers.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Memories);
-        Assert.Equal(workspaceRule.Id, afterRetirement.Id);
-        Assert.Equal(scope, afterRetirement.Scope);
-        Assert.Equal([userRule.Id + " (user)"], afterRetirement.Overrides);
+        var afterRetirement = layers.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Memories.Should().ContainSingle().Which;
+        afterRetirement.Id.Should().Be(workspaceRule.Id);
+        afterRetirement.Scope.Should().Be(scope);
+        afterRetirement.Overrides.Should().Equal(userRule.Id + " (user)");
         var userOnly = new MemoryLayers(null, [new MemoryLevel(MemoryScope.User, userStore)]);
-        Assert.Equal("user", Assert.Single(userOnly.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Memories).Scope.ToString());
+        userOnly.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Memories.Should().ContainSingle().Which.Scope.ToString().Should().Be("user");
     }
 
     [Fact]
@@ -176,14 +178,14 @@ public sealed class MemoryTests
         using var state = new State();
         using var database = HarnessDatabase.Open(state.Path, cancellationToken: TestContext.Current.CancellationToken);
         var store = new MemoryStore(database);
-        Assert.Throws<ArgumentException>(() => store.Put(Input("DB password=hunter2 on staging"), cancellationToken: TestContext.Current.CancellationToken));
+        FluentActions.Invoking(() => store.Put(Input("DB password=hunter2 on staging"), cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<ArgumentException>();
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
-        Assert.Throws<OperationCanceledException>(() => store.Put(Input("ordinary statement"), cancelled.Token));
-        Assert.Throws<OperationCanceledException>(() => store.Search(new MemoryQuery(), cancelled.Token));
-        Assert.Empty(store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Empty(store.Events("missing", cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Throws<KeyNotFoundException>(() => store.Get("missing", cancellationToken: TestContext.Current.CancellationToken));
+        FluentActions.Invoking(() => store.Put(Input("ordinary statement"), cancelled.Token)).Should().ThrowExactly<OperationCanceledException>();
+        FluentActions.Invoking(() => store.Search(new MemoryQuery(), cancelled.Token)).Should().ThrowExactly<OperationCanceledException>();
+        store.Search(new MemoryQuery { IncludeInactive = true }, cancellationToken: TestContext.Current.CancellationToken).Should().BeEmpty();
+        store.Events("missing", cancellationToken: TestContext.Current.CancellationToken).Should().BeEmpty();
+        FluentActions.Invoking(() => store.Get("missing", cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactly<KeyNotFoundException>();
     }
 
     [Fact]
@@ -197,10 +199,10 @@ public sealed class MemoryTests
         var input = Input("Shared exact duplicate written by competing agents");
         var results = await Task.WhenAll(Enumerable.Range(0, 12).Select(index => Task.Run(() =>
             (index % 2 is 0 ? first : second).Put(input with { Source = new MemorySource(Ref: "concurrent", By: "agent-" + index) }), TestContext.Current.CancellationToken)));
-        Assert.Single(results, result => result.Status is "created");
-        Assert.Equal(11, results.Count(result => result.Status is "duplicate"));
-        var memory = Assert.Single(first.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(12, first.Events(memory.Id, cancellationToken: TestContext.Current.CancellationToken).Count);
+        results.Where(result => result.Status is "created").Should().ContainSingle();
+        results.Count(result => result.Status is "duplicate").Should().Be(11);
+        var memory = first.Search(new MemoryQuery(), cancellationToken: TestContext.Current.CancellationToken).Should().ContainSingle().Which;
+        first.Events(memory.Id, cancellationToken: TestContext.Current.CancellationToken).Count.Should().Be(12);
     }
 
     private static MemoryInput Input(string content) => new() { Type = "decision", Content = content, Source = new MemorySource(Ref: "TASK-0008", By: "test-agent") };

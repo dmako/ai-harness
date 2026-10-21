@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Storage;
@@ -23,21 +24,21 @@ public sealed class TaskStoreTests
         using (var command = connection.CreateCommand())
         {
             command.CommandText = "SELECT exit FROM milestones WHERE id='M1'";
-            Assert.Equal("[\"verified\",\"Žluťoučký 🧪 \\u003c\\u0026\\u003e\\u2028\"]", command.ExecuteScalar());
+            command.ExecuteScalar().Should().Be("""["verified","Žluťoučký 🧪 \u003c\u0026\u003e\u2028"]""");
         }
         var result = s.Store.Import([Definition("T-1") with { Status = "done" }, Definition("T-2", "T-1", "T-1"), Definition("T-3", "T-2"),
             Definition("T-4") with { Priority = "critical", Scope = ["src", "", "src", "test"], Milestone = "implicit" }], "fixture", cancellationToken: Token);
-        Assert.Equal(["T-2", "T-4"], result.Unlocked);
-        Assert.Equal("T-4", s.Store.Next(cancellationToken: Token)!.Id);
-        Assert.Equal("T-2", s.Store.Next("M1", Token)!.Id);
-        Assert.Equal(["src", "test"], s.Store.Get("T-4", Token).Definition.Scope);
-        Assert.Equal("backlog", s.Store.Get("T-3", Token).Status);
+        result.Unlocked.Should().Equal("T-2", "T-4");
+        s.Store.Next(cancellationToken: Token)!.Id.Should().Be("T-4");
+        s.Store.Next("M1", Token)!.Id.Should().Be("T-2");
+        s.Store.Get("T-4", Token).Definition.Scope.Should().Equal("src", "test");
+        s.Store.Get("T-3", Token).Status.Should().Be("backlog");
         var ms = s.Store.Milestones(Token);
-        Assert.Equal(["M1", "M0", "implicit"], ms.Select(m => m.Definition.Id));
-        Assert.Equal(3, ms[0].Total);
-        Assert.Equal(1, ms[0].Tasks["done"]);
-        Assert.False(ms[1].Done);
-        Assert.False(ms[2].Defined);
+        ms.Select(m => m.Definition.Id).Should().Equal("M1", "M0", "implicit");
+        ms[0].Total.Should().Be(3);
+        ms[0].Tasks["done"].Should().Be(1);
+        ms[1].Done.Should().BeFalse();
+        ms[2].Defined.Should().BeFalse();
     }
 
     [Fact]
@@ -46,18 +47,18 @@ public sealed class TaskStoreTests
         using var s = new State();
         s.Store.Import([Definition("T-1"), Definition("T-2", "T-1")], "fixture", cancellationToken: Token);
         var before = Snapshot(s.Database);
-        Assert.Single(s.Store.Import([Definition("T-3")], "dry", true, Token).Added);
-        Assert.Equal(1, s.Store.ImportMilestones([new("M9", "dry")], "dry", true, Token));
-        Assert.Equal(before, Snapshot(s.Database));
-        Assert.Throws<ArgumentException>(() => s.Store.Import([Definition("bad")], "bad", cancellationToken: Token));
-        Assert.Throws<ArgumentException>(() => s.Store.Import([Definition("T-3"), Definition("T-3")], "bad", cancellationToken: Token));
-        Assert.Throws<ArgumentException>(() => s.Store.Import([Definition("T-3", "T-3")], "bad", cancellationToken: Token));
-        Assert.Throws<ArgumentException>(() => s.Store.Import([Definition("T-3", "T-99")], "bad", cancellationToken: Token));
-        var cycle = Assert.Throws<ArgumentException>(() => s.Store.Import([Definition("T-1", "T-2")], "bad", cancellationToken: Token));
-        Assert.Equal("dependency cycle: T-1 -> T-2 -> T-1", cycle.Message);
-        Assert.Throws<ArgumentException>(() => s.Store.ImportMilestones([new("", "invalid")], "bad", cancellationToken: Token));
-        Assert.Throws<ArgumentException>(() => s.Store.ImportMilestones([new("M1", "first"), new("M1", "second")], "bad", cancellationToken: Token));
-        Assert.Equal(before, Snapshot(s.Database));
+        s.Store.Import([Definition("T-3")], "dry", true, Token).Added.Should().ContainSingle();
+        s.Store.ImportMilestones([new("M9", "dry")], "dry", true, Token).Should().Be(1);
+        Snapshot(s.Database).Should().Be(before);
+        FluentActions.Invoking(() => s.Store.Import([Definition("bad")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => s.Store.Import([Definition("T-3"), Definition("T-3")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => s.Store.Import([Definition("T-3", "T-3")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => s.Store.Import([Definition("T-3", "T-99")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        var cycle = FluentActions.Invoking(() => s.Store.Import([Definition("T-1", "T-2")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>().Which;
+        cycle.Message.Should().Be("dependency cycle: T-1 -> T-2 -> T-1");
+        FluentActions.Invoking(() => s.Store.ImportMilestones([new("", "invalid")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => s.Store.ImportMilestones([new("M1", "first"), new("M1", "second")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        Snapshot(s.Database).Should().Be(before);
     }
 
     [Fact]
@@ -71,25 +72,25 @@ public sealed class TaskStoreTests
         var claim = s.Store.Get("T-2", Token);
         var result = s.Store.Import([defs[0] with { Title = "new title", Status = "blocked", Notes = "replace?", Acceptance = ["check", "new", "build"] },
             defs[1] with { Title = "claimed new", Status = "done" }], "new", cancellationToken: Token);
-        Assert.Equal(["T-1", "T-2"], result.Updated);
-        Assert.Equal(["T-3"], result.Orphaned);
+        result.Updated.Should().Equal("T-1", "T-2");
+        result.Orphaned.Should().Equal("T-3");
         var done = s.Store.Get("T-1", Token);
-        Assert.Equal(complete.CompletedAt, done.CompletedAt);
-        Assert.Equal(complete.CompletionSummary, done.CompletionSummary);
-        Assert.Equal("execution notes", done.Definition.Notes);
-        Assert.Equal("done", done.Status);
-        Assert.Equal(["pass", "pending", "n/a"], done.Criteria.Select(a => a.Result));
-        Assert.Equal("prior evidence", done.Criteria[0].Evidence);
+        done.CompletedAt.Should().Be(complete.CompletedAt);
+        done.CompletionSummary.Should().Be(complete.CompletionSummary);
+        done.Definition.Notes.Should().Be("execution notes");
+        done.Status.Should().Be("done");
+        done.Criteria.Select(a => a.Result).Should().Equal("pass", "pending", "n/a");
+        done.Criteria[0].Evidence.Should().Be("prior evidence");
         var stillClaimed = s.Store.Get("T-2", Token);
-        Assert.Equal(claim.Status, stillClaimed.Status);
-        Assert.Equal(claim.ClaimToken, stillClaimed.ClaimToken);
-        Assert.Equal(claim.LeaseUntil, stillClaimed.LeaseUntil);
-        Assert.DoesNotContain("secret-claim", JsonSerializer.Serialize(TaskViews.Task(stillClaimed)), StringComparison.Ordinal);
-        Assert.Equal("definition_updated", s.Store.Events("T-1", Token)[^1].Event);
+        stillClaimed.Status.Should().Be(claim.Status);
+        stillClaimed.ClaimToken.Should().Be(claim.ClaimToken);
+        stillClaimed.LeaseUntil.Should().Be(claim.LeaseUntil);
+        JsonSerializer.Serialize(TaskViews.Task(stillClaimed)).Should().NotContain("secret-claim");
+        s.Store.Events("T-1", Token)[^1].Event.Should().Be("definition_updated");
         var before = s.Store.Get("T-2", Token);
         var unchanged = s.Store.Import([defs[1] with { Title = "claimed new", Notes = "ignored" }], "another", cancellationToken: Token);
-        Assert.Equal(["T-2"], unchanged.Unchanged);
-        Assert.Equal(before.UpdatedAt, s.Store.Get("T-2", Token).UpdatedAt);
+        unchanged.Unchanged.Should().Equal("T-2");
+        s.Store.Get("T-2", Token).UpdatedAt.Should().Be(before.UpdatedAt);
     }
 
     [Fact]
@@ -98,22 +99,22 @@ public sealed class TaskStoreTests
         using var s = new State();
         s.Store.Import([Definition("T-1") with { Status = "done" }, Definition("T-2"), Definition("T-3", "T-2")], "fixture", cancellationToken: Token);
         SeedExecution(s.Database);
-        Assert.Equal("review", s.Store.Get("T-2", Token).Status);
+        s.Store.Get("T-2", Token).Status.Should().Be("review");
         var before = Snapshot(s.Database);
-        Assert.Throws<InvalidOperationException>(() => s.Store.Block("T-2", new("agent", "wrong"), "stuck", Token));
-        Assert.Equal(before, Snapshot(s.Database));
-        Assert.Equal("blocked", s.Store.Block("T-2", new("agent", "secret-claim"), "password='example'", Token).Status);
-        Assert.Equal("password=[redacted]", s.Store.Get("T-2", Token).BlockedReason);
-        Assert.Equal("deferred", s.Store.Defer("T-2", Human, "after launch", Token).Status);
-        Assert.Null(s.Store.Next(cancellationToken: Token));
-        Assert.Equal("ready", s.Store.Unblock("T-2", Human, cancellationToken: Token).Status);
+        FluentActions.Invoking(() => s.Store.Block("T-2", new("agent", "wrong"), "stuck", Token)).Should().ThrowExactly<InvalidOperationException>();
+        Snapshot(s.Database).Should().Be(before);
+        s.Store.Block("T-2", new("agent", "secret-claim"), "password='example'", Token).Status.Should().Be("blocked");
+        s.Store.Get("T-2", Token).BlockedReason.Should().Be("password=[redacted]");
+        s.Store.Defer("T-2", Human, "after launch", Token).Status.Should().Be("deferred");
+        s.Store.Next(cancellationToken: Token).Should().BeNull();
+        s.Store.Unblock("T-2", Human, cancellationToken: Token).Status.Should().Be("ready");
         s.Store.Block("T-3", Human, "wait", Token);
-        Assert.Equal("backlog", s.Store.Unblock("T-3", Human, cancellationToken: Token).Status);
-        Assert.Throws<InvalidOperationException>(() => s.Store.Defer("T-1", Human, "terminal", Token));
+        s.Store.Unblock("T-3", Human, cancellationToken: Token).Status.Should().Be("backlog");
+        FluentActions.Invoking(() => s.Store.Defer("T-1", Human, "terminal", Token)).Should().ThrowExactly<InvalidOperationException>();
         SeedExpired(s.Database);
-        Assert.Equal("ready", s.Store.Get("T-2", Token).Status);
-        Assert.Contains(s.Store.Events("T-2", Token), e => e.Event is "lease_expired");
-        Assert.Equal("", s.Store.Get("T-2", Token).ClaimToken);
+        s.Store.Get("T-2", Token).Status.Should().Be("ready");
+        s.Store.Events("T-2", Token).Where(e => e.Event is "lease_expired").Should().NotBeEmpty();
+        s.Store.Get("T-2", Token).ClaimToken.Should().Be("");
     }
 
     [Fact]
@@ -123,10 +124,10 @@ public sealed class TaskStoreTests
         s.Store.Import([Definition("T-1")], "fixture", cancellationToken: Token);
         using var writer = s.Database.OpenConnection();
         using var transaction = writer.BeginTransaction(deferred: false);
-        Assert.Equal("T-1", s.Store.Get("T-1", Token).Id);
-        Assert.Single(s.Store.List(cancellationToken: Token));
-        Assert.Equal("T-1", s.Store.Next(cancellationToken: Token)!.Id);
-        Assert.Single(s.Store.Milestones(Token));
+        s.Store.Get("T-1", Token).Id.Should().Be("T-1");
+        s.Store.List(cancellationToken: Token).Should().ContainSingle();
+        s.Store.Next(cancellationToken: Token)!.Id.Should().Be("T-1");
+        s.Store.Milestones(Token).Should().ContainSingle();
     }
 
     [Fact]
@@ -135,27 +136,27 @@ public sealed class TaskStoreTests
         using var s = new State();
         s.Store.Import([Definition("T-1")], "fixture", cancellationToken: Token);
         var created = s.Store.Create(new() { Title = "New task", Acceptance = ["checked"] }, "", new("human", "cli", "manual"), Token);
-        Assert.Equal("T-2", created.Id);
-        Assert.Throws<ArgumentException>(() => s.Store.NextId("T---", Token));
-        Assert.Equal("created", s.Store.Events(created.Id, Token)[0].Event);
+        created.Id.Should().Be("T-2");
+        FluentActions.Invoking(() => s.Store.NextId("T---", Token)).Should().ThrowExactly<ArgumentException>();
+        s.Store.Events(created.Id, Token)[0].Event.Should().Be("created");
         var path = Path.Combine(s.Directory, "backlog.yaml");
         var original = "# keep this comment\r\nversion: 1\r\ntasks:\r\n  - id: T-1 # inline\r\n    title: existing\r\n";
         File.WriteAllText(path, original);
         var dry = s.Store.Export(path, true, Token);
-        Assert.Equal(["T-2"], dry.Added);
-        Assert.Equal(original, File.ReadAllText(path));
+        dry.Added.Should().Equal("T-2");
+        File.ReadAllText(path).Should().Be(original);
         s.Store.Export(path, cancellationToken: Token);
-        Assert.StartsWith(original, File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(["T-1", "T-2"], BacklogCodec.Read(path).Tasks.Select(d => d.Id));
+        File.ReadAllText(path).Should().StartWith(original);
+        BacklogCodec.Read(path).Tasks.Select(d => d.Id).Should().Equal("T-1", "T-2");
         var appended = File.ReadAllBytes(path);
-        Assert.Empty(s.Store.Export(path, cancellationToken: Token).Added);
-        Assert.Equal(appended, File.ReadAllBytes(path));
+        s.Store.Export(path, cancellationToken: Token).Added.Should().BeEmpty();
+        File.ReadAllBytes(path).Should().Equal(appended);
         File.WriteAllText(path, "version: 1\ntasks: []\nmilestones: []\n");
-        Assert.Throws<InvalidDataException>(() => s.Store.Export(path, cancellationToken: Token));
-        Assert.Equal("version: 1\ntasks: []\nmilestones: []\n", File.ReadAllText(path));
+        FluentActions.Invoking(() => s.Store.Export(path, cancellationToken: Token)).Should().ThrowExactly<InvalidDataException>();
+        File.ReadAllText(path).Should().Be("version: 1\ntasks: []\nmilestones: []\n");
         File.WriteAllText(path, "version: 1\ntasks: []\n");
         s.Store.Export(path, cancellationToken: Token);
-        Assert.Equal(2, BacklogCodec.Read(path).Tasks.Count);
+        BacklogCodec.Read(path).Tasks.Count.Should().Be(2);
     }
 
     [Theory]
@@ -165,20 +166,20 @@ public sealed class TaskStoreTests
     [InlineData("version: 1\ntasks: [{id: T-1, title: a, scope: wrong}]")]
     [InlineData("version: 1\ntasks: [{id: T-1, id: T-2}]")]
     [InlineData("version: 1\nmilestones: [{id: M1, mystery: x}]")]
-    public void StrictFormatRejectsUnknownDuplicateAndInvalidShapes(string yaml) => Assert.Throws<InvalidDataException>(() => BacklogCodec.Parse(yaml));
+    public void StrictFormatRejectsUnknownDuplicateAndInvalidShapes(string yaml) => FluentActions.Invoking(() => BacklogCodec.Parse(yaml)).Should().ThrowExactly<InvalidDataException>();
 
     [Fact]
     public void JsonYamlAliasesAndMultilinePlanningRoundTrip()
     {
         var parsed = BacklogCodec.Parse("version: 1\nmilestones: [{id: M1, title: phase, exit: [tested]}]\ntasks:\n  - id: T-1\n    title: 'null'\n    scope: &paths [src, test]\n    goal: |\n      Line one\n      Line two\n  - id: T-2\n    title: second\n    scope: *paths\n---\nignored: true\n");
-        Assert.Equal("null", parsed.Tasks[0].Title);
-        Assert.Equal(["src", "test"], parsed.Tasks[1].Scope);
-        var json = "{\"version\":1,\"tasks\":[{\"id\":\"T-3\",\"title\":\"json\"}]}";
-        Assert.Equal("T-3", Assert.Single(BacklogCodec.Parse(json).Tasks).Id);
-        Assert.Equal(parsed.Tasks[0].Goal, BacklogCodec.Parse(BacklogCodec.Write(parsed)).Tasks[0].Goal);
+        parsed.Tasks[0].Title.Should().Be("null");
+        parsed.Tasks[1].Scope.Should().Equal("src", "test");
+        var json = """{"version":1,"tasks":[{"id":"T-3","title":"json"}]}""";
+        BacklogCodec.Parse(json).Tasks.Should().ContainSingle().Which.Id.Should().Be("T-3");
+        BacklogCodec.Parse(BacklogCodec.Write(parsed)).Tasks[0].Goal.Should().Be(parsed.Tasks[0].Goal);
         var merged = BacklogCodec.Parse("version: 1\ntasks: [{id: T-1, title: first, scope: &p [src]}, {<<: {id: T-2, title: base, scope: *p}, title: explicit}]\n");
-        Assert.Equal("explicit", merged.Tasks[1].Title);
-        Assert.Equal(["src"], merged.Tasks[1].Scope);
+        merged.Tasks[1].Title.Should().Be("explicit");
+        merged.Tasks[1].Scope.Should().Equal("src");
     }
 
     [Theory]
@@ -196,15 +197,15 @@ public sealed class TaskStoreTests
         store.Import([Definition("T-41") with { Status = "done" }, Definition("T-42", "T-41")], "fixture", cancellationToken: Token);
         store.ImportMilestones([new("M1", "Migrated", "ship", ["verified"])], "fixture", cancellationToken: Token);
         var yaml = Path.Combine(s.Directory, "export.yaml");
-        Assert.True(store.Export(yaml, cancellationToken: Token).Created);
+        store.Export(yaml, cancellationToken: Token).Created.Should().BeTrue();
         var exported = BacklogCodec.Read(yaml);
         var before = Snapshot(database);
         var res = store.Import(exported.Tasks, "export", cancellationToken: Token);
-        Assert.Empty(res.Updated);
-        Assert.Equal(2, res.Unchanged.Count);
-        Assert.Equal(0, store.ImportMilestones(exported.Milestones, "export", cancellationToken: Token));
-        Assert.Equal(before, Snapshot(database));
-        Assert.Equal("ready", store.Get("T-42", Token).Status);
+        res.Updated.Should().BeEmpty();
+        res.Unchanged.Count.Should().Be(2);
+        store.ImportMilestones(exported.Milestones, "export", cancellationToken: Token).Should().Be(0);
+        Snapshot(database).Should().Be(before);
+        store.Get("T-42", Token).Status.Should().Be("ready");
     }
 
     private static string FindRoot()

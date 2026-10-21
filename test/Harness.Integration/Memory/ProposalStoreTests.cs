@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Storage;
@@ -15,26 +16,26 @@ public sealed class ProposalStoreTests
         using var state = new State();
         var input = Input("Use NuGet central package management") with { Rationale = "discussed in review" };
         var first = state.Store.Propose(input, Token);
-        Assert.Equal("proposed", first.Status);
-        Assert.Matches("^prop_[0-9a-f]{16}$", first.Proposal!.Id);
-        Assert.Empty(state.Store.Search(new MemoryQuery(), Token));
+        first.Status.Should().Be("proposed");
+        first.Proposal!.Id.Should().MatchRegex("^prop_[0-9a-f]{16}$");
+        state.Store.Search(new MemoryQuery(), Token).Should().BeEmpty();
         var before = Snapshot(state.Database);
         var again = state.Store.Propose(input with { Content = "use nuget central package management." }, Token);
-        Assert.Equal("already_proposed", again.Status);
-        Assert.Equal(first.Proposal.Id, again.Proposal!.Id);
-        Assert.Equal(before, Snapshot(state.Database));
-        Assert.Equal(new MemoryPending(1, first.Proposal.CreatedAt), state.Store.Pending(Token));
+        again.Status.Should().Be("already_proposed");
+        again.Proposal!.Id.Should().Be(first.Proposal.Id);
+        Snapshot(state.Database).Should().Be(before);
+        state.Store.Pending(Token).Should().Be(new MemoryPending(1, first.Proposal.CreatedAt));
         var approved = state.Store.Approve(first.Proposal.Id, new MemoryApprovalInput { By = "human:reviewer", Note = "yes" }, Token);
-        Assert.Equal("created", approved.Status);
-        Assert.Equal("approved", approved.Proposal.Status);
-        Assert.Equal("human:reviewer", approved.Proposal.DecidedBy);
-        Assert.Equal(input.Source, approved.Memory!.Source);
-        Assert.Equal(input.Source!.By, Assert.Single(state.Store.Events(approved.Memory.Id, Token)).Actor);
+        approved.Status.Should().Be("created");
+        approved.Proposal.Status.Should().Be("approved");
+        approved.Proposal.DecidedBy.Should().Be("human:reviewer");
+        approved.Memory!.Source.Should().Be(input.Source);
+        state.Store.Events(approved.Memory.Id, Token).Should().ContainSingle().Which.Actor.Should().Be(input.Source!.By);
         before = Snapshot(state.Database);
-        Assert.Equal("already_memory", state.Store.Propose(input, Token).Status);
-        Assert.Equal(before, Snapshot(state.Database));
-        Assert.Equal(0, state.Store.Pending(Token).Count);
-        Assert.Throws<InvalidOperationException>(() => state.Store.Approve(first.Proposal.Id, new MemoryApprovalInput(), Token));
+        state.Store.Propose(input, Token).Status.Should().Be("already_memory");
+        Snapshot(state.Database).Should().Be(before);
+        state.Store.Pending(Token).Count.Should().Be(0);
+        FluentActions.Invoking(() => state.Store.Approve(first.Proposal.Id, new MemoryApprovalInput(), Token)).Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
@@ -43,18 +44,18 @@ public sealed class ProposalStoreTests
         using var state = new State();
         var old = state.Store.Put(new MemoryInput { Type = "decision", Content = "Template payload enums are stored as integers" }, Token).Memory!;
         var proposal = state.Store.Propose(Input("Template payload enums are stored as names"), Token);
-        Assert.Equal(old.Id, Assert.Single(proposal.Related).Memory.Id);
+        proposal.Related.Should().ContainSingle().Which.Memory.Id.Should().Be(old.Id);
         var before = Snapshot(state.Database);
         var first = state.Store.Approve(proposal.Proposal!.Id, new MemoryApprovalInput { By = "human" }, Token);
-        Assert.Equal("needs_decision", first.Status);
-        Assert.Equal("pending", first.Proposal.Status);
-        Assert.Equal(before, Snapshot(state.Database));
+        first.Status.Should().Be("needs_decision");
+        first.Proposal.Status.Should().Be("pending");
+        Snapshot(state.Database).Should().Be(before);
         var approved = state.Store.Approve(first.Proposal.Id, new MemoryApprovalInput { By = "human", Supersedes = [old.Id], Content = "Template payload enums are stored as names like other columns" }, Token);
-        Assert.Equal("created", approved.Status);
+        approved.Status.Should().Be("created");
         var replaced = state.Store.Get(old.Id, Token);
-        Assert.Equal(approved.Memory!.Id, replaced.SupersededBy);
-        Assert.Equal("approved proposal " + first.Proposal.Id, replaced.SupersedeReason);
-        Assert.Equal(Input("").Source!.By, state.Store.Events(old.Id, Token)[1].Actor);
+        replaced.SupersededBy.Should().Be(approved.Memory!.Id);
+        replaced.SupersedeReason.Should().Be("approved proposal " + first.Proposal.Id);
+        state.Store.Events(old.Id, Token)[1].Actor.Should().Be(Input("").Source!.By);
     }
 
     [Fact]
@@ -64,15 +65,15 @@ public sealed class ProposalStoreTests
         var old = state.Store.Put(new MemoryInput { Type = "decision", Content = "Use integers for template enum values" }, Token).Memory!;
         var proposal = state.Store.Propose(Input("Use names for template enum values") with { Supersedes = old.Id }, Token).Proposal!;
         var keep = state.Store.Approve(proposal.Id, new MemoryApprovalInput { KeepBoth = true, By = "human" }, Token);
-        Assert.Equal("created", keep.Status);
-        Assert.Equal("", state.Store.Get(old.Id, Token).SupersededBy);
+        keep.Status.Should().Be("created");
+        state.Store.Get(old.Id, Token).SupersededBy.Should().Be("");
         var next = state.Store.Propose(Input("Use JSON strings for template enum values") with { Supersedes = keep.Memory!.Id }, Token).Proposal!;
         var approved = state.Store.Approve(next.Id, new MemoryApprovalInput { By = "human" }, Token);
-        Assert.Equal(approved.Memory!.Id, state.Store.Get(keep.Memory.Id, Token).SupersededBy);
+        state.Store.Get(keep.Memory.Id, Token).SupersededBy.Should().Be(approved.Memory!.Id);
         // An explicit list still supersedes even when KeepBoth is set, matching Go's input precedence.
         var explicitProposal = state.Store.Propose(Input("Always persist enum values as readable names"), Token).Proposal!;
         state.Store.Approve(explicitProposal.Id, new MemoryApprovalInput { KeepBoth = true, Supersedes = [old.Id], By = "human" }, Token);
-        Assert.NotEmpty(state.Store.Get(old.Id, Token).SupersededBy);
+        state.Store.Get(old.Id, Token).SupersededBy.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -89,20 +90,20 @@ public sealed class ProposalStoreTests
             new MemoryApprovalInput { Supersedes = ["mem_missing"] },
         })
         {
-            Assert.ThrowsAny<Exception>(() => state.Store.Approve(proposal.Id, input, Token));
-            Assert.Equal(before, Snapshot(state.Database));
+            FluentActions.Invoking(() => state.Store.Approve(proposal.Id, input, Token)).Should().Throw<Exception>();
+            Snapshot(state.Database).Should().Be(before);
         }
         var rejected = state.Store.Reject(proposal.Id, "human:test", "not a rule", Token);
-        Assert.Equal("rejected", rejected.Status);
-        Assert.Equal("not a rule", rejected.DecisionNote);
+        rejected.Status.Should().Be("rejected");
+        rejected.DecisionNote.Should().Be("not a rule");
         before = Snapshot(state.Database);
-        Assert.Throws<InvalidOperationException>(() => state.Store.Reject(proposal.Id, "human:test", "again", Token));
-        Assert.Throws<InvalidOperationException>(() => state.Store.Approve(proposal.Id, new MemoryApprovalInput(), Token));
-        Assert.Throws<KeyNotFoundException>(() => state.Store.GetProposal("missing", Token));
-        Assert.Equal(before, Snapshot(state.Database));
-        Assert.Empty(state.Store.Search(new MemoryQuery(), Token));
-        Assert.Empty(state.Store.Proposals(cancellationToken: Token));
-        Assert.Single(state.Store.Proposals("all", cancellationToken: Token));
+        FluentActions.Invoking(() => state.Store.Reject(proposal.Id, "human:test", "again", Token)).Should().ThrowExactly<InvalidOperationException>();
+        FluentActions.Invoking(() => state.Store.Approve(proposal.Id, new MemoryApprovalInput(), Token)).Should().ThrowExactly<InvalidOperationException>();
+        FluentActions.Invoking(() => state.Store.GetProposal("missing", Token)).Should().ThrowExactly<KeyNotFoundException>();
+        Snapshot(state.Database).Should().Be(before);
+        state.Store.Search(new MemoryQuery(), Token).Should().BeEmpty();
+        state.Store.Proposals(cancellationToken: Token).Should().BeEmpty();
+        state.Store.Proposals("all", cancellationToken: Token).Should().ContainSingle();
     }
 
     [Fact]
@@ -110,11 +111,11 @@ public sealed class ProposalStoreTests
     {
         using var state = new State();
         var proposal = state.Store.Propose(Input("Use the team vault") with { Rationale = " API_KEY='synthetic example' " }, Token).Proposal!;
-        Assert.Equal("API_KEY=[redacted]", proposal.Rationale);
+        proposal.Rationale.Should().Be("API_KEY=[redacted]");
         var before = Snapshot(state.Database);
-        Assert.Throws<ArgumentException>(() => state.Store.Propose(Input("DB password=synthetic on staging"), Token));
-        Assert.Throws<ArgumentException>(() => state.Store.Propose(Input(new string('ž', 2001)), Token));
-        Assert.Equal(before, Snapshot(state.Database));
+        FluentActions.Invoking(() => state.Store.Propose(Input("DB password=synthetic on staging"), Token)).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => state.Store.Propose(Input(new string('ž', 2001)), Token)).Should().ThrowExactly<ArgumentException>();
+        Snapshot(state.Database).Should().Be(before);
     }
 
     [Fact]
@@ -131,11 +132,11 @@ public sealed class ProposalStoreTests
             catch (InvalidOperationException) { return "closed"; }
         }, Token));
         var results = await Task.WhenAll(tasks);
-        Assert.Single(results, status => status is "created");
-        Assert.Equal(7, results.Count(status => status is "closed"));
-        var memory = Assert.Single(state.Store.Search(new MemoryQuery(), Token));
-        Assert.Single(state.Store.Events(memory.Id, Token));
-        Assert.Equal("approved", state.Store.GetProposal(proposal.Id, Token).Proposal.Status);
+        results.Where(status => status is "created").Should().ContainSingle();
+        results.Count(status => status is "closed").Should().Be(7);
+        var memory = state.Store.Search(new MemoryQuery(), Token).Should().ContainSingle().Which;
+        state.Store.Events(memory.Id, Token).Should().ContainSingle();
+        state.Store.GetProposal(proposal.Id, Token).Proposal.Status.Should().Be("approved");
     }
 
     [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Only three constant statements are iterated; no data is interpolated into SQL.")]

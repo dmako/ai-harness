@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Providers;
 using Xunit;
 
@@ -16,9 +17,9 @@ public sealed class ProviderModelTests
     [InlineData(Capabilities.ArchDuplicates, "inferred")]
     public void EvidenceDefaultsAndDeclarationsRemainDistinct(string capability, string expected)
     {
-        Assert.Equal(expected, new CapabilityInfo(capability, "fake").EvidenceOf());
-        Assert.Equal("exact", new CapabilityInfo(capability, "fake", Evidence: "exact").EvidenceOf());
-        Assert.Equal(expected, new CapabilityInfo(capability, "fake", Evidence: "").EvidenceOf());
+        new CapabilityInfo(capability, "fake").EvidenceOf().Should().Be(expected);
+        new CapabilityInfo(capability, "fake", Evidence: "exact").EvidenceOf().Should().Be("exact");
+        new CapabilityInfo(capability, "fake", Evidence: "").EvidenceOf().Should().Be(expected);
     }
 
     [Theory]
@@ -29,20 +30,20 @@ public sealed class ProviderModelTests
     [InlineData("src", "other/a.cs", false)]
     [InlineData("src//", "src/a.cs", false)]
     public void PathPrefixesRespectDirectoryBoundaries(string prefix, string file, bool expected) =>
-        Assert.Equal(expected, new ProviderRequest(Capabilities.TextSearch, Path: prefix).Covers(file));
+        new ProviderRequest(Capabilities.TextSearch, Path: prefix).Covers(file).Should().Be(expected);
 
     [Fact]
     public void CodePackageAndArchitectureModelsRetainAllFieldsAndWireNames()
     {
-        Assert.True(Capabilities.IsPackage(Capabilities.PackageTypeDefinition));
-        Assert.False(Capabilities.IsPackage(Capabilities.SymbolSearch));
-        Assert.True(Capabilities.IsArchitecture(Capabilities.ArchCycles));
-        Assert.False(Capabilities.IsArchitecture(Capabilities.Overview));
-        Assert.Equal([Capabilities.ArchDependencies, Capabilities.ArchCycles, Capabilities.ArchChangeCoupling, Capabilities.ArchDuplicates, Capabilities.ArchDeadCode], Capabilities.Architecture);
+        Capabilities.IsPackage(Capabilities.PackageTypeDefinition).Should().BeTrue();
+        Capabilities.IsPackage(Capabilities.SymbolSearch).Should().BeFalse();
+        Capabilities.IsArchitecture(Capabilities.ArchCycles).Should().BeTrue();
+        Capabilities.IsArchitecture(Capabilities.Overview).Should().BeFalse();
+        Capabilities.Architecture.Should().Equal(Capabilities.ArchDependencies, Capabilities.ArchCycles, Capabilities.ArchChangeCoupling, Capabilities.ArchDuplicates, Capabilities.ArchDeadCode);
         var request = new ProviderRequest(Capabilities.PackageTypeDefinition, Package: "Example.Package", Version: "1.2.3", Type: "Example.Type");
-        Assert.Equal("Example.Package", request.Package);
-        Assert.Equal("1.2.3", request.Version);
-        Assert.Equal("Example.Type", request.Type);
+        request.Package.Should().Be("Example.Package");
+        request.Version.Should().Be("1.2.3");
+        request.Type.Should().Be("Example.Type");
         var item = new ProviderItem
         {
             Kind = "relation",
@@ -63,19 +64,19 @@ public sealed class ProviderModelTests
             Tool = "dependencies",
         };
         var json = JsonSerializer.SerializeToElement(item);
-        Assert.Equal("A.B", json.GetProperty("qualified_name").GetString());
-        Assert.Equal(4, json.GetProperty("related").GetProperty("start_line").GetInt32());
-        Assert.Equal(2, json.GetProperty("members").GetArrayLength());
-        var roundtrip = Assert.IsType<ProviderItem>(JsonSerializer.Deserialize<ProviderItem>(json));
-        Assert.Equal(item, roundtrip with { Members = item.Members });
-        Assert.Equal("{\"kind\":\"\",\"provider\":\"\",\"tool\":\"\"}", JsonSerializer.Serialize(new ProviderItem()));
-        Assert.Equal("{\"state\":\"idle\"}", JsonSerializer.Serialize(new ProviderHealth("idle")));
-        Assert.Equal("{\"state\":\"idle\"}", JsonSerializer.Serialize(new ProviderHealth("idle", "", "")));
-        Assert.Equal("{}", JsonSerializer.Serialize(new ProviderReference("", "")));
-        Assert.Equal("{\"kind\":\"\",\"provider\":\"\",\"tool\":\"\"}", JsonSerializer.Serialize(new ProviderItem { Name = "", QualifiedName = "", Label = "", Path = "", Snippet = "", Members = [] }));
-        Assert.False(JsonSerializer.SerializeToElement(new CapabilityInfo("x", "y", Evidence: "")).TryGetProperty("evidence", out _));
+        json.GetProperty("qualified_name").GetString().Should().Be("A.B");
+        json.GetProperty("related").GetProperty("start_line").GetInt32().Should().Be(4);
+        json.GetProperty("members").GetArrayLength().Should().Be(2);
+        var roundtrip = JsonSerializer.Deserialize<ProviderItem>(json).Should().BeOfType<ProviderItem>().Which;
+        (roundtrip with { Members = item.Members }).Should().Be(item);
+        JsonSerializer.Serialize(new ProviderItem()).Should().Be("""{"kind":"","provider":"","tool":""}""");
+        JsonSerializer.Serialize(new ProviderHealth("idle")).Should().Be("""{"state":"idle"}""");
+        JsonSerializer.Serialize(new ProviderHealth("idle", "", "")).Should().Be("""{"state":"idle"}""");
+        JsonSerializer.Serialize(new ProviderReference("", "")).Should().Be("""{}""");
+        JsonSerializer.Serialize(new ProviderItem { Name = "", QualifiedName = "", Label = "", Path = "", Snippet = "", Members = [] }).Should().Be("""{"kind":"","provider":"","tool":""}""");
+        JsonSerializer.SerializeToElement(new CapabilityInfo("x", "y", Evidence: "")).TryGetProperty("evidence", out _).Should().BeFalse();
         var info = JsonSerializer.SerializeToElement(new CapabilityInfo(Capabilities.Context, "compiler", "high", "medium", "indexed", "project", "exact"));
-        Assert.Equal("indexed", info.GetProperty("freshness").GetString());
-        Assert.Equal("exact", info.GetProperty("evidence").GetString());
+        info.GetProperty("freshness").GetString().Should().Be("indexed");
+        info.GetProperty("evidence").GetString().Should().Be("exact");
     }
 }

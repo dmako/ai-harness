@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Projects;
@@ -17,11 +18,11 @@ public sealed class KnowledgeLevelTests
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "schema-04.db"), path);
         var before = File.ReadAllBytes(path);
         var results = KnowledgeLevels.Across([new KnowledgeProject("p1", "legacy", directory.Path, path)], store => store.Search(new MemoryQuery(), Token), Token);
-        Assert.Empty(results);
+        results.Should().BeEmpty();
         using (var database = HarnessDatabase.OpenReadOnly(path))
-            Assert.Equal(4, database.SchemaVersion());
-        Assert.Equal(before, File.ReadAllBytes(path));
-        Assert.Empty(DatabaseBackups.List(path));
+            database.SchemaVersion().Should().Be(4);
+        File.ReadAllBytes(path).Should().Equal(before);
+        DatabaseBackups.List(path).Should().BeEmpty();
     }
 
     [Fact]
@@ -33,13 +34,13 @@ public sealed class KnowledgeLevelTests
         var levels = new KnowledgeLevels(Path.Combine(directory.Path, "config.toml"), new MachineRegistry(Path.Combine(directory.Path, "projects.json")));
         var path = levels.KnowledgePath(workspaces, MemoryScope.Parse("workspace:home"));
         using (var workspace = HarnessDatabase.Open(path, cancellationToken: Token))
-            Assert.Equal(19, workspace.SchemaVersion());
+            workspace.SchemaVersion().Should().Be(19);
         Directory.CreateDirectory(Path.Combine(directory.Path, "knowledge", "user.db"));
         using var project = HarnessDatabase.Open(Path.Combine(directory.Path, "project.db"), cancellationToken: Token);
-        var failure = Assert.ThrowsAny<Exception>(() => levels.OpenLayers(new MemoryStore(project), "p1", Token));
-        Assert.True(failure is IOException or UnauthorizedAccessException);
+        var failure = FluentActions.Invoking(() => levels.OpenLayers(new MemoryStore(project), "p1", Token)).Should().Throw<Exception>().Which;
+        (failure is IOException or UnauthorizedAccessException).Should().BeTrue();
         using var exclusive = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        Assert.True(exclusive.Length > 0);
+        (exclusive.Length > 0).Should().BeTrue();
     }
 
     [Fact]
@@ -50,9 +51,9 @@ public sealed class KnowledgeLevelTests
         foreach (var id in new[] { "../escape", "..\\escape", "C:escape", "" })
         {
             var workspaces = new[] { new KnowledgeWorkspace(id, "home", ["p1"]) };
-            Assert.Throws<InvalidDataException>(() => levels.OpenLevel(workspaces, MemoryScope.Parse("workspace:home"), "p1", Token));
+            FluentActions.Invoking(() => levels.OpenLevel(workspaces, MemoryScope.Parse("workspace:home"), "p1", Token)).Should().ThrowExactly<InvalidDataException>();
         }
-        Assert.False(Directory.Exists(Path.Combine(directory.Path, "knowledge")));
+        Directory.Exists(Path.Combine(directory.Path, "knowledge")).Should().BeFalse();
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;

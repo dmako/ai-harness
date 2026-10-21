@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using AwesomeAssertions;
 using Xunit;
 
 namespace Harness.Integration;
@@ -15,7 +16,7 @@ public sealed class CliProcessTests
             directory = directory.Parent;
         }
 
-        Assert.NotNull(directory);
+        directory.Should().NotBeNull();
 #if DEBUG
         const string Configuration = "Debug";
 #else
@@ -39,11 +40,11 @@ public sealed class CliProcessTests
             var stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             var stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
             await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
-            Assert.Equal(0, process.ExitCode);
-            Assert.Empty(await stderr);
+            process.ExitCode.Should().Be(0);
+            (await stderr).Should().BeEmpty();
             using var json = JsonDocument.Parse(await stdout);
-            Assert.StartsWith(".NET ", json.RootElement.GetProperty("go_version").GetString(), StringComparison.Ordinal);
-            Assert.Equal(JsonValueKind.String, json.RootElement.GetProperty("commit").ValueKind);
+            json.RootElement.GetProperty("go_version").GetString().Should().StartWith(".NET ");
+            json.RootElement.GetProperty("commit").ValueKind.Should().Be(JsonValueKind.String);
         }
         finally
         {

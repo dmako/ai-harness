@@ -1,3 +1,4 @@
+using AwesomeAssertions;
 using Harness.Core.Providers;
 using Harness.Providers.Registry;
 using Xunit;
@@ -19,10 +20,10 @@ public sealed class ProviderRoutingTests
             new("heavy", "harness", Forbidden, Context: false), new("z", "mcp", () => new Fake("z", [Capabilities.TextSearch])),
             new("a", "mcp", () => new Fake("a", [Capabilities.SymbolSearch]))];
         await using var registry = ProviderRouting.Build(entries, root.Path, light: true);
-        Assert.Equal(["a", "z"], registry.Providers().Select(provider => provider.Name));
-        Assert.All(registry.Providers(), provider => Assert.Equal(0, Assert.IsType<Fake>(provider).Discoveries));
+        registry.Providers().Select(provider => provider.Name).Should().Equal("a", "z");
+        registry.Providers().Should().AllSatisfy(provider => provider.Should().BeOfType<Fake>().Which.Discoveries.Should().Be(0));
         await using var empty = ProviderRouting.Build([], root.Path);
-        Assert.Empty(empty.Providers());
+        empty.Providers().Should().BeEmpty();
     }
 
     [Fact]
@@ -30,9 +31,9 @@ public sealed class ProviderRoutingTests
     {
         using var root = new Root();
         await using var registry = ProviderRouting.Build([new("heavy", "harness", () => new Fake("heavy", [Capabilities.TextSearch]), Context: false)], root.Path);
-        Assert.False(registry.InContext("heavy"));
-        Assert.Single(await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token));
-        Assert.Empty(await registry.CallAsync(new(Capabilities.TextSearch), name => !registry.InContext(name), Token));
+        registry.InContext("heavy").Should().BeFalse();
+        (await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token)).Should().ContainSingle();
+        (await registry.CallAsync(new(Capabilities.TextSearch), name => !registry.InContext(name), Token)).Should().BeEmpty();
     }
 
     [Fact]
@@ -40,16 +41,16 @@ public sealed class ProviderRoutingTests
     {
         await using var fake = new Fake("a", [Capabilities.SymbolSearch]);
         await using var routed = ProviderRouting.Route(fake, ["csharp"], [], ["typescript"]);
-        Assert.Empty(routed.Capabilities());
+        routed.Capabilities().Should().BeEmpty();
         var health = await routed.HealthAsync(true, Token);
-        Assert.Equal("idle", health.State);
-        Assert.Equal("not used here: serves csharp; project: typescript", health.Detail);
-        await Assert.ThrowsAsync<UnsupportedCapabilityException>(() => routed.ExecuteAsync(new(Capabilities.SymbolSearch), Token));
-        Assert.Equal(0, fake.Discoveries);
-        Assert.Equal(0, fake.Probes);
-        Assert.Equal(0, fake.Calls);
-        Assert.Equal("not used here: serves csharp; project: no recognized language", ProviderRouting.Inactive(["csharp"], []));
-        Assert.Same(fake, ProviderRouting.Route(fake, ["csharp"], [], ["csharp"]));
+        health.State.Should().Be("idle");
+        health.Detail.Should().Be("not used here: serves csharp; project: typescript");
+        await FluentActions.Awaiting(() => routed.ExecuteAsync(new(Capabilities.SymbolSearch), Token)).Should().ThrowExactlyAsync<UnsupportedCapabilityException>();
+        fake.Discoveries.Should().Be(0);
+        fake.Probes.Should().Be(0);
+        fake.Calls.Should().Be(0);
+        ProviderRouting.Inactive(["csharp"], []).Should().Be("not used here: serves csharp; project: no recognized language");
+        ProviderRouting.Route(fake, ["csharp"], [], ["csharp"]).Should().BeSameAs(fake);
     }
 
     [Fact]
@@ -57,12 +58,12 @@ public sealed class ProviderRoutingTests
     {
         await using var fake = new Fake("a", [Capabilities.SymbolSearch, Capabilities.Callers]);
         await using var routed = ProviderRouting.Route(fake, [], [Capabilities.Callers], []);
-        Assert.Equal(Capabilities.Callers, Assert.Single(routed.Capabilities()).Capability);
-        await Assert.ThrowsAsync<UnsupportedCapabilityException>(() => routed.ExecuteAsync(new(Capabilities.SymbolSearch), Token));
+        routed.Capabilities().Should().ContainSingle().Which.Capability.Should().Be(Capabilities.Callers);
+        await FluentActions.Awaiting(() => routed.ExecuteAsync(new(Capabilities.SymbolSearch), Token)).Should().ThrowExactlyAsync<UnsupportedCapabilityException>();
         await routed.ExecuteAsync(new(Capabilities.Callers), Token);
-        Assert.Equal(1, fake.Calls);
-        Assert.Equal("fixture-1", Assert.IsAssignableFrom<IVersionedProvider>(routed).ServerVersion);
-        Assert.False(routed is IProviderRefresher);
+        fake.Calls.Should().Be(1);
+        routed.Should().BeAssignableTo<IVersionedProvider>().Which.ServerVersion.Should().Be("fixture-1");
+        (routed is IProviderRefresher).Should().BeFalse();
     }
 
     [Fact]
@@ -70,11 +71,11 @@ public sealed class ProviderRoutingTests
     {
         await using var fake = new RefreshingFake();
         await using var inactive = ProviderRouting.Route(fake, ["csharp"], [], ["typescript"]);
-        Assert.True((await Assert.IsAssignableFrom<IProviderRefresher>(inactive).RefreshAsync(new(true, ["a.cs"]), Token)).Skipped);
-        Assert.Equal(0, fake.Refreshes);
+        (await inactive.Should().BeAssignableTo<IProviderRefresher>().Which.RefreshAsync(new(true, ["a.cs"]), Token)).Skipped.Should().BeTrue();
+        fake.Refreshes.Should().Be(0);
         await using var active = ProviderRouting.Route(fake, [], [Capabilities.TextSearch], []);
-        Assert.False((await Assert.IsAssignableFrom<IProviderRefresher>(active).RefreshAsync(new(true, ["a.cs"]), Token)).Skipped);
-        Assert.Equal(1, fake.Refreshes);
+        (await active.Should().BeAssignableTo<IProviderRefresher>().Which.RefreshAsync(new(true, ["a.cs"]), Token)).Skipped.Should().BeFalse();
+        fake.Refreshes.Should().Be(1);
     }
 
     [Fact]
@@ -84,9 +85,9 @@ public sealed class ProviderRoutingTests
         await using var registry = ProviderRouting.Build([new("missing", "mcp", () => new Fake("missing", [Capabilities.TextSearch], (_, _) => throw new ProviderException("missing", "cannot start", hint: "install server"), health: "unavailable")),
             new("ready", "mcp", () => new Fake("ready", [Capabilities.TextSearch]))], root.Path);
         var results = await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token);
-        Assert.Equal("unavailable", (await registry.Providers()[0].HealthAsync(false, Token)).State);
-        Assert.Contains("install server", results[0].Error!.Message, StringComparison.Ordinal);
-        Assert.Null(results[1].Error);
+        (await registry.Providers()[0].HealthAsync(false, Token)).State.Should().Be("unavailable");
+        results[0].Error!.Message.Should().Contain("install server");
+        results[1].Error.Should().BeNull();
     }
 
     [Fact]
@@ -98,11 +99,11 @@ public sealed class ProviderRoutingTests
         root.Write("src/go.mod", "");
         root.Write("src/pyproject.toml", "");
         root.Write("src/build.gradle.kts", "");
-        Assert.Equal(["csharp", "go", "java", "python", "typescript"], ProviderRouting.DetectLanguages(root.Path));
+        ProviderRouting.DetectLanguages(root.Path).Should().Equal("csharp", "go", "java", "python", "typescript");
         using var deep = new Root();
         deep.Write("src/Api/Api.csproj", "");
         deep.Write("Wrong.CSPROJ", "");
-        Assert.Empty(ProviderRouting.DetectLanguages(deep.Path));
+        ProviderRouting.DetectLanguages(deep.Path).Should().BeEmpty();
     }
 
     [Fact]
@@ -114,17 +115,17 @@ public sealed class ProviderRoutingTests
         Directory.CreateDirectory(Path.Combine(root.Path, "nested", ".git"));
         var clock = new Clock();
         var filter = new NestedWorktreeFilter(root.Path, clock);
-        Assert.True(filter.Skip(".claude/worktrees/x/a.cs"));
-        Assert.True(filter.Skip(Path.Combine(root.Path, ".claude", "worktrees", "x", "a.cs")));
-        Assert.False(filter.Skip("vendor/sub/a.cs"));
-        Assert.False(filter.Skip("nested/a.cs"));
-        Assert.False(filter.Skip("src/a.cs"));
-        Assert.False(filter.Skip(Path.Combine(root.Path, "..", "outside", "a.cs")));
-        Assert.False(filter.Skip("../outside/a.cs"));
+        filter.Skip(".claude/worktrees/x/a.cs").Should().BeTrue();
+        filter.Skip(Path.Combine(root.Path, ".claude", "worktrees", "x", "a.cs")).Should().BeTrue();
+        filter.Skip("vendor/sub/a.cs").Should().BeFalse();
+        filter.Skip("nested/a.cs").Should().BeFalse();
+        filter.Skip("src/a.cs").Should().BeFalse();
+        filter.Skip(Path.Combine(root.Path, "..", "outside", "a.cs")).Should().BeFalse();
+        filter.Skip("../outside/a.cs").Should().BeFalse();
         root.Write("src/.git", "gitdir: C:/checkout/.git/worktrees/new\n");
-        Assert.False(filter.Skip("src/a.cs"));
+        filter.Skip("src/a.cs").Should().BeFalse();
         clock.Now = clock.Now.AddSeconds(30);
-        Assert.True(filter.Skip("src/a.cs"));
+        filter.Skip("src/a.cs").Should().BeTrue();
     }
 
     private sealed class RefreshingFake() : Fake("refresh", [Core.Providers.Capabilities.TextSearch]), IProviderRefresher
@@ -132,8 +133,8 @@ public sealed class ProviderRoutingTests
         public int Refreshes { get; private set; }
         public Task<RefreshResult> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken = default)
         {
-            Assert.True(request.Full);
-            Assert.Equal(["a.cs"], request.Changed);
+            request.Full.Should().BeTrue();
+            request.Changed.Should().Equal("a.cs");
             Refreshes++;
             return Task.FromResult(new RefreshResult());
         }

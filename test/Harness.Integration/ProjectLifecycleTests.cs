@@ -1,7 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Projects;
@@ -19,31 +20,31 @@ public sealed class ProjectLifecycleTests
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("spaces žluťoučký 🧪");
         var plan = await fixture.Lifecycle.InitAsync(root, dryRun: true, TestContext.Current.CancellationToken);
-        Assert.Null(plan.Registration);
-        Assert.Contains(plan.Actions, action => action.Verb == "create" && action.Path.EndsWith("harness.db", StringComparison.Ordinal));
+        plan.Registration.Should().BeNull();
+        plan.Actions.Should().Contain(action => action.Verb == "create" && action.Path.EndsWith("harness.db", StringComparison.Ordinal));
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
-        Assert.True(inspection.Head!.Unborn);
-        Assert.Null(inspection.Project);
-        Assert.False(Directory.Exists(Path.Combine(root, ".harness")));
-        Assert.False(Directory.Exists(fixture.GlobalDirectory));
+        inspection.Head!.Unborn.Should().BeTrue();
+        inspection.Project.Should().BeNull();
+        Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
+        Directory.Exists(fixture.GlobalDirectory).Should().BeFalse();
 
         var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Matches("^prj_[a-f0-9]{32}$", initialized.Registration!.Project.Id);
+        initialized.Registration!.Project.Id.Should().MatchRegex("^prj_[a-f0-9]{32}$");
         var before = fixture.Snapshot();
         inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         _ = inspection.Checks("test");
-        Assert.Equal(initialized.Registration.Project.Id, inspection.Project!.Id);
-        Assert.Equal(19, inspection.SchemaVersion);
-        Assert.Equal(before, fixture.Snapshot());
+        inspection.Project!.Id.Should().Be(initialized.Registration.Project.Id);
+        inspection.SchemaVersion.Should().Be(19);
+        fixture.Snapshot().Should().Equal(before);
 
         var config = Path.Combine(root, ".harness", "config.toml");
         await File.AppendAllTextAsync(config, "\n# keep this comment\n", TestContext.Current.CancellationToken);
         var content = await File.ReadAllBytesAsync(config, TestContext.Current.CancellationToken);
         var again = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(initialized.Registration.Project.Id, again.Registration!.Project.Id);
-        Assert.Equal(initialized.Registration.Worktree.Id, again.Registration.Worktree.Id);
-        Assert.False(again.Registration.Created);
-        Assert.Equal(content, await File.ReadAllBytesAsync(config, TestContext.Current.CancellationToken));
+        again.Registration!.Project.Id.Should().Be(initialized.Registration.Project.Id);
+        again.Registration.Worktree.Id.Should().Be(initialized.Registration.Worktree.Id);
+        again.Registration.Created.Should().BeFalse();
+        (await File.ReadAllBytesAsync(config, TestContext.Current.CancellationToken)).Should().Equal(content);
     }
 
     [Fact]
@@ -58,28 +59,28 @@ public sealed class ProjectLifecycleTests
         Directory.CreateDirectory(Path.Combine(linked, ".harness"));
         await File.WriteAllTextAsync(ConfigurationPaths.ProjectPath(linked), "[log]\nlevel = 'debug'\n", TestContext.Current.CancellationToken);
         var child = await fixture.Lifecycle.InitAsync(linked, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(root, child.Location.StateRoot);
-        Assert.Equal("debug", child.Location.Configuration.Value.Log.Level);
-        Assert.Equal(main.Registration!.Project.Id, child.Registration!.Project.Id);
-        Assert.NotEqual(main.Registration.Worktree.Id, child.Registration.Worktree.Id);
-        Assert.Equal(main.Location.DatabasePath, child.Location.DatabasePath);
-        Assert.False(File.Exists(Path.Combine(linked, ".harness", "harness.db")));
+        child.Location.StateRoot.Should().Be(root);
+        child.Location.Configuration.Value.Log.Level.Should().Be("debug");
+        child.Registration!.Project.Id.Should().Be(main.Registration!.Project.Id);
+        child.Registration.Worktree.Id.Should().NotBe(main.Registration.Worktree.Id);
+        child.Location.DatabasePath.Should().Be(main.Location.DatabasePath);
+        File.Exists(Path.Combine(linked, ".harness", "harness.db")).Should().BeFalse();
 
         var moved = Path.Combine(fixture.Root, "moved linked");
         await fixture.GitAsync(root, "worktree", "move", linked, moved);
         await fixture.GitAsync(moved, "checkout", "--detach");
         var detached = await fixture.Lifecycle.InitAsync(moved, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(detached.Head.Detached);
-        Assert.Empty(detached.Head.Branch);
-        Assert.Equal(child.Registration.Worktree.Id, detached.Registration!.Worktree.Id);
+        detached.Head.Detached.Should().BeTrue();
+        detached.Head.Branch.Should().BeEmpty();
+        detached.Registration!.Worktree.Id.Should().Be(child.Registration.Worktree.Id);
 
         await fixture.GitAsync(root, "worktree", "remove", "--force", moved);
         var before = fixture.Snapshot();
         var inspected = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
-        Assert.Equal(2, inspected.Worktrees.Count); // inspection never prunes persisted state
-        Assert.Equal(before, fixture.Snapshot());
+        inspected.Worktrees.Count.Should().Be(2); // inspection never prunes persisted state
+        fixture.Snapshot().Should().Equal(before);
         var gone = await fixture.Lifecycle.InspectAsync(moved, TestContext.Current.CancellationToken);
-        Assert.NotNull(gone.GitError);
+        gone.GitError.Should().NotBeNull();
     }
 
     [Fact]
@@ -89,11 +90,11 @@ public sealed class ProjectLifecycleTests
         var root = await fixture.CreateRepositoryAsync("invalid");
         Directory.CreateDirectory(fixture.GlobalDirectory);
         await File.WriteAllTextAsync(fixture.GlobalConfig, "[storage]\nmisspelled = 1", TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.False(Directory.Exists(Path.Combine(root, ".harness")));
+        await FluentActions.Awaiting(() => fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactlyAsync<InvalidDataException>();
+        Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
-        Assert.NotNull(inspection.ConfigurationError);
-        Assert.Contains(inspection.Checks("test"), check => check.Name == "config" && check.Level == "fail");
+        inspection.ConfigurationError.Should().NotBeNull();
+        inspection.Checks("test").Should().Contain(check => check.Name == "config" && check.Level == "fail");
     }
 
     [Fact]
@@ -104,29 +105,29 @@ public sealed class ProjectLifecycleTests
         var path = Path.Combine(root, ".harness", "harness.db");
         using (var database = HarnessDatabase.Open(path, new StorageOptions(), MigrationCatalog.All.Take(1).ToArray(), TestContext.Current.CancellationToken))
         {
-            Assert.Equal(1, database.SchemaVersion());
+            database.SchemaVersion().Should().Be(1);
         }
 
         var before = fixture.Snapshot();
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
-        Assert.Equal(1, inspection.SchemaVersion);
-        Assert.Null(inspection.Project);
-        Assert.Contains(inspection.Checks("test"), check => check.Name == "database" && check.Level == "warn");
-        Assert.Equal(before, fixture.Snapshot());
-        Assert.False(Directory.Exists(fixture.GlobalDirectory));
+        inspection.SchemaVersion.Should().Be(1);
+        inspection.Project.Should().BeNull();
+        inspection.Checks("test").Should().Contain(check => check.Name == "database" && check.Level == "warn");
+        fixture.Snapshot().Should().Equal(before);
+        Directory.Exists(fixture.GlobalDirectory).Should().BeFalse();
     }
 
     [Fact]
     public async Task NonGitLocationWorksForReadersButInitRefusesIt()
     {
         using var fixture = new ProjectFixture();
-        await Assert.ThrowsAsync<NotRepositoryException>(() => fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: TestContext.Current.CancellationToken));
+        await FluentActions.Awaiting(() => fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactlyAsync<NotRepositoryException>();
         var location = await fixture.Lifecycle.LocateAsync(fixture.Root, allowNonGit: true, TestContext.Current.CancellationToken);
-        Assert.Null(location.Repository);
+        location.Repository.Should().BeNull();
         var inspection = await fixture.Lifecycle.InspectAsync(fixture.Root, TestContext.Current.CancellationToken);
-        Assert.NotNull(inspection.GitError);
-        Assert.Contains(inspection.Checks("test"), check => check.Name == "git" && check.Level == "fail");
-        Assert.Empty(Directory.GetFiles(fixture.Root, "*", SearchOption.AllDirectories));
+        inspection.GitError.Should().NotBeNull();
+        inspection.Checks("test").Should().Contain(check => check.Name == "git" && check.Level == "fail");
+        Directory.GetFiles(fixture.Root, "*", SearchOption.AllDirectories).Should().BeEmpty();
     }
 
     [Fact]
@@ -143,17 +144,17 @@ public sealed class ProjectLifecycleTests
         var moved = Path.Combine(fixture.Root, "moved");
         Directory.Move(root, moved);
         var relocated = await fixture.Lifecycle.InitAsync(moved, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(relocated.Registration!.Moved);
-        Assert.Equal(initialized.Registration!.Project.Id, relocated.Registration.Project.Id);
+        relocated.Registration!.Moved.Should().BeTrue();
+        relocated.Registration.Project.Id.Should().Be(initialized.Registration!.Project.Id);
         var copy = Path.Combine(fixture.Root, "copy");
         CopyDirectory(moved, copy);
         var forked = await fixture.Lifecycle.InitAsync(copy, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(forked.Registration!.Copied);
-        Assert.NotEqual(relocated.Registration.Project.Id, forked.Registration.Project.Id);
-        Assert.Equal(relocated.Registration.Project.Id, forked.Registration.Project.CopiedFrom);
+        forked.Registration!.Copied.Should().BeTrue();
+        forked.Registration.Project.Id.Should().NotBe(relocated.Registration.Project.Id);
+        forked.Registration.Project.CopiedFrom.Should().Be(relocated.Registration.Project.Id);
         using var copiedDatabase = HarnessDatabase.OpenReadOnly(forked.Location.DatabasePath);
-        Assert.Equal("knowledge", copiedDatabase.GetDiagnostic("keep"));
-        Assert.Single(ProjectStore.Worktrees(copiedDatabase));
+        copiedDatabase.GetDiagnostic("keep").Should().Be("knowledge");
+        ProjectStore.Worktrees(copiedDatabase).Should().ContainSingle();
     }
 
     [Fact]
@@ -167,18 +168,18 @@ public sealed class ProjectLifecycleTests
         }
 
         var runs = await Task.WhenAll(roots.Select(root => fixture.CliAsync("init", "--project", root)));
-        Assert.All(runs, run => Assert.Equal(0, run.Code));
-        Assert.Equal(5, fixture.Lifecycle.Registry.Load()["projects"]!.AsArray().Count);
+        runs.Should().AllSatisfy(run => run.Code.Should().Be(0));
+        fixture.Lifecycle.Registry.Load()["projects"]!.AsArray().Count.Should().Be(5);
         var data = await File.ReadAllTextAsync(Path.Combine(fixture.GlobalDirectory, "projects.json"), TestContext.Current.CancellationToken);
-        Assert.Contains("last_init", data, StringComparison.Ordinal);
+        data.Should().Contain("last_init");
         Directory.Move(roots[0], roots[0] + "-gone");
         var before = fixture.Snapshot();
         var doctor = await fixture.CliAsync("doctor", "--all", "--json");
-        Assert.Equal(1, doctor.Code);
+        doctor.Code.Should().Be(1);
         using var json = JsonDocument.Parse(doctor.Output);
-        Assert.Equal(5, json.RootElement.GetProperty("projects").GetArrayLength());
-        Assert.Equal(1, json.RootElement.GetProperty("projects").EnumerateArray().Count(item => !item.GetProperty("healthy").GetBoolean()));
-        Assert.Equal(before, fixture.Snapshot());
+        json.RootElement.GetProperty("projects").GetArrayLength().Should().Be(5);
+        json.RootElement.GetProperty("projects").EnumerateArray().Count(item => !item.GetProperty("healthy").GetBoolean()).Should().Be(1);
+        fixture.Snapshot().Should().Equal(before);
     }
 
     [Fact]
@@ -187,22 +188,22 @@ public sealed class ProjectLifecycleTests
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("cli Ω");
         var dry = await fixture.CliAsync("init", "-project", root, "-dry-run");
-        Assert.Equal(0, dry.Code);
-        Assert.Contains("Dry run: nothing was changed.", dry.Output, StringComparison.Ordinal);
-        Assert.False(Directory.Exists(fixture.GlobalDirectory));
+        dry.Code.Should().Be(0);
+        dry.Output.Should().Contain("Dry run: nothing was changed.");
+        Directory.Exists(fixture.GlobalDirectory).Should().BeFalse();
         var status = await fixture.CliAsync("status", "--project", root, "--json");
-        Assert.Equal(0, status.Code);
+        status.Code.Should().Be(0);
         using var json = JsonDocument.Parse(status.Output);
-        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("project").ValueKind);
-        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("worktrees").ValueKind);
-        Assert.False(json.RootElement.GetProperty("database").GetProperty("exists").GetBoolean());
-        Assert.Equal(0, (await fixture.CliAsync("doctor", "--project", root, "--json")).Code);
-        Assert.False(Directory.Exists(Path.Combine(root, ".harness")));
-        Assert.Equal(0, (await fixture.CliAsync("init", "--project", root)).Code);
+        json.RootElement.GetProperty("project").ValueKind.Should().Be(JsonValueKind.Null);
+        json.RootElement.GetProperty("worktrees").ValueKind.Should().Be(JsonValueKind.Null);
+        json.RootElement.GetProperty("database").GetProperty("exists").GetBoolean().Should().BeFalse();
+        (await fixture.CliAsync("doctor", "--project", root, "--json")).Code.Should().Be(0);
+        Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
+        (await fixture.CliAsync("init", "--project", root)).Code.Should().Be(0);
         var before = fixture.Snapshot();
-        Assert.Equal(0, (await fixture.CliAsync("doctor", "--project", root, "--json")).Code);
-        Assert.Equal(0, (await fixture.CliAsync("status", "--project", root, "--json")).Code);
-        Assert.Equal(before, fixture.Snapshot());
+        (await fixture.CliAsync("doctor", "--project", root, "--json")).Code.Should().Be(0);
+        (await fixture.CliAsync("status", "--project", root, "--json")).Code.Should().Be(0);
+        fixture.Snapshot().Should().Equal(before);
     }
 
     [Fact]
@@ -217,13 +218,13 @@ public sealed class ProjectLifecycleTests
         var wal = new FileInfo(initialized.Location.DatabasePath + "-wal");
         var before = (wal.Length, wal.LastWriteTimeUtc);
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
-        Assert.Equal(initialized.Registration!.Project.Id, inspection.Project!.Id);
-        Assert.Equal(19, inspection.SchemaVersion);
+        inspection.Project!.Id.Should().Be(initialized.Registration!.Project.Id);
+        inspection.SchemaVersion.Should().Be(19);
         wal.Refresh();
-        Assert.Equal(before, (wal.Length, wal.LastWriteTimeUtc));
+        ((wal.Length, wal.LastWriteTimeUtc)).Should().Be(before);
         using var readOnly = HarnessDatabase.OpenReadOnly(initialized.Location.DatabasePath);
-        Assert.Equal("visible", readOnly.GetDiagnostic("live"));
-        Assert.Equal("visible", writer.GetDiagnostic("live"));
+        readOnly.GetDiagnostic("live").Should().Be("visible");
+        writer.GetDiagnostic("live").Should().Be("visible");
     }
 
     [Fact]
@@ -240,20 +241,20 @@ public sealed class ProjectLifecycleTests
         await File.WriteAllTextAsync(path, registry.ToJsonString(), TestContext.Current.CancellationToken);
         await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
         registry = fixture.Lifecycle.Registry.Load();
-        Assert.Equal("keep", registry["future"]!.GetValue<string>());
-        Assert.Equal("chosen-name", registry["projects"]![0]!["name"]!.GetValue<string>());
-        Assert.Equal("2026-01-01T00:00:00Z", registry["projects"]![0]!["last_sync"]!.GetValue<string>());
+        registry["future"]!.GetValue<string>().Should().Be("keep");
+        registry["projects"]![0]!["name"]!.GetValue<string>().Should().Be("chosen-name");
+        registry["projects"]![0]!["last_sync"]!.GetValue<string>().Should().Be("2026-01-01T00:00:00Z");
         await File.WriteAllTextAsync(path, "malformed", TestContext.Current.CancellationToken);
         await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken); // registry is best effort
-        Assert.Equal("malformed", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
-        await File.WriteAllTextAsync(path, "{\"version\":1,\"projects\":[\"wrong shape\"]}", TestContext.Current.CancellationToken);
-        Assert.Throws<InvalidDataException>(() => fixture.Lifecycle.Registry.Load());
+        (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).Should().Be("malformed");
+        await File.WriteAllTextAsync(path, """{"version":1,"projects":["wrong shape"]}""", TestContext.Current.CancellationToken);
+        FluentActions.Invoking(() => fixture.Lifecycle.Registry.Load()).Should().ThrowExactly<InvalidDataException>();
         await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Contains("wrong shape", await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).Should().Contain("wrong shape");
         using var lease = new FileStream(path + ".lock", FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancellation.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Lifecycle.Registry.NoteInitAsync(initialized.Registration!.Project, [], "test", cancellation.Token));
+        await FluentActions.Awaiting(() => fixture.Lifecycle.Registry.NoteInitAsync(initialized.Registration!.Project, [], "test", cancellation.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     private static void CopyDirectory(string source, string destination)
@@ -290,7 +291,7 @@ public sealed class ProjectLifecycleTests
         internal async Task GitAsync(string root, params string[] args)
         {
             var result = await RunAsync("git", ["-C", root, .. args]);
-            Assert.True(result.Code == 0, result.Error);
+            (result.Code == 0).Should().BeTrue(result.Error);
         }
 
         internal Task<(int Code, string Output, string Error)> CliAsync(params string[] args)
@@ -301,7 +302,7 @@ public sealed class ProjectLifecycleTests
                 repository = repository.Parent;
             }
 
-            Assert.NotNull(repository);
+            repository.Should().NotBeNull();
 #if DEBUG
             const string Configuration = "Debug";
 #else
@@ -316,7 +317,11 @@ public sealed class ProjectLifecycleTests
         {
             var start = new ProcessStartInfo(executable)
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = Root,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = Root,
             };
             start.Environment["HARNESS_CONFIG_DIR"] = GlobalDirectory;
             if (executable == "dotnet")

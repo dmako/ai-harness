@@ -1,6 +1,7 @@
-using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Cli;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,10 +21,10 @@ public sealed class CliTests
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.Equal(0, await Run([argument], output, error));
-        Assert.Contains("version", output.ToString(), StringComparison.Ordinal);
-        Assert.Empty(error.ToString());
-        Assert.DoesNotContain('\u001b', output.ToString());
+        (await Run([argument], output, error)).Should().Be(0);
+        output.ToString().Should().Contain("version");
+        error.ToString().Should().BeEmpty();
+        output.ToString().Should().NotContain('\u001b'.ToString());
     }
 
     [Fact]
@@ -31,12 +32,12 @@ public sealed class CliTests
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.Equal(0, await Run([], output, error));
-        Assert.Contains("version", output.ToString(), StringComparison.Ordinal);
+        (await Run([], output, error)).Should().Be(0);
+        output.ToString().Should().Contain("version");
         output.GetStringBuilder().Clear();
-        Assert.Equal(0, await Run(["help", "version"], output, error));
-        Assert.Contains("--json", output.ToString(), StringComparison.Ordinal);
-        Assert.Empty(error.ToString());
+        (await Run(["help", "version"], output, error)).Should().Be(0);
+        output.ToString().Should().Contain("--json");
+        error.ToString().Should().BeEmpty();
     }
 
     [Theory]
@@ -48,15 +49,15 @@ public sealed class CliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         var info = new BuildInformation("test", "0123456789abcdef", "2026-10-20T00:00:00Z", true, ".NET test", "windows/amd64");
-        Assert.Equal(0, await CliApplication.RunConfiguredAsync([argument, "--json"], output, error,
-            builder => builder.Services.AddSingleton(info), null, TestContext.Current.CancellationToken));
+        (await CliApplication.RunConfiguredAsync([argument, "--json"], output, error,
+            builder => builder.Services.AddSingleton(info), null, TestContext.Current.CancellationToken)).Should().Be(0);
         using var json = JsonDocument.Parse(output.ToString());
-        Assert.Equal(6, json.RootElement.EnumerateObject().Count());
-        Assert.Equal("test", json.RootElement.GetProperty("version").GetString());
-        Assert.True(json.RootElement.GetProperty("modified").GetBoolean());
-        Assert.Equal(".NET test", json.RootElement.GetProperty("go_version").GetString());
-        Assert.Equal(info.Date, json.RootElement.GetProperty("date").GetString());
-        Assert.Empty(error.ToString());
+        json.RootElement.EnumerateObject().Count().Should().Be(6);
+        json.RootElement.GetProperty("version").GetString().Should().Be("test");
+        json.RootElement.GetProperty("modified").GetBoolean().Should().BeTrue();
+        json.RootElement.GetProperty("go_version").GetString().Should().Be(".NET test");
+        json.RootElement.GetProperty("date").GetString().Should().Be(info.Date);
+        error.ToString().Should().BeEmpty();
     }
 
     [Theory]
@@ -67,17 +68,16 @@ public sealed class CliTests
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.Equal(2, await Run(arguments, output, error));
-        Assert.Empty(output.ToString());
-        Assert.NotEmpty(error.ToString());
+        (await Run(arguments, output, error)).Should().Be(2);
+        output.ToString().Should().BeEmpty();
+        error.ToString().Should().NotBeEmpty();
     }
 
     [Fact]
     public void HumanVersionHasStableFormattingAndExplicitUnknownValues()
     {
-        Assert.Equal("harness dev (commit unknown, built unknown, .NET test, linux/arm64)",
-            new BuildInformation("dev", "", "", false, ".NET test", "linux/arm64").ToString());
-        Assert.Contains("0123456789ab-dirty", new BuildInformation("v1", "0123456789abcdef", "date", true, ".NET test", "linux/arm64").ToString(), StringComparison.Ordinal);
+        new BuildInformation("dev", "", "", false, ".NET test", "linux/arm64").ToString().Should().Be("harness dev (commit unknown, built unknown, .NET test, linux/arm64)");
+        new BuildInformation("v1", "0123456789abcdef", "date", true, ".NET test", "linux/arm64").ToString().Should().Contain("0123456789ab-dirty");
     }
 
     [Fact]
@@ -85,11 +85,11 @@ public sealed class CliTests
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.Equal(1, await CliApplication.RunConfiguredAsync(["fail"], output, error, null,
+        (await CliApplication.RunConfiguredAsync(["fail"], output, error, null,
             configuration => configuration.AddDelegate<ProbeSettings>("fail", (_, _, _) => throw new IOException("probe failure")),
-            TestContext.Current.CancellationToken));
-        Assert.Empty(output.ToString());
-        Assert.NotEmpty(error.ToString());
+            TestContext.Current.CancellationToken)).Should().Be(1);
+        output.ToString().Should().BeEmpty();
+        error.ToString().Should().NotBeEmpty();
     }
 
     [Fact]
@@ -98,17 +98,17 @@ public sealed class CliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         var state = new ProbeState();
-        Assert.Equal(0, await CliApplication.RunConfiguredAsync(["probe"], output, error,
+        (await CliApplication.RunConfiguredAsync(["probe"], output, error,
             builder =>
             {
                 builder.Services.AddSingleton(state);
                 builder.Services.AddSingleton<ProbeResource>();
             },
-            configuration => configuration.AddCommand<ProbeCommand>("probe"), TestContext.Current.CancellationToken));
-        Assert.Equal(1, state.Disposals);
-        Assert.True(state.Shared);
-        Assert.Empty(output.ToString());
-        Assert.Contains("probe message", error.ToString(), StringComparison.Ordinal);
+            configuration => configuration.AddCommand<ProbeCommand>("probe"), TestContext.Current.CancellationToken)).Should().Be(0);
+        state.Disposals.Should().Be(1);
+        state.Shared.Should().BeTrue();
+        output.ToString().Should().BeEmpty();
+        error.ToString().Should().Contain("probe message");
         await output.WriteAsync("writer remains owned by caller");
     }
 
@@ -130,15 +130,15 @@ public sealed class CliTests
         {
             await state.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             await cancellation.CancelAsync();
-            Assert.Equal(130, await running);
+            (await running).Should().Be(130);
         }
         finally
         {
             await cancellation.CancelAsync();
             await running;
         }
-        Assert.Equal(1, state.Disposals);
-        Assert.Empty(output.ToString());
+        state.Disposals.Should().Be(1);
+        output.ToString().Should().BeEmpty();
     }
 
     private static Task<int> Run(string[] args, TextWriter output, TextWriter error) =>

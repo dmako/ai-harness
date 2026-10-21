@@ -1,4 +1,5 @@
 using System.Text;
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Xunit;
 
@@ -16,7 +17,7 @@ public sealed class MemoryTests
     [InlineData("subsystem:auth", "subsystem:auth")]
     [InlineData("branch:feature/x", "branch:feature/x")]
     [InlineData("workspace:home", "workspace:home")]
-    public void ScopesNormalizeLikeGo(string input, string expected) => Assert.Equal(expected, MemoryScope.Parse(input).ToString());
+    public void ScopesNormalizeLikeGo(string input, string expected) => MemoryScope.Parse(input).ToString().Should().Be(expected);
 
     [Theory]
     [InlineData("path:")]
@@ -28,18 +29,18 @@ public sealed class MemoryTests
     [InlineData("team:core")]
     [InlineData("project:x")]
     [InlineData("internal/storage")]
-    public void InvalidScopesAreRejected(string input) => Assert.Throws<ArgumentException>(() => MemoryScope.Parse(input));
+    public void InvalidScopesAreRejected(string input) => FluentActions.Invoking(() => MemoryScope.Parse(input)).Should().ThrowExactly<ArgumentException>();
 
     [Fact]
     public void ApplicabilityRespectsPathBoundariesAndCase()
     {
         var target = MemoryScope.Parse("path:internal/storage/db.cs");
         foreach (var scope in new[] { "project", "workspace:home", "user", "path:internal/storage", "path:internal/storage/db.cs" })
-            Assert.True(MemoryScope.Parse(scope).AppliesTo(target));
+            MemoryScope.Parse(scope).AppliesTo(target).Should().BeTrue();
         foreach (var scope in new[] { "path:internal/stor", "path:Internal/storage", "path:internal/git", "subsystem:auth", "branch:main" })
-            Assert.False(MemoryScope.Parse(scope).AppliesTo(target));
-        Assert.True(MemoryScope.Parse("branch:main").AppliesTo(MemoryScope.Parse("branch:main")));
-        Assert.False(MemoryScope.Parse("branch:main").AppliesTo(MemoryScope.Parse("branch:Main")));
+            MemoryScope.Parse(scope).AppliesTo(target).Should().BeFalse();
+        MemoryScope.Parse("branch:main").AppliesTo(MemoryScope.Parse("branch:main")).Should().BeTrue();
+        MemoryScope.Parse("branch:main").AppliesTo(MemoryScope.Parse("branch:Main")).Should().BeFalse();
     }
 
     [Fact]
@@ -47,36 +48,36 @@ public sealed class MemoryTests
     {
         var first = MemoryTimestamp.Parse("2026-10-21T01:02:03.123456789Z");
         var next = MemoryTimestamp.Parse("2026-10-21T03:02:03.123456790+02:00");
-        Assert.True(first < next);
-        Assert.Equal("2026-10-21T01:02:03.123456789Z", first.ToString());
-        Assert.Equal("2026-10-21T01:02:03Z", first.ToRfc3339());
-        Assert.Equal("2026-10-21T01:02:03.000000000Z", MemoryTimestamp.Parse("2026-10-21T01:02:03Z").ToString());
-        Assert.Throws<FormatException>(() => MemoryTimestamp.Parse("2026-10-21T01:02:03.1234567890Z"));
+        (first < next).Should().BeTrue();
+        first.ToString().Should().Be("2026-10-21T01:02:03.123456789Z");
+        first.ToRfc3339().Should().Be("2026-10-21T01:02:03Z");
+        MemoryTimestamp.Parse("2026-10-21T01:02:03Z").ToString().Should().Be("2026-10-21T01:02:03.000000000Z");
+        FluentActions.Invoking(() => MemoryTimestamp.Parse("2026-10-21T01:02:03.1234567890Z")).Should().ThrowExactly<FormatException>();
     }
 
     [Fact]
     public void NormalizationHashesAndSimilarityMatchLegacyRules()
     {
-        Assert.Equal("wrap errors with %w", MemoryText.Normalize("  Wrap\tERRORS\nwith %w.!;,  "));
-        Assert.Equal(MemoryText.Hash("Wrap errors with %w."), MemoryText.Hash("  wrap ERRORS with %w "));
-        Assert.Equal(2.0 / 3, MemoryText.Similarity("Use SQLite for storage", "Storage uses SQLite"));
-        Assert.Equal(0, MemoryText.Similarity("Use SQLite for storage", "Deploy with Kubernetes"));
-        Assert.Equal("\"DROP\" OR \"TABLE\" OR \"memories\"", MemoryText.FullTextQuery("\"; DROP TABLE memories; --"));
-        Assert.Equal("", MemoryText.FullTextQuery("!!!"));
-        Assert.Equal("open_question", MemoryText.ParseType(" OPEN_QUESTION "));
+        MemoryText.Normalize("  Wrap\tERRORS\nwith %w.!;,  ").Should().Be("wrap errors with %w");
+        MemoryText.Hash("  wrap ERRORS with %w ").Should().Be(MemoryText.Hash("Wrap errors with %w."));
+        MemoryText.Similarity("Use SQLite for storage", "Storage uses SQLite").Should().Be(2.0 / 3);
+        MemoryText.Similarity("Use SQLite for storage", "Deploy with Kubernetes").Should().Be(0);
+        MemoryText.FullTextQuery("\"; DROP TABLE memories; --").Should().Be("\"DROP\" OR \"TABLE\" OR \"memories\"");
+        MemoryText.FullTextQuery("!!!").Should().Be("");
+        MemoryText.ParseType(" OPEN_QUESTION ").Should().Be("open_question");
     }
 
     [Fact]
     public void ValidationBoundsUtf8RejectsInvalidEncodingAndNonfiniteConfidence()
     {
         var input = new MemoryInput { Type = "fact", Content = new string('ž', 2000) };
-        Assert.Equal(4000, Encoding.UTF8.GetByteCount(MemoryText.Validate(input).Content));
-        Assert.Throws<ArgumentException>(() => MemoryText.Validate(input with { Content = input.Content + "a" }));
-        Assert.Throws<EncoderFallbackException>(() => MemoryText.Validate(input with { Content = "\ud800" }));
+        Encoding.UTF8.GetByteCount(MemoryText.Validate(input).Content).Should().Be(4000);
+        FluentActions.Invoking(() => MemoryText.Validate(input with { Content = input.Content + "a" })).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => MemoryText.Validate(input with { Content = "\ud800" })).Should().ThrowExactly<EncoderFallbackException>();
         foreach (var confidence in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity, -0.1, 1.1 })
-            Assert.Throws<ArgumentException>(() => MemoryText.Validate(input with { Confidence = confidence }));
-        Assert.Throws<ArgumentException>(() => MemoryText.Validate(input with { Scope = MemoryScope.User }));
-        Assert.Throws<ArgumentException>(() => MemoryText.Validate(input with { Scope = MemoryScope.Parse("workspace:home") }));
+            FluentActions.Invoking(() => MemoryText.Validate(input with { Confidence = confidence })).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => MemoryText.Validate(input with { Scope = MemoryScope.User })).Should().ThrowExactly<ArgumentException>();
+        FluentActions.Invoking(() => MemoryText.Validate(input with { Scope = MemoryScope.Parse("workspace:home") })).Should().ThrowExactly<ArgumentException>();
     }
 
     [Fact]
@@ -84,12 +85,12 @@ public sealed class MemoryTests
     {
         var input = new MemoryInput { Type = " FACT ", Content = "  CI uses GitHub Actions  ", Scope = new MemoryScope(""), Source = new MemorySource("", " ", " ") };
         var normalized = MemoryText.Validate(input);
-        Assert.Equal("fact", normalized.Type);
-        Assert.Equal("CI uses GitHub Actions", normalized.Content);
-        Assert.Equal(MemoryScope.Project, normalized.Scope);
-        Assert.Equal(new MemorySource("agent", "unknown", "unknown"), normalized.Source);
-        Assert.Equal("codex", MemoryText.Validate(input with { Source = new MemorySource(By: "codex") }).Source.Ref);
-        Assert.Throws<ArgumentException>(() => MemoryText.Validate(input with { Source = new MemorySource("rumour") }));
+        normalized.Type.Should().Be("fact");
+        normalized.Content.Should().Be("CI uses GitHub Actions");
+        normalized.Scope.Should().Be(MemoryScope.Project);
+        normalized.Source.Should().Be(new MemorySource("agent", "unknown", "unknown"));
+        MemoryText.Validate(input with { Source = new MemorySource(By: "codex") }).Source.Ref.Should().Be("codex");
+        FluentActions.Invoking(() => MemoryText.Validate(input with { Source = new MemorySource("rumour") })).Should().ThrowExactly<ArgumentException>();
     }
 
     public static TheoryData<string, string> RedactionFixtures => new()
@@ -101,7 +102,7 @@ public sealed class MemoryTests
         { "glpat-abcdefghijklmnopqrstu in the CI", "[redacted] in the CI" },
         { "aws AKIAIOSFODNN7EXAMPLE key", "aws [redacted] key" },
         { "DB_PASSWORD=s3cr3t! and API_KEY: 'abc def'", "DB_PASSWORD=[redacted] and API_KEY: [redacted]" },
-        { "{\"client_secret\": \"xyz\"}", "{\"client_secret\": [redacted]}" },
+        { """{"client_secret": "xyz"}""", """{"client_secret": [redacted]}""" },
         { "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U", "jwt [redacted]" },
         { "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----", "[redacted]" },
     };
@@ -110,10 +111,10 @@ public sealed class MemoryTests
     [MemberData(nameof(RedactionFixtures))]
     public void GoRedactionFixturesRejectCredentialsWithoutEchoingThem(string input, string expected)
     {
-        Assert.Equal(expected, CredentialRedactor.Redact(input));
-        var error = Assert.Throws<ArgumentException>(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = input }));
-        Assert.Contains("never stores credentials", error.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain(input, error.Message, StringComparison.Ordinal);
+        CredentialRedactor.Redact(input).Should().Be(expected);
+        var error = FluentActions.Invoking(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = input })).Should().ThrowExactly<ArgumentException>().Which;
+        error.Message.Should().Contain("never stores credentials");
+        error.Message.Should().NotContain(input);
     }
 
     [Theory]
@@ -124,8 +125,8 @@ public sealed class MemoryTests
     [InlineData("sk-learn style model")]
     public void OrdinaryGoRedactionFixturesRemainUsable(string input)
     {
-        Assert.Equal(input, CredentialRedactor.Redact(input));
-        Assert.Equal(input, MemoryText.Validate(new MemoryInput { Type = "fact", Content = input }).Content);
+        CredentialRedactor.Redact(input).Should().Be(input);
+        MemoryText.Validate(new MemoryInput { Type = "fact", Content = input }).Content.Should().Be(input);
     }
 
     [Fact]
@@ -134,9 +135,9 @@ public sealed class MemoryTests
         var from = MemoryTimestamp.Parse("2026-10-21T00:00:00.000000001Z");
         var until = MemoryTimestamp.Parse("2026-10-21T00:00:00.000000002Z");
         var memory = new MemoryRecord("id", "fact", "content", MemoryScope.Project, new MemorySource(), null, "", "", from, until, from, from);
-        Assert.True(memory.Current(from));
-        Assert.False(memory.Current(until));
-        Assert.False((memory with { SupersededBy = "replacement" }).Current(from));
+        memory.Current(from).Should().BeTrue();
+        memory.Current(until).Should().BeFalse();
+        (memory with { SupersededBy = "replacement" }).Current(from).Should().BeFalse();
     }
 
     [Fact]
@@ -145,11 +146,11 @@ public sealed class MemoryTests
         var failed = new FailedStore(new IOException("unavailable"));
         var scope = MemoryScope.Parse("workspace:offline");
         var result = new MemoryLayers(null, [new MemoryLevel(scope, failed)]).Search(new MemoryQuery(), TestContext.Current.CancellationToken);
-        Assert.Empty(result.Memories);
-        Assert.Equal(scope, Assert.Single(result.Errors).Scope);
-        Assert.Throws<IOException>(() => new MemoryLayers(failed, []).Search(new MemoryQuery(), TestContext.Current.CancellationToken));
-        Assert.Throws<OperationCanceledException>(() => new MemoryLayers(null,
-            [new MemoryLevel(scope, new FailedStore(new OperationCanceledException()))]).Search(new MemoryQuery(), TestContext.Current.CancellationToken));
+        result.Memories.Should().BeEmpty();
+        result.Errors.Should().ContainSingle().Which.Scope.Should().Be(scope);
+        FluentActions.Invoking(() => new MemoryLayers(failed, []).Search(new MemoryQuery(), TestContext.Current.CancellationToken)).Should().ThrowExactly<IOException>();
+        FluentActions.Invoking(() => new MemoryLayers(null,
+            [new MemoryLevel(scope, new FailedStore(new OperationCanceledException()))]).Search(new MemoryQuery(), TestContext.Current.CancellationToken)).Should().ThrowExactly<OperationCanceledException>();
     }
 
     private sealed class FailedStore(Exception error) : IMemoryStore

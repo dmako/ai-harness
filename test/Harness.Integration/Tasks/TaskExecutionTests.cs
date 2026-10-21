@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Storage;
@@ -21,32 +22,32 @@ public sealed class TaskExecutionTests
         using var state = new State();
         state.Store.Import([Definition("T-1"), Definition("T-2", "T-1")], "fixture", cancellationToken: Token);
         var claim = state.Store.Claim("T-1", new("claude"), TimeSpan.FromMinutes(1), Token);
-        Assert.StartsWith("clm_", claim.Token, StringComparison.Ordinal);
-        Assert.Equal(28, claim.Token.Length);
-        Assert.Equal("claude", claim.Task.Claimant);
+        claim.Token.Should().StartWith("clm_");
+        claim.Token.Length.Should().Be(28);
+        claim.Task.Claimant.Should().Be("claude");
         var before = Snapshot(state.Database);
-        Assert.Throws<InvalidOperationException>(() => state.Store.Update("T-1", new("claude", "wrong"), new("in_progress", "should not persist", Acceptance: [new(1, "pass")]), Token));
-        Assert.Equal(before, Snapshot(state.Database));
+        FluentActions.Invoking(() => state.Store.Update("T-1", new("claude", "wrong"), new("in_progress", "should not persist", Acceptance: [new(1, "pass")]), Token)).Should().ThrowExactly<InvalidOperationException>();
+        Snapshot(state.Database).Should().Be(before);
         state.Clock.Advance(TimeSpan.FromSeconds(30));
         var updated = state.Store.Update("T-1", new("codex", claim.Token), new("in_progress", "API_KEY='synthetic'", Acceptance: [new(1, "pass", "evidence")]), Token);
-        Assert.Equal("claude", updated.Claimant);
-        Assert.Equal(new MemoryTimestamp(state.Clock.GetUtcNow().AddHours(2)), updated.LeaseUntil);
-        Assert.Contains("API_KEY=[redacted]", updated.Definition.Notes, StringComparison.Ordinal);
-        Assert.Equal("codex", state.Store.Events("T-1", Token)[^1].Actor);
+        updated.Claimant.Should().Be("claude");
+        updated.LeaseUntil.Should().Be(new MemoryTimestamp(state.Clock.GetUtcNow().AddHours(2)));
+        updated.Definition.Notes.Should().Contain("API_KEY=[redacted]");
+        state.Store.Events("T-1", Token)[^1].Actor.Should().Be("codex");
         before = Snapshot(state.Database);
-        Assert.Throws<InvalidTaskCompletionException>(() => state.Store.Complete("T-1", new("codex", claim.Token), new("complete", Acceptance: [new(1, "pass")]), Token));
-        Assert.Throws<InvalidTaskCompletionException>(() => state.Store.Complete("T-1", new("codex", claim.Token), new("complete", Acceptance: [new(1, "pass"), new(2, "pass")], Checks: [new("build", "fail")]), Token));
-        Assert.Throws<InvalidOperationException>(() => state.Store.Update("T-1", new("codex", claim.Token), new("done", "not stored", Acceptance: [new(2, "pass")]), Token));
-        Assert.Equal(before, Snapshot(state.Database));
+        FluentActions.Invoking(() => state.Store.Complete("T-1", new("codex", claim.Token), new("complete", Acceptance: [new(1, "pass")]), Token)).Should().ThrowExactly<InvalidTaskCompletionException>();
+        FluentActions.Invoking(() => state.Store.Complete("T-1", new("codex", claim.Token), new("complete", Acceptance: [new(1, "pass"), new(2, "pass")], Checks: [new("build", "fail")]), Token)).Should().ThrowExactly<InvalidTaskCompletionException>();
+        FluentActions.Invoking(() => state.Store.Update("T-1", new("codex", claim.Token), new("done", "not stored", Acceptance: [new(2, "pass")]), Token)).Should().ThrowExactly<InvalidOperationException>();
+        Snapshot(state.Database).Should().Be(before);
         var complete = state.Store.Complete("T-1", new("codex", claim.Token), new("completed", "abcdef1", [new(1, "pass"), new(2, "n/a", "not applicable")], [new("build", "pass", "password='synthetic'")]), Token);
-        Assert.Equal("done", complete.Task.Status);
-        Assert.Equal(["T-2"], complete.Unlocked);
-        Assert.Equal("codex", complete.Task.CompletedBy);
-        Assert.Equal(claim.Task.ClaimedAt, complete.Task.ClaimedAt);
-        Assert.Equal("", complete.Task.ClaimToken);
-        Assert.Null(complete.Task.LeaseUntil);
-        Assert.Equal("password=[redacted]", complete.Task.CompletionChecks[0].Output);
-        Assert.Equal("T-2", state.Store.Next(cancellationToken: Token)!.Id);
+        complete.Task.Status.Should().Be("done");
+        complete.Unlocked.Should().Equal("T-2");
+        complete.Task.CompletedBy.Should().Be("codex");
+        complete.Task.ClaimedAt.Should().Be(claim.Task.ClaimedAt);
+        complete.Task.ClaimToken.Should().Be("");
+        complete.Task.LeaseUntil.Should().BeNull();
+        complete.Task.CompletionChecks[0].Output.Should().Be("password=[redacted]");
+        state.Store.Next(cancellationToken: Token)!.Id.Should().Be("T-2");
     }
 
     [Fact]
@@ -57,14 +58,14 @@ public sealed class TaskExecutionTests
         var first = state.Store.Claim("T-1", new("same-client"), TimeSpan.FromSeconds(1), Token);
         state.Clock.Advance(TimeSpan.FromSeconds(1));
         var second = state.Store.Claim("T-1", new("same-client"), cancellationToken: Token);
-        Assert.NotEqual(first.Token, second.Token);
-        Assert.Equal("lease_expired", state.Store.Events("T-1", Token)[^2].Event);
+        second.Token.Should().NotBe(first.Token);
+        state.Store.Events("T-1", Token)[^2].Event.Should().Be("lease_expired");
         var before = Snapshot(state.Database);
-        Assert.Throws<InvalidOperationException>(() => state.Store.Update("T-1", new("same-client", first.Token), new("review"), Token));
-        Assert.Throws<ArgumentException>(() => state.Store.Release("T-1", new("human", Privileged: true), cancellationToken: Token));
-        Assert.Equal(before, Snapshot(state.Database));
-        Assert.Equal("ready", state.Store.Release("T-1", new("human", Privileged: true), "stopped session", Token).Status);
-        Assert.Equal("force_released", state.Store.Events("T-1", Token)[^1].Event);
+        FluentActions.Invoking(() => state.Store.Update("T-1", new("same-client", first.Token), new("review"), Token)).Should().ThrowExactly<InvalidOperationException>();
+        FluentActions.Invoking(() => state.Store.Release("T-1", new("human", Privileged: true), cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        Snapshot(state.Database).Should().Be(before);
+        state.Store.Release("T-1", new("human", Privileged: true), "stopped session", Token).Status.Should().Be("ready");
+        state.Store.Events("T-1", Token)[^1].Event.Should().Be("force_released");
     }
 
     [Theory]
@@ -89,8 +90,8 @@ public sealed class TaskExecutionTests
             _ => [new(1, "pass"), new(2, kind)],
         };
         var before = Snapshot(state.Database);
-        Assert.Throws<InvalidTaskCompletionException>(() => state.Store.Complete("T-1", new("agent", claim.Token), new("summary", kind is "commit" ? "NOT_A_COMMIT" : "", acceptance), Token));
-        Assert.Equal(before, Snapshot(state.Database));
+        FluentActions.Invoking(() => state.Store.Complete("T-1", new("agent", claim.Token), new("summary", kind is "commit" ? "NOT_A_COMMIT" : "", acceptance), Token)).Should().ThrowExactly<InvalidTaskCompletionException>();
+        Snapshot(state.Database).Should().Be(before);
     }
 
     [Fact]
@@ -99,23 +100,23 @@ public sealed class TaskExecutionTests
         using var state = new State();
         state.Store.Import([Definition("T-1")], "fixture", cancellationToken: Token);
         var proposal = state.Store.Propose(Definition("proposal") with { DependsOn = ["T-1"] }, "why", "claude", Token);
-        Assert.Equal(1, state.Store.PendingProposals(Token));
-        Assert.Single(state.Store.List(cancellationToken: Token));
+        state.Store.PendingProposals(Token).Should().Be(1);
+        state.Store.List(cancellationToken: Token).Should().ContainSingle();
         var before = Snapshot(state.Database);
-        Assert.Throws<ArgumentException>(() => state.Store.Approve(proposal.Id, proposal.Task with { DependsOn = ["T-99"] }, "", "human", Token));
-        Assert.Equal(before, Snapshot(state.Database));
+        FluentActions.Invoking(() => state.Store.Approve(proposal.Id, proposal.Task with { DependsOn = ["T-99"] }, "", "human", Token)).Should().ThrowExactly<ArgumentException>();
+        Snapshot(state.Database).Should().Be(before);
         var approved = state.Store.Approve(proposal.Id, null, "", "human", Token);
-        Assert.Equal("T-2", approved.Task.Id);
-        Assert.Equal("backlog", approved.Task.Status);
-        Assert.Equal("proposal:" + proposal.Id, approved.Task.Source);
-        Assert.Contains("proposed by claude", state.Store.Events("T-2", Token)[0].Detail, StringComparison.Ordinal);
+        approved.Task.Id.Should().Be("T-2");
+        approved.Task.Status.Should().Be("backlog");
+        approved.Task.Source.Should().Be("proposal:" + proposal.Id);
+        state.Store.Events("T-2", Token)[0].Detail.Should().Contain("proposed by claude");
         before = Snapshot(state.Database);
-        Assert.Throws<InvalidOperationException>(() => state.Store.Approve(proposal.Id, null, "", "other", Token));
-        Assert.Equal(before, Snapshot(state.Database));
+        FluentActions.Invoking(() => state.Store.Approve(proposal.Id, null, "", "other", Token)).Should().ThrowExactly<InvalidOperationException>();
+        Snapshot(state.Database).Should().Be(before);
         var rejection = state.Store.Propose(Definition("proposal"), "why", "codex", Token);
-        Assert.Equal("rejected", state.Store.Reject(rejection.Id, " no ", "human", Token).Status);
-        Assert.Equal("no", state.Store.GetProposal(rejection.Id, Token).Note);
-        Assert.Equal(2, state.Store.List(cancellationToken: Token).Count);
+        state.Store.Reject(rejection.Id, " no ", "human", Token).Status.Should().Be("rejected");
+        state.Store.GetProposal(rejection.Id, Token).Note.Should().Be("no");
+        state.Store.List(cancellationToken: Token).Count.Should().Be(2);
     }
 
     [Fact]
@@ -130,24 +131,24 @@ public sealed class TaskExecutionTests
                 clients.Add(await StartAsync(state.Directory, "same-client"));
             var attempts = await Task.WhenAll(clients.Select(c => c.CallToolAsync("task_claim", new Dictionary<string, object?> { ["id"] = "T-1" }, cancellationToken: Token).AsTask()));
             var winnerIndex = Array.FindIndex(attempts, r => r.IsError is not true);
-            Assert.Single(attempts, r => r.IsError is not true);
+            attempts.Where(result => result.IsError is not true).Should().ContainSingle();
             var leaseToken = attempts[winnerIndex].StructuredContent!.Value.GetProperty("claim_token").GetString()!;
-            Assert.Equal("same-client fixture", state.Store.Get("T-1", Token).Claimant);
+            state.Store.Get("T-1", Token).Claimant.Should().Be("same-client fixture");
             var before = Snapshot(state.Database);
             var malformed = await clients[0].CallToolAsync("task_complete", new Dictionary<string, object?> { ["id"] = "T-1", ["claim_token"] = leaseToken, ["summary"] = "done", ["acceptance"] = new object[] { new { index = 1, result = "pass", unexpected = true } } }, cancellationToken: Token);
-            Assert.True(malformed.IsError);
-            Assert.Equal(before, Snapshot(state.Database));
+            malformed.IsError.Should().BeTrue();
+            Snapshot(state.Database).Should().Be(before);
             var invalid = await clients[(winnerIndex + 1) % clients.Count].CallToolAsync("task_complete", new Dictionary<string, object?> { ["id"] = "T-1", ["claim_token"] = "wrong", ["summary"] = "done" }, cancellationToken: Token);
-            Assert.True(invalid.IsError);
-            Assert.Equal(before, Snapshot(state.Database));
+            invalid.IsError.Should().BeTrue();
+            Snapshot(state.Database).Should().Be(before);
             var complete = await clients[winnerIndex].CallToolAsync("task_complete", new Dictionary<string, object?> { ["id"] = "T-1", ["claim_token"] = leaseToken, ["summary"] = "done", ["acceptance"] = new[] { new { index = 1, result = "pass" }, new { index = 2, result = "pass" } }, ["validation"] = new object[] { "test passed" } }, cancellationToken: Token);
-            Assert.NotEqual(true, complete.IsError);
-            Assert.Equal("T-2", complete.StructuredContent!.Value.GetProperty("unlocked")[0].GetString());
+            complete.IsError.Should().NotBe(true);
+            complete.StructuredContent!.Value.GetProperty("unlocked")[0].GetString().Should().Be("T-2");
             var next = await Task.WhenAll(clients.Select(c => c.CallToolAsync("task_next", new Dictionary<string, object?> { ["claim"] = true }, cancellationToken: Token).AsTask()));
-            Assert.All(next, r => Assert.NotEqual(true, r.IsError));
-            Assert.Single(next, r => r.StructuredContent!.Value.GetProperty("task").ValueKind is JsonValueKind.Object);
-            Assert.Equal(3, next.Count(r => r.StructuredContent!.Value.GetProperty("task").ValueKind is JsonValueKind.Null));
-            Assert.Single(state.Store.Events("T-2", Token), e => e.Event is "claimed");
+            next.Should().AllSatisfy(r => r.IsError.Should().NotBe(true));
+            next.Where(result => result.StructuredContent!.Value.GetProperty("task").ValueKind is JsonValueKind.Object).Should().ContainSingle();
+            next.Count(r => r.StructuredContent!.Value.GetProperty("task").ValueKind is JsonValueKind.Null).Should().Be(3);
+            state.Store.Events("T-2", Token).Where(item => item.Event is "claimed").Should().ContainSingle();
         }
         finally { foreach (var client in clients) await client.DisposeAsync(); }
     }
@@ -157,7 +158,7 @@ public sealed class TaskExecutionTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
             directory = directory.Parent;
-        Assert.NotNull(directory);
+        directory.Should().NotBeNull();
 #if DEBUG
         const string Configuration = "Debug";
 #else

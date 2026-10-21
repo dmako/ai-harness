@@ -11,6 +11,7 @@
     <ProjectReference Include="../../src/Harness.Providers/Harness.Providers.csproj" />
     <ProjectReference Include="Storage/Worker/Harness.StorageWorker.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="xunit.v3" />
+    <PackageReference Include="AwesomeAssertions" />
     <Compile Remove="Storage/Worker/**/*.cs" />
     <None Include="../fixtures/compatibility/sqlite/*" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../fixtures/compatibility/providers-registry.json" Link="Fixtures/providers-registry.json" CopyToOutputDirectory="PreserveNewest" />

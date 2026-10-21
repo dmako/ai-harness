@@ -1,3 +1,4 @@
+using AwesomeAssertions;
 using Harness.Cli.Tasks;
 using Xunit;
 
@@ -12,16 +13,16 @@ public sealed class TaskCliInputTests
     [InlineData("1hX")]
     [InlineData("9999999999999h")]
     [InlineData("١h")]
-    public void InvalidGoStyleDurationIsRejected(string value) => Assert.Throws<TaskUsageException>(() => TaskCliInput.Lease(value));
+    public void InvalidGoStyleDurationIsRejected(string value) => FluentActions.Invoking(() => TaskCliInput.Lease(value)).Should().ThrowExactly<TaskUsageException>();
 
     [Fact]
     public void GoStyleCompoundDurationsAndClrSubtickRoundingAreExplicit()
     {
-        Assert.Equal(TimeSpan.FromMinutes(90), TaskCliInput.Lease("1h30m"));
-        Assert.Equal(TimeSpan.FromMinutes(90), TaskCliInput.Lease("1.5h"));
-        Assert.Equal(TimeSpan.FromHours(-1), TaskCliInput.Lease("-1h"));
-        Assert.Equal(TimeSpan.FromTicks(1), TaskCliInput.Lease("1ns"));
-        Assert.Equal(TimeSpan.Zero, TaskCliInput.Lease("-0"));
-        Assert.Equal(TimeSpan.FromMilliseconds(1.5), TaskCliInput.Lease("1ms500us"));
+        TaskCliInput.Lease("1h30m").Should().Be(TimeSpan.FromMinutes(90));
+        TaskCliInput.Lease("1.5h").Should().Be(TimeSpan.FromMinutes(90));
+        TaskCliInput.Lease("-1h").Should().Be(TimeSpan.FromHours(-1));
+        TaskCliInput.Lease("1ns").Should().Be(TimeSpan.FromTicks(1));
+        TaskCliInput.Lease("-0").Should().Be(TimeSpan.Zero);
+        TaskCliInput.Lease("1ms500us").Should().Be(TimeSpan.FromMilliseconds(1.5));
     }
 }

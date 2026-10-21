@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Storage;
@@ -19,9 +20,10 @@ public sealed class MemoryOracleTests
         foreach (var entry in mapping.AsObject())
         {
             // Punctuation/space normalization is not relevant to these cased letters.
-            if (MemoryText.Normalize(entry.Key) != entry.Value!.GetValue<string>()) mismatches.Add(entry.Key);
+            if (MemoryText.Normalize(entry.Key) != entry.Value!.GetValue<string>())
+                mismatches.Add(entry.Key);
         }
-        Assert.Empty(mismatches);
+        mismatches.Should().BeEmpty();
     }
 
     [Fact]
@@ -33,7 +35,7 @@ public sealed class MemoryOracleTests
         foreach (var scalar in scalars)
         {
             var isWord = ranges.Any(range => scalar >= range.First && scalar <= range.Last);
-            Assert.Equal(isWord ? 0 : 1, MemoryText.Similarity("abc" + new Rune(scalar) + "def", "abc def"));
+            MemoryText.Similarity("abc" + new Rune(scalar) + "def", "abc def").Should().Be(isWord ? 0 : 1);
         }
     }
 
@@ -44,9 +46,9 @@ public sealed class MemoryOracleTests
         foreach (var fixture in fixtures.AsObject())
         {
             var expected = fixture.Value!.GetValue<string>();
-            Assert.Equal(expected, CredentialRedactor.Redact(fixture.Key));
+            CredentialRedactor.Redact(fixture.Key).Should().Be(expected);
             if (expected != fixture.Key)
-                Assert.Throws<ArgumentException>(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = fixture.Key }));
+                FluentActions.Invoking(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = fixture.Key })).Should().ThrowExactly<ArgumentException>();
         }
     }
 
@@ -62,7 +64,7 @@ public sealed class MemoryOracleTests
         {
             var store = new MemoryStore(database);
             Equal(expected, Report(store));
-            Assert.Equal("duplicate", store.Put(new MemoryInput { Type = "fact", Content = "İSTANBUL 𐐀 Á Ž Σ K Unicode compatibility" }, Token).Status);
+            store.Put(new MemoryInput { Type = "fact", Content = "İSTANBUL 𐐀 Á Ž Σ K Unicode compatibility" }, Token).Status.Should().Be("duplicate");
             var old = store.Search(new MemoryQuery { Text = "TOML" }, Token)[0];
             store.Supersede(old.Id, new MemoryInput { Content = "Use TOML with explicit source metadata for config.", Source = new MemorySource("agent", "C# review", "codex"), SupersedeReason = "C# roundtrip" }, Token);
             store.Put(new MemoryInput { Type = "fact", Content = "žluťoučký memory 🧪 survives C# → Go", Source = new MemorySource("import", "roundtrip", "csharp") }, Token);
@@ -74,7 +76,7 @@ public sealed class MemoryOracleTests
         Equal(after, await Run(oracle, "read", path));
         using var reopened = HarnessDatabase.OpenReadOnly(path);
         Equal(after, Report(new MemoryStore(reopened)));
-        Assert.Empty(DatabaseBackups.List(path));
+        DatabaseBackups.List(path).Should().BeEmpty();
     }
 
     [Fact]
@@ -98,7 +100,7 @@ public sealed class MemoryOracleTests
             new() { Text = "SQLite" }, new() { Scope = target, Limit = 1 },
         };
         var results = queries.Select(query => layers.Search(query, Token)).ToArray();
-        Assert.All(results, result => Assert.Empty(result.Errors));
+        results.Should().AllSatisfy(result => result.Errors.Should().BeEmpty());
         var actual = JsonSerializer.SerializeToNode(results.Select(result => result.Memories.Select(Snapshot)))!;
         Equal(expected, actual);
     }
@@ -120,7 +122,11 @@ public sealed class MemoryOracleTests
             histories = all.ToDictionary(memory => memory.Id, memory => store.History(memory.Id, Token).Select(Snapshot), StringComparer.Ordinal),
             events = all.ToDictionary(memory => memory.Id, memory => store.Events(memory.Id, Token).Select(item => new
             {
-                @event = item.Event, related_id = item.RelatedId, actor = item.Actor, detail = item.Detail, at = item.At.ToString(),
+                @event = item.Event,
+                related_id = item.RelatedId,
+                actor = item.Actor,
+                detail = item.Detail,
+                at = item.At.ToString(),
             }), StringComparer.Ordinal),
             similar = store.Similar("decision", "Store project memory in the SQLite project database", Token).Select(item => new { memory = Snapshot(item.Memory), similarity = item.Similarity }),
         })!;
@@ -128,22 +134,32 @@ public sealed class MemoryOracleTests
 
     private static object Snapshot(MemoryRecord memory) => new
     {
-        id = memory.Id, type = memory.Type, content = memory.Content, scope = memory.Scope.ToString(),
-        source_type = memory.Source.Type, source_ref = memory.Source.Ref, recorded_by = memory.Source.By,
-        confidence = memory.Confidence, superseded_by = memory.SupersededBy, supersede_reason = memory.SupersedeReason,
-        valid_from = memory.ValidFrom?.ToString(), valid_until = memory.ValidUntil?.ToString(),
-        created_at = memory.CreatedAt.ToString(), updated_at = memory.UpdatedAt.ToString(),
+        id = memory.Id,
+        type = memory.Type,
+        content = memory.Content,
+        scope = memory.Scope.ToString(),
+        source_type = memory.Source.Type,
+        source_ref = memory.Source.Ref,
+        recorded_by = memory.Source.By,
+        confidence = memory.Confidence,
+        superseded_by = memory.SupersededBy,
+        supersede_reason = memory.SupersedeReason,
+        valid_from = memory.ValidFrom?.ToString(),
+        valid_until = memory.ValidUntil?.ToString(),
+        created_at = memory.CreatedAt.ToString(),
+        updated_at = memory.UpdatedAt.ToString(),
         overrides = memory.Overrides.Count is 0 ? null : memory.Overrides,
     };
 
     private static void Equal(JsonNode expected, JsonNode actual) =>
-        Assert.True(JsonNode.DeepEquals(expected, actual), "Memory oracle mismatch. Expected: " + expected.ToJsonString() + " Actual: " + actual.ToJsonString());
+        JsonNode.DeepEquals(expected, actual).Should().BeTrue("Memory oracle mismatch. Expected: " + expected.ToJsonString() + " Actual: " + actual.ToJsonString());
 
     private static string Oracle()
     {
         var executable = Environment.GetEnvironmentVariable("HARNESS_GO_MEMORY_ORACLE");
-        if (string.IsNullOrWhiteSpace(executable)) Assert.Skip("Set HARNESS_GO_MEMORY_ORACLE to the bridge built by Memory/Go/build-oracle.ps1.");
-        Assert.True(File.Exists(executable));
+        if (string.IsNullOrWhiteSpace(executable))
+            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_MEMORY_ORACLE to the bridge built by Memory/Go/build-oracle.ps1.");
+        File.Exists(executable).Should().BeTrue();
         return executable;
     }
 
@@ -151,7 +167,11 @@ public sealed class MemoryOracleTests
     {
         var start = new ProcessStartInfo(oracle)
         {
-            UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
         };
         start.ArgumentList.Add(operation);
         start.ArgumentList.Add(path);
@@ -162,7 +182,7 @@ public sealed class MemoryOracleTests
             var output = process.StandardOutput.ReadToEndAsync(Token);
             var error = process.StandardError.ReadToEndAsync(Token);
             await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(30), Token);
-            Assert.True(process.ExitCode is 0, await error);
+            (process.ExitCode is 0).Should().BeTrue(await error);
             return JsonNode.Parse(await output)!;
         }
         finally
