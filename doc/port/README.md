@@ -64,6 +64,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Clones and co-change](clones-and-cochange.md) | PORT-022 canonical/shape comparisons, provider duplicate filtering, repeated statements, workspace copies, Git history and change_coupling MCP |
 | [Finding lifecycle](findings-lifecycle.md) | PORT-023 snapshots, drift, marks, pending proposals, author review and the final two MCP tools |
 | [Local observability](local-observability.md) | PORT-024 bounded event consumers, local metrics, context outcomes, reports and activity feeds |
+| [Client setup](client-setup.md) | PORT-025 safe MCP configuration edits, marked guidance, terminal setup and guarded uninstall |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

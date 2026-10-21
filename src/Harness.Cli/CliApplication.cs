@@ -1,5 +1,6 @@
 using Harness.Cli.Workspaces;
 using Harness.Cli.Telemetry;
+using Harness.Cli.Setup;
 using Harness.Infrastructure.Projects;
 using Harness.Cli.Memory;
 using Harness.Cli.Tasks;
@@ -35,6 +36,9 @@ public static class CliApplication
         builder.Services.AddSingleton<TaskCommandRunner>();
         builder.Services.AddSingleton<WorkspaceCommandRunner>();
         builder.Services.AddSingleton<ReportCommandRunner>();
+        builder.Services.AddSingleton(new SetupInvocation(args));
+        builder.Services.AddSingleton<SetupTerminal>();
+        builder.Services.AddSingleton<SetupCommandRunner>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -56,6 +60,9 @@ public static class CliApplication
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
             configuration.AddCommand<SyncCommand>("sync").WithDescription("Refresh recorded project state (worktree, branch, HEAD)");
+            configuration.AddCommand<InstallCommand>("install");
+            configuration.AddCommand<UninstallCommand>("uninstall");
+            configuration.AddCommand<InstructionsCommand>("instructions");
             configuration.AddCommand<MetricsCommand>("metrics");
             configuration.AddCommand<ReportCommand>("report");
             configuration.AddBranch("context", context => context.AddCommand<ContextStatsCommand>("stats"));
@@ -176,6 +183,10 @@ public static class CliApplication
                 "-since" => "--since",
                 "-all" => "--all",
                 "-days" => "--days",
+                "-client" => "--client",
+                "-command" => "--command",
+                "-remove" => "--remove",
+                "-delete-data" => "--delete-data",
                 "-reason" => "--reason",
                 "-to" => "--to",
                 "-force" => "--force",
@@ -207,7 +218,7 @@ public static class CliApplication
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
+            if (equals < 0 && replacement is "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
             {
                 index++; // A value is data, even when it resembles another option.
             }

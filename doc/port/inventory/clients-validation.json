@@ -1,0 +1,238 @@
+{
+  "task": "TASK-0025",
+  "base_commit": "31d36469a445633232705735774eb5595a0cbfe0",
+  "generated_at": "2026-10-21T19:23:16.477858+00:00",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "source_sha256": {
+    "doc/port/README.md": "01d62d773810bcf217138319593e48def6c20b40ba9c7685a8a0b21633bd6f44",
+    "doc/port/client-setup.md": "c7a395116854a2250c11c682cada304afbdd5e61d1eadc010b44497faf83eb20",
+    "src/Harness.Cli/CliApplication.cs": "5e062dcf5b6a56191645c3199230ac93c4000881bb1b6d4cc8eb95b00e7a5799",
+    "src/Harness.Cli/Setup/EditOutput.cs": "391d7391c392276f1396140a07d708132405d604e4dd44e53cb927fec5be6be5",
+    "src/Harness.Cli/Setup/SetupCleanup.cs": "d5e3c419c09d9bcc8d54c597b25b046d4ccdd3b359e132bf14a7f7349e7361e7",
+    "src/Harness.Cli/Setup/SetupCommandRunner.cs": "2908026aa2b72342463fd4ce3702edaf34b5c381c09ae3344ccb0226ca363dac",
+    "src/Harness.Cli/Setup/SetupCommands.cs": "79b6b2b9bd05712dbacfc48f0ff697825b31c10d38219c44ad66c4cda602889a",
+    "src/Harness.Cli/Setup/SetupWizard.cs": "573c7cde83f5f909535599a6504a4dc92100e76c27babc3f3916d5182268bf82",
+    "src/Harness.Core/Instructions/AgentGuidance.cs": "972ec001132bcf56ffc0ed4cf4f1498c63933a964c6f47da944e384654803f8a",
+    "src/Harness.Core/Instructions/MarkedBlock.cs": "4065d278fdb967f1a157cc1565ab9e7bb58b750085806da7516f6f609ec0f4e8",
+    "src/Harness.Infrastructure/Clients/ClientConfiguration.cs": "258980a6ab3d355b132f80119346834b1fe2b3547ae35f5ed19143c17f6d581d",
+    "src/Harness.Infrastructure/Clients/ClientHookCleanup.cs": "ec24b82920bfbe12f723c2ddd6ffd458cf9e6b63afb72684583c49d82a52d0a2",
+    "src/Harness.Infrastructure/Clients/FileEditor.cs": "4721b7e06db0247bf3ca9e1ba8fabc2db4a0a92cd0ad6b311ec40c9fb5993c12",
+    "src/Harness.Infrastructure/Clients/JsonConfigurationEditor.cs": "6c633219cc080744e1b4c150d6d6c6381048b1f664f07a8a31fc1af673bb3bba",
+    "src/Harness.Infrastructure/Clients/ProjectInstructions.cs": "3b647dc355fa6a59ba87bf75e6ca169ad26cd4b2984540a8625da5456bd26b7a",
+    "src/Harness.Infrastructure/Clients/TomlConfigurationEditor.cs": "420a5a014efae976c34e629b9c7f3a4fc69926faaaf6dafaef6c069edae631ca",
+    "test/Harness.Compatibility/Clients/build_oracle.py": "86efd68e6ce7187509c350b74529b1db7727ab294aea18fb64d095d7c4db8320",
+    "test/Harness.Compatibility/Clients/main.go": "57935d8ffe7b2320d547146a9f806347c044e3ebd5c53e33a97afb2eabfe11db",
+    "test/Harness.Compatibility/Clients/publish_smoke.py": "0ae0e4a2531e463ba5d4a8164a6080c029347098af29d125ab19a80274ad3f83",
+    "test/Harness.Compatibility/Clients/wizard_smoke.py": "509cff2e786f3564596de473a120061c338fdb11b4db7ae78748b3034e156500",
+    "test/Harness.Integration/Clients/SetupProcessTests.cs": "4243349980fb89ec4afac03e2f91ca0848dd3a3ef8cf1cb374c21d3caca2bcf7",
+    "test/Harness.Unit/Clients/ClientTests.cs": "fa103bb4b6b6d41665b01d59c4924e548a8f5f95f44d56c8f6feb4d89a2b20be"
+  },
+  "oracle_sources": {
+    "internal/clients/client.go": "ac3188cfbdfdc3700810c170c70cae38e94aebae737afef0438d3e409648033a",
+    "internal/clients/clients.go": "3e7c31ae8d868c30360e27870e04308abd6c47659202cbebb95c4cb0dd22192d",
+    "internal/clients/clients_test.go": "ad26fc502d7f21aecbd503afa3a5f2686046c150231d1cfa4c44d34b0cc5ad50",
+    "internal/clients/hookpayload.go": "50d4c8d022118dc46c2b4531b7f393b1316efaba5c9fa11e2fb50629e091a19f",
+    "internal/clients/hookpayload_test.go": "490ff6cdf830649249850263ce4fde95f99fbb89e7e3e6682f1643ee650b4443",
+    "internal/clients/hooks.go": "0fdc734ed164f63ecf471073fc1bdf52dffb314cf2db433202f1e00cf5c99430",
+    "internal/clients/hooks_test.go": "394b1bf50a66d25eb84da0ecdc02656aa53d9e6c99ca4933e6abf3ad191dc36a",
+    "internal/clients/install.go": "d2871c9055c3846ab7f2937f10174941dc64f56e61e00590a14c86e4c88c7350",
+    "internal/clients/install_test.go": "bcec0d1c4dcd53afc6d6eca9b3a34ef86133e454b0b900abd5d175ff9b41af2c",
+    "internal/clients/jsonedit.go": "a1b67775ceddfe5dab8775fed8681459b421d660dec5cee63e8919fe6e318caf",
+    "internal/clients/jsonedit_test.go": "b20beb2118e115bfa705ccc3a3a1e7ef8a9115d3780549b7c1431bcfa6bdb127",
+    "internal/clients/tomledit.go": "6a93ce349d9ab083bc26b166081c3712ce9c3b9173ccfafe30bdf6445f39b298",
+    "internal/fileedit/fileedit.go": "2e5ebc42c18fda5df7ed936dd564f633de72ba9f9ab2208220c4130610f32857",
+    "internal/fileedit/fileedit_test.go": "921377376026f20ba70dd80552f9e19862d1e08bbc5e21c74aafda44e2f9cdda",
+    "internal/fsutil/exec.go": "a4d81ea1b69d4dfbcba58c76b48b03d3ae73d83e98b6100db5f4e5b783f8b71f",
+    "internal/fsutil/exec_test.go": "b235fc80f4b8a7f182d9947941e20c27e4fc150ef5e883bf8bd8dea6fe8d8a47",
+    "internal/fsutil/fsutil.go": "9a748137cf4330b76b63105c0d81f6992faf9e91c04ece1c8b5968b5790bd2b2",
+    "internal/fsutil/lock_other.go": "f6d5b01778904e0a6259e2a032e2e0ffd938261c12807124ad2c773659dfed84",
+    "internal/fsutil/lock_unix.go": "4a247dd9fd470a96a22a15a596fcdd4a891ef7e7804df1f59efaba15b265e8eb",
+    "internal/instructions/instructions.go": "8f668c24aa78e09aa6e8ef5b47a389c3c010d224b115ec3d4aef1642c9b3dd07",
+    "internal/instructions/instructions_test.go": "9365f6421c5fe08367176fd23ad639d2418c2585df3e4abfead8e836cd2b7e23",
+    "internal/cli/install.go": "f7699c66a9c43635685867d2a2e1ebc3f0570866e688fd8c136d90e23ee1c96c",
+    "internal/cli/setup.go": "2e2389c98bc3784ad05838bf37b532fe099b71e7d6f3e9a198d85d429e45e747",
+    "internal/cli/wizard.go": "bbd11282bb901dacd17bdcd9b020705c980890d2980ce9f4dfb7e1d63b2c7f61",
+    "internal/cli/instructions.go": "7fb691fe1c9d6a346a22f8b93ed5d86b615f78898d2eab328fcf15b13873380d",
+    "internal/cli/uninstall_all.go": "eac19559cd14a824c07dda80d73eb71eb6133e34f55ef1b52c15d8a78c74fd15",
+    "internal/cli/install_test.go": "04c95b0575b35c4759f404b93f59206e1889748bea829fc4f57c616f7520c117",
+    "internal/cli/uninstall_all_test.go": "e024765e26ff77be910f3ab7eeb7fa0f961d52c2ea7244a5c051eba0a741f758",
+    "internal/cli/completion.go": "751ad59bf696b636e6224e9256e7b6bb5cb39501c1f55554e37f90025f210736"
+  },
+  "locks": {
+    "count": 11,
+    "semantic_equal_to_head": true,
+    "git_normalized_equal_to_head": true,
+    "sha256": {
+      "src/Harness.Cli/packages.lock.json": "d4d84ca30bc0b474e0d7b0d07f56fe692ccc12974362c10f7cfea2e28fe06ba6",
+      "src/Harness.Core/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "src/Harness.Graphify/packages.lock.json": "79a73a25ec13072fd2f02aeb6d538fc3a3cc35bae95b4e93d42a310bc68e7ce2",
+      "src/Harness.Infrastructure/packages.lock.json": "6cd3dd55e3cddbaa75234490eddd16a6c670a664707ba076c47b9d3c2a7a80a2",
+      "src/Harness.Mcp/packages.lock.json": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "src/Harness.Providers/packages.lock.json": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "src/Harness.Web/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "test/Harness.Integration/Storage/Worker/packages.lock.json": "112ca61422e901e82b942eb5ad4f872610dc88b3c1f94b5b696c60118051430a",
+      "test/Harness.Integration/packages.lock.json": "7abd3ee7cbf1b33703dbea24880483d545bdf9765bc257a9ea879424de58c7b5",
+      "test/Harness.ProviderWorker/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "test/Harness.Unit/packages.lock.json": "f18d62e17038c1e6cb4930ed6f427f9af1d2e8ed39d6f0118a0047558b698dde"
+    }
+  },
+  "artifacts_sha256": {
+    "artifacts/clients-build-01.binlog": "cb7dfef2b72035740093e6e066444050fe479e9262ff3ad3cc68571978568939",
+    "artifacts/clients-build-02.binlog": "d9ff8b5ca1bc89879903b41d5c1d8827e563fb61af0cf4106623bb2feeacd2af",
+    "artifacts/clients-build-03.binlog": "994e41da60f0b772e525d306bfedfdb632c055a8adc1263be06d75cb8e520785",
+    "artifacts/clients-build-04.binlog": "b2e352bb318917199983af6a67d77af53109cc1bdb11472692d0e4b8b102dcb1",
+    "artifacts/clients-build-05.binlog": "3e4f71bbdd6a245dce7dad5c7d827c9b7dc3067fec1447ca46f2ee74fb115fd4",
+    "artifacts/clients-build-06.binlog": "5746120452d4b13d5b1eda90cd9c5c04252921659ac005e2c116d7ffc8a4d787",
+    "artifacts/clients-build-07.binlog": "d5d1ef11d0abc9a9310401e91f3469bd75207434a6c58ebbfa381eb7aff0f48b",
+    "artifacts/clients-format-01.binlog": "4888c8e84e2190f77e7a859b3dc5218068642393efac58088aa4787ae65479de",
+    "artifacts/clients-format-verify-01.binlog": "63b32578f23d8f6e0067ed10baf153debe1c4bab2ebde16a208d929140ccef09",
+    "artifacts/clients-format-verify-02.binlog": "207671c5ae79d129aa6858a6e5fa298e1b305214c1eb5dc6ac17fe13b7247448",
+    "artifacts/clients-format-verify-03.binlog": "2c0e184c4f05553f0e685c0ffedcef1818b3cd6810504bf1b70cc95a2b79e8ca",
+    "artifacts/clients-integration-01/Harness.Integration_net10.0_x64.trx": "9c884e06adaa2c64291a5df5d0cbda22929fb51eade16296d04eadcca94c7a8a",
+    "artifacts/clients-integration-01-dotnet-test.binlog": "c7437e50b1da70a883bf0adea3a5ac4d2e16286f91d3023b4b20c33f184f0028",
+    "artifacts/clients-integration-01.binlog": "35089ab0f0366de310da86dfd612b71ab66834cf6b87dd5ad2682558207eb2f0",
+    "artifacts/clients-integration-02/Harness.Integration_net10.0_x64.trx": "841f2c0bccbe5a81fe60c043eab10cfbae0a251afb9df97fc7ba291d5745de9c",
+    "artifacts/clients-integration-02-dotnet-test.binlog": "a32dd7371bb6e7309424c7f375a0960ee149eed6a571694330cd7dc7588d8850",
+    "artifacts/clients-integration-02.binlog": "ec6dba7714b1ea3d05a93524608003d5df7149474a7c009e7230ee4e78eb9287",
+    "artifacts/clients-integration-03/Harness.Integration_net10.0_x64.trx": "e447589f730175853d13ff2238ddc8a9c7ee0375a60c888eb74c8b4a5ba09522",
+    "artifacts/clients-integration-03-dotnet-test.binlog": "46765368945d4b92b5123877b324c692de225d07e5289bb7ab86ba967077701c",
+    "artifacts/clients-integration-03.binlog": "b5dbe009e2d6771a029cd160b8542837e48998e8bb2bbc987edb1307267bdb93",
+    "artifacts/clients-linux-integration-01.log": "c94939094a518658993d731fdcbe93f8a84d33568aec0f62652fa5edb8b9797f",
+    "artifacts/clients-linux-integration-02.log": "ef74b3d057bc479d392f6c8a8599bf5e195802dc8e62a27f289625de56a26bd1",
+    "artifacts/clients-linux-integration-03.log": "673fa6aee72bbd901f05704b6da4a0b2242265deec1f9f1b7d15f0a66224a2d4",
+    "artifacts/clients-linux-unit-01.log": "34b82b864534c96dee68bf2295d3d0d6dc904740f2eaa2dbba0b796be2f48f18",
+    "artifacts/clients-linux-unit-02.log": "3b21494ec46f14fade0d762a85d9bed4e101864035e69438316b2fe4a5f27a26",
+    "artifacts/clients-linux-unit-03.log": "28f5a71c18fe2184bc3746d57e6e90240a686b4a1df030d45a13d7d5437f6186",
+    "artifacts/clients-oracle/clients-oracle-linux": "6eacfd0fdfe41c739183801700f738b91f21eb0733adfe20349549750489d23b",
+    "artifacts/clients-oracle/clients-oracle.exe": "256791f803e12643c17dbe2adfbdebe319afef766e4bd28c2a5f1373e81b5d66",
+    "artifacts/clients-original-linux-race-tests-01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/clients-original-linux-race-tests-02.log": "7e5ca2ac0a1a14b4f5eba46ff832ef1bad582c062ddd5c621c867c0a6edba89e",
+    "artifacts/clients-original-linux-tests-01.log": "b663a5fc76298696d1fc742b28c4d19e78ab0d27a00a4c1f4946a34b10e81f5e",
+    "artifacts/clients-original-tests-01.log": "99c4adaf1862af7f8d59a30a5ffd02f8fa7efdf004c6807186e15252b4952248",
+    "artifacts/clients-publish/harness.exe": "6bd580959fbbe78f761b88b0b9827e784438124f5cb9c1c8adf31579e592fcc3",
+    "artifacts/clients-publish-01.binlog": "5116e027be0960fcf01444698af1255699a9f95bad0cdcace11bea8bbfb3fbee",
+    "artifacts/clients-publish-02.binlog": "57573f40f699325e948244c0c2f59b4c6e58d42f8d88c2f7172cfc013ebeee69",
+    "artifacts/clients-publish-03.binlog": "b7bf5bb3b3c1fc45f4c84be111696b497c242f017c0d39d1b9fbf188fc27102f",
+    "artifacts/clients-published-smoke.json": "66192781c0595a9dc03194e7dbd5d4a1fa12da185ed2b9496deb575ff8af61d9",
+    "artifacts/clients-regression-01/Harness.Integration_net10.0_x64.trx": "9f2110fc9ebc806ff69479a2edfffc9069539ab7cae4fa7bc875196df813234a",
+    "artifacts/clients-regression-01/Harness.Unit_net10.0_x64.trx": "4f83a0c1a4e81c8458318f86474804577785571b524c5c6f20b1c486b35e2983",
+    "artifacts/clients-regression-01-dotnet-test.binlog": "73888b087006c0593a367235ffd7556987f27dc5e48655853344f284cb1d6a71",
+    "artifacts/clients-regression-01.binlog": "193aad578780e675cfc9f72f830538723b36a898b20dde332bdf18adf17b4730",
+    "artifacts/clients-restore-normal-01.binlog": "4c8b56c36b253131321525527150e6185063f6a4d23893e13152a2ab17447ef4",
+    "artifacts/clients-restore-normal-02.binlog": "d2830b2e5e16680f0410d829e862d9c9c1b375ce004b4cc0fdc4d771e1d6b621",
+    "artifacts/clients-restore-publish-01.binlog": "3325eaa2f8fad425df466d1f1d0d6756aba9ecf41e89fd99a85cb68b2a79dbe1",
+    "artifacts/clients-restore-publish-02.binlog": "f07eb8d03d24bac0a1197bd3428a71aac0727a268cdea742ddd86299bdedcc98",
+    "artifacts/clients-tests-01.binlog": "b95393a530a3369e0ec252730cc4fd0230e415ca6171d65c8fb644ccf4ca6357",
+    "artifacts/clients-tests-02/Harness.Unit_net10.0_x64.trx": "b7aaabea91d022fbdc6ce350f2e698f556dd941b27f3023a582a40351dd3503b",
+    "artifacts/clients-tests-02-dotnet-test.binlog": "60d1a409c6ea44fe4d3ff81042e22797edd12d7a22d482bc72af15096e66c183",
+    "artifacts/clients-tests-02.binlog": "e12e79098676e4db53f896918f6de58859c1936aee4d55610a5a14b44d04f6c5",
+    "artifacts/clients-tests-03/Harness.Unit_net10.0_x64.trx": "ae30d6cce4c8a1b1616377489954d493ca1452878c83069f452e0f6d2fa549d5",
+    "artifacts/clients-tests-03-dotnet-test.binlog": "5036f55bc7d538cdaad311ec04b124dc867646c5c7d0ebf6b2f92b6bddbce5c8",
+    "artifacts/clients-tests-03.binlog": "02160b022079151ffe0cb10979b5cdc6a77f56f0149c758a388d621290f1f28e",
+    "artifacts/clients-tests-04/Harness.Unit_net10.0_x64.trx": "2447f3331f6e7d619950fd2a5f874390a1ea3b122f8b9601d62e2e3dc01465c7",
+    "artifacts/clients-tests-04-dotnet-test.binlog": "470ea60e1feda53a3c4baf0cf77bb0b299c0220f8b63220669f0da5efe6092da",
+    "artifacts/clients-tests-04.binlog": "d069db31b64cadcafe3da8d85057d06226bff93086d72d41316a54e24ac8ae1e",
+    "artifacts/clients-tests-05/Harness.Unit_net10.0_x64.trx": "08beb9fd3da4bb62066787e43cc2d7966939e1c80b3388870b9e28f4337229d1",
+    "artifacts/clients-tests-05-dotnet-test.binlog": "c641cdee7d728f60a0e7fb4e013e4015fc5c7f8498aeb8b890951794b17eeb81",
+    "artifacts/clients-tests-05.binlog": "5aecd550bfd7fddf32dc1b7f9d1fa0487288f8db6da7e701cfa6dfa138d061fa",
+    "artifacts/clients-wizard-terminal-01.log": "c616959a5e883d26d83fa46c2c5a369dd4366e712399833a7f9ff4f214d4fe89",
+    "artifacts/clients-wizard-terminal-02.log": "c616959a5e883d26d83fa46c2c5a369dd4366e712399833a7f9ff4f214d4fe89",
+    "artifacts/clients-wizard-terminal.json": "5d6fe3ebc86d520f2f868ba56e3f728266617a0fac4e08b2a012133b37a58436"
+  },
+  "regression": {
+    "total": 671,
+    "passed": 666,
+    "failed": 0,
+    "skipped": 5
+  },
+  "commands": [
+    {
+      "command": "python test/Harness.Compatibility/Clients/build_oracle.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --modules artifacts/compatibility/oracle/modules --output artifacts/clients-oracle/clients-oracle.exe",
+      "result": "pass",
+      "output": ""
+    },
+    {
+      "command": "python test/Harness.Compatibility/Clients/build_oracle.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --modules artifacts/compatibility/oracle/modules --output artifacts/clients-oracle/clients-oracle-linux --goos linux",
+      "result": "pass",
+      "output": ""
+    },
+    {
+      "command": "WSL Ubuntu: go test -C artifacts/compatibility/oracle/source -race ./internal/clients ./internal/instructions ./internal/fileedit -count=1",
+      "result": "pass",
+      "output": "All three unmodified original packages passed; isolated Go module/build caches, GOTOOLCHAIN=local. See clients-original-linux-race-tests-02.log."
+    },
+    {
+      "command": "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/clients-regression-01.binlog --report-trx --results-directory artifacts/clients-regression-01",
+      "result": "pass",
+      "output": "{'total': 671, 'passed': 666, 'failed': 0, 'skipped': 5}; all 15 frozen-oracle variables plus installed codebase-memory/graphify configured."
+    },
+    {
+      "command": "dotnet test --project test/Harness.Unit/Harness.Unit.csproj --no-restore --filter-namespace Harness.Unit.Clients -bl:artifacts/clients-tests-05.binlog --report-trx --results-directory artifacts/clients-tests-05",
+      "result": "pass",
+      "output": "41 passed, Windows Go oracle configured."
+    },
+    {
+      "command": "dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --filter-namespace Harness.Integration.Clients -bl:artifacts/clients-integration-03.binlog --report-trx --results-directory artifacts/clients-integration-03",
+      "result": "pass",
+      "output": "5 passed, 1 expected Unix-only directory-link skip; final framework-dependent default launcher verified."
+    },
+    {
+      "command": "WSL Ubuntu: HARNESS_GO_CLIENTS_ORACLE=$PWD/artifacts/clients-oracle/clients-oracle-linux dotnet test/Harness.Unit/bin/Debug/net10.0/Harness.Unit.dll --filter-namespace Harness.Unit.Clients",
+      "result": "pass",
+      "output": "41 passed; clients-linux-unit-03.log; .NET runtime 10.0.13."
+    },
+    {
+      "command": "WSL Ubuntu: dotnet test/Harness.Integration/bin/Debug/net10.0/Harness.Integration.dll --filter-namespace Harness.Integration.Clients",
+      "result": "pass",
+      "output": "6 passed; clients-linux-integration-03.log, including redirected-state deletion refusal."
+    },
+    {
+      "command": "WSL Ubuntu: python3 test/Harness.Compatibility/Clients/wizard_smoke.py --assembly src/Harness.Cli/bin/Debug/net10.0/harness.dll --artifacts artifacts",
+      "result": "pass",
+      "output": "Three actual POSIX PTY sessions passed: cancel, install and uninstall; review confirmed no write before apply; clients-wizard-terminal-02.log."
+    },
+    {
+      "command": "dotnet restore src/Harness.Cli/Harness.Cli.csproj --locked-mode -p:RuntimeIdentifier=win-x64 -p:PublishProfile=Release -bl:artifacts/clients-restore-publish-02.binlog",
+      "result": "pass",
+      "output": ""
+    },
+    {
+      "command": "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release --no-restore -o artifacts/clients-publish -bl:artifacts/clients-publish-03.binlog",
+      "result": "pass",
+      "output": ""
+    },
+    {
+      "command": "python test/Harness.Compatibility/Clients/publish_smoke.py --executable artifacts/clients-publish/harness.exe --artifacts artifacts",
+      "result": "pass",
+      "output": "All scopes, dry run, backups, idempotence, default single-file launcher, guidance, 30-tool MCP launch from installed space-path entry, removal and explicit data deletion guards passed."
+    },
+    {
+      "command": "dotnet restore Harness.slnx --locked-mode -bl:artifacts/clients-restore-normal-02.binlog",
+      "result": "pass",
+      "output": "11 lockfiles unchanged after Git line-ending normalization; semantically identical."
+    },
+    {
+      "command": "dotnet format whitespace Harness.slnx --no-restore --include <all changed/new C# files> --verify-no-changes --binarylog artifacts/clients-format-verify-03.binlog",
+      "result": "pass",
+      "output": ""
+    },
+    {
+      "command": "git diff --check HEAD",
+      "result": "pass",
+      "output": ""
+    }
+  ],
+  "validation_sequence": [
+    "Full Windows regression passed with all new editor/setup/deletion tests. Single-file publishing then exposed IL3000 in default command resolution; it was corrected to use process/entry-point paths, and cleanup subprocess cancellation now always reaps children.",
+    "After those final CLI changes, all 41 focused Windows units and 5 Windows integrations passed (1 Unix-only skip), all 41 Linux units and 6 Linux integrations passed, actual Linux terminal wizard sessions passed, final Release publish and published smoke passed, formatting verified.",
+    "Earlier analyzer/compilation iterations and incorrect Go race flag ordering were corrected; no C# test failures remain.",
+    "Uninstrumented original Go package tests have Unix path/permission assumptions on Windows and millisecond backup collisions on Linux. The original sources were not patched. The complete original suites passed with Linux race instrumentation; C# backup collision handling has an independent rapid-backup test."
+  ],
+  "limits": [
+    "macOS and native Windows terminal interaction were not exercised; Windows command processes and POSIX PTY sessions were tested.",
+    "This task supplies MCP/guidance setup and removal of pre-existing owned hook/completion content; TASK-0026 supplies hook execution, completion generation and their setup sections.",
+    "Intentional robustness differences are documented in doc/port/client-setup.md: duplicate-key refusal, syntax-aware multiline/comment preservation, backup collision suffixes, multi-file guidance preflight, redirected-state refusal, preservation of fish additions and user-only uninstall outside Git.",
+    "File conflict checks are optimistic around atomic replacement, not a filesystem compare-and-swap.",
+    "No package changes; no real client configurations, project databases, binary artifacts or user knowledge committed."
+  ]
+}
