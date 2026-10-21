@@ -1,4 +1,5 @@
 using Harness.Core.Projects;
+using Harness.Core.Sync;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -177,7 +178,7 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
 
     private static Dictionary<string, object?> ReadSync(HarnessDatabase database, string worktree, GitHead? head, out bool crossBranch, bool includeRecentRuns = true)
     {
-        // This read-only view preserves the diagnostics contract; sync mutations remain PORT-016.
+        // Keep facade reads cheap and use the same freshness rules as the synchronization engine.
         crossBranch = false;
         Dictionary<string, object?> result = new(StringComparer.Ordinal);
         if (includeRecentRuns)
@@ -199,20 +200,15 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         Add(result, "branch", branch);
         Add(result, "commit", commit);
         Add(result, "synced_at", SecondPrecision(reader.GetString(3)));
-        if (head is not null && (head.Branch != branch || head.Detached != detached))
+        if (head is not null)
         {
-            crossBranch = true;
-            result["stale"] = $"branch changed since the last sync ({(detached ? "detached HEAD" : branch)} -> {(head.Detached ? "detached HEAD" : head.Branch)}); indexed results may describe the other branch (run 'harness sync')";
-        }
-        else if (head is not null && head.Commit != commit)
-        {
-            result["stale"] = $"HEAD moved since the last sync ({Short(commit)} -> {Short(head.Commit)}); indexed results may be out of date (run 'harness sync')";
+            var previous = new SyncState(worktree, branch, commit, detached, false, 0, reader.GetString(3), [], false);
+            crossBranch = SyncFreshness.CrossBranch(previous, head.Branch, head.Detached);
+            Add(result, "stale", SyncFreshness.Staleness(previous, head.Branch, head.Commit, head.Detached));
         }
 
         return result;
     }
-
-    private static string Short(string value) => value.Length > 12 ? value[..12] : value;
 
     private static string SecondPrecision(string value)
     {

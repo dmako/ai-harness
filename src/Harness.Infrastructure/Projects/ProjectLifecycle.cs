@@ -23,6 +23,7 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
     private const string ConfigurationTemplate = "# Harness project configuration. Values here override the global config.\n# Everything is optional; uncomment to change a default.\n\n# [storage]\n# db_path = \".harness/harness.db\"\n# busy_timeout_ms = 5000\n\n# [log]\n# level = \"info\"\n";
 
     public string GlobalConfigurationPath => globalConfigurationPath ?? ConfigurationPaths.GlobalPath();
+    public string Version => version;
     public MachineRegistry Registry => new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigurationPath))!, "projects.json"));
 
     public async Task<ProjectLocation> LocateAsync(string directory, bool allowNonGit = false, CancellationToken cancellationToken = default)

@@ -37,6 +37,9 @@ public sealed class MachineRegistry(string path)
     public Task NoteMcpAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, CancellationToken cancellationToken = default) =>
         NoteAsync(project, worktrees, version, "last_mcp", cancellationToken);
 
+    public Task NoteSyncAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, CancellationToken cancellationToken = default) =>
+        NoteAsync(project, worktrees, version, "last_sync", cancellationToken);
+
     private async Task NoteAsync(ProjectIdentity project, IReadOnlyList<WorktreeIdentity> worktrees, string version, string eventKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(project);

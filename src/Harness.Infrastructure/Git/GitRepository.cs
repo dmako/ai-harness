@@ -15,7 +15,7 @@ public sealed record GitHead(string Branch, string Commit, bool Detached, bool U
     private string ShortCommit => Commit.Length > 12 ? Commit[..12] : Commit;
 }
 
-public sealed record GitRepository(string Root, string GitDir, string CommonDir, bool Linked)
+public sealed partial record GitRepository(string Root, string GitDir, string CommonDir, bool Linked)
 {
     public string StateRoot => Path.GetFileName(CommonDir) == ".git" ? Path.GetDirectoryName(CommonDir)! : Root;
 
@@ -73,8 +73,13 @@ public sealed record GitRepository(string Root, string GitDir, string CommonDir,
     {
         var start = new ProcessStartInfo(FindExecutable())
         {
-            UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
-            StandardOutputEncoding = new UTF8Encoding(false, true), StandardErrorEncoding = new UTF8Encoding(false, true),
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            StandardOutputEncoding = new UTF8Encoding(false, true),
+            StandardErrorEncoding = new UTF8Encoding(false, true),
         };
         start.ArgumentList.Add("-C");
         start.ArgumentList.Add(root);

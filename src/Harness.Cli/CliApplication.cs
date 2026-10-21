@@ -51,6 +51,7 @@ public static class CliApplication
             configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
+            configuration.AddCommand<SyncCommand>("sync").WithDescription("Refresh recorded project state (worktree, branch, HEAD)");
             configuration.AddBranch("tasks", tasks =>
             {
                 tasks.AddCommand<TaskListCommand>("list");
@@ -145,6 +146,8 @@ public static class CliApplication
                 "-dry-run" => "--dry-run",
                 "-json" => "--json",
                 "-syncs" => "--syncs",
+                "-full" => "--full",
+                "-since" => "--since",
                 "-all" => "--all",
                 "-reason" => "--reason",
                 "-to" => "--to",
