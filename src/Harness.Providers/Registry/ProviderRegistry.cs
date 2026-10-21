@@ -4,7 +4,7 @@ using Harness.Core.Providers;
 namespace Harness.Providers.Registry;
 
 /// <summary>Routes calls independently and keeps provider registration order in merged answers.</summary>
-public sealed class ProviderRegistry : IProviderRegistry, IAsyncDisposable
+public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposable
 {
     private readonly object _gate = new();
     private readonly List<IProvider> _providers = [];
@@ -66,6 +66,10 @@ public sealed class ProviderRegistry : IProviderRegistry, IAsyncDisposable
 
     public Task DiscoverAsync(CancellationToken cancellationToken = default) => Task.WhenAll(Providers().OfType<IProviderDiscovery>().Select(provider => provider.DiscoverAsync(cancellationToken)));
 
+    public Task DiscoverContextAsync(CancellationToken cancellationToken = default) => Task.WhenAll(Providers().Where(provider => InContext(provider.Name)).OfType<IProviderDiscovery>().Select(provider => provider.DiscoverAsync(cancellationToken)));
+    public IReadOnlyList<CapabilityInfo> ContextCapabilities() => Providers().Where(provider => InContext(provider.Name)).SelectMany(provider => provider.Capabilities())
+        .OrderBy(info => info.Capability, StringComparer.Ordinal).ThenBy(info => info.Provider, StringComparer.Ordinal).ToArray();
+
     public IReadOnlyList<CapabilityInfo> Capabilities() => Providers().SelectMany(provider => provider.Capabilities())
         .OrderBy(info => info.Capability, StringComparer.Ordinal).ThenBy(info => info.Provider, StringComparer.Ordinal).ToArray();
 
@@ -77,8 +81,9 @@ public sealed class ProviderRegistry : IProviderRegistry, IAsyncDisposable
 
     public async Task<IReadOnlyList<ProviderResult>> CallAsync(ProviderRequest request, Func<string, bool>? skip = null, CancellationToken cancellationToken = default)
     {
-        await DiscoverAsync(cancellationToken).ConfigureAwait(false);
-        var providers = For(request.Capability).Where(provider => skip is null || !skip(provider.Name));
+        var included = Providers().Where(provider => skip is null || !skip(provider.Name)).ToArray();
+        await Task.WhenAll(included.OfType<IProviderDiscovery>().Select(provider => provider.DiscoverAsync(cancellationToken))).ConfigureAwait(false);
+        var providers = included.Where(provider => provider.Capabilities().Any(info => info.Capability == request.Capability));
         // Task.Run also isolates adapters doing synchronous work before their first await.
         var results = await Task.WhenAll(providers.Select(provider => CallOneAsync(provider, request, cancellationToken))).ConfigureAwait(false);
         Action<ProviderResult, ProviderRequest>? observer;

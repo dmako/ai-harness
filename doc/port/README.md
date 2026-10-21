@@ -56,6 +56,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Provider facade](provider-facade.md) | PORT-014 v1 protocol, frozen packs, CLI composition, four public provider MCP tools and stale-index filtering |
 | [Graphify adapter](graphify.md) | PORT-015 external C# intelligence, nested input discovery, reusable warm sessions, ownership and platform cleanup |
 | [Git synchronization](git-sync.md) | PORT-016 incremental scans, transactional file hashes, worktree locks, provider refresh retries and branch freshness |
+| [Context retrieval](context-retrieval.md) | PORT-017 deterministic gathering, candidate merging/ranking, applicable memory, recent changes and request-scoped file reads |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

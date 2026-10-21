@@ -12,6 +12,14 @@ public interface IProviderRegistry
     Task<(IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonElement>?> Structure, IReadOnlyList<string> Errors)> OverviewAsync(Func<string, bool>? skip = null, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Context discovery must filter excluded adapters before any handshake or capability read.</summary>
+public interface IContextProviderRegistry : IProviderRegistry
+{
+    bool InContext(string name);
+    Task DiscoverContextAsync(CancellationToken cancellationToken = default);
+    IReadOnlyList<CapabilityInfo> ContextCapabilities();
+}
+
 public sealed record ProviderProjectSnapshot(string Root = "", string ProjectId = "", string Branch = "", string Commit = "", string Stale = "", bool CrossBranch = false, JsonElement? Stack = null);
 
 /// <summary>Project metadata and optional historical observations, independent of provider adapters.</summary>
