@@ -52,6 +52,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Tasks and backlogs](tasks-and-backlogs.md) | PORT-010 dependency scheduling, task/milestone state, strict planning import, history-preserving reimport and append-only export |
 | [Task execution](task-execution.md) | PORT-011 capability claims, lease/progress/completion transactions, six MCP tools and human task proposal review |
 | [Provider registry](provider-registry.md) | PORT-012 provider-neutral models, lazy routing, ordered fanout, isolated deadlines and nested-worktree filtering |
+| [Downstream MCP](downstream-mcp.md) | PORT-013 SDK process client, generic mappings, supervised restart, bounded I/O and native descendant cleanup |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

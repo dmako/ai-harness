@@ -11,5 +11,6 @@
     <Project Path="test/Harness.Unit/Harness.Unit.csproj" />
     <Project Path="test/Harness.Integration/Harness.Integration.csproj" />
     <Project Path="test/Harness.Integration/Storage/Worker/Harness.StorageWorker.csproj" />
+    <Project Path="test/Harness.ProviderWorker/Harness.ProviderWorker.csproj" />
   </Folder>
 </Solution>

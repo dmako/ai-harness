@@ -236,7 +236,8 @@
       "harness.providers": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.1.0-localbuild, )"
+          "Harness.Core": "[0.1.0-localbuild, )",
+          "ModelContextProtocol.Core": "[2.2.0, )"
         }
       },
       "harness.web": {

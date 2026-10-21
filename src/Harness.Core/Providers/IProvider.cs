@@ -26,6 +26,7 @@ public sealed class ProviderException(string provider, string message, string to
     public ProviderException(string message) : this("", message) { }
     public ProviderException(string message, Exception innerException) : this("", message, innerException: innerException) { }
     public string Provider { get; } = provider;
+    public string Detail { get; } = message;
     public string Tool { get; } = tool;
     public string Hint { get; } = hint;
     private static string Format(string provider, string message, string tool, string hint) =>

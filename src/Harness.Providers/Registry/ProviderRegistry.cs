@@ -166,6 +166,6 @@ public sealed class ProviderRegistry : IAsyncDisposable
         {
             result = new() { Error = error };
         }
-        return result with { Provider = provider.Name, Capability = request.Capability, Latency = Stopwatch.GetElapsedTime(start), TimedOut = deadline.IsCancellationRequested };
+        return result with { Provider = provider.Name, Capability = request.Capability, Latency = Stopwatch.GetElapsedTime(start), TimedOut = result.TimedOut || deadline.IsCancellationRequested };
     }
 }

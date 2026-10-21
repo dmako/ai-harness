@@ -10,6 +10,7 @@
     <ProjectReference Include="../../src/Harness.Mcp/Harness.Mcp.csproj" />
     <ProjectReference Include="../../src/Harness.Providers/Harness.Providers.csproj" />
     <ProjectReference Include="Storage/Worker/Harness.StorageWorker.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Harness.ProviderWorker/Harness.ProviderWorker.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="AwesomeAssertions" />
     <Compile Remove="Storage/Worker/**/*.cs" />
