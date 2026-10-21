@@ -1,8 +1,10 @@
+using Harness.Cli.Hooks;
 using Harness.Cli.Memory;
 using Harness.Cli.Setup;
 using Harness.Cli.Tasks;
 using Harness.Cli.Telemetry;
 using Harness.Cli.Workspaces;
+using Harness.Infrastructure.Completion;
 using Harness.Infrastructure.Projects;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,21 @@ public static class CliApplication
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(stdout);
         ArgumentNullException.ThrowIfNull(stderr);
+        if (args.Length >= 2 && args[0] is "hook" or "hooks" && args[1] is "event" or "session")
+        {
+            using var input = Console.OpenStandardInput();
+            return await HookExecution.RunAsync(args, input, stdout, stderr, cancellationToken);
+        }
+        if (args.Length is 2 && args[0] is "completion" && CompletionManager.Shells.Contains(args[1], StringComparer.Ordinal))
+        {
+            await stdout.WriteAsync(CompletionScripts.For(args[1]));
+            return 0;
+        }
+        var completing = args.Length > 0 && args[0] is "__complete";
+        if (completing && args.Length < 2)
+        {
+            return 2;
+        }
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { DisableDefaults = true });
         builder.Logging.ClearProviders();
         using var loggerProvider = new WriterLoggerProvider(TextWriter.Synchronized(stderr));
@@ -39,6 +56,7 @@ public static class CliApplication
         builder.Services.AddSingleton(new SetupInvocation(args));
         builder.Services.AddSingleton<SetupTerminal>();
         builder.Services.AddSingleton<SetupCommandRunner>();
+        builder.Services.AddSingleton<HookCommandRunner>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -63,12 +81,36 @@ public static class CliApplication
             configuration.AddCommand<InstallCommand>("install");
             configuration.AddCommand<UninstallCommand>("uninstall");
             configuration.AddCommand<InstructionsCommand>("instructions");
+            configuration.AddBranch("hooks", hooks =>
+            {
+                hooks.AddCommand<HooksChooseCommand>("choose").WithDescription("Choose hooks to install");
+                hooks.AddCommand<HooksInstallCommand>("install").WithDescription("Install optional hooks");
+                hooks.AddCommand<HooksUninstallCommand>("uninstall").WithDescription("Remove harness hooks");
+                hooks.AddCommand<HooksStatusCommand>("status").WithDescription("Show installed hooks");
+                hooks.AddAsyncDelegate<HookEventSettings>("event", (_, _, _) => Task.FromResult(0)).WithDescription("Record one client tool event");
+                hooks.AddAsyncDelegate<HookEventSettings>("session", (_, _, _) => Task.FromResult(0)).WithDescription("Tell the agent this repository uses harness");
+            }).WithAlias("hook");
+            configuration.AddBranch("completion", completion =>
+            {
+                completion.AddCommand<CompletionStatusCommand>("status");
+                completion.AddCommand<CompletionInstallCommand>("install");
+                completion.AddCommand<CompletionUninstallCommand>("uninstall");
+                foreach (var shell in CompletionManager.Shells)
+                {
+                    var selected = shell;
+                    completion.AddAsyncDelegate<CommandSettings>(shell, async (_, _, _) =>
+                    {
+                        await stdout.WriteAsync(CompletionScripts.For(selected));
+                        return 0;
+                    }).WithDescription("Print the " + shell + " completion script");
+                }
+            });
             configuration.AddCommand<MetricsCommand>("metrics");
             configuration.AddCommand<ReportCommand>("report");
             configuration.AddBranch("context", context => context.AddCommand<ContextStatsCommand>("stats"));
             configuration.AddBranch("tasks", tasks =>
             {
-                tasks.AddCommand<TaskListCommand>("list");
+                tasks.AddCommand<TaskListCommand>("list").WithDescription("List tasks");
                 tasks.AddCommand<TaskMilestonesCommand>("milestones");
                 tasks.AddCommand<TaskShowCommand>("show");
                 tasks.AddCommand<TaskNextCommand>("next");
@@ -116,12 +158,16 @@ public static class CliApplication
                 projects.AddCommand<ProjectsRenameCommand>("rename");
             });
             configureCommands?.Invoke(configuration);
+            if (completing)
+            {
+                configuration.SetHelpProvider(new CompletionProvider(args[1..], stdout));
+            }
         });
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = await app.RunAsync(Normalize(args), cancellationToken);
+            var result = await app.RunAsync(completing ? ["--help"] : Normalize(args), cancellationToken);
             return result < 0 ? 2 : result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -148,6 +194,10 @@ public static class CliApplication
         }
 
         var normalized = NormalizeLegacyFlags(args);
+        if (normalized[0] is "hooks" or "hook" or "completion" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
+        {
+            normalized = [normalized[0], normalized[0] is "completion" ? "status" : "choose", .. normalized[1..]];
+        }
         if (normalized[0] is "workspace" or "workspaces" or "projects" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
         {
             normalized = [normalized[0], "list", .. normalized[1..]];
@@ -212,6 +262,8 @@ public static class CliApplication
                 "-depends" => "--depends",
                 "-accept" => "--accept",
                 "-scope" => "--scope",
+                "-kind" => "--kind",
+                "-shell" => "--shell",
                 "-lease" => "--lease",
                 "-summary" => "--summary",
                 "-commit" => "--commit",
@@ -221,7 +273,7 @@ public static class CliApplication
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
+            if (equals < 0 && replacement is "--kind" or "--shell" or "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
             {
                 index++; // A value is data, even when it resembles another option.
             }

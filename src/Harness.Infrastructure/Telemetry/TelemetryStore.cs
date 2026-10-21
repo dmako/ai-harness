@@ -94,6 +94,7 @@ public sealed partial class TelemetryStore(HarnessDatabase database, TimeProvide
         long last = 0;
         foreach (var path in paths)
         {
+            token.ThrowIfCancellationRequested();
             Execute(c, t, "INSERT INTO tool_events(at,client,session_id,worktree_id,tool,kind,mcp_server,mcp_tool,path) VALUES($at,$client,$session,$wt,$tool,$kind,$server,$mcp,$path)", ("$at", Stamp(e.At)), ("$client", e.Client), ("$session", e.Session), ("$wt", e.WorktreeId), ("$tool", e.Tool), ("$kind", e.Kind), ("$server", e.McpServer), ("$mcp", e.McpTool), ("$path", path));
             last = Identity(c, t);
         }

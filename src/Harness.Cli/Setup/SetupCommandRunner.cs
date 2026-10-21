@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Harness.Cli.Hooks;
 using Harness.Cli.Memory;
 using Harness.Core.Instructions;
 using Harness.Infrastructure.Clients;
@@ -8,7 +9,7 @@ using Harness.Infrastructure.Projects;
 
 namespace Harness.Cli.Setup;
 
-internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error, SetupInvocation invocation, SetupTerminal terminal)
+internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error, SetupInvocation invocation, SetupTerminal terminal, HookCommandRunner hooks)
 {
     private readonly ClientPaths _paths = ClientPaths.Current();
     private ClientConfiguration Clients => new(_paths);
@@ -270,6 +271,8 @@ internal sealed class SetupCommandRunner(ProjectLifecycle lifecycle, TextWriter 
             guidance.Add(new("Harness guidance", files.Length is 0 ? "AGENTS.md (new)" : string.Join(", ", files), installed, install => InstructionsAsync(new() { Project = root, Remove = !install }, token)));
         }
         steps.Add(new("Agent instructions", repository is null ? "not in a Git repository: run it inside one to add the guidance" : "a short harness section in AGENTS.md (or an existing CLAUDE.md)", guidance));
+        steps.Add(await hooks.HookStepAsync(directory, token));
+        steps.Add(await hooks.CompletionStepAsync(token));
         return await terminal.RunAsync(new SetupWizard(title, steps), output, token);
     }
 }

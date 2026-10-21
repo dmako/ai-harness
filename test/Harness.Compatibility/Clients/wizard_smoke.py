@@ -65,6 +65,10 @@ def main():
                     os.write(master, b" \r")
                     until("Agent instructions")
                     os.write(master, b"\r")
+                    until("Hooks")
+                    os.write(master, b"\r")
+                    until("Shell completion")
+                    os.write(master, b"\r")
                     until("Review")
                     # A review screen must not have applied the pending entry change.
                     installed = "harness" in json.loads(claude.read_text())["mcpServers"] if "mcpServers" in json.loads(claude.read_text()) else False

@@ -184,7 +184,7 @@ internal sealed class SetupFixture : IDisposable
     }
     public Task<(int Code, string Output, string Error)> CliAsync(params string[] args) => RunAsync([.. args, "--project", Repository.Root]);
     [SuppressMessage("Security", "S4036:Searching OS commands in PATH is security-sensitive", Justification = "Integration tests execute installed dotnet directly with ArgumentList and isolated client homes.")]
-    public async Task<(int Code, string Output, string Error)> RunAsync(string[] args)
+    public async Task<(int Code, string Output, string Error)> RunAsync(string[] args, string input = "", bool holdInput = false, bool debug = false)
     {
         var binary = Path.Combine(ProviderFixture.RepositoryRoot, "src", "Harness.Cli", "bin", Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name, "net10.0", "harness.dll");
         using var process = new Process { StartInfo = new("dotnet") { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = Repository.Root } };
@@ -204,8 +204,16 @@ internal sealed class SetupFixture : IDisposable
             process.StartInfo.Environment.Remove(key);
         }
 
+        process.StartInfo.Environment["HARNESS_HOOK_DEBUG"] = debug ? "1" : "";
         process.Start();
-        process.StandardInput.Close();
+        if (input.Length > 0)
+        {
+            await process.StandardInput.WriteAsync(input);
+        }
+        if (!holdInput)
+        {
+            process.StandardInput.Close();
+        }
         var token = TestContext.Current.CancellationToken;
         var stdout = process.StandardOutput.ReadToEndAsync(token);
         var stderr = process.StandardError.ReadToEndAsync(token);
