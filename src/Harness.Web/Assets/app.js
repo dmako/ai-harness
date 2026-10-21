@@ -3953,7 +3953,12 @@ async function applyLive() {
 }
 
 function connectLive() {
-  if (!window.EventSource) return;
+  let poll = 0;
+  const stopPolling = () => { clearInterval(poll); poll = 0; };
+  const startPolling = () => {
+    if (!poll) poll = setInterval(() => { if (!document.hidden) queueLive({ all: true }); }, 15000);
+  };
+  if (!window.EventSource) { startPolling(); return; }
   // While the stream is live, changes arrive by themselves and Refresh is
   // hidden; offline, the badge itself reloads the page's data.
   const badge = h("button", { class: "live off ghost", role: "status", onclick: () => { if (badge.classList.contains("off")) refresh(); } });
@@ -3967,6 +3972,7 @@ function connectLive() {
   function connect() {
     const es = new EventSource("/api/events");
     es.addEventListener("open", () => {
+      stopPolling();
       show(true, "● live", "Changes by agents, the CLI, hooks and sync show up here by themselves.");
       if (opened) queueLive({ all: true }); // whatever changed while disconnected
       opened = true;
@@ -3975,6 +3981,7 @@ function connectLive() {
       try { queueLive(JSON.parse(ev.data)); } catch { queueLive({ all: true }); }
     });
     es.addEventListener("error", () => {
+      startPolling();
       show(false, "○ offline — reload", "The live update stream dropped (it reconnects by itself); click to reload now.");
       // the browser retries a dropped stream itself, but not a refused one
       if (es.readyState === EventSource.CLOSED) { es.close(); setTimeout(connect, 15000); }

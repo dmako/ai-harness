@@ -26,7 +26,8 @@ public static class UiHost
         }
         return (uri.Host is "localhost" ? IPAddress.Loopback : IPAddress.Parse(uri.Host.Trim('[', ']')), port);
     }
-    public static WebApplication Create(string address, Func<IServiceProvider, IUiReadApi> api)
+    public static WebApplication Create(string address, Func<IServiceProvider, IUiReadApi> api,
+        Func<IServiceProvider, IUiWriteApi>? writes = null, Func<IUiChangeSource>? changes = null)
     {
         ArgumentNullException.ThrowIfNull(api);
         var (ip, port) = ParseAddress(address);
@@ -42,6 +43,10 @@ public static class UiHost
             options.Listen(ip, port);
         });
         builder.Services.AddScoped(api);
+        if (writes is not null)
+        { builder.Services.AddScoped(writes); }
+        if (changes is not null)
+        { builder.Services.AddSingleton(_ => new UiLiveHub(changes)); }
         var app = builder.Build();
         app.Use(async (context, next) =>
         {
@@ -85,6 +90,12 @@ public static class UiHost
             });
         }
         UiAssets.Map(app);
+        if (writes is not null)
+        { UiWrites.Map(app); }
+        if (changes is not null)
+        {
+            app.MapGet("/api/events", (HttpContext context, UiLiveHub hub) => hub.ServeAsync(context));
+        }
         app.MapMethods("/api/{**rest}", ["GET", "HEAD"], (HttpContext context) => ErrorAsync(context, 404, "unknown endpoint"));
         app.MapFallback((HttpContext context) => ErrorAsync(context, 404, "404 page not found"));
         return app;
@@ -96,6 +107,11 @@ public static class UiHost
     }
     private static Task ErrorAsync(HttpContext context, int status, string message)
     {
+        if (context.Response.HasStarted)
+        {
+            context.Abort();
+            return Task.CompletedTask;
+        }
         context.Response.StatusCode = status;
         return context.Response.WriteAsJsonAsync(new JsonObject { ["error"] = message }, context.RequestAborted);
     }

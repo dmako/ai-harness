@@ -2,6 +2,17 @@ namespace Harness.Web;
 
 public static class UiRoutes
 {
+    public static IReadOnlyList<string> Writes { get; } =
+    [
+        "/api/projects/{id}/memories/{mid}/supersede", "/api/projects/{id}/memories/{mid}/retire", "/api/projects/{id}/memories/{mid}/promote",
+        "/api/knowledge/memories", "/api/knowledge/memories/{mid}/supersede", "/api/knowledge/memories/{mid}/retire",
+        "/api/projects/{id}/proposals/{pid}/approve", "/api/projects/{id}/proposals/{pid}/reject",
+        "/api/projects/{id}/findings/{action}", "/api/workspaces/{name}/findings/{action}",
+        "/api/projects/{id}/tasks", "/api/projects/{id}/task-proposals/{pid}/approve", "/api/projects/{id}/task-proposals/{pid}/reject",
+        "/api/projects/{id}/arch-proposals/{pid}/approve", "/api/projects/{id}/arch-proposals/{pid}/reject",
+        "/api/graphify/sessions/{action}", "/api/workspaces", "/api/workspaces/{name}/join", "/api/workspaces/{name}/leave",
+        "/api/workspaces/{name}/delete", "/api/workspaces/{name}/rename", "/api/projects/{id}/rename",
+    ];
     public static IReadOnlyList<string> Reads { get; } =
     [
         "/api/projects", "/api/projects/{id}/summary", "/api/projects/{id}/snippet",

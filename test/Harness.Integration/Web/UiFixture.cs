@@ -30,7 +30,7 @@ internal sealed class UiFixture : IAsyncDisposable
             return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../src/Harness.Cli/bin", Configuration, "net10.0/harness.dll"));
         }
     }
-    public static async Task<UiFixture> StartAsync(SyncFixture fixture, string? oracle = null, string? address = "127.0.0.1:0")
+    public static async Task<UiFixture> StartAsync(SyncFixture fixture, string? oracle = null, string? address = "127.0.0.1:0", IReadOnlyDictionary<string, string>? environment = null)
     {
         var start = new ProcessStartInfo(oracle ?? "dotnet") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = fixture.DirectoryRoot };
         if (oracle is null)
@@ -46,6 +46,10 @@ internal sealed class UiFixture : IAsyncDisposable
         start.Environment["USERPROFILE"] = fixture.DirectoryRoot;
         start.Environment["CLAUDE_CONFIG_DIR"] = Path.Combine(fixture.DirectoryRoot, "claude");
         start.Environment["CODEX_HOME"] = Path.Combine(fixture.DirectoryRoot, "codex");
+        foreach (var (key, value) in environment ?? new Dictionary<string, string>())
+        {
+            start.Environment[key] = value;
+        }
         var process = Process.Start(start)!;
         var errors = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
         try

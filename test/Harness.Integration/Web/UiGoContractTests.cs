@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using Harness.Core.Memory;
@@ -57,6 +58,22 @@ public sealed class UiGoContractTests
         {
             var expected = await source.Client.GetByteArrayAsync(asset, Token);
             var actual = await target.Client.GetByteArrayAsync(asset, Token);
+            if (asset is "/app.js")
+            {
+                // PORT-028 adds offline polling; all review screens remain frozen.
+                var script = Encoding.UTF8.GetString(actual);
+                var newline = script.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+                script = script.Replace(string.Join(newline,
+                    "  let poll = 0;",
+                    "  const stopPolling = () => { clearInterval(poll); poll = 0; };",
+                    "  const startPolling = () => {",
+                    "    if (!poll) poll = setInterval(() => { if (!document.hidden) queueLive({ all: true }); }, 15000);",
+                    "  };",
+                    "  if (!window.EventSource) { startPolling(); return; }"), "  if (!window.EventSource) return;", StringComparison.Ordinal)
+                    .Replace("      stopPolling();" + newline, "", StringComparison.Ordinal)
+                    .Replace("      startPolling();" + newline, "", StringComparison.Ordinal);
+                actual = Encoding.UTF8.GetBytes(script);
+            }
             actual.Should().Equal(expected, asset);
         }
         var documentation = await UiTests.ReadAsync(source.Client, "/api/docs");

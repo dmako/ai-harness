@@ -11,6 +11,7 @@ internal sealed class UiProjectCatalog(ProjectLifecycle lifecycle) : IDisposable
     private sealed record Snapshot(string Key, DateTimeOffset At, IReadOnlyList<JsonObject> Projects);
     private readonly SemaphoreSlim _gate = new(1);
     private Snapshot? _snapshot;
+    public void Forget() => _snapshot = null;
     private WorkspaceStore Workspaces => new(lifecycle.GlobalConfigurationPath, lifecycle.Registry);
     private string Key()
     {

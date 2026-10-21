@@ -29,7 +29,8 @@ internal sealed class UiCommand(ProjectLifecycle lifecycle, UiProjectCatalog cat
 {
     public override async Task<int> ExecuteAsync(CommandContext context, UiSettings settings, CancellationToken cancellationToken)
     {
-        await using var app = UiHost.Create(settings.Address, _ => new UiReadService(lifecycle, catalog, sessions));
+        await using var app = UiHost.Create(settings.Address, _ => new UiReadService(lifecycle, catalog, sessions),
+            _ => new UiReadService(lifecycle, catalog, sessions), () => new UiChangeSource(lifecycle, catalog));
         await app.StartAsync(cancellationToken);
         var address = UiHost.Address(app);
         await output.WriteLineAsync("harness ui on " + address + " (Ctrl-C to stop)");

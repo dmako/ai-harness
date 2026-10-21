@@ -67,6 +67,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Client setup](client-setup.md) | PORT-025 safe MCP configuration edits, marked guidance, terminal setup and guarded uninstall |
 | [Hooks and completion](hooks-and-completion.md) | PORT-026 Git/client hooks, bounded metadata ingestion, dynamic shell completion and setup integration |
 | [Embedded UI](embedded-ui.md) | PORT-027 loopback read APIs, frozen embedded assets/docs, lazy provider views, request caches and default port 17477 |
+| [UI writes and live updates](ui-writes-and-live.md) | PORT-028 protected author operations, review workflows, bounded SSE, cross-process changes and offline polling |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

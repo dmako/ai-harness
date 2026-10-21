@@ -1,0 +1,128 @@
+{
+  "task": "TASK-0028",
+  "base_commit": "ca6fbac64715ee388b4661bc56900c0b29fcbf6c",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "generated_at": "2026-10-21T22:38:58.331209+00:00",
+  "default_address": "127.0.0.1:17477",
+  "tests": {
+    "windows_full": {
+      "total": 795,
+      "passed": 790,
+      "failed": 0,
+      "notExecuted": 5
+    },
+    "windows_final_web": {
+      "total": 37,
+      "passed": 37,
+      "failed": 0,
+      "notExecuted": 0
+    },
+    "windows_browser_and_web": {
+      "Passed": 37
+    },
+    "linux_final_web": {
+      "total": 37,
+      "passed": 36,
+      "failed": 0,
+      "notExecuted": 1
+    }
+  },
+  "validation_order": "The full regression run preceded the final field-type and session-error-envelope fixes; the final Windows and Linux Web suites cover those fixes and their two additional regression tests.",
+  "browser": {
+    "engine": "installed headless Chrome",
+    "memory_conflict_choice": "pass",
+    "task_confirmation_and_edit": "pass",
+    "sse_refresh": "pass",
+    "blocked_sse_polling": "pass",
+    "return_to_live": "pass"
+  },
+  "published_writes_smoke": {
+    "result": "pass",
+    "executable_sha256": "76620ef632e3b5ff08f47ca5cd3cb7e831222464eef2acab7f6cb67c79440efd",
+    "empty_path": true,
+    "empty_working_directory": true,
+    "foreign_origin": "pass",
+    "memory_create_correct_retire": "pass",
+    "human_audit": "pass",
+    "workspace_create_rename_delete": "pass",
+    "sse": "pass"
+  },
+  "published_read_smoke": {
+    "result": "pass",
+    "executable_sha256": "76620ef632e3b5ff08f47ca5cd3cb7e831222464eef2acab7f6cb67c79440efd",
+    "default_address": "127.0.0.1:17477",
+    "empty_path": true,
+    "empty_working_directory": true,
+    "external_resources": [],
+    "head": "pass",
+    "host_guard": "pass",
+    "traversal_guard": "pass",
+    "assets": {
+      "/brand.css": "e2e3dfd46e44a92580da6a015616054e297d73e324e1c757a1f186d933e91e12",
+      "app.js": "4338a1a5ed21323e7ee3f43d1b6e12366ba516ee293bd16065eae51af8000581",
+      "/style.css": "1e026f4d3a10a8ca19af680d3ba7209aeba29d2cce54322a8f58d16a451c5761",
+      "/apple-touch-icon.png": "928b3ca9ea6b83e55b93b319e2b62bcd598eec42d402f961c51bf28b212cb833",
+      "/app.js": "4338a1a5ed21323e7ee3f43d1b6e12366ba516ee293bd16065eae51af8000581",
+      "brand.css": "e2e3dfd46e44a92580da6a015616054e297d73e324e1c757a1f186d933e91e12",
+      "favicon.png": "928b3ca9ea6b83e55b93b319e2b62bcd598eec42d402f961c51bf28b212cb833",
+      "logo.svg": "125f047d1d01c9c8c3ff0da175873e649a1bf9cc6b1dfc7ad70d5f32d9f0a7e2",
+      "/favicon.png": "928b3ca9ea6b83e55b93b319e2b62bcd598eec42d402f961c51bf28b212cb833",
+      "/logo.svg": "125f047d1d01c9c8c3ff0da175873e649a1bf9cc6b1dfc7ad70d5f32d9f0a7e2",
+      "apple-touch-icon.png": "928b3ca9ea6b83e55b93b319e2b62bcd598eec42d402f961c51bf28b212cb833",
+      "style.css": "1e026f4d3a10a8ca19af680d3ba7209aeba29d2cce54322a8f58d16a451c5761"
+    }
+  },
+  "intentional_differences": [
+    "Strict JSON writes reject non-object, trailing, invalid UTF-8 and repeated-field bodies.",
+    "Frontend polls every fifteen seconds while SSE is unavailable; existing review forms are preserved.",
+    "The listener retains the user-requested default port 17477."
+  ],
+  "limits": [
+    "Linux browser review is skipped when HARNESS_UI_BROWSER is not supplied; Windows runs the actual browser flow.",
+    "Like frozen Go, live SQLite watches cover registered project databases."
+  ],
+  "source_sha256_lf": {
+    "doc/port/README.md": "aed816a280cc59dd88a60e318cc765d3c973da0c74e32d84a4566c70f6f2fcf6",
+    "doc/port/ui-writes-and-live.md": "3217b5ba5955bcfb294f4f26510afd934c110651ed24ce59ecdee8e3e2d7af39",
+    "src/Harness.Cli/Ui/UiChangeSource.cs": "e4c785bd9026cc34fcac00a30047a483414d63b718cc6529c31b8727ad7c676d",
+    "src/Harness.Cli/Ui/UiCommand.cs": "8cd494d92dbad5b85ffe1599c140120b3c39951d0201da88381cca26e9739e7f",
+    "src/Harness.Cli/Ui/UiProjectCatalog.cs": "9254876db7b99a3cec8e084c9e74eafaa54d609ea3caa9e82c5b867150cf056d",
+    "src/Harness.Cli/Ui/UiReadService.Reviews.cs": "e3fb06f6d0a8385646e93201e6238269f085f56bbeca701598b16db083b39c25",
+    "src/Harness.Cli/Ui/UiReadService.Writes.cs": "ef706483a7e6a765549e8a73078414948160129be24fe2af13512cb9050ad437",
+    "src/Harness.Cli/Ui/UiReadService.cs": "1a5789d5b1ac49f6d8e0b7324709df014ae83a68bce914ddb9a85bb835b701bb",
+    "src/Harness.Cli/Ui/UiSessions.cs": "1142099f8b42c103e24a1f351df74c1a0d8554987a629720675379fdefdd7f4d",
+    "src/Harness.Cli/Ui/UiWriteBody.cs": "0f38300d224bf4f49a7bdd1a436c7db0dd6b437c6ef0bddda9decd640b5031ce",
+    "src/Harness.Core/Web/UiWriteApi.cs": "201de1504ffac37e0f7b31ab11bc2dfe73a917de66e2fd160fbacc0a95957127",
+    "src/Harness.Web/Assets/app.js": "495f2bf009f757eb8e0ee50b561cb773c1467ba450beb2a3a7c023d6980a039c",
+    "src/Harness.Web/UiHost.cs": "620eaa4a226405af0c3f19b5eca47b56daf80cec309bc279330e28b78b6d1fa6",
+    "src/Harness.Web/UiLiveHub.cs": "dc12de3edd873486fa1f30ee978046cb742b1977745d66894aac0246909c6ee2",
+    "src/Harness.Web/UiRoutes.cs": "4c3c4e062cb053fdfcf4999622f96608c1479539ab8d54b46a7c95856a38d086",
+    "src/Harness.Web/UiWrites.cs": "79bc7c72616e9b22c9f538024653a8e1dac750cacab7ac7a39f2b95bbf0309a7",
+    "test/Harness.Compatibility/Web/publish_writes_smoke.py": "708d0fc434be2358e84ed93044bca0155353f2b78d95e64b9f40d28b369b624e",
+    "test/Harness.Compatibility/Web/record_write_validation.py": "d1a6f58a6df85c788d8694a5f3fe2bfe2cd2b1cf6d206228cffb36cc10408521",
+    "test/Harness.Integration/Web/UiBrowserTests.cs": "3d31780a64e5ee0f70022c0f6eebfab9a83daf6794781c32f3e6c346699e5589",
+    "test/Harness.Integration/Web/UiFixture.cs": "075188b6d3c1f460db50933c19a9657b10bdddc146f65ddc81d06f05b86041e8",
+    "test/Harness.Integration/Web/UiGoContractTests.cs": "a9165e3f437c181761231e6d93b1128facd991f66c2ede721c7d3c9b20feb709",
+    "test/Harness.Integration/Web/UiGraphifyTests.cs": "6bf664abc67f9a82579cce1325e8926d351d9f525f1d264ebc99609ea8ff279d",
+    "test/Harness.Integration/Web/UiLiveLifecycleTests.cs": "2d27a0c56931cc220a30e78d6f1f80a7d777bd826625e2f6b53eb03e4138cfa7",
+    "test/Harness.Integration/Web/UiLiveTests.cs": "1ea0c0ab9310c15cdfc2b3e37091880d8f879ef68908df47ed4332530c6bf91e",
+    "test/Harness.Integration/Web/UiWriteGoContractTests.cs": "b165839bc1228cba73138f69853e5102369b09f4c2477ac49a9fa86adf448510",
+    "test/Harness.Integration/Web/UiWriteTests.cs": "d3149287bdcf6db18a7dea55afda3beea6246077a9224284c131cdc34d3d9892"
+  },
+  "embedded_asset_sha256": {
+    "src/Harness.Web/Assets/app.js": "4338a1a5ed21323e7ee3f43d1b6e12366ba516ee293bd16065eae51af8000581",
+    "src/Harness.Web/Assets/brand.css": "e2e3dfd46e44a92580da6a015616054e297d73e324e1c757a1f186d933e91e12",
+    "src/Harness.Web/Assets/index.html": "4d2911c418311ad83114531730f3cd3931fc974704ea4cf4602696f5c3382244",
+    "src/Harness.Web/Assets/logo.png": "928b3ca9ea6b83e55b93b319e2b62bcd598eec42d402f961c51bf28b212cb833",
+    "src/Harness.Web/Assets/logo.svg": "125f047d1d01c9c8c3ff0da175873e649a1bf9cc6b1dfc7ad70d5f32d9f0a7e2",
+    "src/Harness.Web/Assets/style.css": "1e026f4d3a10a8ca19af680d3ba7209aeba29d2cce54322a8f58d16a451c5761"
+  },
+  "artifacts_sha256": {
+    "artifacts/ui-writes-publish-smoke.json": "1670a0e50c31e791139229cc26291b4dd37879efe777b27f326ab604952bf6b0",
+    "artifacts/ui-writes-publish-read-smoke.json": "adc63501db70be25f3ceb36b9d1b15d2d66121b2fa87c26f36f2bd1e69a10501",
+    "artifacts/ui-writes-full-01/Harness.Integration_net10.0_x64.trx": "25d3bc9864832adc8c88d98331e08ada1c135a88bdf9a68a61fdf8ec03803ea4",
+    "artifacts/ui-writes-full-01/Harness.Unit_net10.0_x64.trx": "1ae781c7d5d745f268611eb026e1f2f6173b3fb99095dc6cbecb963239c75395",
+    "artifacts/ui-writes-windows-final/Harness.Integration_net10.0_x64.trx": "3f4014cc98fdc8bb4f764f919f5100b45edd744648f070f693c6804b5dadd347",
+    "artifacts/ui-writes-linux-final/Harness.Integration_net10.0_x64.trx": "cf31cc156bfc10184d3ea8c7514aabd44498fa5873665b18648845f6d51e2e64"
+  }
+}

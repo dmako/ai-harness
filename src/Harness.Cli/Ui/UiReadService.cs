@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+using Harness.Core.Findings;
 using Harness.Core.Web;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
@@ -11,7 +14,23 @@ namespace Harness.Cli.Ui;
 
 internal static class UiJson
 {
-    internal static readonly JsonSerializerOptions Options = new(Harness.Core.Telemetry.TelemetryJson.Options) { WriteIndented = false };
+    internal static readonly JsonSerializerOptions Options = Create();
+    private static JsonSerializerOptions Create()
+    {
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(info =>
+        {
+            if (info.Type != typeof(FindingMark) && info.Type != typeof(FindingProposal) && info.Type != typeof(FindingSnapshot))
+            { return; }
+            // These models retain Go zero values in storage; the HTTP views use omitempty.
+            foreach (var property in info.Properties.Where(p => p.PropertyType == typeof(string) &&
+                p.AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreAttribute), true).OfType<JsonIgnoreAttribute>().Any(a => a.Condition is JsonIgnoreCondition.WhenWritingNull) is true))
+            {
+                property.ShouldSerialize = (_, value) => value is string { Length: > 0 };
+            }
+        });
+        return new(Harness.Core.Telemetry.TelemetryJson.Options) { WriteIndented = false, TypeInfoResolver = resolver };
+    }
     internal static JsonNode? Node(object? value) => value is JsonNode node ? node.DeepClone() : JsonSerializer.SerializeToNode(value, Options);
 }
 internal sealed partial class UiReadService(ProjectLifecycle lifecycle, UiProjectCatalog catalog, UiSessions sessions) : IUiReadApi
