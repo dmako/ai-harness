@@ -61,6 +61,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Machine workspaces](workspaces.md) | PORT-019 atomic membership, project management, layered cross-project search/impact/context and read-only peer state |
 | [Workspace comparisons](workspace-evidence.md) | PORT-020 library adoption, similar concerns, shared manifest/build/stack readers and workspace version comparisons |
 | [Architecture readers](architecture-readers.md) | PORT-021 dependency findings, boundary knowledge rules, workspace communication evidence, provider coverage and bounded snippets |
+| [Clones and co-change](clones-and-cochange.md) | PORT-022 canonical/shape comparisons, provider duplicate filtering, repeated statements, workspace copies, Git history and change_coupling MCP |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

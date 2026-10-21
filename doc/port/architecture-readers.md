@@ -46,7 +46,7 @@ Wider knowledge is opened read-only and is never created by an analysis read.
 discovery and adapts successful `arch.cycles` responses. Healthy empty responses
 remain distinct from unavailable or failed providers. As in Go, there is no
 compiler-level dead-code reader: only unused project/package evidence. Duplicate
-and co-change generation belongs to TASK-0022. Finding storage, sync integration,
+and co-change generation is implemented by [TASK-0022](clones-and-cochange.md). Finding storage, sync integration,
 drift, marks/proposals and public architecture MCP tools belong to TASK-0023.
 
 ## Evidence and request cost
@@ -55,8 +55,8 @@ drift, marks/proposals and public architecture MCP tools belong to TASK-0023.
 2 MiB text files, lists folders with directories first, preserves span focus and
 refuses absolute/outside/symlink-escape paths. A containing-function resolver
 can supply the clone reader's function range; without one the reader shows five
-lines around the evidence, or twenty opening lines. TASK-0022 supplies function
-extraction rather than duplicating that parser here. Non-file evidence such as
+lines around the evidence, or twenty opening lines. [TASK-0022](clones-and-cochange.md) supplies function extraction, which is used
+by default when no resolver is supplied. Non-file evidence such as
 memory IDs and communication arrows does not become a file path.
 
 `ArchitectureReader` shares repository/build reads across project and system

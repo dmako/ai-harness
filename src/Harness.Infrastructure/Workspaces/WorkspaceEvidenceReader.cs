@@ -8,7 +8,7 @@ namespace Harness.Infrastructure.Workspaces;
 /// <summary>One comparison request shares repository lists, text and manifest evaluations across all passes.</summary>
 public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMember> members)
 {
-    private static readonly HashSet<string> GenericNames = new("Program Startup Constants Extensions Options Settings Helper Helpers Utils Module Plugin Configuration Config Client Service Error Errors Result Context Handler Mapper Mapping Model Models Request Response Main Test Tests Fixture New String".Split(' '), StringComparer.Ordinal);
+    internal static readonly HashSet<string> GenericNames = new("Program Startup Constants Extensions Options Settings Helper Helpers Utils Module Plugin Configuration Config Client Service Error Errors Result Context Handler Mapper Mapping Model Models Request Response Main Test Tests Fixture New String".Split(' '), StringComparer.Ordinal);
     private readonly Dictionary<string, (AnalysisRepository Repository, EcosystemReader Ecosystem)> _repositories = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<DeclaredType>> _declarations = new(StringComparer.Ordinal);
     public async Task<(AnalysisRepository Repository, EcosystemReader Ecosystem)> RepositoryAsync(WorkspaceMember member, CancellationToken token)

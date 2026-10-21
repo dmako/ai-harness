@@ -1,0 +1,190 @@
+{
+  "description": "Files that change together, from the Git history. file: its partners (commits shared, share of its commits; from providers offering arch.change_coupling). check: the usual partners (3+ shared commits, half or more of the commits of a file with 5+) of the changed files that the change leaves out — run it before you finish a change; files: the change (default: the uncommitted changes). Neither: the hotspots, the code files that changed most in the last 180 days, with their usual partners. A reminder of what usually changes too, never a rule: decide from the code whether it needs changing.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "file": {
+        "type": "string",
+        "description": "a file (path from the project root): its co-change partners"
+      },
+      "check": {
+        "type": "boolean",
+        "description": "check a change for usual partners it leaves out"
+      },
+      "files": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "with check: the changed files (default: the uncommitted changes)"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "partners or hotspots to list (default 10)"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "change_coupling",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "partners": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "together": {
+              "type": "integer"
+            },
+            "share": {
+              "type": "number"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "tool": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "together",
+            "share",
+            "provider",
+            "tool"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "hotspots": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "commits": {
+              "type": "integer"
+            },
+            "partners": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "together": {
+                    "type": "integer"
+                  },
+                  "share": {
+                    "type": "number"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "tool": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "together",
+                  "share",
+                  "provider",
+                  "tool"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "path",
+            "commits"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "commits": {
+        "type": "integer"
+      },
+      "changed": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "missing": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "changed": {
+              "type": "string"
+            },
+            "partner": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "together": {
+                  "type": "integer"
+                },
+                "share": {
+                  "type": "number"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "tool": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "together",
+                "share",
+                "provider",
+                "tool"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "changed",
+            "partner"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  }
+}

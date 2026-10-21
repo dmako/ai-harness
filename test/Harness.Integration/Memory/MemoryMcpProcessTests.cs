@@ -20,7 +20,7 @@ public sealed class MemoryMcpProcessTests
             await using var claude = await StartAsync(root, "claude-code");
             await using var codex = await StartAsync(root, "codex");
             var tools = await claude.ListToolsAsync(cancellationToken: Token);
-            tools.Count.Should().Be(27);
+            tools.Count.Should().Be(28);
             var created = await Call(claude, "memory_put", new { type = "decision", content = "Use JSON for task import", scope = "path:src/tasks", source_ref = "TASK-0009 review", confidence = (double?)null });
             var old = created.GetProperty("memory").GetProperty("id").GetString()!;
             created.GetProperty("memory").GetProperty("recorded_by").GetString().Should().Be("claude-code fixture");

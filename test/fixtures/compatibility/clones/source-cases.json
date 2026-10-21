@@ -1,0 +1,152 @@
+{
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "cases": [
+    {
+      "files": {
+        "a/a.go": "package a\n\nfunc short(id string) string {\n\tif len(id) > 12 {\n\t\treturn id[:12]\n\t}\n\treturn id\n}\n\ntype T struct{ n string }\n\nfunc (t T) Name() string { return t.n }\n",
+        "b/b.go": "package b\n\n// a comment is no difference\nfunc shortID(c string) string {\n\tif len(c) > 12 { return c[:12] }\n\treturn c\n}\n\ntype U struct{ n string }\n\nfunc (u U) Name() string { return u.n }\n",
+        "b/b_test.go": "package b\n\nfunc short(x string) string {\n\tif len(x) > 12 {\n\t\treturn x[:12]\n\t}\n\treturn x\n}\n"
+      },
+      "name": "TestIdenticalAcrossPackages:1"
+    },
+    {
+      "files": {
+        "memory/s.go": "package memory\n\ntype Store struct{ db, name string }\n\nconst tsFormat = \"2006-01-02\"\n\nfunc NewStore(db string) *Store {\n\treturn &Store{db: db, name: db + \"/\" + db}\n}\n\nfunc stamp(s string) string {\n\tif s == \"\" {\n\t\treturn tsFormat\n\t}\n\treturn s + tsFormat\n}\n",
+        "tasks/s.go": "package tasks\n\ntype Store struct{ db, name string }\n\nconst tsFormat = \"2006-01-02\"\n\nfunc NewStore(db string) *Store {\n\treturn &Store{db: db, name: db + \"/\" + db}\n}\n\nfunc stamp(s string) string {\n\tif s == \"\" {\n\t\treturn tsFormat\n\t}\n\treturn s + tsFormat\n}\n"
+      },
+      "name": "TestPackageTypes:1"
+    },
+    {
+      "files": {
+        "Contracts/Svc.cs": "class ContractService {\n\tpublic async Task<ContractResponse> GetContractAsync(Guid id, CancellationToken ct)\n\t{\n\t\tusing var activity = Source.StartActivity(\"GetContract\");\n\t\tvar item = await _contractRepository.GetByIdAsync(id, ct);\n\t\tif (item is null)\n\t\t{\n\t\t\tthrow new NotFoundException(nameof(Contract), id);\n\t\t}\n\t\treturn item.ToResponse();\n\t}\n}",
+        "Links/Service.cs": "class LinkService {\n\tpublic async Task<LinkResponse> GetLinkAsync(Guid id, CancellationToken ct)\n\t{\n\t\tusing var activity = Source.StartActivity(\"GetLink\");\n\t\tvar item = await _linkRepository.GetByIdAsync(id, ct);\n\t\tif (item is null)\n\t\t{\n\t\t\tthrow new NotFoundException(nameof(Link), id);\n\t\t}\n\t\treturn item.ToResponse();\n\t}\n}",
+        "system/lines.go": "package system\n\nfunc forLines(root, f string, fn func(n int, l string)) {\n\th, err := os.Open(filepath.Join(root, filepath.FromSlash(f)))\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer h.Close()\n\tsc := bufio.NewScanner(h)\n\tsc.Buffer(make([]byte, 64*1024), 1024*1024)\n\tfor n := 1; sc.Scan(); n++ {\n\t\tfn(n, sc.Text())\n\t}\n}\n",
+        "web/app.ts": "export const load = async (p) => {\n  const r = await fetch(`/api/${p.id}/a`);\n  if (!r.ok) { throw new Error(\"load failed\"); }\n  const body = await r.json();\n  render(body.items, p.id);\n  return body.items.length;\n};\n",
+        "web/generated.g.ts": "export const x = 1;\n",
+        "web/other.ts": "export const reload = async (q) => {\n  const r = await fetch(`/api/${q.id}/b`);\n  if (!r.ok) { throw new Error(\"reload failed\"); }\n  const body = await r.json();\n  render(body.items, q.id);\n  return body.items.length;\n};\n",
+        "wsearch/lines.go": "package wsearch\n\nfunc forEachLine(root, f string, fn func(n int, l string)) {\n\th, err := os.Open(filepath.Join(root, filepath.FromSlash(f)))\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer h.Close()\n\tsc := bufio.NewScanner(h)\n\tsc.Buffer(make([]byte, 64<<10), 1024*1024)\n\tfor n := 1; sc.Scan(); n++ {\n\t\tfn(n, sc.Text())\n\t}\n}\n"
+      },
+      "name": "TestNearAndTemplate:1"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc GetForJobs(ctx context.Context, ids []string, from, to time.Time) ([]Item, error) {\n\tspan := trace.Start(ctx, \"query\")\n\tdefer span.End()\n\tspan.Tag(\"count\", len(ids))\n\tspan.Tag(\"window\", !from.IsZero() || !to.IsZero())\n\titems, err := repo.ByJobIDs(ctx, ids, from, to)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tspan.Tag(\"result\", len(items))\n\treturn items, nil\n}\n"
+      },
+      "name": "TestTemplateRule:1"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc GetForOrders(ctx context.Context, ids []string, from, to time.Time) ([]Item, error) {\n\tspan := trace.Start(ctx, \"query\")\n\tdefer span.End()\n\tspan.Tag(\"count\", len(ids))\n\tspan.Tag(\"window\", !from.IsZero() || !to.IsZero())\n\titems, err := repo.ByOrderIDs(ctx, ids, from, to)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tspan.Tag(\"result\", len(items))\n\treturn items, nil\n}\n"
+      },
+      "name": "TestTemplateRule:2"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc findA(content string) (int, int, error) {\n\tstart := strings.Index(content, beginMarker)\n\tif start < 0 {\n\t\treturn -1, -1, nil\n\t}\n\tend := strings.Index(content[start:], endMarker)\n\tif end < 0 || strings.Count(content, beginMarker) > 1 {\n\t\treturn 0, 0, ErrMarkers\n\t}\n\treturn start, start + end + len(endMarker), nil\n}\n"
+      },
+      "name": "TestTemplateRule:3"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc findB(content string) (int, int, error) {\n\tstart := strings.Index(content, beginPrefix)\n\tif start < 0 {\n\t\treturn -1, -1, nil\n\t}\n\tend := strings.Index(content[start:], endMarker)\n\tif end < 0 || strings.Count(content, beginPrefix) > 1 {\n\t\treturn 0, 0, ErrMarkers\n\t}\n\treturn start, start + end + len(endMarker), nil\n}\n"
+      },
+      "name": "TestTemplateRule:4"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc a(ctx context.Context, ids []string, from, to time.Time) ([]Item, error) {\n\tspan := trace.Start(ctx, \"query\")\n\tdefer span.End()\n\tspan.Tag(\"count\", len(ids))\n\tspan.Tag(\"window\", !from.IsZero() || !to.IsZero())\n\titems, err := repo.Get(ctx, ids, from, to)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tspan.Tag(\"result\", len(items))\n\treturn items, nil\n}\n"
+      },
+      "name": "TestTemplateRule:5"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc b(ctx context.Context, ids []string, from, to time.Time) ([]Item, error) {\n\tspan := trace.Start(ctx, \"lookup\")\n\tdefer span.End()\n\tspan.Tag(\"count\", len(ids))\n\tspan.Tag(\"window\", !from.IsZero() || !to.IsZero())\n\titems, err := repo.Get(ctx, ids, from, to)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tspan.Tag(\"result\", len(items))\n\treturn items, nil\n}\n"
+      },
+      "name": "TestTemplateRule:6"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc paths(ctx context.Context, db *sql.DB, id string) ([]string, error) {\n\trows, err := db.QueryContext(ctx, \"SELECT path FROM files WHERE id = ?\", id)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tdefer rows.Close()\n\tout := []string{}\n\tfor rows.Next() {\n\t\tvar p string\n\t\tif err := rows.Scan(&p); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tout = append(out, p)\n\t}\n\treturn out, rows.Err()\n}\n"
+      },
+      "name": "TestTemplateRule:7"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc set(ctx context.Context, db *sql.DB, id string) (map[string]bool, error) {\n\trows, err := db.QueryContext(ctx, \"SELECT path FROM files WHERE id = ?\", id)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tdefer rows.Close()\n\tout := map[string]bool{}\n\tfor rows.Next() {\n\t\tvar p string\n\t\tif err := rows.Scan(&p); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tout[p] = true\n\t}\n\treturn out, rows.Err()\n}\n"
+      },
+      "name": "TestTemplateRule:8"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc forLines(root, f string, fn func(n int, l string)) {\n\th, err := os.Open(filepath.Join(root, filepath.FromSlash(f)))\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer h.Close()\n\tsc := bufio.NewScanner(h)\n\tfor n := 1; sc.Scan(); n++ {\n\t\tfn(n, sc.Text())\n\t}\n}\n"
+      },
+      "name": "TestTemplateRule:9"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc forEachLine(root, f string, fn func(n int, line string)) {\n\th, err := os.Open(filepath.Join(root, filepath.FromSlash(f)))\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer h.Close()\n\tsc := bufio.NewScanner(h)\n\tfor n := 1; sc.Scan(); n++ {\n\t\tfn(n, sc.Text())\n\t}\n}\n"
+      },
+      "name": "TestTemplateRule:10"
+    },
+    {
+      "files": {
+        "A.cs": "class A {\n\tpublic async Task<Link> GetLinkAsync(Guid id)\n\t{\n\t\tusing var activity = activitySource.StartActivity();\n\t\tactivity?.SetTag(\"id\", id);\n\t\tEntityGuards.ThrowIfEmptyId(id);\n\t\tvar item = await linkRepository.GetByIdAsync(id);\n\t\treturn EntityGuards.ThrowIfNotFound(item, id);\n\t}\n}",
+        "B.cs": "class B {\n\tpublic async Task<Order> GetOrderAsync(Guid id)\n\t{\n\t\tusing var activity = activitySource.StartActivity();\n\t\tactivity?.SetTag(\"id\", id);\n\t\tEntityGuards.ThrowIfEmptyId(id);\n\t\tvar item = await orderRepository.GetByIdAsync(id);\n\t\treturn EntityGuards.ThrowIfNotFound(item, id);\n\t}\n}",
+        "C.cs": "class C {\n\tpublic async Task<Contract> GetContractAsync(Guid id)\n\t{\n\t\tusing var activity = activitySource.StartActivity();\n\t\tactivity?.SetTag(\"id\", id);\n\t\tEntityGuards.ThrowIfEmptyId(id);\n\t\tvar item = await contractRepository.GetByIdAsync(id);\n\t\treturn EntityGuards.ThrowIfNotFound(item, id);\n\t}\n}"
+      },
+      "name": "TestTemplates:1"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc parens(s string) string {\n\tvar b strings.Builder\n\tdepth := 0\n\tfor _, c := range s {\n\t\tswitch {\n\t\tcase c == '(':\n\t\t\tdepth++\n\t\tcase c == ')':\n\t\t\tdepth--\n\t\tcase depth > 0:\n\t\t\tb.WriteRune(c)\n\t\t}\n\t}\n\treturn b.String()\n}\n"
+      },
+      "name": "TestOtherLogicAndStd:1"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nfunc stripParens(s string) string {\n\tvar b strings.Builder\n\tdepth := 0\n\tfor _, c := range s {\n\t\tswitch {\n\t\tcase c == '(':\n\t\t\tdepth++\n\t\tcase c == ')':\n\t\t\tdepth--\n\t\tcase depth == 0:\n\t\t\tb.WriteRune(c)\n\t\t}\n\t}\n\treturn b.String()\n}\n"
+      },
+      "name": "TestOtherLogicAndStd:2"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\nfunc firstNonEmpty(xs ...string) string {\n\tfor _, x := range xs {\n\t\tif x != \"\" {\n\t\t\treturn x\n\t\t}\n\t}\n\treturn \"\"\n}\n"
+      },
+      "name": "TestOtherLogicAndStd:3"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nimport \"strings\"\n\nfunc firstLine(s string) string {\n\tline, _, _ := strings.Cut(s, \"\\n\")\n\treturn line\n}\n"
+      },
+      "name": "TestOtherLogicAndStd:4"
+    },
+    {
+      "files": {
+        "cli/install.go": "package cli\n\nimport \"x/clients\"\n\nfunc trust(client string) bool {\n\tif client == clients.Codex {\n\t\treturn true\n\t}\n\treturn false\n}\n",
+        "clients/clients.go": "package clients\n\nconst (\n\tClaudeCode = \"claude-code\"\n\tCodex      = \"codex\"\n)\n\nfunc DetectClaude(root string) string { return root + \"/.mcp.json\" }\nfunc DetectCodex(root string) string  { return root + \"/.codex/config.toml\" }\nfunc claudeEntry(cmd string) map[string]any { return map[string]any{\"type\": \"stdio\", \"command\": cmd} }\nfunc codexEntry(cmd string) map[string]any  { return map[string]any{\"command\": cmd} }\n",
+        "clients/hooks.go": "package clients\n\nfunc hookPath(client, scope string) string {\n\tswitch client + \"/\" + scope {\n\tcase ClaudeCode + \"/user\":\n\t\treturn \"~/.claude/settings.json\"\n\tcase Codex + \"/user\":\n\t\treturn \"~/.codex/hooks.json\"\n\t}\n\treturn \"\"\n}\n",
+        "store/store.go": "package store\n\nfunc memoryDetail(id string) string { return \"m\" + id }\nfunc taskDetail(id string) string   { return \"t\" + id }\nfunc memoryFlags() []string         { return nil }\nfunc taskFlags() []string           { return nil }\n"
+      },
+      "name": "TestContracts:1"
+    },
+    {
+      "files": {
+        "cli/cli.go": "package cli\n\nimport (\n\t\"encoding/json\"\n\t\"io\"\n\t\"os\"\n)\n\nfunc flags0(stdout io.Writer, asJSON bool, v any) int {\n\tn := \"flag0\"\n\tif asJSON {\n\t\te := json.NewEncoder(stdout)\n\t\te.SetIndent(\"\", \"  \")\n\t\te.Encode(v)\n\t\treturn n\n\t}\n\treturn len(n)\n}\n\nfunc guard0(a, b string) {\n\tmust(a, \"a\")\n\tmust(b, \"b\")\n\tmust(a+b, \"ab\")\n\tprintln(\"guard0\")\n}\n\nfunc read0(p string) error {\n\tf, err := os.Open(p)\n\tif err != nil {\n\t\treturn err\n\t}\n\tdefer f.Close()\n\tprintln(\"read0\")\n\treturn nil\n}\n\nfunc flags1(stdout io.Writer, asJSON bool, v any) int {\n\tn := \"flag1\"\n\tif asJSON {\n\t\te := json.NewEncoder(stdout)\n\t\te.SetIndent(\"\", \"  \")\n\t\te.Encode(v)\n\t\treturn n\n\t}\n\treturn len(n)\n}\n\nfunc guard1(a, b string) {\n\tmust(a, \"a\")\n\tmust(b, \"b\")\n\tmust(a+b, \"ab\")\n\tprintln(\"guard1\")\n}\n\nfunc read1(p string) error {\n\tf, err := os.Open(p)\n\tif err != nil {\n\t\treturn err\n\t}\n\tdefer f.Close()\n\tprintln(\"read1\")\n\treturn nil\n}\n\nfunc flags2(stdout io.Writer, asJSON bool, v any) int {\n\tn := \"flag2\"\n\tif asJSON {\n\t\te := json.NewEncoder(stdout)\n\t\te.SetIndent(\"\", \"  \")\n\t\te.Encode(v)\n\t\treturn n\n\t}\n\treturn len(n)\n}\n\nfunc guard2(a, b string) {\n\tmust(a, \"a\")\n\tmust(b, \"b\")\n\tmust(a+b, \"ab\")\n\tprintln(\"guard2\")\n}\n\nfunc read2(p string) error {\n\tf, err := os.Open(p)\n\tif err != nil {\n\t\treturn err\n\t}\n\tdefer f.Close()\n\tprintln(\"read2\")\n\treturn nil\n}\n\nfunc must(s, what string) {}\n",
+        "out/out.go": "package out\n\nimport (\n\t\"encoding/json\"\n\t\"io\"\n)\n\nfunc pretty(w io.Writer, v any) error {\n\tenc := json.NewEncoder(w)\n\tenc.SetIndent(\"\", \"  \")\n\treturn enc.Encode(v)\n}\n"
+      },
+      "name": "TestSequences:1"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\n\nimport (\n\t\"bufio\"\n\t\"io\"\n)\n\nfunc use(string) {}\n\nfunc a(f io.Reader) {\n\tsc := bufio.NewScanner(f)\n\tsc.Buffer(make([]byte, 4096), 1<<20)\n\tfor sc.Scan() {\n\t\tuse(sc.Text())\n\t}\n}\n\nfunc b(f io.Reader) {\n\tsc := bufio.NewScanner(f)\n\tsc.Buffer(make([]byte, 4096), 1<<20)\n\tfor sc.Scan() {\n\t\tuse(sc.Text())\n\t}\n}\n\nfunc c(f io.Reader) {\n\tsc := bufio.NewScanner(f)\n\tsc.Buffer(make([]byte, 8192), 1<<20)\n\tfor sc.Scan() {\n\t\tuse(sc.Text())\n\t}\n}\n\nfunc d(f io.Reader) {\n\tsc := bufio.NewScanner(f)\n\tsc.Buffer(make([]byte, 4096), 1<<20)\n\tfor sc.Scan() {\n\t\tuse(sc.Text())\n\t}\n}\n"
+      },
+      "name": "TestSequencePlaces:1"
+    },
+    {
+      "files": {
+        "p/p.go": "package p\nfunc f(m map[string]int) {\n\tif v, ok := m[\"a\"]; ok {\n\t\tx := T{A: v,\n\t\t\tB: 2}\n\t\t_ = x\n\t}\n}"
+      },
+      "name": "TestUnits:1"
+    }
+  ]
+}

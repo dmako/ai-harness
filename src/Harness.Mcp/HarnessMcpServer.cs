@@ -1,4 +1,6 @@
 using Harness.Mcp.Workspaces;
+using Harness.Mcp.Architecture;
+using Harness.Core.Architecture;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text;
@@ -33,6 +35,7 @@ public static class HarnessMcpServer
         ArgumentNullException.ThrowIfNull(loggerFactory);
         await using var ownedSession = session;
         var providerTools = new ProviderTools(providers, session as IProviderProjectSession, workspaceTools);
+        var couplingTools = new CouplingTools(providers, session as IChangeCouplingSession);
         var contextTools = new ContextTools(providers, session as IContextProjectSession, workspaceTools);
         await using var transport = new CompatibleStdioTransport(input, output);
         var options = new McpServerOptions
@@ -53,7 +56,7 @@ public static class HarnessMcpServer
                     var version = string.IsNullOrEmpty(client?.Version) ? "" : " " + client.Version;
                     var caller = string.IsNullOrEmpty(client?.Name) ? "unknown" : client.Name + version;
                     try
-                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools, workspaceTools); }
+                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools, workspaceTools, couplingTools); }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
                         // The C# SDK intentionally emits no reply for client-cancelled calls.
@@ -68,7 +71,7 @@ public static class HarnessMcpServer
     }
 
     internal static async ValueTask<CallToolResult> CallAsync(CallToolRequestParams parameters, IHarnessStateSession session,
-        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null, ContextTools? contextTools = null, WorkspaceTools? workspaceTools = null)
+        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null, ContextTools? contextTools = null, WorkspaceTools? workspaceTools = null, CouplingTools? couplingTools = null)
     {
         var tool = Tools.FirstOrDefault(tool => tool.Name == parameters.Name)
             ?? throw new McpProtocolException($"unknown tool {JsonSerializer.Serialize(parameters.Name)}", McpErrorCode.InvalidParams);
@@ -94,6 +97,8 @@ public static class HarnessMcpServer
             {
                 if (parameters.Name is "library_adoption" or "similar_concerns")
                     return workspaceTools is null ? Error("this project is not in a workspace; use 'harness workspace create' to add it") : Success(await workspaceTools.EvidenceAsync(parameters.Name, parameters.Arguments, cancellationToken));
+                if (parameters.Name is "change_coupling")
+                    return Success(await (couplingTools ?? new CouplingTools(null, session as IChangeCouplingSession)).CallAsync(parameters.Arguments, cancellationToken));
                 if (parameters.Name is "get_context")
                     return Success(await (contextTools ?? new ContextTools(project: session as IContextProjectSession)).CallAsync(parameters.Arguments, cancellationToken));
                 if (ProviderTools.Handles(parameters.Name))

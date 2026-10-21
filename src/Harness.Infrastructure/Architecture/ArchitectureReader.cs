@@ -14,6 +14,18 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
 {
     private readonly WorkspaceEvidenceReader _evidence = new(members);
     private readonly Dictionary<string, ProjectBuild?> _builds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Clones.RepeatedCodeReader> _repeated = new(StringComparer.Ordinal);
+    public async Task<IReadOnlyList<ArchitectureFinding>> RepeatedAsync(WorkspaceMember member, IReadOnlyList<ArchitectureFinding>? provided, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!_repeated.TryGetValue(member.Id, out var reader))
+        {
+            var (repository, _) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
+            reader = new(repository);
+            _repeated.Add(member.Id, reader);
+        }
+        return reader.Read(provided);
+    }
     public async Task<ArchitectureRead> ProjectAsync(WorkspaceMember current, BoundaryRules? rules, bool includeMembers, CancellationToken token)
     {
         var build = await BuildAsync(current, token).ConfigureAwait(false);
@@ -46,7 +58,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         notes.AddRange(own.Notes);
         return new(architecture, notes);
     }
-    public async Task<WorkspaceSystem> SystemAsync(CancellationToken token)
+    public async Task<WorkspaceSystem> SystemAsync(CancellationToken token, string workspace = "", KnowledgeLevels? levels = null)
     {
         List<SystemMember> inputs = [];
         List<string> notes = [];
@@ -60,6 +72,8 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
             catch (Exception error) when (WorkspaceEvidenceReader.ReadError(error)) { notes.Add(member.Name + ": " + error.Message.Split('\n')[0]); }
         token.ThrowIfCancellationRequested();
         var system = new SystemReader(inputs).Read();
+        var shared = await new WorkspaceDuplicateReader(members, _evidence).SharedAsync(workspace, levels, token).ConfigureAwait(false);
+        system = system with { Findings = system.Findings.Concat(shared.Findings).ToArray() };
         var allNotes = (system.Notes ?? []).Concat(notes).ToArray();
         return system with { Notes = allNotes.Length is 0 ? null : allNotes };
     }

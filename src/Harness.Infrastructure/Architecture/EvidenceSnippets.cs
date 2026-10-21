@@ -37,7 +37,7 @@ public static class EvidenceSnippets
         var lines = text.TrimEnd('\n').Split('\n');
         var start = site.Line > 0 ? Math.Max(1, site.Line - 5) : 1;
         var end = site.Line > 0 ? (int)Math.Min(lines.Length, (long)site.Line + 5) : Math.Min(lines.Length, 20);
-        var function = locate?.Invoke(site);
+        var function = site.Line > 0 ? (locate ?? new Clones.CloneExtractor(new(repository.Root, [site.Path])).Locate).Invoke(site) : null;
         if (function is not null && function.Start > 0 && function.Start <= site.Line && site.Line <= function.End)
         { start = function.Start; end = Math.Min(function.End, lines.Length); }
         var truncated = end - start + 1 > max;

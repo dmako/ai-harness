@@ -1,0 +1,356 @@
+{
+  "task": "TASK-0022",
+  "base_commit": "348871f630409f211308e0a3efa5fccdf50bf171",
+  "generated_at": "2026-10-21T16:31:10.740144+00:00",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "source_sha256": {
+    "doc/port/README.md": "b9475781139cf0cc17c30a8250673b71f0d07014828ad739af8a7fe25dd57015",
+    "doc/port/architecture-readers.md": "b6835dfc9fe3414573114dc5497505c06195b2e4421259be56c396e50f31f582",
+    "doc/port/clones-and-cochange.md": "881c3e3baac8b34ac2934dfda38d537e1a907fcfbc3ee912921d9bfc6d080e42",
+    "src/Harness.Core/Architecture/ChangeCouplingModels.cs": "f1df6c4047a5a8bdbeda137f975a38348386e655b98bf2a5c6df789edb128332",
+    "src/Harness.Core/Architecture/CloneModels.cs": "c49f3c40b33fa9b24ceb939f4ea61e114544cb1fff5716c1473dfcbd2ccfa6bb",
+    "src/Harness.Core/Workspaces/WorkspaceDuplicateModels.cs": "41aed92a944a1ef548c7f39b9d536adc12f8ecf1867b36cc0ac7038e158bce72",
+    "src/Harness.Infrastructure/Architecture/ArchitectureReader.cs": "600ccb2eb75f4491f3c43f20873c1c7fbc10b6066d49d1114b26a98f0cec4722",
+    "src/Harness.Infrastructure/Architecture/ChangeCoupling.cs": "1c8870765958332ac7ea12dcf440a8236dd2c3b251cfb9fdf054224e206c8f34",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneComparison.cs": "15122a3d9175cd0f0db56d2937b638f2b53ff41f8ee12bfbe023d7169305e355",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneContracts.cs": "85a2b9a76279ed40416a6e2e6c3dc9a980457eb29a6d8f03077c4b0503ca75b4",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneExtractor.Branches.cs": "edf362e759ed1cd1f5dadadb44e4bf1ee74829560dcef3d6581b5e9044076e86",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneExtractor.Forms.cs": "f1965d2b670435ac293abd87cc4a017815382f1b6be240bbe625129f8e4bbbef",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneExtractor.Go.cs": "53e6757bb97cfadb4e6dc99d00e310f7dbaa8297fdc3a725458b6ea56730121d",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneExtractor.cs": "ada5249f936924b8ecf1254b623156c25b6c47814abd4b475783b11a14bf2d2e",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneLexer.cs": "e066c5ffd70e6c966644ca1d4dd404c3c188e0df8a4c22f9eb0b85ecd12e7b6f",
+    "src/Harness.Infrastructure/Architecture/Clones/CloneSequences.cs": "c7d12f6479d5e9191dec8a95519e4aa2b87e2b790c702e00a42089c70f620bab",
+    "src/Harness.Infrastructure/Architecture/Clones/RepeatedCodeReader.cs": "d49a67aa095634cf082254e5eb301905b4c3669cced89d110113ab801416ca11",
+    "src/Harness.Infrastructure/Architecture/Clones/StatementSplitter.cs": "7ca80bb847d49aba439bd0c1f6ea2634ed95535f9dde962fb4dd05be7c650ef6",
+    "src/Harness.Infrastructure/Architecture/EvidenceSnippets.cs": "a620be2799873bb43c579bf875c824f346bb90e66cd11b3665b6bcaa76adba30",
+    "src/Harness.Infrastructure/Git/GitRepository.Churn.cs": "90b8edc577007d1a93478add98c27b3ea4d77a0392b3de5bf0a076485cf3717d",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.Coupling.cs": "be43d3b0b43a76d9dcb38d2f56763ddf4359bacd94210dfa31f77f58ab3b0ffd",
+    "src/Harness.Infrastructure/Workspaces/WorkspaceDuplicateReader.Shared.cs": "edae9cfd9ea042a396a0e6ed682b18dd1a4331c265b791a11b4300db1a35b4f9",
+    "src/Harness.Infrastructure/Workspaces/WorkspaceDuplicateReader.cs": "d4735da895884db9f9f6cb0dcc69c9e185a3f735af20511d6baf3b434af826d4",
+    "src/Harness.Infrastructure/Workspaces/WorkspaceEvidenceReader.cs": "447a8f690342d36bf0e5a9443b7d1418515124f542afab5cdc73cb07df41c884",
+    "src/Harness.Mcp/Architecture/CouplingTools.cs": "214ae9a5b8d128ad93176e225184468fa7b1b215c60fbc00778d68681fcee49f",
+    "src/Harness.Mcp/HarnessMcpServer.cs": "86163cf07933b4caf2d15ff844903d480f26039092c038c13658759bbc1893d1",
+    "src/Harness.Mcp/Schemas/change_coupling.json": "7d051ab704e4ca1744132c36c72a16d1a2f6d697378d9165bb415bd952be57f5",
+    "test/Harness.Compatibility/Clones/build_oracle.py": "f1e67d87bc61b8a7357d48a80094b468c84aa0c994b7580c87d64f0bed3b5c61",
+    "test/Harness.Compatibility/Clones/capture_fixtures.py": "9280f091d98f1a48cec0ee03b16c33ab70697fe127278ce49e83667a837f7014",
+    "test/Harness.Compatibility/Clones/main.go": "6d16858133a0b7b6cd0205e0f770fd9953ed74aec48ac4cc5d8d38b4929631aa",
+    "test/Harness.Compatibility/Clones/publish_smoke.py": "8d11dff738b7c51e8076baf34a6df2933fbfa7d4e613a0a52eaac9022a6a4d8d",
+    "test/Harness.Integration/Memory/MemoryMcpProcessTests.cs": "37f9738301498cfcc1207bfcef59632788363f1d011c871fbbad79ddbd1ffca9",
+    "test/Harness.Integration/Workspaces/CloneEvidenceTests.cs": "57a2e9b3e5da8a3a26b2425a6527bdee786d692db434e4505df96258d48f355c",
+    "test/Harness.Integration/Workspaces/CouplingProcessTests.cs": "9641e86477ff9cc6674606766f1c5e40c0a4f794a931be361507a50d0059a58a",
+    "test/Harness.Unit/Architecture/CloneReaderTests.cs": "e6bc075cd6685d3507f6ad24cfb25e17579b0b17a70eed90e187fa9c73670f03",
+    "test/fixtures/compatibility/clones/source-cases.json": "6f95bb593178d4dacae1e357856319f03d63dd832666c0a25b3dcffb2863d1ed"
+  },
+  "oracle_sources": {
+    "internal/clones/extract.go": "65a1535e80ac96718c6b4604678de93a8106ae8f75c5c260c76fd48521c187b4",
+    "internal/clones/clike.go": "3b0d43d4b6438d40fd71d37cdb2bc4d87a1d743355711669997edf94ff4a7ee7",
+    "internal/clones/compare.go": "a0b9b094c0b11d5a60a44baaccfe61da5b5e67b12883362516f2b414eca477e7",
+    "internal/clones/sequences.go": "0265ef8108d5ef8e3006cef8634a011ba66757d00eee4c856e7e5df628d21d5d",
+    "internal/clones/variants.go": "7cbfba5ce16e5dc92006222bf51b0587be13f9b9f9e2e31445397fd5525d2f0b",
+    "internal/clones/std.go": "c28874e8b2ce2b79e36bcc980a0a20912b7153de08bda60a55995d1969f5221d",
+    "internal/clones/clones_test.go": "2da783d6623c3c017f91d356ea19d14b94bdefd78cb44eb628ec7402f4d846e6",
+    "internal/clones/sequences_test.go": "8a81c4c6f6dff0933e9d97cd5c346e13f68ef788aa4384a680ce3abe0c881147",
+    "internal/coupling/coupling.go": "e0df3fc57b23fbc06101333bc0c6dfc589e4e65b2138c7025e01523b5f3b7085",
+    "internal/coupling/coupling_test.go": "514d6d15da030a447b39214f6dd42a896ca556192b28e5534359f11424bd69ea",
+    "internal/readcache/readcache.go": "70b49df304fb31ff0beb528dd688b74f5569e06cd2297d793832327d94d94230",
+    "internal/findings/clones.go": "da3099f55a5369c5f94b227f1a56209b53f2eb95a5c3dee621f6cba1820ee739",
+    "internal/findings/shared.go": "00fdcb0ba5ebf95beb33a58c23ffc4396488940d16a0780565484b23e6b787fc",
+    "internal/findings/snippet.go": "97326b2e829cf3eede596e8c12007d0cd41438c2e147e711a706663cef022c1b",
+    "internal/wsearch/duplicates.go": "20fecd70a896bbcb6222a4f7a254ab8a402d358d439037a07ffc3663fe05c021",
+    "internal/mcp/server/coupling_tools.go": "65499c50b9335de1f9147848adc56496744187a57c363ac152280a663ba3e50c",
+    "internal/git/worktree.go": "289687185c2a39f323d1b9a07992f22dd699d0fae8f901967586d73d18f9a1f6"
+  },
+  "package_locks": {
+    "src/Harness.Cli/packages.lock.json": {
+      "sha256": "d4d84ca30bc0b474e0d7b0d07f56fe692ccc12974362c10f7cfea2e28fe06ba6",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Cli/packages.publish.lock.json": {
+      "sha256": "a722475a638bd520f59b59025589764cbf5f370ca590edcdb7ddc157d03f6f79",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Core/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Graphify/packages.lock.json": {
+      "sha256": "79a73a25ec13072fd2f02aeb6d538fc3a3cc35bae95b4e93d42a310bc68e7ce2",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Graphify/packages.publish.lock.json": {
+      "sha256": "d1c1386057c7bc3bfd4beee0f89ecb0cfb8993a946c2a93084975ccfbd079787",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Infrastructure/packages.lock.json": {
+      "sha256": "6cd3dd55e3cddbaa75234490eddd16a6c670a664707ba076c47b9d3c2a7a80a2",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Mcp/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Providers/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Web/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": {
+      "sha256": "112ca61422e901e82b942eb5ad4f872610dc88b3c1f94b5b696c60118051430a",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/packages.lock.json": {
+      "sha256": "7abd3ee7cbf1b33703dbea24880483d545bdf9765bc257a9ea879424de58c7b5",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.ProviderWorker/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Unit/packages.lock.json": {
+      "sha256": "f18d62e17038c1e6cb4930ed6f427f9af1d2e8ed39d6f0118a0047558b698dde",
+      "semantic_change": "unchanged"
+    }
+  },
+  "test_reports": {
+    "artifacts/clones-regression-01/Harness.Integration_net10.0_x64.trx": {
+      "sha256": "2d1d37609b900f7613ace22e7700138729b9ca8cdbd85e22d004a67aa62e44cb",
+      "counters": {
+        "total": "281",
+        "executed": "278",
+        "passed": "278",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "3",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/clones-regression-01/Harness.Unit_net10.0_x64.trx": {
+      "sha256": "d75824cabad65bb91a09afa0fb6c95758abee8ecb04e00d5fb49207d29f5084e",
+      "counters": {
+        "total": "271",
+        "executed": "270",
+        "passed": "270",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "1",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/clones-tests-final-01/Harness.Unit_net10.0_x64.trx": {
+      "sha256": "074a457ee44bc297679c07e1fd642604e7d12a7023430874117ec6ffb973b19c",
+      "counters": {
+        "total": "72",
+        "executed": "72",
+        "passed": "72",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/clones-integration-03/Harness.Integration_net10.0_x64.trx": {
+      "sha256": "449649993ec3f307b94691edaba6be76c6761765d0e6a05af46028e1222f449d",
+      "counters": {
+        "total": "4",
+        "executed": "4",
+        "passed": "4",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/clones-mcp-01/Harness.Integration_net10.0_x64.trx": {
+      "sha256": "613b9139d019ce459e21e41f571f399b67a69560a6006f29475ea40f5f6edb30",
+      "counters": {
+        "total": "1",
+        "executed": "1",
+        "passed": "1",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/clones-provider-final-01/Harness.Integration_net10.0_x64.trx": {
+      "sha256": "9fa1613b63ea7386e5e94b1bc467cb8919bcaf15a736b74d589f91416a8436d7",
+      "counters": {
+        "total": "1",
+        "executed": "1",
+        "passed": "1",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    }
+  },
+  "artifacts_sha256": {
+    "artifacts/clones-regression-01.binlog": "eda24e1484bd1fed0808e7b4eb6f170e1d5561b447b9c419b76977173da1972f",
+    "artifacts/clones-tests-final-01.binlog": "9d2ffc050dc8b117f1432ce8aab9b7b456adcd597ea3d3ad86b60e056fe4785b",
+    "artifacts/clones-publish-02.binlog": "9de77377519067c45a29b1760f3b533e6e5f3a4cab553704bc8faa45a726925f",
+    "artifacts/clones-restore-normal-01.binlog": "128d842f411b739cf36fc088c484fa0da300bb0f0803d7c8c8628f6388941e6a",
+    "artifacts/clones-format-verify-01.binlog": "f5e9e2daac11f09751dccfd75e193d7a4d5371c745e3985cfce8251d4be30cea",
+    "artifacts/clones-linux-unit-final-01.log": "ca61d562fb4736166b73ca8c3ee637340790ec951dd7808c8af21886298bef70",
+    "artifacts/clones-linux-integration-01.log": "fff61d773ca2973bdb19c8831281498aaebfbf7919d533ff4b63b2cad745de09",
+    "artifacts/clones-linux-mcp-01.log": "8e05db39c71bfd4e3e8bda1ac359ba1b1a7fb24ac7c62f971237a30b8c54cc19",
+    "artifacts/clones-oracle/clones-oracle.exe": "e247dd0ccac4a74fcf6730584f8d1d841b7228ab698f4498a535d7ac31bf66eb",
+    "artifacts/clones-oracle/clones-oracle-linux": "59b5dd61e82f592965d3cfc4c8f540dba90510a621664e92bd7068d6ba9f67df",
+    "artifacts/clones-publish/harness.exe": "0a38755a149d7087b9880003802b29925a23d69439bab0e416520b14b6cc17bc",
+    "artifacts/clones-published-smoke.json": "d5066b424e5ccef39f14d75019d0030ec7094b1ac7022d34d3585d107a7b8a67"
+  },
+  "validation": [
+    {
+      "command": "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/clones-regression-01.binlog --report-trx --results-directory artifacts/clones-regression-01",
+      "result": "pass",
+      "output": "552 total, 548 passed, four expected Unix-only skips; twelve frozen Go oracles and both real providers enabled."
+    },
+    {
+      "command": "dotnet test --project test/Harness.Unit/Harness.Unit.csproj --no-restore --filter-class \"*CloneReaderTests\" -bl:artifacts/clones-tests-final-01.binlog --report-trx --results-directory artifacts/clones-tests-final-01",
+      "result": "pass",
+      "output": "Final 72 comparisons passed, including canonical/private statement metadata and final call-classification correction."
+    },
+    {
+      "command": "dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --filter-class \"*CloneEvidenceTests\" -bl:artifacts/clones-integration-03.binlog --report-trx --results-directory artifacts/clones-integration-03",
+      "result": "pass",
+      "output": "Four passed: multi-repo copies/homes, dates/renames/partners/hotspots/checks, request caches and provider filtering."
+    },
+    {
+      "command": "dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --filter-class \"*CouplingProcessTests\" -bl:artifacts/clones-mcp-01.binlog --report-trx --results-directory artifacts/clones-mcp-01",
+      "result": "pass",
+      "output": "Public MCP schema, precedence, dirty paths, text/structured agreement and validation errors passed."
+    },
+    {
+      "command": "dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --filter-method \"*RequestCachesRefreshOnNextReadAndProviderTemplatesAreNotCopies\" -bl:artifacts/clones-provider-final-01.binlog --report-trx --results-directory artifacts/clones-provider-final-01",
+      "result": "pass",
+      "output": "Final provider pair/healthy-empty tests passed; also included in full regression."
+    },
+    {
+      "command": "WSL: HARNESS_GO_CLONES_ORACLE=$PWD/artifacts/clones-oracle/clones-oracle-linux dotnet test/Harness.Unit/bin/Debug/net10.0/Harness.Unit.dll --filter-class \"*CloneReaderTests\"",
+      "result": "pass",
+      "output": "Final 72 passed, retained console log hashed."
+    },
+    {
+      "command": "WSL: portable Integration assembly filters *CloneEvidenceTests and *CouplingProcessTests",
+      "result": "pass",
+      "output": "Four integration and one public MCP test passed."
+    },
+    {
+      "command": "WSL frozen source: go test -count=1 -mod=readonly ./internal/clones ./internal/coupling ./internal/readcache",
+      "result": "pass",
+      "output": "All three upstream Go suites passed, offline module cache, Go 1.27.3."
+    },
+    {
+      "command": "python test/Harness.Compatibility/Clones/capture_fixtures.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --output test/fixtures/compatibility/clones/source-cases.json --artifacts artifacts",
+      "result": "pass",
+      "output": "Captured 22 original synthetic input sets from an isolated copy; original clone suites passed. Known map-order assertion retried by capture utility."
+    },
+    {
+      "command": "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release --no-restore -o artifacts/clones-publish -bl:artifacts/clones-publish-02.binlog",
+      "result": "pass",
+      "output": "Final production code published self-contained win-x64."
+    },
+    {
+      "command": "python test/Harness.Compatibility/Clones/publish_smoke.py --executable artifacts/clones-publish/harness.exe --artifacts artifacts",
+      "result": "pass",
+      "output": {
+        "published_change_coupling": true,
+        "git_hotspots": true,
+        "dirty_paths": true,
+        "file_precedence": true,
+        "unknown_provider_note": true,
+        "text_structured_agreement": true
+      }
+    },
+    {
+      "command": "dotnet restore Harness.slnx --locked-mode -bl:artifacts/clones-restore-normal-01.binlog",
+      "result": "pass",
+      "output": "Normal assets restored after release publish; all 13 locks semantically unchanged."
+    },
+    {
+      "command": "dotnet format whitespace Harness.slnx --no-restore --include <changed C# files> --verify-no-changes --binarylog artifacts/clones-format-verify-01.binlog",
+      "result": "pass",
+      "output": "No whitespace changes required."
+    },
+    {
+      "command": "git diff --check HEAD; validate Python syntax, JSON, UTF-8/CRLF and receipt hashes",
+      "result": "pass",
+      "output": "No whitespace errors, syntax/JSON valid and source/artifact hashes verified."
+    }
+  ],
+  "platforms": {
+    "windows": "x64 .NET 10.0.402 SDK / 10.0.13 runtime",
+    "linux": "Ubuntu WSL x64 .NET 10.0.13 runtime; cross-built frozen oracle uses Go 1.27.1; native upstream suites use Go 1.27.3",
+    "macos": "not executed"
+  },
+  "sequencing": "Full regression preceded a final source-faithful statement-call classification correction and stronger private statement comparisons; all 72 final unit comparisons passed Windows and Linux afterwards. The final release publish contains that correction.",
+  "limits": [
+    "Syntactic function/body extraction is not compilation or a native symbol index; unsupported declaration shapes are omitted.",
+    "Canonical equality normalizes local names and numbers; it is not literal source equality.",
+    "LCS work can be expensive for large near copies and belongs to sync/explicit analysis, not repeated page/query background scans.",
+    "Linux direct-DLL runs do not retain announced TRX reports; hashed console logs preserve results.",
+    "Finding snapshots, drift, marks and proposal lifecycle remain TASK-0023."
+  ],
+  "intentional_differences": [
+    "Co-change existence checks enforce repository/symlink containment instead of statting outside-repository paths.",
+    "Text reads retain existing strict UTF-8, size bounds and partial notes; foreign knowledge stores are read-only."
+  ],
+  "source_test_caveat": "The original TestSequences assumes map iteration orders cli before out. Fixture capture retries only that known assertion without changing algorithms or the frozen oracle tree."
+}
