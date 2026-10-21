@@ -50,6 +50,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Memory storage](memory-storage.md) | PORT-008 typed knowledge, SQLite search/history/audit, layered precedence, credential rejection and Go database roundtrips |
 | [Memory workflows](memory-workflows.md) | PORT-009 ten memory MCP tools, transactional proposals/review, CLI history/retirement/promotion and wider-scope boundaries |
 | [Tasks and backlogs](tasks-and-backlogs.md) | PORT-010 dependency scheduling, task/milestone state, strict planning import, history-preserving reimport and append-only export |
+| [Task execution](task-execution.md) | PORT-011 capability claims, lease/progress/completion transactions, six MCP tools and human task proposal review |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

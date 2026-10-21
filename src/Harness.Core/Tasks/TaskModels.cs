@@ -110,6 +110,7 @@ public static partial class TaskWorkflow
             ?? throw new ArgumentException($"invalid status {Quote(value)} (want one of: {string.Join(", ", Statuses)})");
     }
     public static bool HoldsClaim(string status) => status is "claimed" or "in_progress" or "review";
+    public static string NormalizeResult(string value) => string.Concat(value.Trim().EnumerateRunes().Select(r => GoUnicode.ToLower(r).ToString()));
     public static int PriorityRank(string priority) => priority switch { "critical" => 0, "high" => 1, "medium" => 2, "low" => 3, _ => 4 };
     public static bool CanTransition(string from, string to) => from switch
     {

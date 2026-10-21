@@ -12,21 +12,23 @@ public sealed partial class TaskStore
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(origin);
-        return database.WithTransaction((c, t) =>
-        {
-            var d = (definition with { Id = string.IsNullOrWhiteSpace(definition.Id) ? NextId(c, t, prefix) : definition.Id.Trim().ToUpperInvariant(), Status = "" }).Normalize();
-            d.Validate();
-            var (existing, _) = LoadGraph(c, t);
-            if (existing.Contains(d.Id))
-                throw new InvalidOperationException($"{d.Id}: task already exists");
-            if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
-                throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
-            using var ordinal = Command(c, t, "SELECT COALESCE(MAX(ordinal),-1)+1 FROM tasks");
-            Insert(c, t, d, Convert.ToInt32(ordinal.ExecuteScalar(), CultureInfo.InvariantCulture), origin.Source, Stamp(), "created", origin.By, origin.Detail);
-            ReplaceDependencies(c, t, d);
-            RecomputeReadiness(c, t);
-            return Get(c, t, d.Id);
-        }, cancellationToken);
+        return database.WithTransaction((c, t) => Create(c, t, definition, prefix, origin), cancellationToken);
+    }
+
+    private TaskRecord Create(SqliteConnection c, SqliteTransaction t, TaskDefinition definition, string prefix, TaskOrigin origin)
+    {
+        var d = (definition with { Id = string.IsNullOrWhiteSpace(definition.Id) ? NextId(c, t, prefix) : definition.Id.Trim().ToUpperInvariant(), Status = "" }).Normalize();
+        d.Validate();
+        var (existing, _) = LoadGraph(c, t);
+        if (existing.Contains(d.Id))
+            throw new InvalidOperationException($"{d.Id}: task already exists");
+        if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+            throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
+        using var ordinal = Command(c, t, "SELECT COALESCE(MAX(ordinal),-1)+1 FROM tasks");
+        Insert(c, t, d, Convert.ToInt32(ordinal.ExecuteScalar(), CultureInfo.InvariantCulture), origin.Source, Stamp(), "created", origin.By, origin.Detail);
+        ReplaceDependencies(c, t, d);
+        RecomputeReadiness(c, t);
+        return Get(c, t, d.Id);
     }
 
     public string NextId(string prefix = "", CancellationToken cancellationToken = default) => database.WithTransaction((c, t) => NextId(c, t, prefix), cancellationToken);

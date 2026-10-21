@@ -2,6 +2,31 @@ namespace Harness.Core.Tasks;
 
 public static class TaskViews
 {
+    public static Dictionary<string, object?> Definition(TaskDefinition d)
+    {
+        Dictionary<string, object?> view = new() { ["id"] = d.Id, ["title"] = d.Title };
+        Add(view, "milestone", d.Milestone);
+        Add(view, "type", d.Type);
+        Add(view, "priority", d.Priority);
+        Add(view, "goal", d.Goal);
+        Add(view, "scope", d.Scope);
+        Add(view, "depends_on", d.DependsOn);
+        Add(view, "acceptance", d.Acceptance);
+        Add(view, "validation", d.Validation);
+        Add(view, "notes", d.Notes);
+        Add(view, "status", d.Status);
+        return view;
+    }
+    public static Dictionary<string, object?> Proposal(TaskProposal p)
+    {
+        Dictionary<string, object?> view = new() { ["id"] = p.Id, ["task"] = Definition(p.Task), ["status"] = p.Status, ["proposed_by"] = p.ProposedBy, ["proposed_at"] = p.ProposedAt };
+        Add(view, "reason", p.Reason);
+        Add(view, "decided_by", p.DecidedBy);
+        Add(view, "decided_at", p.DecidedAt);
+        Add(view, "note", p.Note);
+        Add(view, "result", p.Result);
+        return view;
+    }
     public static Dictionary<string, object?> Task(TaskRecord t)
     {
         var d = t.Definition;

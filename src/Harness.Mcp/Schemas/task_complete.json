@@ -1,0 +1,448 @@
+{
+  "description": "Complete a claimed task. Report EVERY acceptance criterion (pass, or n/a with an explanation) and the validation commands you ran. Rejected if anything is missing or failing; nothing changes then.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "claim_token": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string",
+        "description": "short explanation of what changed"
+      },
+      "commit": {
+        "type": "string",
+        "description": "commit hash, if committed"
+      },
+      "acceptance": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "index": {
+              "type": "integer",
+              "description": "1-based acceptance criterion number"
+            },
+            "result": {
+              "type": "string",
+              "description": "pass, fail, n/a or pending"
+            },
+            "evidence": {
+              "type": "string",
+              "description": "test name, command output, file:line, or why n/a"
+            }
+          },
+          "required": [
+            "index",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "description": "one entry per acceptance criterion (omit when the task has none)"
+      },
+      "validation": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "a command that passed"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string"
+                },
+                "result": {
+                  "type": "string",
+                  "description": "pass or fail"
+                },
+                "output": {
+                  "type": "string",
+                  "description": "short relevant output"
+                }
+              },
+              "required": [
+                "command",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "description": "validation commands run: a command string (it passed) or {command, result, output}"
+      },
+      "proposals": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "one of: goal, constraint, decision, fact, open_question, warning, convention"
+            },
+            "content": {
+              "type": "string",
+              "description": "one short, self-contained statement"
+            },
+            "scope": {
+              "type": "string",
+              "description": "project (default), path:<dir or file>, subsystem:<name> or branch:<name>"
+            },
+            "source_ref": {
+              "type": "string",
+              "description": "where it came from: task id, commit, document, conversation topic"
+            },
+            "rationale": {
+              "type": "string",
+              "description": "why this looks settled, one line"
+            },
+            "supersedes": {
+              "type": "string",
+              "description": "id of a current memory this would replace"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "description": "durable decisions, conventions or warnings from this task that the user has not confirmed (stored for approval)"
+      }
+    },
+    "required": [
+      "id",
+      "claim_token",
+      "summary"
+    ],
+    "additionalProperties": false
+  },
+  "name": "task_complete",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "task": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "milestone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "scope": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "depends_on": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "acceptance": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "criterion": {
+                  "type": "string"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "criterion",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "validation": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "blocked_reason": {
+            "type": "string"
+          },
+          "claim": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "claimant": {
+                "type": "string"
+              },
+              "claimed_at": {
+                "type": "string"
+              },
+              "lease_until": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claimant"
+            ],
+            "additionalProperties": false
+          },
+          "completion": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "checks": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "string"
+                    },
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "command",
+                    "result"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "completed_by": {
+                "type": "string"
+              },
+              "completed_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "completed_by",
+              "completed_at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "claim_token": {
+        "type": "string"
+      },
+      "unlocked": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "events": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "actor",
+            "at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "proposals": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "proposed_by": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "supersedes": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "decided_by": {
+              "type": "string"
+            },
+            "decision_note": {
+              "type": "string"
+            },
+            "memory_id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_ref",
+            "proposed_by",
+            "status",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "proposal_errors": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "task"
+    ],
+    "additionalProperties": false
+  }
+}

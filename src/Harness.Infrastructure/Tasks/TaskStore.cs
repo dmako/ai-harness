@@ -30,15 +30,15 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
     public TaskRecord Get(string id, CancellationToken cancellationToken = default) => Read((c, t) => Get(c, t, id), cancellationToken);
     public IReadOnlyList<TaskRecord> List(TaskFilter? filter = null, CancellationToken cancellationToken = default) =>
         Read((c, t) => List(c, t, filter ?? new()), cancellationToken);
-    public TaskRecord? Next(string milestone = "", CancellationToken cancellationToken = default) =>
-        Read((c, t) =>
-        {
-            using var command = Command(c, t, """
-                SELECT id FROM tasks WHERE status='ready' AND ($milestone='' OR milestone=$milestone)
-                ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,ordinal,id LIMIT 1
-                """, ("$milestone", milestone));
-            return command.ExecuteScalar() is string id ? Get(c, t, id) : null;
-        }, cancellationToken);
+    public TaskRecord? Next(string milestone = "", CancellationToken cancellationToken = default) => Read((c, t) => Next(c, t, milestone), cancellationToken);
+    private static TaskRecord? Next(SqliteConnection c, SqliteTransaction t, string milestone)
+    {
+        using var command = Command(c, t, """
+            SELECT id FROM tasks WHERE status='ready' AND ($milestone='' OR milestone=$milestone)
+            ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,ordinal,id LIMIT 1
+            """, ("$milestone", milestone));
+        return command.ExecuteScalar() is string id ? Get(c, t, id) : null;
+    }
     public IReadOnlyList<TaskEvent> Events(string id, CancellationToken cancellationToken = default) => database.ReadTransaction((c, t) =>
     {
         using var command = Command(c, t, "SELECT event, COALESCE(from_status,''), COALESCE(to_status,''), actor, COALESCE(detail,''), at FROM task_events WHERE task_id=$id ORDER BY id", ("$id", id));

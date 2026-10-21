@@ -82,6 +82,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
     {
         try
         {
+            var requestedLease = settings is TaskClaimSettings leaseSettings ? TaskCliInput.Lease(leaseSettings.Lease) : TimeSpan.Zero;
             var location = await lifecycle.LocateAsync(settings.Project, cancellationToken: cancellationToken);
             if (!System.IO.File.Exists(location.DatabasePath))
                 throw new IOException("project not initialized (run 'harness init'): " + location.DatabasePath);
@@ -90,6 +91,78 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             var actor = new TaskActor(HumanActor.Current(), Privileged: true);
             switch (verb)
             {
+                case "claim":
+                    var claimSettings = (TaskClaimSettings)settings;
+                    var claimed = store.Claim(claimSettings.Id.ToUpperInvariant(), actor, requestedLease, cancellationToken);
+                    if (settings.Json)
+                        await JsonAsync(new { task = TaskViews.Task(claimed.Task), claim_token = claimed.Token });
+                    else
+                        await output.WriteLineAsync($"Claimed {claimed.Task.Id} as {claimed.Task.Claimant} until {Local(claimed.Task.LeaseUntil!.Value)}.");
+                    break;
+                case "release":
+                    var releaseSettings = (TaskReasonSettings)settings;
+                    var releasing = store.Get(releaseSettings.Id.ToUpperInvariant(), cancellationToken);
+                    var releaseReason = releasing.Claimant == actor.Name && releaseSettings.Reason.Length is 0 ? "released by claimant" : releaseSettings.Reason;
+                    var released = store.Release(releasing.Id, actor, releaseReason, cancellationToken);
+                    if (settings.Json)
+                        await JsonAsync(new { task = TaskViews.Task(released) });
+                    else
+                        await output.WriteLineAsync($"Released {released.Id} (now {released.Status}).");
+                    break;
+                case "complete":
+                    var completeSettings = (TaskCompleteSettings)settings;
+                    var current = store.Get(completeSettings.Id.ToUpperInvariant(), cancellationToken);
+                    var completed = store.Complete(current.Id, actor, TaskCliInput.Complete(completeSettings, current), cancellationToken);
+                    if (settings.Json)
+                        await JsonAsync(new { task = TaskViews.Task(completed.Task), unlocked = Nil(completed.Unlocked) });
+                    else
+                    {
+                        await output.WriteLineAsync($"Completed {completed.Task.Id}.");
+                        if (completed.Unlocked.Count > 0)
+                            await output.WriteLineAsync("Now ready: " + string.Join(", ", completed.Unlocked));
+                    }
+                    break;
+                case "proposals":
+                    var proposalStatus = ((TaskProposalListSettings)settings).Status;
+                    var proposals = store.Proposals(proposalStatus, cancellationToken);
+                    if (settings.Json)
+                        await JsonAsync(new { proposals = proposals.Select(TaskViews.Proposal).ToArray() });
+                    else if (proposals.Count is 0)
+                        await output.WriteLineAsync($"No {proposalStatus} task proposals.");
+                    else
+                    {
+                        foreach (var proposal in proposals)
+                        {
+                            await output.WriteLineAsync($"{proposal.Id}  [{proposal.Status}] {proposal.Task.Title}  (by {proposal.ProposedBy})");
+                            if (proposal.Task.Goal.Length is not 0)
+                                await output.WriteLineAsync("    goal: " + proposal.Task.Goal);
+                            if (proposal.Reason.Length is not 0)
+                                await output.WriteLineAsync("    why:  " + proposal.Reason);
+                            for (var i = 0; i < proposal.Task.Acceptance.Count; i++)
+                                await output.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"    {i + 1}. {proposal.Task.Acceptance[i]}"));
+                            if (proposal.Result.Length is not 0)
+                                await output.WriteLineAsync("    became " + proposal.Result);
+                        }
+                        if (proposalStatus is "pending")
+                            await output.WriteLineAsync("\nharness tasks approve <id> creates the task; harness tasks reject <id> --note \"why\" closes it.");
+                    }
+                    break;
+                case "approve":
+                    var approve = (TaskApproveSettings)settings;
+                    var approved = store.Approve(approve.Id, null, approve.Prefix, actor.Name, cancellationToken);
+                    if (settings.Json)
+                        await JsonAsync(new { proposal = TaskViews.Proposal(approved.Proposal), task = TaskViews.Task(approved.Task) });
+                    else
+                        await output.WriteLineAsync($"Approved {approved.Proposal.Id}: {approved.Task.Id} ({approved.Task.Status}) {approved.Task.Definition.Title}");
+                    break;
+                case "reject":
+                    var reject = (TaskReadySettings)settings;
+                    var rejected = store.Reject(reject.Id, reject.Note, actor.Name, cancellationToken);
+                    if (settings.Json)
+                        await JsonAsync(new { proposal = TaskViews.Proposal(rejected) });
+                    else
+                        await output.WriteLineAsync($"Rejected {rejected.Id}.");
+                    break;
                 case "import" or "export":
                     await FileAsync(verb, (TaskFileSettings)settings, location.Root, store, cancellationToken);
                     break;

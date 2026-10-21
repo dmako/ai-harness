@@ -63,6 +63,12 @@ public static class CliApplication
                 tasks.AddCommand<TaskBlockCommand>("block");
                 tasks.AddCommand<TaskDeferCommand>("defer");
                 tasks.AddCommand<TaskReadyCommand>("ready");
+                tasks.AddCommand<TaskClaimCommand>("claim");
+                tasks.AddCommand<TaskReleaseCommand>("release");
+                tasks.AddCommand<TaskCompleteCommand>("complete");
+                tasks.AddCommand<TaskProposalsCommand>("proposals");
+                tasks.AddCommand<TaskApproveCommand>("approve");
+                tasks.AddCommand<TaskRejectCommand>("reject");
             }).WithAlias("task");
             configuration.AddBranch("memory", memory =>
             {
@@ -159,10 +165,16 @@ public static class CliApplication
                 "-depends" => "--depends",
                 "-accept" => "--accept",
                 "-scope" => "--scope",
+                "-lease" => "--lease",
+                "-summary" => "--summary",
+                "-commit" => "--commit",
+                "-acc" => "--acc",
+                "-acc-all" => "--acc-all",
+                "-check" => "--check",
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope")
+            if (equals < 0 && replacement is "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
             {
                 index++; // A value is data, even when it resembles another option.
             }

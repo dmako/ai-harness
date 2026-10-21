@@ -4,6 +4,8 @@ using System.Text;
 using Harness.Core.Projects;
 using Harness.Core.Memory;
 using Harness.Mcp.Memory;
+using Harness.Core.Tasks;
+using Harness.Mcp.Tasks;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -83,13 +85,16 @@ public static class HarnessMcpServer
         {
             try
             {
+                if (parameters.Name.StartsWith("task_", StringComparison.Ordinal))
+                    return session is ITaskSession tasks ? Success(await TaskTools.CallAsync(parameters.Name, parameters.Arguments, tasks, session as IMemorySession, caller, cancellationToken)) : Error("task session unavailable");
                 if (session is not IMemorySession memory)
                     return Error("memory session unavailable");
                 return Success(await MemoryTools.CallAsync(parameters.Name, parameters.Arguments, memory, caller, cancellationToken));
             }
             catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
             {
-                return Error("memory content rejected: credential validation timed out");
+                var kind = parameters.Name.StartsWith("task_", StringComparison.Ordinal) ? "task" : "memory";
+                return Error(kind + " content rejected: credential validation timed out");
             }
             catch (Exception exception) when (exception is IOException or InvalidDataException or JsonException or ArgumentException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException or UnauthorizedAccessException)
             {

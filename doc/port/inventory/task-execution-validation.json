@@ -1,0 +1,438 @@
+{
+  "schema_version": 1,
+  "task": "TASK-0011",
+  "status": "complete",
+  "validated_on_local": "2026-10-21",
+  "host": "Windows x64",
+  "sdk_pin": "10.0.402",
+  "go_source_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "summary": {
+    "total_tests": 189,
+    "passed_tests": 188,
+    "failed_tests": 0,
+    "skipped_tests": 1,
+    "new_test_cases": 28,
+    "implemented_mcp_tools": 20,
+    "new_task_tools": 6,
+    "storage_schema_unchanged": 19,
+    "new_packages": 0,
+    "changed_package_locks": 0,
+    "release_warnings": 0,
+    "release_errors": 0
+  },
+  "contracts": [
+    {
+      "path": "artifacts/task-tools-managed-validated.json",
+      "sha256": "808d9c86aaf3513a5cba05e8a6ede26e79a21b661e3f1faeb9ce74ca44ff35c8",
+      "bytes": 245168,
+      "passed": 121,
+      "total": 121
+    },
+    {
+      "path": "artifacts/task-tools-published-validated.json",
+      "sha256": "2395487612a442916c7861839a933be6d4613f62cb9e6b9ac5fd9b9d79967aa6",
+      "bytes": 245168,
+      "passed": 121,
+      "total": 121
+    },
+    {
+      "path": "artifacts/task-tools-memory-regression.json",
+      "sha256": "404a2941d26f2f14783d65923d4ae96fd802f0b2e17785c6ef7f40faab9ada59",
+      "bytes": 402978,
+      "passed": 199,
+      "total": 199
+    }
+  ],
+  "concurrency": [
+    "Four independent official-SDK MCP processes: exactly one explicit claimant; invalid token and malformed evidence leave task state unchanged.",
+    "Atomic next-and-claim: concurrent processes select distinct ready tasks or return the normal empty result.",
+    "Four independent CLI approvals: exactly one task creation and its proposal decision commit together."
+  ],
+  "documented_differences": [
+    "Go MCP next/claim uses two transactions; the port makes selection and claim atomic as TASK-0011 requires.",
+    "Proposal dependency validation and insertion share a transaction in the port.",
+    "CLR clock/duration precision is 100 ns; positive sub-tick CLI leases round up to one tick. Imported nanosecond timestamps remain intact.",
+    "Commit context-scoring integration is deferred to the planned telemetry port."
+  ],
+  "commands": [
+    "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/task-tools-test-validated.binlog --report-trx --results-directory artifacts/task-tools-results-validated",
+    "python test/Harness.Compatibility/Tasks/execution.py --oracle artifacts/compatibility/oracle/harness.exe --candidate src/Harness.Cli/bin/Debug/net10.0/harness.dll --output artifacts/task-tools-managed-validated.json",
+    "python test/Harness.Compatibility/Tasks/execution.py --oracle artifacts/compatibility/oracle/harness.exe --candidate artifacts/task-tools-publish/win-x64/harness.exe --output artifacts/task-tools-published-validated.json",
+    "python test/Harness.Compatibility/Memory/contracts.py --oracle artifacts/compatibility/oracle/harness.exe --candidate src/Harness.Cli/bin/Debug/net10.0/harness.dll --output artifacts/task-tools-memory-regression.json",
+    "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release -p:ContinuousIntegrationBuild=true --no-restore -o artifacts/task-tools-publish/win-x64 -bl:artifacts/task-tools-publish-checked.binlog",
+    "dotnet restore Harness.slnx --locked-mode -bl:artifacts/task-tools-locked-restore.binlog",
+    "dotnet format whitespace Harness.slnx --no-restore --verify-no-changes --include <changed C# files> --binarylog artifacts/task-tools-format-validated.binlog --report artifacts/task-tools-format-validated.json"
+  ],
+  "doctor": {
+    "failures": 0,
+    "warnings": 1,
+    "warning": "Existing CLAUDE.md does not import AGENTS.md; no providers configured (optional)."
+  },
+  "sources": [
+    {
+      "path": "doc/port/README.md",
+      "sha256": "138f3526cf57f00fcd33595e5cbcc615a11d64fb3c9d08f395fbad044972207a",
+      "bytes": 6199
+    },
+    {
+      "path": "doc/port/task-execution.md",
+      "sha256": "89262a9a894ee60b88a6359bc39f81c656b6424a1938789598519472cda84b87",
+      "bytes": 8040
+    },
+    {
+      "path": "src/Harness.Cli/CliApplication.cs",
+      "sha256": "546dcf3873be65fbab3a1baa3cf6697cfbe595956ff505db8aebf7155eea4103",
+      "bytes": 9119
+    },
+    {
+      "path": "src/Harness.Cli/Tasks/TaskCommands.cs",
+      "sha256": "72efd93b0e7ad82af2ba56f3ee36f82d0e858161fc42c80c015f8e95e573df36",
+      "bytes": 25506
+    },
+    {
+      "path": "src/Harness.Cli/Tasks/TaskExecutionCommands.cs",
+      "sha256": "5d872cc7202e6a11eb2e3126713b34b8dd3168c357cf7ecaa404c3c8a449ab99",
+      "bytes": 5691
+    },
+    {
+      "path": "src/Harness.Core/Tasks/TaskExecution.cs",
+      "sha256": "55f792e7668895227aa0ae3618cfdb4a3fa5a4ccb7adb0e53363467103345a30",
+      "bytes": 2215
+    },
+    {
+      "path": "src/Harness.Core/Tasks/TaskModels.cs",
+      "sha256": "c3c266e7a876958417f801f0aa46cc7165c53fd9787121b86a8b9ce892fdce6d",
+      "bytes": 7646
+    },
+    {
+      "path": "src/Harness.Core/Tasks/TaskViews.cs",
+      "sha256": "92a9dfa23b3ceecb82cd6a258e1a92348da9f6c1b6fcc3f3da5c568def811e90",
+      "bytes": 4342
+    },
+    {
+      "path": "src/Harness.Infrastructure/Projects/HarnessStateSession.Tasks.cs",
+      "sha256": "c8b00c94d50a6310b64f4242d7d15e1d8bc30929af3503a2ee5b2917fe7e4726",
+      "bytes": 2364
+    },
+    {
+      "path": "src/Harness.Infrastructure/Projects/HarnessStateSession.cs",
+      "sha256": "5a3fff8250f60ff32508acaf586090cbba15f1376260d860b45481f6be5f87e1",
+      "bytes": 11597
+    },
+    {
+      "path": "src/Harness.Infrastructure/Tasks/TaskStore.Execution.cs",
+      "sha256": "62846c023eda2ccb3bbe4b06bf7dafd596cf67aa8e6ab5821b0c67d9237de02e",
+      "bytes": 11899
+    },
+    {
+      "path": "src/Harness.Infrastructure/Tasks/TaskStore.Proposals.cs",
+      "sha256": "8bff3acd54f5cecf93e017d6f69d7364a4f077a8b81379a310db2c39a5cccd52",
+      "bytes": 6478
+    },
+    {
+      "path": "src/Harness.Infrastructure/Tasks/TaskStore.Workflow.cs",
+      "sha256": "79e9058913b82cb28defe91c270f887f3779f69a53aa293dd7427929c38a4436",
+      "bytes": 7199
+    },
+    {
+      "path": "src/Harness.Infrastructure/Tasks/TaskStore.cs",
+      "sha256": "6f912bf94a8675907a286e7acd935f701ee814c1aedd99d812a029452921d52c",
+      "bytes": 14286
+    },
+    {
+      "path": "src/Harness.Mcp/HarnessMcpServer.cs",
+      "sha256": "43895629449392e9947e17430e025347903c200bc6a4b6a541f2f1376d628303",
+      "bytes": 8785
+    },
+    {
+      "path": "src/Harness.Mcp/Memory/MemoryArguments.cs",
+      "sha256": "51645c91fbcd9d5484a6c68662c01dddeb01dcab1aa4d78d83b9219435a709c5",
+      "bytes": 6682
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_claim.json",
+      "sha256": "638a7e6775388255f637222234f2480a811506844acc590ee00dfec2ae36f3b9",
+      "bytes": 7861
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_complete.json",
+      "sha256": "501ccf3186708205b98d003d305f81f43a8079791760cae88e2b6f1349379137",
+      "bytes": 11450
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_get.json",
+      "sha256": "8d111cfa4d557a28376ef771daeeb5c14de0ff5c97b603ac0eadc5812d2ead76",
+      "bytes": 7781
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_next.json",
+      "sha256": "11192237c9448998ce08fc705b857580833b580f272549400d049eb85131af41",
+      "bytes": 8097
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_propose.json",
+      "sha256": "5c58799fe74e0307ee47bcf51c73b941297f2d63850ba5da0412a90e236c4bc2",
+      "bytes": 4792
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_update.json",
+      "sha256": "38ae24e9e30267bd08e44b5b21b61de71108944a90d51dcb5db8d52ae16499c6",
+      "bytes": 9018
+    },
+    {
+      "path": "src/Harness.Mcp/Tasks/TaskTools.cs",
+      "sha256": "8df2176822fce5ded150e80b1d8727a6fa3cbd28026cfa9545b504044ba29f3f",
+      "bytes": 9010
+    },
+    {
+      "path": "test/Harness.Compatibility/Memory/contracts.py",
+      "sha256": "61a21cd72bdd025a746038ed8d41ce5fc67fdfe5055c7c3ee59e0e75214a3707",
+      "bytes": 27862
+    },
+    {
+      "path": "test/Harness.Compatibility/Tasks/execution.py",
+      "sha256": "4c19988c17a54986a8d75de3784df2e96b0b1ebe453b5cbd0d581fb965ce4ade",
+      "bytes": 15251
+    },
+    {
+      "path": "test/Harness.Integration/Memory/MemoryMcpProcessTests.cs",
+      "sha256": "573631e8847bc9d321a854bdfccb63aa2d6c6c4f50929ef0545e09a134c60dd9",
+      "bytes": 5013
+    },
+    {
+      "path": "test/Harness.Integration/Tasks/TaskExecutionTests.cs",
+      "sha256": "159e972938d50b6ce8189f5ce6eec229f605820928b44a3c63562f66561f7313",
+      "bytes": 13600
+    },
+    {
+      "path": "test/Harness.Unit/Tasks/TaskCliInputTests.cs",
+      "sha256": "1929d2abfb59751711c9978db5e401aa2b4c86c86a2cb55581d8d2fc9c7adf90",
+      "bytes": 990
+    },
+    {
+      "path": "test/Harness.Unit/Tasks/TaskSchemaTests.cs",
+      "sha256": "10a5880cae0f7685032b1b7c760ae4cffe315e44b931bd0a55fe60c74e0ed9fe",
+      "bytes": 1715
+    }
+  ],
+  "schemas": [
+    {
+      "path": "src/Harness.Mcp/Schemas/constraints_current.json",
+      "sha256": "119396d7dbe65a413a07c96608e935561aaf77cbeda68543a6a953b2931ca447",
+      "bytes": 4860
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/decisions_for.json",
+      "sha256": "6a2aa39fdde68b014bb5d3c617e58e8d8b44e9fc01b22a86c9c1cf94bafad109",
+      "bytes": 4980
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/diagnostics.json",
+      "sha256": "fc7a976c3f8a4dcaf2893dfcef858a70534b1aa19ee0dc60051dfe439485a085",
+      "bytes": 4604
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/goals_current.json",
+      "sha256": "6c5621bf222b9f599f8b38124cf8d00f1210bd64764b4982ce8b954e088bfdc4",
+      "bytes": 4861
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_get.json",
+      "sha256": "d87cb24917990a71832e3f1c067d3c97dafe5cb8a764fae67d93d454eac1f11b",
+      "bytes": 4654
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_proposals.json",
+      "sha256": "7e535b0ecf5b68786b9c44e985f15571826f2f779250eab1130db9138edb8692",
+      "bytes": 2084
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_propose.json",
+      "sha256": "eccb709a344d67f0b634751c1b15bca0635920aeb7570ef6ce64f70385ae24fd",
+      "bytes": 6697
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_put.json",
+      "sha256": "f139a6265e6e4d52b1e24ed3325c65eb666fea0b48933fa7cad273f8922804c3",
+      "bytes": 6403
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_review.json",
+      "sha256": "fcfaa482c9a989c8d7fadda8e0304c2f0d1ad4b5ea6325a2b8564e3a69abe43a",
+      "bytes": 6861
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_search.json",
+      "sha256": "6d65ea64dc9c014747301a752437ccd3851e920b0f9a6963a51c00ad9cca0aff",
+      "bytes": 5479
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/memory_supersede.json",
+      "sha256": "5aa4a54b9d04a3c7ccbc81fa414d2a2948416ae3f42e1e0452360e8b026e3668",
+      "bytes": 5290
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/ping.json",
+      "sha256": "a4daa7249184a06f6759456719a85a89ed9c2aef454e891aadeaabf74eb29cc0",
+      "bytes": 562
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/state_get_test.json",
+      "sha256": "60555a5fef44a5ef3aaee92b5a8b11f109dfc85f0a2bac94d9089e042f72ef0d",
+      "bytes": 714
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/state_put_test.json",
+      "sha256": "faa07d62e24883bb9d2f20e6214bd9a42a395ce133c51c212df4f6f5c4924308",
+      "bytes": 779
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_claim.json",
+      "sha256": "638a7e6775388255f637222234f2480a811506844acc590ee00dfec2ae36f3b9",
+      "bytes": 7861
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_complete.json",
+      "sha256": "501ccf3186708205b98d003d305f81f43a8079791760cae88e2b6f1349379137",
+      "bytes": 11450
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_get.json",
+      "sha256": "8d111cfa4d557a28376ef771daeeb5c14de0ff5c97b603ac0eadc5812d2ead76",
+      "bytes": 7781
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_next.json",
+      "sha256": "11192237c9448998ce08fc705b857580833b580f272549400d049eb85131af41",
+      "bytes": 8097
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_propose.json",
+      "sha256": "5c58799fe74e0307ee47bcf51c73b941297f2d63850ba5da0412a90e236c4bc2",
+      "bytes": 4792
+    },
+    {
+      "path": "src/Harness.Mcp/Schemas/task_update.json",
+      "sha256": "38ae24e9e30267bd08e44b5b21b61de71108944a90d51dcb5db8d52ae16499c6",
+      "bytes": 9018
+    }
+  ],
+  "package_locks": [
+    {
+      "path": "src/Harness.Cli/packages.lock.json",
+      "sha256": "04ced63a35ce50fb41b2a22a5681f3d329721aae31317d1c479826b06bc628bc",
+      "bytes": 7485
+    },
+    {
+      "path": "src/Harness.Cli/packages.publish.lock.json",
+      "sha256": "806829e7ec4a1fb98c1a4f248ed41a5376bc0345c6bb4dc243a061b5ba455850",
+      "bytes": 7739
+    },
+    {
+      "path": "src/Harness.Core/packages.lock.json",
+      "sha256": "adf92aa4e37c520dc0e1bd65a5759b9107797116e6cb391f2a5f228d353756a2",
+      "bytes": 997
+    },
+    {
+      "path": "src/Harness.Infrastructure/packages.lock.json",
+      "sha256": "d94ac31e01d05a22ad4fe3b1e7cd76b9b6eb9b5a25019422dc7a99512be3ac99",
+      "bytes": 4479
+    },
+    {
+      "path": "src/Harness.Mcp/packages.lock.json",
+      "sha256": "957dbad7329f798d46265f7494d62e487b52448e399634d0b42e84eb09aebf9e",
+      "bytes": 2384
+    },
+    {
+      "path": "src/Harness.Providers/packages.lock.json",
+      "sha256": "3db5049a7ffbca66923db6a0d12e6efbb0b8dff6676f8abc931e4b9b3ee44877",
+      "bytes": 1056
+    },
+    {
+      "path": "src/Harness.Web/packages.lock.json",
+      "sha256": "3db5049a7ffbca66923db6a0d12e6efbb0b8dff6676f8abc931e4b9b3ee44877",
+      "bytes": 1056
+    },
+    {
+      "path": "test/Harness.Integration/Storage/Worker/packages.lock.json",
+      "sha256": "a969ac38d2da1714c657a333932588a3ebc0eea649222e0e51f6abe62e92eef9",
+      "bytes": 4789
+    },
+    {
+      "path": "test/Harness.Integration/packages.lock.json",
+      "sha256": "c3908fa2f1b0dceb2139fb717dca9fba69d833db705effa0c6810a1e8c58b32e",
+      "bytes": 14174
+    },
+    {
+      "path": "test/Harness.Unit/packages.lock.json",
+      "sha256": "98e4d16f3a98265b426e4169a615bab19caca375bb1b67a4a4746771c0893a98",
+      "bytes": 15746
+    }
+  ],
+  "binaries": [
+    {
+      "path": "src/Harness.Cli/bin/Debug/net10.0/harness.dll",
+      "sha256": "c76a88de6b4adfd90f4a938077c151c395d8d831cfee4b249f5d75946dbb2f23",
+      "bytes": 151552
+    },
+    {
+      "path": "artifacts/task-tools-publish/win-x64/harness.exe",
+      "sha256": "4b415daf26bd6c2203b7fd5c741aec989e44bf416bd730de82042946bee07b1c",
+      "bytes": 110995135
+    },
+    {
+      "path": "artifacts/compatibility/oracle/harness.exe",
+      "sha256": "249b3a500c5f6ae002c91d11d2578e4052d3ec7b09532b38db8510559819909c",
+      "bytes": 28964864
+    }
+  ],
+  "test_results": [
+    {
+      "path": "artifacts/task-tools-results-validated/Harness.Integration_net10.0_x64.trx",
+      "sha256": "0f31e1a22b6ae40f860fd05fbf5dff65a8fa9c18582c8cd19475101928247be1",
+      "bytes": 119031,
+      "counters": {
+        "total": 83,
+        "executed": 82,
+        "passed": 82,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 1,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "path": "artifacts/task-tools-results-validated/Harness.Unit_net10.0_x64.trx",
+      "sha256": "84f0ad79f3164383ed505ac4eb183e4f051cf487abfdc2c4ea46b7cb9b890740",
+      "bytes": 149456,
+      "counters": {
+        "total": 106,
+        "executed": 106,
+        "passed": 106,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "platform_limits": "Windows x64 validated; Unix permissions and other release targets require separate platform runs."
+}

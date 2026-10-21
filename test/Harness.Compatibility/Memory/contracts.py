@@ -152,7 +152,7 @@ def main():
         current = [start(index) for index in range(2)]
         toolsets = [peer.request("tools/list")["result"] for peer in current]
         compare("ten-exact-memory-schemas", [{tool["name"]: tool for tool in toolset["tools"] if tool["name"] in TOOLS} for toolset in toolsets])
-        check("fourteen-implemented-tools", len(toolsets[1]["tools"]) == 14)
+        check("memory-bootstrap-tools-present", {t["name"] for t in toolsets[1]["tools"]}.issuperset(TOOLS | {"ping", "diagnostics", "state_put_test", "state_get_test"}))
         call("uninitialized-read", "memory_search", {})
         check("uninitialized-no-project-state", all(not (sandbox.repository / ".harness").exists() for sandbox in sandboxes))
         user = call("uninitialized-user-write", "memory_put", {"type": "fact", "content": "User prefers isolated fixture execution", "scope": "user"}, alias="user")
