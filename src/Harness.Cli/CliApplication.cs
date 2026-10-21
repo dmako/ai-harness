@@ -54,6 +54,7 @@ public static class CliApplication
         builder.Services.AddSingleton<TaskCommandRunner>();
         builder.Services.AddSingleton<WorkspaceCommandRunner>();
         builder.Services.AddSingleton<ReportCommandRunner>();
+        builder.Services.AddSingleton<ExportCommandRunner>();
         builder.Services.AddSingleton(new SetupInvocation(args));
         builder.Services.AddSingleton<SetupTerminal>();
         builder.Services.AddSingleton<SetupCommandRunner>();
@@ -108,6 +109,14 @@ public static class CliApplication
                         return 0;
                     }).WithDescription("Print the " + shell + " completion script");
                 }
+            });
+            configuration.AddBranch("telemetry", telemetry =>
+            {
+                telemetry.AddCommand<ExportStatusCommand>("status");
+                telemetry.AddCommand<ExportEnableCommand>("enable");
+                telemetry.AddCommand<ExportDisableCommand>("disable");
+                telemetry.AddCommand<ExportPreviewCommand>("preview");
+                telemetry.AddCommand<ExportSendCommand>("send");
             });
             configuration.AddCommand<MetricsCommand>("metrics");
             configuration.AddCommand<ReportCommand>("report");
@@ -202,9 +211,9 @@ public static class CliApplication
         {
             normalized = [normalized[0], normalized[0] is "completion" ? "status" : "choose", .. normalized[1..]];
         }
-        if (normalized[0] is "workspace" or "workspaces" or "projects" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
+        if (normalized[0] is "workspace" or "workspaces" or "projects" or "telemetry" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
         {
-            normalized = [normalized[0], "list", .. normalized[1..]];
+            normalized = [normalized[0], normalized[0] is "telemetry" ? "status" : "list", .. normalized[1..]];
         }
 
         return normalized[0] switch
@@ -232,6 +241,9 @@ public static class CliApplication
             var replacement = name switch
             {
                 "-help" => "--help",
+                "-endpoint" => "--endpoint",
+                "-token" => "--token",
+                "-auto" => "--auto",
                 "-addr" => "--addr",
                 "-no-open" => "--no-open",
                 "-project" => "--project",
@@ -279,7 +291,7 @@ public static class CliApplication
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--addr" or "--kind" or "--shell" or "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
+            if (equals < 0 && replacement is "--endpoint" or "--token" or "--addr" or "--kind" or "--shell" or "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
             {
                 index++; // A value is data, even when it resembles another option.
             }

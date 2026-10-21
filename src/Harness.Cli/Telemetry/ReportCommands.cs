@@ -90,7 +90,7 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
 
         return 0;
     }
-    private LocalReport RegisteredReport(JsonObject project, int days, DateTimeOffset now)
+    internal LocalReport RegisteredReport(JsonObject project, int days, DateTimeOffset now)
     {
         var root = project["root"]?.GetValue<string>() ?? "";
         try

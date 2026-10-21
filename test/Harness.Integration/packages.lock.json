@@ -198,12 +198,26 @@
           "xunit.v3.runner.common": "[4.0.0]"
         }
       },
+      "harness-collect": {
+        "type": "Project",
+        "dependencies": {
+          "Harness.Infrastructure": "[0.1.0-localbuild, )",
+          "Harness.Web": "[0.1.0-localbuild, )"
+        }
+      },
       "harness-graphify": {
         "type": "Project",
         "dependencies": {
           "Harness.Core": "[0.1.0-localbuild, )",
           "Harness.Infrastructure": "[0.1.0-localbuild, )",
           "Harness.Providers": "[0.1.0-localbuild, )"
+        }
+      },
+      "harness-share": {
+        "type": "Project",
+        "dependencies": {
+          "Harness.Infrastructure": "[0.1.0-localbuild, )",
+          "Harness.Web": "[0.1.0-localbuild, )"
         }
       },
       "harness.core": {

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>harness-share</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Web/Harness.Web.csproj" />
+    <ProjectReference Include="../Harness.Infrastructure/Harness.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

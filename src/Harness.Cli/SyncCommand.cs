@@ -20,7 +20,7 @@ internal sealed class SyncSettings : ProjectSettings
     public string Since { get; init; } = "";
 }
 
-internal sealed class SyncCommand(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error) : AsyncCommand<SyncSettings>
+internal sealed class SyncCommand(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error, Telemetry.ExportCommandRunner export) : AsyncCommand<SyncSettings>
 {
     public override async Task<int> ExecuteAsync(CommandContext context, SyncSettings settings, CancellationToken cancellationToken)
     {
@@ -33,6 +33,7 @@ internal sealed class SyncCommand(ProjectLifecycle lifecycle, TextWriter output,
         var mode = (settings.Full, settings.Since.Length > 0) switch { (true, _) => "full", (_, true) => "since", _ => "incremental" };
         var result = await new ProjectSynchronizer(lifecycle, providers: registry).RunAsync(settings.Project, new SyncOptions { Mode = mode, Since = settings.Since, Refreshers = registry.Providers().OfType<Core.Providers.IProviderRefresher>().ToArray() }, cancellationToken);
         await PrintAsync(result);
+        export.SendLater();
         return 0;
     }
 
