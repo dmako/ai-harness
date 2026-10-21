@@ -53,7 +53,7 @@ public static class HarnessMcpServer
                     var version = string.IsNullOrEmpty(client?.Version) ? "" : " " + client.Version;
                     var caller = string.IsNullOrEmpty(client?.Name) ? "unknown" : client.Name + version;
                     try
-                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools); }
+                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools, workspaceTools); }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
                         // The C# SDK intentionally emits no reply for client-cancelled calls.
@@ -68,7 +68,7 @@ public static class HarnessMcpServer
     }
 
     internal static async ValueTask<CallToolResult> CallAsync(CallToolRequestParams parameters, IHarnessStateSession session,
-        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null, ContextTools? contextTools = null)
+        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null, ContextTools? contextTools = null, WorkspaceTools? workspaceTools = null)
     {
         var tool = Tools.FirstOrDefault(tool => tool.Name == parameters.Name)
             ?? throw new McpProtocolException($"unknown tool {JsonSerializer.Serialize(parameters.Name)}", McpErrorCode.InvalidParams);
@@ -92,6 +92,8 @@ public static class HarnessMcpServer
         {
             try
             {
+                if (parameters.Name is "library_adoption" or "similar_concerns")
+                    return workspaceTools is null ? Error("this project is not in a workspace; use 'harness workspace create' to add it") : Success(await workspaceTools.EvidenceAsync(parameters.Name, parameters.Arguments, cancellationToken));
                 if (parameters.Name is "get_context")
                     return Success(await (contextTools ?? new ContextTools(project: session as IContextProjectSession)).CallAsync(parameters.Arguments, cancellationToken));
                 if (ProviderTools.Handles(parameters.Name))
@@ -104,6 +106,8 @@ public static class HarnessMcpServer
             }
             catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
             {
+                if (parameters.Name is "library_adoption" or "similar_concerns")
+                    return Error("workspace analysis timed out while matching source evidence");
                 var kind = parameters.Name.StartsWith("task_", StringComparison.Ordinal) ? "task" : "memory";
                 return Error(kind + " content rejected: credential validation timed out");
             }

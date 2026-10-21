@@ -1,0 +1,243 @@
+{
+  "description": "Workspace evidence about a shared library (a member repository named by library): which other members reference its packages or import its namespaces, which do not, and which declare types named like its public ones (possible local implementations). Evidence for you to judge, never a verdict. Start with depth light.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "library": {
+        "type": "string",
+        "description": "the library's member name in the workspace (as search results name projects)"
+      },
+      "depth": {
+        "type": "string",
+        "description": "light (default; always start here) or deep. Use deep only when the user explicitly asks for deeper or compiler-exact cross-project answers: it starts heavy providers (graphify) in every member and can take up to 60 s"
+      }
+    },
+    "required": [
+      "library"
+    ],
+    "additionalProperties": false
+  },
+  "name": "library_adoption",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "library": {
+        "type": "string"
+      },
+      "packages": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "namespaces": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "public_types": {
+        "type": "integer"
+      },
+      "consumers": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "packages": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "matched": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "namespaces": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "import_files": {
+              "type": "integer"
+            },
+            "imports": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "matched": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "project",
+            "import_files"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "non_consumers": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "possible_local_implementations": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "declared": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "bases": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "kind",
+                "path",
+                "line"
+              ],
+              "additionalProperties": false
+            },
+            "library": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "bases": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "kind",
+                "path",
+                "line"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "project",
+            "declared",
+            "library"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "notes": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "library",
+      "packages",
+      "namespaces",
+      "public_types",
+      "consumers",
+      "non_consumers",
+      "possible_local_implementations"
+    ],
+    "additionalProperties": false
+  }
+}

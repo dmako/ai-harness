@@ -1,0 +1,212 @@
+{
+  "description": "Workspace evidence about one concern described in words (e.g. 'pdf invoice generation'): each member's code named after it, its own decisions about it and its dependencies on packages named after it, side by side with provenance. For you to compare; harness makes no merge or extraction recommendation. Start with depth light.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "concern": {
+        "type": "string",
+        "description": "the concern in words, e.g. 'pdf invoice generation' or 'tenant resolution'"
+      },
+      "depth": {
+        "type": "string",
+        "description": "light (default; always start here) or deep. Use deep only when the user explicitly asks for deeper or compiler-exact cross-project answers: it starts heavy providers (graphify) in every member and can take up to 60 s"
+      }
+    },
+    "required": [
+      "concern"
+    ],
+    "additionalProperties": false
+  },
+  "name": "similar_concerns",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "concern": {
+        "type": "string"
+      },
+      "words": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "members": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "code": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "matched_words": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "path",
+                  "provider",
+                  "matched_words"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "decisions": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "source_type": {
+                    "type": "string"
+                  },
+                  "source_ref": {
+                    "type": "string"
+                  },
+                  "recorded_by": {
+                    "type": "string"
+                  },
+                  "confidence": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "superseded_by": {
+                    "type": "string"
+                  },
+                  "supersede_reason": {
+                    "type": "string"
+                  },
+                  "valid_from": {
+                    "type": "string"
+                  },
+                  "valid_until": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "overrides": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "content",
+                  "scope",
+                  "source_type",
+                  "source_ref",
+                  "recorded_by",
+                  "created_at"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "dependencies": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "package": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "provider": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "package",
+                  "path",
+                  "provider"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "project",
+            "code",
+            "decisions",
+            "dependencies"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "notes": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "concern",
+      "words",
+      "members"
+    ],
+    "additionalProperties": false
+  }
+}

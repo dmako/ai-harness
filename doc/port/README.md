@@ -59,6 +59,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Context retrieval](context-retrieval.md) | PORT-017 deterministic gathering, candidate merging/ranking, applicable memory, recent changes and request-scoped file reads |
 | [Context budgets](context-budgets.md) | PORT-018 serialized UTF-8 budgets, bounded debug, Go JSON escaping and the public get_context tool |
 | [Machine workspaces](workspaces.md) | PORT-019 atomic membership, project management, layered cross-project search/impact/context and read-only peer state |
+| [Workspace comparisons](workspace-evidence.md) | PORT-020 library adoption, similar concerns, shared manifest/build/stack readers and workspace version comparisons |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

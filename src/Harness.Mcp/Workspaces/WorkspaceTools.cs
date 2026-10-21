@@ -24,6 +24,24 @@ public sealed class WorkspaceTools(IWorkspaceProjectSession project, Func<Worksp
         internal bool Disposing { get; set; }
         internal TaskCompletionSource Closed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+    public Task<object> EvidenceAsync(string name, IDictionary<string, JsonElement>? arguments, CancellationToken token)
+    {
+        var depth = arguments?.TryGetValue("depth", out var mode) is true ? mode.GetString() ?? "" : "";
+        if (depth is not ("" or "light" or "deep"))
+            throw new ArgumentException("depth must be light or deep");
+        var key = name is "library_adoption" ? "library" : "concern";
+        var text = arguments?.TryGetValue(key, out var value) is true ? value.GetString() ?? "" : "";
+        if (name is "similar_concerns" && string.IsNullOrWhiteSpace(text))
+            throw new ArgumentException("concern must not be empty: describe it in words");
+        return UseAsync<object>(async search =>
+        {
+            if (search is not IWorkspaceEvidenceSession evidence)
+                throw new InvalidOperationException("workspace evidence session unavailable");
+            return name is "library_adoption"
+                ? await evidence.AdoptionAsync(text.Trim(), token).ConfigureAwait(false)
+                : await evidence.ConcernAsync(text, depth is "deep", token).ConfigureAwait(false);
+        }, token);
+    }
     private async Task<T> UseAsync<T>(Func<IWorkspaceSearchSession, Task<T>> action, CancellationToken token)
     {
         var membership = await project.ReadWorkspaceMembershipAsync(token).ConfigureAwait(false);

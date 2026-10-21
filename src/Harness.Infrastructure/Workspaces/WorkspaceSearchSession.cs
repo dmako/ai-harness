@@ -9,7 +9,7 @@ using Harness.Infrastructure.Storage;
 namespace Harness.Infrastructure.Workspaces;
 
 public sealed partial class WorkspaceSearchSession(WorkspaceMembership membership, IProviderRegistry? current,
-    Func<WorkspaceMember, bool, IProviderRegistry> build, TimeSpan lightCap = default, TimeSpan deepCap = default, TimeSpan warmRetry = default) : IWorkspaceSearchSession
+    Func<WorkspaceMember, bool, IProviderRegistry> build, TimeSpan lightCap = default, TimeSpan deepCap = default, TimeSpan warmRetry = default) : IWorkspaceSearchSession, IWorkspaceEvidenceSession
 {
     private readonly ConcurrentDictionary<(string Root, bool Deep), Lazy<IProviderRegistry>> _registries = new();
     private readonly object _gate = new();
