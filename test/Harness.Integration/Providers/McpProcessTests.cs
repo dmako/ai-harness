@@ -10,6 +10,7 @@ using Xunit;
 
 namespace Harness.Integration.Providers;
 
+[Collection("Provider processes")]
 public sealed class McpProcessTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;

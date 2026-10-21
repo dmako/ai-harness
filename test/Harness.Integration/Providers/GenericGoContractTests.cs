@@ -8,6 +8,7 @@ using Xunit;
 
 namespace Harness.Integration.Providers;
 
+[Collection("Provider processes")]
 public sealed class GenericGoContractTests
 {
     [Theory]

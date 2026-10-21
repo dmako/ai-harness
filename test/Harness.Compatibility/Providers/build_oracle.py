@@ -12,13 +12,14 @@ def main():
     parser.add_argument("--go", type=Path, required=True)
     parser.add_argument("--modules", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--bridge", type=Path, default=Path(__file__).with_name("oracle.go"))
     args = parser.parse_args()
     source = args.source.resolve()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ, GOTOOLCHAIN="local", GOENV="off", GOTELEMETRY="off",
                        GOCACHE=str(source.parent.parent / "go-cache"), GOMODCACHE=str(args.modules.resolve()))
     with tempfile.TemporaryDirectory(prefix="port-generic-", dir=source / "cmd") as directory:
-        (Path(directory) / "main.go").write_bytes(Path(__file__).with_name("oracle.go").read_bytes())
+        (Path(directory) / "main.go").write_bytes(args.bridge.read_bytes())
         result = subprocess.run([str(args.go.resolve()), "build", "-mod=readonly", "-buildvcs=false", "-trimpath", "-o",
                                  str(args.output.resolve()), "./cmd/" + Path(directory).name], cwd=source,
                                 env=environment, stdin=subprocess.DEVNULL, capture_output=True, timeout=180)

@@ -1,0 +1,204 @@
+{
+  "task": "TASK-0014",
+  "generated_at": "2026-10-21T11:17:43.834515+00:00",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "platforms": {
+    "windows": "Windows x64;.NET SDK10.0.402",
+    "linux": "Ubuntu WSL x64;.NET runtime10.0.13",
+    "macos": "not executed"
+  },
+  "oracle_sources": {
+    "internal/providers/protocol/protocol.go": "1b879d6ffea89b5ebe8b2b269077dc7d39b6adff2a2f94889fb456f7a451b5f5",
+    "internal/providers/protocol/client.go": "5c5c7b01b14caa9781c12c9eb264c0e032564cd3360bcfd4041d9e630e9b5692",
+    "internal/providers/protocol/serve.go": "579d40ac393d147b630babb6e5d79b139ab6a58263296993430c260a547fb4ee",
+    "internal/mcp/server/facade.go": "ccd4093b4c56bb944270356488b5d13c8291b6db18074954dcf73b0178230e7f",
+    "internal/providers/builtin/builtin.go": "f64d5f7c22cd195a69a0138c44fbe316930a9e4838e1895667c26573ecf87c48",
+    "internal/findings/coverage.go": "b88bcd6b895353e55735f9f72e4442ceed5deac7cc99c55af8bf5f1a5394e0eb"
+  },
+  "source_sha256": {
+    "doc/port/README.md": "07c5010d2b95d4508e3865ebf1e2ea9319dc1ad93353e0494fb5f2c30b5263e6",
+    "doc/port/provider-facade.md": "94710e1b94d59e998ebe551e615949f8a075f7113680da327557182988608800",
+    "src/Harness.Cli/McpCommand.cs": "b6cc521f7050fe3538b15856b5170b6deb6f898848a8b83e319ffd8bc713efbb",
+    "src/Harness.Core/Providers/IProvider.cs": "443e8cb48ff1799f9a11922ef9925be7ece275a58ba843e5d713afe7bdb55956",
+    "src/Harness.Core/Providers/IProviderRegistry.cs": "d6c6ee7ad57a1021b3dc9d524d0d7f610238ba5d4d3d1c72c975d0bceed6811d",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.Providers.cs": "32f976e70aba69b6a106c7816735d4a51fb6a75d663186447113512a04465c27",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.cs": "f0271718185ced6fc0815ff580164887b509096647706cddfba901ee9ff6985c",
+    "src/Harness.Infrastructure/Providers/ProviderCallRecorder.cs": "e3c9fdb1bd25c3ac51a65257663cb31a0c231a991490da9a699f8094b2ab7c65",
+    "src/Harness.Mcp/HarnessMcpServer.cs": "2ddf3704a481ed6888dc9f35955ef55a08e9e79b9250191b2733407d0ea70f89",
+    "src/Harness.Mcp/Providers/ProviderTools.cs": "1cf424d111f89f65a5d8b072b3b2d67e644aab02cd1c28a44d8b1a41f75023a8",
+    "src/Harness.Mcp/Schemas/package_api.json": "89dfdeb0edae8c084fa10683ed274e1912fc826295ef04c78ea4bc7b3626130d",
+    "src/Harness.Mcp/Schemas/project_overview.json": "942eef9ca763591b0698185c2b660201e2c4efd39cc135a584a1615362ec21a9",
+    "src/Harness.Mcp/Schemas/provider_status.json": "b24162788e75b5c4938e517b8d174ac9e50647cb8db01ac5680dd07f99b5671d",
+    "src/Harness.Mcp/Schemas/search_project.json": "86c31842ed3de15d446c3abfebb22907f9fb33f28b61c482d1d55209a1ca7087",
+    "src/Harness.Providers/Packs/ConfiguredProviders.cs": "4b5db1a5c066ae197e6c892a0570126d71a95ea0997c07e2999178bb1287a797",
+    "src/Harness.Providers/Protocol/ProtocolProvider.cs": "d5dfdce9237431b915653004793cb066895f0deb2c054400b29748ab9c9023a8",
+    "src/Harness.Providers/Protocol/ProtocolServer.cs": "ceb80304c32a8b1a1eefe1782f409aa350abac1ae2a2494b8475abb229810c9d",
+    "src/Harness.Providers/Protocol/ProviderProtocol.cs": "bfed2166941ece8b01cc6a6ec37cc1228bd5659e2f29126e700864359a6a73ba",
+    "src/Harness.Providers/Registry/ProviderRegistry.cs": "89561563ae6ce249ba172c84a7e02a10805ff4fd5e67f19ba9cac7c3bf26ef35",
+    "src/Harness.Providers/Registry/ProviderRouting.cs": "25a6c28f88e56ddab05420ad641f35a874e1ec16a7c747939af393b84318e3f3",
+    "test/Harness.Compatibility/Providers/build_oracle.py": "9fd461effc75e0f1e3c21c28906d95189ee215d9967d8d67cf5da9cb388e8fe3",
+    "test/Harness.Compatibility/Providers/protocol_oracle.go": "4072111f152d92593cbc26571dc68cca007da45fae611d317d91d8efa3785dbc",
+    "test/Harness.Integration/Memory/MemoryMcpProcessTests.cs": "0c61a412ef0a00e17ed3588d50ffa551790b11a064196cf3d4b768fdce1544f9",
+    "test/Harness.Integration/ProjectLifecycleTests.cs": "c5875d36f666c22c869952b5ba5075656d079365815435c7e324763636970f35",
+    "test/Harness.Integration/Providers/GenericGoContractTests.cs": "9c5305f8bc02026b83e96bdb18b57f745548a7938705243b43f7d55d48f5fb62",
+    "test/Harness.Integration/Providers/GenericMcpTests.cs": "90e0d6b613a90935effc94ba7049ca85de866a5d8d7cf49af59c1f8136fcb3f1",
+    "test/Harness.Integration/Providers/McpProcessTests.cs": "8b1e651cc333a95b5a66d61edb40323e4f0ef53b618d649e4ed34ff993584a4a",
+    "test/Harness.Integration/Providers/McpSupervisorTests.cs": "2c38ffacecbb907d46d5a4bae21a38b82d1f2112584ebf73c68cde15077a3f0c",
+    "test/Harness.Integration/Providers/ProtocolGoContractTests.cs": "fb1ff0375c0a47bf28c33f5ff4ecdcfc8797d146701d8b62aeb25807b552d858",
+    "test/Harness.Integration/Providers/ProtocolProviderTests.cs": "403dcd56f7f885d17e0fc235f993050873c522f4947d3e6fe0ceeed363f5dd69",
+    "test/Harness.Integration/Providers/ProviderFacadeProcessTests.cs": "0c43744728fef8b826b4483a32ae7a509a462ba23c3cda2326cc9bdd0f22e479",
+    "test/Harness.Integration/Providers/ProviderFacadeTests.cs": "fc684114a83c09918e0ec4b8b4771cd7c175fe7777fb43a6cce505c1785ad858"
+  },
+  "package_locks": {
+    "src/Harness.Cli/packages.lock.json": {
+      "sha256": "d4d84ca30bc0b474e0d7b0d07f56fe692ccc12974362c10f7cfea2e28fe06ba6",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Cli/packages.publish.lock.json": {
+      "sha256": "a722475a638bd520f59b59025589764cbf5f370ca590edcdb7ddc157d03f6f79",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Core/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Infrastructure/packages.lock.json": {
+      "sha256": "6cd3dd55e3cddbaa75234490eddd16a6c670a664707ba076c47b9d3c2a7a80a2",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Mcp/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Providers/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Web/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/packages.lock.json": {
+      "sha256": "c69d55fa7d9c74ff0241bb1df648dff5d2d3f8d66273fdde65e1f60a64b542f6",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": {
+      "sha256": "112ca61422e901e82b942eb5ad4f872610dc88b3c1f94b5b696c60118051430a",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.ProviderWorker/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Unit/packages.lock.json": {
+      "sha256": "f18d62e17038c1e6cb4930ed6f427f9af1d2e8ed39d6f0118a0047558b698dde",
+      "semantic_change": "unchanged"
+    }
+  },
+  "packs": {
+    "codebase-memory.toml": "7b6a87e64d2061b45ec2a26d415af5d13831c86658a4f02c8c557563a59f0cea",
+    "graphify-csharp.toml": "66858d975b2755692b5c082e130fc74ad5b47b3bf03aaab2510b6da9979f5ee8",
+    "nuget.toml": "671991cc26f3a98e72f17ee399d46563be2bd3451b78617101ad1b3a371396c2",
+    "rg-fd.toml": "3b1d51cf0d8e6dc199a2093527788ac722e44c0c59b2135e14f8284e44d38033",
+    "ripwire.toml": "917f6c95e3ddc67b22c3669bcfae75917a93f79d018a0fbcc701868f0ec007d1"
+  },
+  "tests": {
+    "windows": {
+      "Harness.Integration_net10.0_x64.trx": {
+        "total": 196,
+        "passed": 195,
+        "failed": 0,
+        "notExecuted": 1
+      },
+      "Harness.Unit_net10.0_x64.trx": {
+        "total": 106,
+        "passed": 106,
+        "failed": 0,
+        "notExecuted": 0
+      }
+    },
+    "linux_providers": {
+      "Harness.Integration_net10.0_x64.trx": {
+        "total": 103,
+        "passed": 91,
+        "failed": 0,
+        "notExecuted": 12
+      }
+    },
+    "linux_metadata_final": {
+      "Harness.Integration_net10.0_x64.trx": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "notExecuted": 0
+      }
+    },
+    "new_go_protocol_facade_scenarios": 11,
+    "existing_go_generic_scenarios": 9,
+    "implemented_mcp_tools": 24
+  },
+  "validation": [
+    {
+      "command": "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/provider-facade-tests-11.binlog --report-trx --results-directory artifacts/provider-facade-results-11",
+      "result": "pass",
+      "output": "302 total;301 passed;1 existing platform skip. All storage/memory/generic/protocol Go bridges and real-provider smoke enabled."
+    },
+    {
+      "command": "wsl.exe -d Ubuntu --exec dotnet <portable Harness.Integration.dll> --filter-namespace Harness.Integration.Providers --filter-not-class Harness.Integration.Providers.GenericGoContractTests --report-trx --results-directory artifacts/provider-facade-linux-results",
+      "result": "pass",
+      "output": "103 total;91 passed;12 optional Windows executable cases skipped."
+    },
+    {
+      "command": "wsl.exe -d Ubuntu --exec dotnet <portable Harness.Integration.dll> --filter-class Harness.Integration.Providers.ProviderFacadeTests --report-trx --results-directory artifacts/provider-facade-linux-metadata-final",
+      "result": "pass",
+      "output": "12 passed after final metadata cleanup."
+    },
+    {
+      "command": "dotnet build Harness.slnx -c Release --no-restore -m -bl:artifacts/provider-facade-release-build-final.binlog",
+      "result": "pass",
+      "output": "0 warnings;0 errors."
+    },
+    {
+      "command": "dotnet restore src/Harness.Cli/Harness.Cli.csproj --locked-mode --force -p:RuntimeIdentifier=win-x64 -p:PublishProfile=Release -bl:artifacts/provider-facade-publish-audited-restore.binlog",
+      "result": "pass",
+      "output": "Passed with NuGet vulnerability auditing; an earlier sandbox-only attempt could not contact api.nuget.org and was repeated successfully with network permission."
+    },
+    {
+      "command": "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release -p:ContinuousIntegrationBuild=true --no-restore -o artifacts/provider-facade-publish/win-x64 -bl:artifacts/provider-facade-publish-final.binlog",
+      "result": "pass",
+      "output": "Self-contained single-file publish; version JSON smoke passed."
+    },
+    {
+      "command": "dotnet restore Harness.slnx --locked-mode -bl:artifacts/provider-facade-locked-restore-final.binlog",
+      "result": "pass",
+      "output": "All ten solution projects;all eleven package locks unchanged."
+    },
+    {
+      "command": "dotnet format whitespace Harness.slnx --no-restore --verify-no-changes --include <changed C# files> --binarylog artifacts/provider-facade-format-verify.binlog",
+      "result": "pass",
+      "output": "Passed; UTF-8 without BOM,CRLF and final newline checked."
+    },
+    {
+      "command": "python test/Harness.Compatibility/baseline.py; git diff HEAD --check",
+      "result": "pass",
+      "output": "Final offline inventory/link/whitespace validation recorded at task completion."
+    }
+  ],
+  "artifact_sha256": {
+    "artifacts/provider-facade-tests-11.binlog": "777701b0a8fe44e233aeec77ecfb6f12cf5a4da818bd8df80ade925c2f109710",
+    "artifacts/provider-facade-release-build-final.binlog": "6eb37b9c4a9b59973271dcd410869a809cf8de5409c98ac0b2806d760aaa84a6",
+    "artifacts/provider-facade-publish-final.binlog": "fddfb61ffce42757380da6534ff51c7dca2844812da98427b3f729493831e281",
+    "artifacts/provider-facade-locked-restore-final.binlog": "5d17220b773858242a19272c0bfe7c7dd59c8b556c0e972462a2c2e3c776845c",
+    "artifacts/provider-facade-format-verify.binlog": "6629a4c2d9361b01a97c4c2d5a0395cd39e1f1eed2097bff252213d8f8f2b17a",
+    "artifacts/provider-oracle/protocol-oracle.exe": "2ad09588d23b017828137465fb0f6e5a4c76f095e1a23f3cf8f7335461dc2246",
+    "artifacts/provider-facade-publish/win-x64/harness.exe": "d7d643618a4e22d74171117522fc9169e5b8c8f2d4d507e402eabbe2d62efd94"
+  },
+  "boundaries": [
+    "No separate trace pack exists at the baseline;the five captured TOML packs remain unchanged.",
+    "Stack enrichment and workspace search remain PORT-020;sync mutations remain PORT-016.",
+    "ProtocolServer provides protocol conformance;this task does not implement a native language analyzer.",
+    "Legacy synchronous capability declarations may perform first-use discovery;MCP routing awaits the async discovery port before reading declarations.",
+    "Provider observations are bounded and best effort;two-second queue drain budget plus an in-flight bounded SQLite wait."
+  ],
+  "license": "Original MIT source provenance retained in baseline.json, embedded pack license and MCP schema license."
+}

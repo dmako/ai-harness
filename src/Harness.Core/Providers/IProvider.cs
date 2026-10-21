@@ -9,6 +9,12 @@ public interface IProvider : IAsyncDisposable
     Task<ProviderResult> ExecuteAsync(ProviderRequest request, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Asynchronous warm-up for adapters whose capability declarations require remote discovery.</summary>
+public interface IProviderDiscovery
+{
+    Task DiscoverAsync(CancellationToken cancellationToken = default);
+}
+
 public interface IProviderRefresher : IProvider
 {
     Task<RefreshResult> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken = default);

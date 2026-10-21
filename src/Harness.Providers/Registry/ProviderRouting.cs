@@ -84,9 +84,10 @@ public static class ProviderRouting
         }
     }
 
-    private class Routed(IProvider provider, string[] only, string inactive) : IProvider, IVersionedProvider
+    private class Routed(IProvider provider, string[] only, string inactive) : IProvider, IVersionedProvider, IProviderDiscovery
     {
         protected string InactiveReason => inactive;
+        public Task DiscoverAsync(CancellationToken cancellationToken = default) => inactive.Length is 0 && provider is IProviderDiscovery discovery ? discovery.DiscoverAsync(cancellationToken) : Task.CompletedTask;
         public string Name => provider.Name;
         public string ServerVersion => (provider as IVersionedProvider)?.ServerVersion ?? "";
         public IReadOnlyList<CapabilityInfo> Capabilities() => inactive.Length > 0 ? [] : provider.Capabilities().Where(info => only.Contains(info.Capability, StringComparer.Ordinal)).ToArray();

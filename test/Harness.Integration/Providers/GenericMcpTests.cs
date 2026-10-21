@@ -8,6 +8,7 @@ using Xunit;
 
 namespace Harness.Integration.Providers;
 
+[Collection("Provider processes")]
 public sealed class GenericMcpTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -17,7 +18,7 @@ public sealed class GenericMcpTests
         Type = "mcp",
         Command = "dotnet",
         Args = [],
-        TimeoutMs = 3000,
+        TimeoutMs = 10000,
         Capabilities = mappings.ToDictionary(pair => pair.Capability, pair => pair.Mapping, StringComparer.Ordinal),
     };
     private static IProvider Provider(ProviderFixture fixture, ProviderConfiguration configuration, bool linked = false) => GenericMcpProvider.Build("fakeidx", configuration with { Args = [ProviderFixture.Worker, "normal", fixture.Root] }, fixture.Root, new ProviderProcessFactory(), linkedWorktree: linked);

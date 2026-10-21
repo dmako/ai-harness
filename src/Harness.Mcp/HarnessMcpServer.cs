@@ -2,6 +2,8 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text;
 using Harness.Core.Projects;
+using Harness.Core.Providers;
+using Harness.Mcp.Providers;
 using Harness.Core.Memory;
 using Harness.Mcp.Memory;
 using Harness.Core.Tasks;
@@ -19,7 +21,7 @@ public static class HarnessMcpServer
     private static readonly IReadOnlyList<Tool> Tools = LoadTools();
 
     public static async Task RunAsync(Stream input, Stream output, IHarnessStateSession session, HarnessRuntime runtime,
-        ILoggerFactory loggerFactory, IServiceProvider? services = null, CancellationToken cancellationToken = default)
+        ILoggerFactory loggerFactory, IServiceProvider? services = null, IProviderRegistry? providers = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
@@ -27,6 +29,7 @@ public static class HarnessMcpServer
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         await using var ownedSession = session;
+        var providerTools = new ProviderTools(providers, session as IProviderProjectSession);
         await using var transport = new CompatibleStdioTransport(input, output);
         var options = new McpServerOptions
         {
@@ -46,7 +49,7 @@ public static class HarnessMcpServer
                     var version = string.IsNullOrEmpty(client?.Version) ? "" : " " + client.Version;
                     var caller = string.IsNullOrEmpty(client?.Name) ? "unknown" : client.Name + version;
                     try
-                    { return await CallAsync(request.Params, session, runtime, token, caller); }
+                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools); }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
                         // The C# SDK intentionally emits no reply for client-cancelled calls.
@@ -61,7 +64,7 @@ public static class HarnessMcpServer
     }
 
     internal static async ValueTask<CallToolResult> CallAsync(CallToolRequestParams parameters, IHarnessStateSession session,
-        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown")
+        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown", ProviderTools? providerTools = null)
     {
         var tool = Tools.FirstOrDefault(tool => tool.Name == parameters.Name)
             ?? throw new McpProtocolException($"unknown tool {JsonSerializer.Serialize(parameters.Name)}", McpErrorCode.InvalidParams);
@@ -85,6 +88,8 @@ public static class HarnessMcpServer
         {
             try
             {
+                if (ProviderTools.Handles(parameters.Name))
+                    return Success(await (providerTools ?? new ProviderTools(project: session as IProviderProjectSession)).CallAsync(parameters.Name, parameters.Arguments, cancellationToken));
                 if (parameters.Name.StartsWith("task_", StringComparison.Ordinal))
                     return session is ITaskSession tasks ? Success(await TaskTools.CallAsync(parameters.Name, parameters.Arguments, tasks, session as IMemorySession, caller, cancellationToken)) : Error("task session unavailable");
                 if (session is not IMemorySession memory)

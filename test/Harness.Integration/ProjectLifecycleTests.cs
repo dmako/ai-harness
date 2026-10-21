@@ -15,6 +15,39 @@ namespace Harness.Integration;
 public sealed class ProjectLifecycleTests
 {
     [Fact]
+    public async Task ProviderFacadeReadsStalenessAcrossSyncHeadMovementAndBranchSwitch()
+    {
+        using var fixture = new ProjectFixture();
+        var token = TestContext.Current.CancellationToken;
+        var root = await fixture.CreateRepositoryAsync("facade-staleness");
+        await fixture.GitAsync(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "initial");
+        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: token);
+        await using var session = new HarnessStateSession(initialized.Location, fixture.Lifecycle.Registry, new("test", "", "test", "test"));
+        var first = await session.ReadProviderProjectAsync(token);
+        first.Stale.Should().Contain("never been synced");
+        first.ProjectId.Should().NotBeEmpty();
+        using (var database = HarnessDatabase.Open(initialized.Location.DatabasePath, cancellationToken: token))
+        using (var connection = database.OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "INSERT INTO sync_state(worktree_id,branch,head_commit,detached,dirty,dirty_paths,synced_at) SELECT id,$branch,$commit,0,0,0,'2026-10-21T00:00:00Z' FROM worktrees WHERE path=$path";
+            command.Parameters.AddWithValue("$branch", first.Branch);
+            command.Parameters.AddWithValue("$commit", first.Commit);
+            command.Parameters.AddWithValue("$path", initialized.Location.Root);
+            await command.ExecuteNonQueryAsync(token);
+        }
+        (await session.ReadProviderProjectAsync(token)).Stale.Should().BeEmpty();
+        await fixture.GitAsync(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "moved");
+        var moved = await session.ReadProviderProjectAsync(token);
+        moved.Stale.Should().Contain("HEAD moved");
+        moved.CrossBranch.Should().BeFalse();
+        await fixture.GitAsync(root, "switch", "-c", "other");
+        var switched = await session.ReadProviderProjectAsync(token);
+        switched.Stale.Should().Contain("branch changed");
+        switched.CrossBranch.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task DryRunAndInspectionNeverInitializeOrModifyState()
     {
         using var fixture = new ProjectFixture();

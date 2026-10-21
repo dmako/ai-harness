@@ -1,0 +1,173 @@
+{
+  "description": "Search this project's code through harness providers. kind: 'symbol' (definitions by name/concept), 'text' (occurrences), 'file' (file names), 'callers' (who calls the symbol named by query), 'references' (every use of that symbol), 'impact' (what a change to that symbol affects, transitively, with depth = hops; check before editing), or 'all' (symbol+text, default). Plain-text query. Each result names the provider that produced it.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "text to search for (plain text, not a regex)"
+      },
+      "kind": {
+        "type": "string",
+        "description": "symbol, text, file, callers, references, impact or all (default all = symbol+text)"
+      },
+      "path": {
+        "type": "string",
+        "description": "optional path prefix relative to the project root"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "max results per provider and kind (default 10, max 50)"
+      },
+      "debug": {
+        "type": "boolean",
+        "description": "include per-provider latency, size and truncation"
+      },
+      "scope": {
+        "type": "string",
+        "description": "project (default) or workspace: also search the other repositories in this project's workspaces; results then name their project, and path may be <project>:<path>"
+      },
+      "depth": {
+        "type": "string",
+        "description": "light (default; always start here) or deep. Use deep only when the user explicitly asks for deeper or compiler-exact cross-project answers: it starts heavy providers (graphify) in every member and can take up to 60 s"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "name": "search_project",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string"
+      },
+      "results": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "qualified_name": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "start_line": {
+              "type": "integer"
+            },
+            "end_line": {
+              "type": "integer"
+            },
+            "snippet": {
+              "type": "string"
+            },
+            "depth": {
+              "type": "integer"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "tool": {
+              "type": "string"
+            },
+            "score": {
+              "type": "number"
+            },
+            "via": {
+              "type": "string"
+            },
+            "evidence": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "provider"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "errors": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "calls": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "capability": {
+              "type": "string"
+            },
+            "items": {
+              "type": "integer"
+            },
+            "latency_ms": {
+              "type": "integer"
+            },
+            "bytes": {
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "capability",
+            "items",
+            "latency_ms",
+            "bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "note": {
+        "type": "string"
+      },
+      "stale": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "query",
+      "results"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed partial class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime, string? globalConfigurationPath = null) : IHarnessStateSession, Harness.Core.Memory.IMemorySession, Harness.Core.Tasks.ITaskSession
+public sealed partial class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime, string? globalConfigurationPath = null) : IHarnessStateSession, Harness.Core.Memory.IMemorySession, Harness.Core.Tasks.ITaskSession, Harness.Core.Providers.IProviderProjectSession
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private HarnessDatabase? _database;
@@ -90,7 +90,7 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
             {
                 result["project_id"] = registration.Project.Id;
                 result["worktree_id"] = registration.Worktree.Id;
-                result["sync"] = ReadSync(database, registration.Worktree.Id, head);
+                result["sync"] = ReadSync(database, registration.Worktree.Id, head, out _);
             }
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or SqliteException or ArgumentException)
@@ -175,10 +175,13 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
             result[key] = value;
     }
 
-    private static Dictionary<string, object?> ReadSync(HarnessDatabase database, string worktree, GitHead? head)
+    private static Dictionary<string, object?> ReadSync(HarnessDatabase database, string worktree, GitHead? head, out bool crossBranch, bool includeRecentRuns = true)
     {
         // This read-only view preserves the diagnostics contract; sync mutations remain PORT-016.
-        Dictionary<string, object?> result = new(StringComparer.Ordinal) { ["recent_runs"] = RecentRuns(database, worktree) };
+        crossBranch = false;
+        Dictionary<string, object?> result = new(StringComparer.Ordinal);
+        if (includeRecentRuns)
+            result["recent_runs"] = RecentRuns(database, worktree);
         using var connection = database.OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT branch, head_commit, detached, synced_at FROM sync_state WHERE worktree_id=$worktree";
@@ -198,6 +201,7 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         Add(result, "synced_at", SecondPrecision(reader.GetString(3)));
         if (head is not null && (head.Branch != branch || head.Detached != detached))
         {
+            crossBranch = true;
             result["stale"] = $"branch changed since the last sync ({(detached ? "detached HEAD" : branch)} -> {(head.Detached ? "detached HEAD" : head.Branch)}); indexed results may describe the other branch (run 'harness sync')";
         }
         else if (head is not null && head.Commit != commit)
