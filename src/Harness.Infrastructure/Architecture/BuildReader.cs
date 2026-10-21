@@ -88,6 +88,7 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
         var nested = repository.Files.Where(file => file != "go.mod" && Path.GetFileName(file) is "go.mod").Select(file => Directory(file) + "/").ToArray();
         Dictionary<string, BuildUnit> units = new(StringComparer.Ordinal);
         Dictionary<string, HashSet<string>> external = new(StringComparer.Ordinal);
+        List<ArchitectureFinding> internals = [];
         foreach (var file in repository.Files.Where(file => Path.GetExtension(file) is ".go" && !file.EndsWith("_test.go", StringComparison.Ordinal) && !nested.Any(prefix => file.StartsWith(prefix, StringComparison.Ordinal)) && !Directory(file).Split('/').Any(part => part is "vendor" or "testdata" || part.StartsWith('.') || part.StartsWith('_'))))
         {
             var dir = Directory(file);
@@ -123,6 +124,10 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
                             target = ".";
                         if (target != dir && !unit.References.Contains(target, StringComparer.Ordinal))
                         { unit.References.Add(target); (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[target] = file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture); }
+                        var internalAt = ("/" + target + "/").LastIndexOf("/internal/", StringComparison.Ordinal);
+                        var parent = internalAt < 0 ? "" : ("/" + target + "/")[..internalAt].Trim('/');
+                        if (target != dir && parent.Length > 0 && dir != parent && !dir.StartsWith(parent + "/", StringComparison.Ordinal))
+                            internals.Add(new() { Kind = "internal-import", Level = "problem", Title = dir + " imports " + target + " from outside its tree", Why = "Go allows an internal package to be imported only from below the folder that holds internal/; this does not build.", Fix = "Move the importing package below the internal package's parent, or move the package out of internal/.", Project = dir, Evidence = [file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture)], Key = ArchitectureAnalyzer.Key("internal-import", dir, target) });
                     }
                     else if (path.Split('/')[0].Contains('.', StringComparison.Ordinal))
                     {
@@ -142,7 +147,7 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             if (unit.Kind is "library" && (name.EndsWith("test", StringComparison.Ordinal) || name is "testutil" or "testhelpers"))
                 unit.Kind = "test";
         }
-        return new("go", "package", [], units.Values.OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray());
+        return new("go", "package", [], units.Values.OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray()) { Extra = internals };
     }
     private string Join(string dir, string path) => repository.Relative(Path.GetFullPath(path, Path.GetFullPath(Path.Combine(repository.Root, dir))));
     private static string Directory(string path) => Path.GetDirectoryName(path)?.Replace('\\', '/') is { Length: > 0 } value ? value : ".";

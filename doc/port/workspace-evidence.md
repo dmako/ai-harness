@@ -54,8 +54,9 @@ summaries and workspace runtime/framework/core version rows. Published versions
 remain separate from consumed versions; a mismatch means the declarations
 differ, not that a consumer was proven incompatible. The HTTP endpoints and
 UI wiring remain PORT-027/028 work. Architecture rules, deep/internal-import
-findings and system communication analysis remain PORT-021 work; these readers
-do not create findings or native symbol indexes.
+findings and system communication analysis are implemented by
+[PORT-021](architecture-readers.md); the manifest readers do not create native
+symbol indexes.
 
 The original PORT-019 `PackageIdentityReader` remains the conservative impact
 helper. The new static evaluator follows the source's supported build-reading

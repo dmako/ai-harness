@@ -8,7 +8,7 @@ public sealed record BuildPackage(
     [property: JsonPropertyName("frameworks"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Frameworks = null,
     [property: JsonPropertyName("conditional"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Conditional = false,
     [property: JsonPropertyName("unresolved"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Unresolved = false);
-public sealed record BuildUnit
+public record BuildUnit
 {
     [JsonPropertyName("name")] public string Name { get; init; } = "";
     [JsonPropertyName("path")] public string Path { get; init; } = "";
@@ -28,4 +28,7 @@ public sealed record ProjectBuild(
     [property: JsonPropertyName("language")] string Language,
     [property: JsonPropertyName("noun")] string Noun,
     [property: JsonPropertyName("solutions")] IReadOnlyList<BuildGroup> Solutions,
-    [property: JsonPropertyName("projects")] IReadOnlyList<BuildUnit> Projects);
+    [property: JsonPropertyName("projects")] IReadOnlyList<BuildUnit> Projects)
+{
+    [JsonIgnore] public IReadOnlyList<ArchitectureFinding> Extra { get; init; } = [];
+}

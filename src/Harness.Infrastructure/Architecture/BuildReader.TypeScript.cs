@@ -55,6 +55,7 @@ public sealed partial class BuildReader
             units = FolderUnits(code, root);
         var aliases = Aliases();
         var byName = noun is "package" ? units.ToDictionary(unit => unit.Build.Name, StringComparer.Ordinal) : new Dictionary<string, TsUnit>(StringComparer.Ordinal);
+        Dictionary<(string From, string To), List<string>> deeps = [];
         foreach (var file in code)
         {
             var from = UnitOf(file);
@@ -66,16 +67,30 @@ public sealed partial class BuildReader
                 var line = lines[index].Trim();
                 if (line.StartsWith("//", StringComparison.Ordinal) || line.StartsWith('*'))
                     continue;
-                foreach (Match import in Imports.Matches(lines[index]))
+                foreach (var import in Imports.Matches(lines[index]).Select(match => match.Groups))
                 {
-                    var (target, bare) = Resolve(import.Groups[1].Value, file, aliases, files);
+                    var (target, bare) = Resolve(import[1].Value, file, aliases, files);
                     TsUnit? to = null;
                     if (target.Length > 0)
                         to = UnitOf(target);
                     else if (bare.Length > 0 && !byName.TryGetValue(bare, out to) && !bare.StartsWith("node:", StringComparison.Ordinal))
                         from.Npm.Add(bare);
                     if (to is not null && to != from)
+                    {
                         Reference(from.Build, to.Build.Path, file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture));
+                        if (target.Length > 0 && to.Folder.Length > 0 && Containers.Contains(Path.GetFileName(Directory(to.Folder))))
+                        {
+                            var rest = target[to.Folder.Length..].TrimStart('/');
+                            if (rest.Length > 0 && rest is not "index" && !rest.StartsWith("index.", StringComparison.Ordinal))
+                            {
+                                var key = (from.Build.Path, to.Build.Path);
+                                if (!deeps.TryGetValue(key, out var places))
+                                { places = []; deeps.Add(key, places); }
+                                if (places.Count < 3)
+                                    places.Add(file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture) + " " + import[1].Value);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -97,7 +112,21 @@ public sealed partial class BuildReader
             unit.Build.Packages.AddRange(unit.Npm.Order(WorkspaceNameComparer.Instance).Select(name => new BuildPackage(name, Empty(PackageVersion(source, name) is { Length: > 0 } version ? version : PackageVersion(root, name)))));
             unit.Build.References.Sort(WorkspaceNameComparer.Instance);
         }
-        return new("typescript", noun, [], units.Select(unit => unit.Build).OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray());
+        var names = units.ToDictionary(unit => unit.Build.Path, unit => unit.Build.Name, StringComparer.Ordinal);
+        return new("typescript", noun, [], units.Select(unit => unit.Build).OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray())
+        {
+            Extra = deeps.Select(pair => new ArchitectureFinding
+            {
+                Kind = "deep-import",
+                Level = "warn",
+                Title = names[pair.Key.From] + " reaches into " + names[pair.Key.To] + "'s internals",
+                Why = "It imports files inside the feature instead of its entry file (index), so a change inside " + names[pair.Key.To] + " can break " + names[pair.Key.From] + ". Export what is needed from its index.",
+                Fix = "Export what is used from the feature's index and import it from there.",
+                Project = pair.Key.From,
+                Evidence = pair.Value,
+                Key = ArchitectureAnalyzer.Key("deep-import", pair.Key.From, pair.Key.To),
+            }).OrderBy(finding => finding.Title, StringComparer.Ordinal).ToArray(),
+        };
 
         TsUnit? UnitOf(string file)
         {
