@@ -1,3 +1,4 @@
+using Harness.ProviderWorker;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -6,6 +7,11 @@ using System.Text;
 
 Console.InputEncoding = new UTF8Encoding(false, true);
 Console.OutputEncoding = new UTF8Encoding(false);
+if (Environment.GetEnvironmentVariable("HARNESS_FAKE_GRAPHIFY") is { Length: > 0 } graphifyDirectory)
+{
+    Environment.ExitCode = await GraphifyWorker.RunAsync(graphifyDirectory, args);
+    return;
+}
 var mode = args.FirstOrDefault() ?? "normal";
 if (mode is "descendant")
 {

@@ -21,17 +21,19 @@ internal sealed class UnixProviderProcess : IProviderProcess
         _input = input;
         _output = output;
         _error = error;
-        Completion = Task.Factory.StartNew(() =>
-        {
-            int status;
-            while (Native.waitpid(Id, out status, 0) < 0)
-            {
-                if (Marshal.GetLastPInvokeError() is not 4) // EINTR
-                    throw new Win32Exception(Marshal.GetLastPInvokeError());
-            }
-            return (status & 0x7f) is 0 ? status >> 8 : 128 + (status & 0x7f);
-        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Completion = Reap(Id);
     }
+
+    internal static Task<int> Reap(int pid) => Task.Factory.StartNew(() =>
+    {
+        int status;
+        while (Native.waitpid(pid, out status, 0) < 0)
+        {
+            if (Marshal.GetLastPInvokeError() is not 4)
+                throw new Win32Exception(Marshal.GetLastPInvokeError());
+        }
+        return (status & 0x7f) is 0 ? status >> 8 : 128 + (status & 0x7f);
+    }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     public int Id { get; }
     public Stream Input => _input;
@@ -138,7 +140,7 @@ internal sealed class UnixProviderProcess : IProviderProcess
         public void Dispose() { _read?.Dispose(); _write?.Dispose(); }
     }
 
-    private sealed class StringVector : IDisposable
+    internal sealed class StringVector : IDisposable
     {
         private readonly List<NativeMemory> _strings = [];
         private readonly NativeMemory _vector;
@@ -162,7 +164,7 @@ internal sealed class UnixProviderProcess : IProviderProcess
         public void Dispose() { _vector.Dispose(); foreach (var value in _strings) value.Dispose(); }
     }
 
-    private static class Native
+    internal static class Native
     {
         private const string LibC = "libc";
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)][DllImport(LibC)] internal static extern int posix_spawnattr_init(IntPtr attributes);

@@ -38,7 +38,7 @@ internal sealed class WindowsProviderProcess : IProviderProcess
     public Task<int> Completion { get; }
 
     [SuppressMessage("Blocker Code Smell", "S3869:SafeHandle.DangerousGetHandle should not be called", Justification = "STARTUPINFOEX handle arrays require raw handles; all owners remain alive through CreateProcess and are disposed only afterward.")]
-    internal static WindowsProviderProcess Start(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment)
+    internal static WindowsProviderProcess Start(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment, bool allowDetachedChildren = false)
     {
         var job = Native.CreateJobObjectW(IntPtr.Zero, null);
         if (job.IsInvalid)
@@ -53,7 +53,7 @@ internal sealed class WindowsProviderProcess : IProviderProcess
         {
             // JOBOBJECT_EXTENDED_LIMIT_INFORMATION is 144 bytes on all supported 64-bit Windows RIDs.
             using var limits = new NativeMemory(144);
-            Marshal.WriteInt32(limits.Pointer, 16, 0x2000); // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            Marshal.WriteInt32(limits.Pointer, 16, 0x2000 | (allowDetachedChildren ? 0x800 : 0)); // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
             Check(Native.SetInformationJobObject(job, 9, limits.Pointer, 144));
             input = new(PipeDirection.Out, HandleInheritability.Inheritable);
             output = new(PipeDirection.In, HandleInheritability.Inheritable);
@@ -145,7 +145,7 @@ internal sealed class WindowsProviderProcess : IProviderProcess
             throw new Win32Exception(Marshal.GetLastPInvokeError());
     }
 
-    private static string Quote(string value)
+    internal static string Quote(string value)
     {
         var result = new StringBuilder("\"");
         var slashes = 0;
@@ -163,7 +163,7 @@ internal sealed class WindowsProviderProcess : IProviderProcess
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct StartupInfo
+    internal struct StartupInfo
     {
         public int Size;
         public IntPtr Reserved, Desktop, Title;
@@ -172,12 +172,12 @@ internal sealed class WindowsProviderProcess : IProviderProcess
         public IntPtr ReservedData, Input, Output, Error;
     }
     [StructLayout(LayoutKind.Sequential)]
-    private struct StartupInfoEx { public StartupInfo Startup; public IntPtr Attributes; }
+    internal struct StartupInfoEx { public StartupInfo Startup; public IntPtr Attributes; }
     [StructLayout(LayoutKind.Sequential)]
-    private struct ProcessInfo { public IntPtr Process, Thread; public int Id, ThreadId; }
+    internal struct ProcessInfo { public IntPtr Process, Thread; public int Id, ThreadId; }
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute to generate P/Invoke marshalling code at compile time", Justification = "The repository disallows unsafe code; these bounded Windows ABI declarations use runtime marshalling.")]
-    private static class Native
+    internal static class Native
     {
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
@@ -197,6 +197,10 @@ internal sealed class WindowsProviderProcess : IProviderProcess
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport("kernel32.dll")]
         internal static extern void DeleteProcThreadAttributeList(IntPtr list);
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool SetHandleInformation(SafeFileHandle handle, int mask, int flags);
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

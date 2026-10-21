@@ -21,12 +21,13 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
     private bool _closed;
 
     public ProtocolProvider(string name, ProviderConfiguration configuration, string root, IProviderProcessFactory factory,
-        IReadOnlyDictionary<string, string?>? environment = null, McpRestartPolicy? policy = null, TimeProvider? clock = null)
+        IReadOnlyDictionary<string, string?>? environment = null, McpRestartPolicy? policy = null, TimeProvider? clock = null, bool allowDetachedChildren = false)
     {
         Name = name;
         _clock = clock ?? TimeProvider.System;
         _supervisor = new(factory, new(name, new(configuration.Command, configuration.Args)
         {
+            AllowDetachedChildren = allowDetachedChildren,
             WorkingDirectory = configuration.Dir is "project" ? root : "",
             Environment = environment ?? new Dictionary<string, string?>(),
         })

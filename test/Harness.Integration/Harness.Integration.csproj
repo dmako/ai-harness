@@ -8,6 +8,7 @@
     <ProjectReference Include="../../src/Harness.Cli/Harness.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/Harness.Infrastructure/Harness.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Harness.Mcp/Harness.Mcp.csproj" />
+    <ProjectReference Include="../../src/Harness.Graphify/Harness.Graphify.csproj" />
     <ProjectReference Include="../../src/Harness.Providers/Harness.Providers.csproj" />
     <ProjectReference Include="Storage/Worker/Harness.StorageWorker.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Harness.ProviderWorker/Harness.ProviderWorker.csproj" ReferenceOutputAssembly="false" />

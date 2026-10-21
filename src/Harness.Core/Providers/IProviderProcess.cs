@@ -2,6 +2,8 @@ namespace Harness.Core.Providers;
 
 public sealed record ProviderProcessOptions(string Command, IReadOnlyList<string> Arguments)
 {
+    /// <summary>Allows an explicitly detached child to outlive this process; ordinary providers keep this disabled.</summary>
+    public bool AllowDetachedChildren { get; init; }
     public string WorkingDirectory { get; init; } = "";
     public IReadOnlyDictionary<string, string?> Environment { get; init; } = new Dictionary<string, string?>();
 }

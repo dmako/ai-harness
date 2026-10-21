@@ -8,13 +8,13 @@ public sealed record ProviderRegistration(string Name, string Type, Func<IProvid
 
 public static class ProviderRouting
 {
-    public static ProviderRegistry Build(IEnumerable<ProviderRegistration> registrations, string root, bool light = false)
+    public static ProviderRegistry Build(IEnumerable<ProviderRegistration> registrations, string root, bool light = false, IReadOnlyList<string>? detectedLanguages = null)
     {
         var entries = registrations.ToArray();
         var timeout = entries.Aggregate(TimeSpan.FromSeconds(30), (current, entry) => entry.Timeout + TimeSpan.FromSeconds(1) > current ? entry.Timeout + TimeSpan.FromSeconds(1) : current);
         var registry = new ProviderRegistry(timeout);
         registry.SetPathFilter(new NestedWorktreeFilter(root).Skip);
-        var languages = DetectLanguages(root);
+        var languages = detectedLanguages ?? DetectLanguages(root);
         foreach (var entry in entries.OrderBy(entry => entry.Name, StringComparer.Ordinal))
         {
             if (!entry.Enabled || light && !entry.Context || entry.Type is not ("mcp" or "harness"))

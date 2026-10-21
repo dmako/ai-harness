@@ -54,6 +54,7 @@ the hashes and newline counts; the source files have not been changed.
 | [Provider registry](provider-registry.md) | PORT-012 provider-neutral models, lazy routing, ordered fanout, isolated deadlines and nested-worktree filtering |
 | [Downstream MCP](downstream-mcp.md) | PORT-013 SDK process client, generic mappings, supervised restart, bounded I/O and native descendant cleanup |
 | [Provider facade](provider-facade.md) | PORT-014 v1 protocol, frozen packs, CLI composition, four public provider MCP tools and stale-index filtering |
+| [Graphify adapter](graphify.md) | PORT-015 external C# intelligence, nested input discovery, reusable warm sessions, ownership and platform cleanup |
 | [CLI source contracts](inventory/cli.json) | Exact command builders, flag declaration functions, conditional defaults and companion flag declarations |
 | [MCP roots](inventory/mcp.json) and [schema types](inventory/schema-types.json) | Exact Go type declarations and JSON/schema tags, including nested types; custom completion schema and argument hints |
 | [HTTP registrations](inventory/http.json) | Method/path patterns, handler wrappers and pinned source locations |

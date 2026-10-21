@@ -8,6 +8,14 @@ public sealed class ProviderProcessFactory : IProviderProcessFactory
 {
     public IProviderProcess Start(ProviderProcessOptions options)
     {
+        var (executable, directory, environment) = Prepare(options);
+        return OperatingSystem.IsWindows()
+            ? WindowsProviderProcess.Start(executable, options.Arguments, directory, environment, options.AllowDetachedChildren)
+            : UnixProviderProcess.Start(executable, options.Arguments, directory, environment);
+    }
+
+    internal static (string Executable, string Directory, Dictionary<string, string> Environment) Prepare(ProviderProcessOptions options)
+    {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Command);
         if (options.Command.Contains('\0', StringComparison.Ordinal) || options.Arguments.Any(argument => argument.Contains('\0', StringComparison.Ordinal)))
@@ -25,9 +33,7 @@ public sealed class ProviderProcessFactory : IProviderProcessFactory
         }
         var directory = options.WorkingDirectory.Length is 0 ? System.Environment.CurrentDirectory : Path.GetFullPath(options.WorkingDirectory);
         var executable = ResolveExecutable(options.Command, environment);
-        return OperatingSystem.IsWindows()
-            ? WindowsProviderProcess.Start(executable, options.Arguments, directory, environment)
-            : UnixProviderProcess.Start(executable, options.Arguments, directory, environment);
+        return (executable, directory, environment);
     }
 
     private static string ResolveExecutable(string command, Dictionary<string, string> environment)

@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Harness.Core.Projects;
 using Harness.Infrastructure.Projects;
+using Harness.Infrastructure.Graphify;
+using Harness.Providers.Registry;
 using Harness.Mcp;
 using Harness.Infrastructure.Processes;
 using Harness.Providers.Packs;
@@ -21,7 +23,14 @@ internal sealed class McpCommand(ProjectLifecycle lifecycle, BuildInformation in
         }
 
         var location = await lifecycle.LocateAsync(settings.Project, allowNonGit: true, cancellationToken);
-        await using var providers = ConfiguredProviders.Build(location.Configuration.Value.Providers, location.Root, new ProviderProcessFactory());
+        var languages = ProviderRouting.DetectLanguages(location.Root);
+        if (location.Configuration.Value.Providers.Values.Any(provider => provider.Pack is "graphify-csharp" && provider.IsEnabled()) && !languages.Contains("csharp", StringComparer.Ordinal))
+        {
+            var candidate = GraphifyDiscovery.FindInput(location.Root);
+            if (candidate.AtRoot || candidate.Path.Length > 0 || candidate.Candidates is { Count: > 0 })
+                languages = [.. languages, "csharp"];
+        }
+        await using var providers = ConfiguredProviders.Build(location.Configuration.Value.Providers, location.Root, new ProviderProcessFactory(), detectedLanguages: languages);
         await using var calls = new ProviderCallRecorder(location.DatabasePath, location.Configuration.Value.Storage.BusyTimeoutMs);
         providers.SetObserver(calls.Observe);
         var runtime = new HarnessRuntime(information.Version, information.Commit, information.Runtime, information.Platform);

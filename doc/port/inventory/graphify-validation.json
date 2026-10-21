@@ -1,0 +1,260 @@
+{
+  "task": "TASK-0015",
+  "generated_at": "2026-10-21T12:03:54.280424+00:00",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "platforms": {
+    "windows": "Windows x64; .NET SDK 10.0.402/runtime 10.0.13",
+    "linux": "Ubuntu WSL x64; .NET runtime 10.0.13",
+    "macos": "not executed"
+  },
+  "oracle_sources": {
+    "cmd/harness-graphify/adapter.go": "daa36f77fed8706e00eef3ff6a7fb83cd5918deff1bee32c0f70a6e524d27aea",
+    "cmd/harness-graphify/main.go": "44574c867f200f1313a08fc0c29ea8e63a153b86e62398479599e43f85c508cc",
+    "cmd/harness-graphify/alive_other.go": "bf85f26618366a8a3f704798362371a80ca243201dea30a6f86aaf7ecf1a1295",
+    "cmd/harness-graphify/alive_unix.go": "27e38ca4e499b970ac9a7a9074a3275c02192b0edf8d4b9f28c27ca063a4961e",
+    "internal/graphify/graphify.go": "cf5a55e44045244d71c66109e36e6d16de8f759030810d97d78e1a08d19e3262",
+    "internal/graphify/detach_other.go": "13689e949c595e66ce7c87311cf589076128e66ed212cfa578ec883a911ac9a9",
+    "internal/graphify/detach_unix.go": "0f93df1ef347d6c40d01cbf67e2d46424dec2b30c11a04b7a1ed6374a0354f83",
+    "internal/dotnet/solution.go": "5ac86a03eb551bdb2cb57e2d37574e513dfabdf0122298b527222e45404b3ff6",
+    "internal/fsutil/lock_other.go": "f6d5b01778904e0a6259e2a032e2e0ffd938261c12807124ad2c773659dfed84"
+  },
+  "source_sha256": {
+    ".gitignore": "84ed394efb79283258fabdb11e025a1f2579af5a87a4d0e71ce688f4172821c9",
+    "Harness.slnx": "ebe8b2ae277790ac1c751d2cf2b9a134f2ed9c98ef4b7c3bd833774e41e7c0dd",
+    "doc/port/README.md": "251034350617054dae4e60c06426f91060166a49fc0eb5a40f55dfc898dd2dcc",
+    "doc/port/graphify.md": "1c86f3334bc2baeb123fb187f76ce125a6e9dd67b5a60ccd72a03023cfb0006b",
+    "src/Harness.Cli/McpCommand.cs": "9f5bd619d6e4dfc9615e28105cef6db64078713a3359f5b203e39ffb3c25fc44",
+    "src/Harness.Core/Graphify/GraphifyModels.cs": "c5ec4682aea8edcc2fe9c208cc9e8a2a8d01ff5d71b846c6c6eb59ec5212af40",
+    "src/Harness.Core/Providers/IProviderProcess.cs": "76e56529c93b0d942df5d5bc9588e6b9d3eaec21149aea1d62bf74e016f8f0bb",
+    "src/Harness.Graphify/GraphifyApplication.cs": "c8c7cb0a38081c308be7efa5c91760aab52302ccf3f539f8ae92b79e4023c015",
+    "src/Harness.Graphify/Harness.Graphify.csproj": "476fc73b12bed5149c6556b81aaf764fcbea5381dc838c419d114662a15090aa",
+    "src/Harness.Graphify/Program.cs": "bb95d54533605af51cfab597d1bdb7adf664963f7d5f277cd863d3b95abc3861",
+    "src/Harness.Graphify/Properties/PublishProfiles/Release.pubxml": "34b4eb696fb2afc85b632f65f80a1db0587fa8d912cd0aeaa7d52e118da15d65",
+    "src/Harness.Infrastructure/Graphify/GraphifyDiscovery.cs": "104c97c04ae26f7dd13b19d3066047baf707987675c69faca313952367bbd48d",
+    "src/Harness.Infrastructure/Graphify/GraphifyRecords.cs": "2364b423d7b4fa881a43942027454062c7db829553334972899fbdd009698f05",
+    "src/Harness.Infrastructure/Graphify/GraphifySessionManager.cs": "3b529896751a01bdacb8107bcb974da369f39c44ed515b5a103a5c5df73b0460",
+    "src/Harness.Infrastructure/Processes/DetachedProcess.cs": "74244517ac70af5e8cc354c803cb25cb26c1ec598e3f9b30933115b15bd4e7e3",
+    "src/Harness.Infrastructure/Processes/ProviderProcessFactory.cs": "7469892aaee8e4ce013501dd489b51b67883c6f2fc1d12612f2d81707324a63c",
+    "src/Harness.Infrastructure/Processes/UnixProviderProcess.cs": "0bbedc8dd1acee95fbd87789b65c90f300057e90695358ec6e1ed3183287d5ae",
+    "src/Harness.Infrastructure/Processes/WindowsProviderProcess.cs": "14c603ce44175c3a287870a1f955152f99915b8e8cfec4b66d075b2274a782fe",
+    "src/Harness.Providers/Graphify/GraphifyProvider.cs": "9126a4590f009501a8086b78241d191c7c33150763be07c1728aa6b65448d308",
+    "src/Harness.Providers/Graphify/GraphifyQueryException.cs": "ec7204dd7234965cd1c01c80402e6aa163fde91fee53e8861c6c30d0393c84ba",
+    "src/Harness.Providers/Packs/ConfiguredProviders.cs": "886d377bf28e8f6f828914a75489c6a63566f790e05c1d324d14f76cc2d66bbd",
+    "src/Harness.Providers/Protocol/ProtocolProvider.cs": "359ef3b16594952698423dd9327a47596c68f375c1d9ca01e72b963ce40e8927",
+    "src/Harness.Providers/Registry/ProviderRouting.cs": "0fd0b5c88cb555455f2ca549e520a1c7051bac5a0cf6618236e3f3b43364f968",
+    "test/Harness.Compatibility/Graphify/build_oracle.py": "e369ba7f249f83d29a5cde4a5913905089ca07b03aa4f406ab1c57f6d3e1c947",
+    "test/Harness.Compatibility/Graphify/main.go": "7287c26d8ffda8460073106eb7fa8f5206440826597157ad08a5123e35100efb",
+    "test/Harness.Integration/Harness.Integration.csproj": "a92ec83020480db0307d97bfd8d6a02796344a824c53259582cfb84af47f2787",
+    "test/Harness.Integration/Providers/GraphifyGoContractTests.cs": "d992901309ce8dc413e251d447c77dc68eabce5d269d99cf7303bbdeaf191c7a",
+    "test/Harness.Integration/Providers/GraphifyRealTests.cs": "32b39f891cbefb93aff957f601ea51bb14675bf4a192906ddd07371444de2d2d",
+    "test/Harness.Integration/Providers/GraphifySessionTests.cs": "a08847d9fd1a216186d19851f300446add93b9f1067eb717300ef61e754bce04",
+    "test/Harness.Integration/Providers/GraphifyTests.cs": "07dc4546cd24128bb4128d05ac7319c4657852e8aba95f226e9038b72a0de1e3",
+    "test/Harness.ProviderWorker/GraphifyWorker.cs": "bac651162f724144344b0f033722e7a84b70263e5e07c9ba0efea8de36b70174",
+    "test/Harness.ProviderWorker/Program.cs": "c8fc5f63bb94a2218b6ca390914cdca9b4a7e6457131e549d9d5c7c272b35209"
+  },
+  "package_locks": {
+    "src/Harness.Cli/packages.lock.json": {
+      "sha256": "d4d84ca30bc0b474e0d7b0d07f56fe692ccc12974362c10f7cfea2e28fe06ba6",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Cli/packages.publish.lock.json": {
+      "sha256": "a722475a638bd520f59b59025589764cbf5f370ca590edcdb7ddc157d03f6f79",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Core/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Graphify/packages.lock.json": {
+      "sha256": "79a73a25ec13072fd2f02aeb6d538fc3a3cc35bae95b4e93d42a310bc68e7ce2",
+      "semantic_change": "new companion lock"
+    },
+    "src/Harness.Graphify/packages.publish.lock.json": {
+      "sha256": "d1c1386057c7bc3bfd4beee0f89ecb0cfb8993a946c2a93084975ccfbd079787",
+      "semantic_change": "new companion lock"
+    },
+    "src/Harness.Infrastructure/packages.lock.json": {
+      "sha256": "6cd3dd55e3cddbaa75234490eddd16a6c670a664707ba076c47b9d3c2a7a80a2",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Mcp/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Providers/packages.lock.json": {
+      "sha256": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "semantic_change": "unchanged"
+    },
+    "src/Harness.Web/packages.lock.json": {
+      "sha256": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Integration/packages.lock.json": {
+      "sha256": "7abd3ee7cbf1b33703dbea24880483d545bdf9765bc257a9ea879424de58c7b5",
+      "semantic_change": "changed project dependency graph"
+    },
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": {
+      "sha256": "112ca61422e901e82b942eb5ad4f872610dc88b3c1f94b5b696c60118051430a",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.ProviderWorker/packages.lock.json": {
+      "sha256": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "semantic_change": "unchanged"
+    },
+    "test/Harness.Unit/packages.lock.json": {
+      "sha256": "f18d62e17038c1e6cb4930ed6f427f9af1d2e8ed39d6f0118a0047558b698dde",
+      "semantic_change": "unchanged"
+    }
+  },
+  "results": {
+    "full_windows": [
+      {
+        "path": "artifacts/graphify-final-results-16/Harness.Integration_net10.0_x64.trx",
+        "sha256": "2e2c1577eb9b7fed9a241f6cdbe1442c657e983914e368e17c75ee4ea134e562",
+        "counters": {
+          "total": "223",
+          "executed": "221",
+          "passed": "221",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "2",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        }
+      },
+      {
+        "path": "artifacts/graphify-final-results-16/Harness.Unit_net10.0_x64.trx",
+        "sha256": "898cf47f2327a3dfd8f520853ebc290abc58d06e6923e5044f49dfe7f65c72ce",
+        "counters": {
+          "total": "106",
+          "executed": "106",
+          "passed": "106",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        }
+      }
+    ],
+    "final_graphify_windows": {
+      "total": 27,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "duration": "33s 645ms",
+      "evidence": "captured test-run stdout from the approved direct-DLL invocation; the announced TRX was not retained at the reported path",
+      "reported_trx": "artifacts/graphify-final-results-26/Harness.Integration_net10.0_x64.trx"
+    },
+    "portable_linux": [
+      {
+        "path": "artifacts/graphify-linux-final-results-17/Harness.Integration_net10.0_x64.trx",
+        "sha256": "54bfa4b6c63c4017741f27519395a24ad293c5ac27daf33bd6786777e16320db",
+        "counters": {
+          "total": "27",
+          "executed": "15",
+          "passed": "15",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "12",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        }
+      }
+    ]
+  },
+  "real_graphify": {
+    "executable_version": "0.2.1+18c3f8ec89381464a83cd8649420477a0ebf9112",
+    "ready": true,
+    "callers": [
+      "Run"
+    ],
+    "references": 2,
+    "impact": [
+      {
+        "Name": "Run",
+        "Depth": 1
+      },
+      {
+        "Name": "Execute",
+        "Depth": 2
+      }
+    ],
+    "owned_session": true
+  },
+  "artifacts": {
+    "artifacts/graphify-oracle/graphify-oracle.exe": "5c44169d69a12a339798d28fa85d2aad828f4317bcab804e794191940a53699c",
+    "artifacts/graphify-publish/win-x64/harness-graphify.exe": "b79864828a40afe74accf71243c29f5e4b0be69cc504b352ae33e88b81fb0c05"
+  },
+  "validation": [
+    {
+      "command": "dotnet restore Harness.slnx --locked-mode -bl:artifacts/graphify-final-restore-29.binlog",
+      "result": "pass; auditing enabled"
+    },
+    {
+      "command": "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/graphify-final-tests-16.binlog --report-trx --results-directory artifacts/graphify-final-results-16",
+      "result": "329 total, 327 passed, 2 skipped: Unix mode bits and opt-in real graphify (run separately)"
+    },
+    {
+      "command": "dotnet test/Harness.Integration/bin/Debug/net10.0/Harness.Integration.dll --filter-class Harness.Integration.Providers.Graphify* --report-trx --results-directory artifacts/graphify-final-results-26",
+      "environment": "HARNESS_GO_GRAPHIFY_ORACLE + HARNESS_REAL_GRAPHIFY set",
+      "result": "27 passed including nine frozen Go comparisons and real compiler/descriptor cleanup"
+    },
+    {
+      "command": "wsl.exe -d Ubuntu --exec env TESTINGPLATFORM_TELEMETRY_OPTOUT=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet /mnt/c/repos/personal/ai-harness-cs/test/Harness.Integration/bin/Debug/net10.0/Harness.Integration.dll --filter-class Harness.Integration.Providers.Graphify* --report-trx --results-directory /mnt/c/repos/personal/ai-harness-cs/artifacts/graphify-linux-final-results-17",
+      "result": "15 passed; 12 skipped: Windows fake apphost/oracle and opt-in installed graphify"
+    },
+    {
+      "command": "dotnet build Harness.slnx --no-restore -m -bl:artifacts/graphify-final-build-25.binlog",
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "dotnet publish src/Harness.Graphify/Harness.Graphify.csproj -c Release -r win-x64 -p:PublishProfile=Release --no-restore -o artifacts/graphify-publish/win-x64 -bl:artifacts/graphify-final-publish-28.binlog",
+      "result": "self-contained single-file publish; 0 warnings/errors; published --help exits 0"
+    },
+    {
+      "command": "dotnet format whitespace Harness.slnx --no-restore --include <changed C# files> --verify-no-changes --binarylog artifacts/graphify-format-verify-30.binlog",
+      "result": "pass"
+    },
+    {
+      "command": "python test/Harness.Compatibility/baseline.py",
+      "result": "pass"
+    },
+    {
+      "command": "git diff HEAD --check",
+      "result": "pass"
+    }
+  ],
+  "limitations": [
+    "Light get_context is guarded at the light registry boundary: get_context implementation belongs to a later port task.",
+    "macOS native process paths were not executed.",
+    "Containing Windows jobs can forbid explicit breakaway; launch fails visibly.",
+    "Descriptor recheck/delete and noncooperating Go Windows record writers are not an atomic cross-runtime transaction.",
+    "Impact context-deadline estimation is replaced by cancellation and bounded command/provider deadlines.",
+    "Go durations below 100 ns round toward zero to .NET ticks."
+  ]
+}
