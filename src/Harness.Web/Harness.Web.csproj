@@ -3,4 +3,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/*" LogicalName="Harness.Web.Assets/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Documentation/*.md" LogicalName="Harness.Web.Documentation/%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

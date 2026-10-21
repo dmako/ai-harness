@@ -12,7 +12,7 @@ using Harness.Infrastructure.Workspaces;
 namespace Harness.Infrastructure.Findings;
 
 /// <summary>Request-scoped project/workspace finding sets, shared by MCP and sync.</summary>
-public sealed class FindingSets(string root, string projectId, HarnessDatabase? database, string globalConfigurationPath, Projects.MachineRegistry registry)
+public sealed class FindingSets(string root, string projectId, HarnessDatabase? database, string globalConfigurationPath, Projects.MachineRegistry registry, ArchitectureRead? projectRead = null)
 {
     private readonly KnowledgeLevels _levels = new(globalConfigurationPath, registry);
     private readonly WorkspaceStore _workspaces = new(globalConfigurationPath, registry);
@@ -29,7 +29,7 @@ public sealed class FindingSets(string root, string projectId, HarnessDatabase? 
         var reader = new ArchitectureReader(members);
         var own = database is null ? null : new MemoryStore(database);
         var rules = ArchitectureReader.RulesFor(own, _levels, projectId, token);
-        var read = await reader.ProjectAsync(Current, rules, full, token).ConfigureAwait(false);
+        var read = projectRead ?? await reader.ProjectAsync(Current, rules, full, token).ConfigureAwait(false);
         var found = (read.Architecture?.Findings ?? []).ToList();
         var stored = database is null ? [] : new FindingStore(database).Current(token).Findings;
         if (!full)

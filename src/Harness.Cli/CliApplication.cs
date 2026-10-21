@@ -3,6 +3,7 @@ using Harness.Cli.Memory;
 using Harness.Cli.Setup;
 using Harness.Cli.Tasks;
 using Harness.Cli.Telemetry;
+using Harness.Cli.Ui;
 using Harness.Cli.Workspaces;
 using Harness.Infrastructure.Completion;
 using Harness.Infrastructure.Projects;
@@ -57,6 +58,8 @@ public static class CliApplication
         builder.Services.AddSingleton<SetupTerminal>();
         builder.Services.AddSingleton<SetupCommandRunner>();
         builder.Services.AddSingleton<HookCommandRunner>();
+        builder.Services.AddSingleton<UiProjectCatalog>();
+        builder.Services.AddSingleton<UiSessions>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -76,6 +79,7 @@ public static class CliApplication
             configuration.AddCommand<InitCommand>("init").WithDescription("Initialize project state");
             configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
+            configuration.AddCommand<UiCommand>("ui").WithDescription("Open the local harness UI");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
             configuration.AddCommand<SyncCommand>("sync").WithDescription("Refresh recorded project state (worktree, branch, HEAD)");
             configuration.AddCommand<InstallCommand>("install");
@@ -228,6 +232,8 @@ public static class CliApplication
             var replacement = name switch
             {
                 "-help" => "--help",
+                "-addr" => "--addr",
+                "-no-open" => "--no-open",
                 "-project" => "--project",
                 "-dry-run" => "--dry-run",
                 "-json" => "--json",
@@ -273,7 +279,7 @@ public static class CliApplication
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--kind" or "--shell" or "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
+            if (equals < 0 && replacement is "--addr" or "--kind" or "--shell" or "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
             {
                 index++; // A value is data, even when it resembles another option.
             }

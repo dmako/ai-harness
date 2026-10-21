@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harness</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="180x180">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="brand.css">
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<div class="splash" id="splash" role="status" aria-label="Loading harness"></div>
+<header class="top">
+  <button class="menu" id="menu" aria-label="Projects" aria-expanded="false">☰</button>
+  <h1><a href="#/"><img src="logo.svg" alt="">harness</a></h1>
+  <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+  <div class="spacer"></div>
+  <form class="searchbox" role="search"><input type="search" id="search" placeholder="Search  ⌘K" aria-label="Search projects, workspaces, memories and tasks"></form>
+  <label class="window"><span>Window</span>
+    <select id="days">
+      <option value="7">7 days</option>
+      <option value="30" selected>30 days</option>
+      <option value="90">90 days</option>
+      <option value="365">1 year</option>
+    </select>
+  </label>
+  <button id="theme" class="ghost" aria-label="Theme">◐</button>
+  <button id="refresh" title="Reload from the project databases">Refresh</button>
+</header>
+<div class="layout">
+  <nav class="projects" id="projects" aria-label="Workspaces and projects"></nav>
+  <main id="main" tabindex="-1"><p class="empty">Loading…</p></main>
+</div>
+</body>
+</html>

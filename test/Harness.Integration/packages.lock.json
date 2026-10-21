@@ -232,6 +232,12 @@
           "ModelContextProtocol.Core": "[2.2.0, )"
         }
       },
+      "harness.web": {
+        "type": "Project",
+        "dependencies": {
+          "Harness.Core": "[0.1.0-localbuild, )"
+        }
+      },
       "Microsoft.Bcl.AsyncInterfaces": {
         "type": "CentralTransitive",
         "requested": "[10.0.13, )",

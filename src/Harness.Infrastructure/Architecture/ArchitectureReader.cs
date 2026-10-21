@@ -26,7 +26,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         }
         return reader.Read(provided);
     }
-    public async Task<ArchitectureRead> ProjectAsync(WorkspaceMember current, BoundaryRules? rules, bool includeMembers, CancellationToken token)
+    public async Task<ArchitectureRead> ProjectAsync(WorkspaceMember current, BoundaryRules? rules, bool includeMembers, CancellationToken token, bool workspaceKnown = false)
     {
         var build = await BuildAsync(current, token).ConfigureAwait(false);
         if (build is null)
@@ -63,7 +63,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
             }
         }
         // Unreadable peers cannot prove a published package unused.
-        Func<string, bool>? used = includeMembers && complete && members.Count > 1 ? consumed.Contains : null;
+        Func<string, bool>? used = includeMembers && complete && (members.Count > 1 || workspaceKnown) ? consumed.Contains : null;
         var architecture = ArchitectureAnalyzer.Analyze(build, used);
         if (rules is not null)
         {

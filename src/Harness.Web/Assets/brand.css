@@ -1,0 +1,300 @@
+/* The harness palette: every colour harness uses, defined once (brand:
+   docs/assets/logo.svg). Interfaces never write a colour value; they map
+   their semantic tokens (--accent, --surface...) to these. */
+:root {
+  /* Maya teal */
+  --brand-teal: #006b6c;
+  --brand-teal-light: #4fb4b1;
+  --brand-teal-wash-light: #cfe6e4;
+  --brand-teal-wash-dark: #0d3f40;
+  /* Aztec gold */
+  --brand-gold: #e2a33b;
+  --brand-gold-light: #f0c26a;
+  --brand-gold-dark: #7d5208;
+  /* white: the light theme's surfaces */
+  --brand-white: #ffffff;
+  --brand-grey-50: #f6f7f8;
+  /* limestone (text on dark) */
+  --brand-stone-50: #fcf9f3;
+  --brand-stone-100: #f6f1e7;
+  --brand-stone-150: #f3ecdf;
+  --brand-stone-200: #eee7d9;
+  --brand-stone-300: #e2dacb;
+  --brand-stone-400: #c4baa6;
+  --brand-stone-500: #c2bbae;
+  --brand-stone-600: #9b958a;
+  --brand-stone-700: #68635a;
+  --brand-stone-800: #4b473f;
+  /* graphite (dark surfaces and text on light) */
+  --brand-graphite-950: #141413;
+  --brand-graphite-900: #1c1c1b;
+  --brand-graphite-850: #252523;
+  --brand-graphite-800: #2d2d2a;
+  --brand-graphite-700: #3c3b37;
+  /* status and category hues: -ink for light backgrounds, -glow for dark */
+  --brand-green-ink: #146c3a;
+  --brand-green: #1f9d55;
+  --brand-green-glow: #52c784;
+  --brand-green-bright: #2fb36a;
+  --brand-red: #c7413b;
+  --brand-red-glow: #e0605a;
+  --brand-red-soft: #e66767;
+  --brand-orange: #d9733f;
+  --brand-orange-glow: #e0874f;
+  --brand-rust: #d0612c;
+  --brand-rust-glow: #e07a45;
+  --brand-jade: #1b8f66;
+  --brand-jade-glow: #3fbf8f;
+  --brand-ochre: #b47a12;
+  --brand-moss: #3f7d2a;
+  --brand-moss-glow: #7fb860;
+  --brand-violet: #5b4bb3;
+  --brand-violet-glow: #9d90f0;
+}
+
+/* The harness design system (TASK-0022): what every harness interface
+   shares — harness ui, the download page, the telemetry collector and
+   any future one. It maps the palette (palette.css) to semantic roles for
+   light and dark, and defines fonts, type scale, radii, spacing, shadows
+   and the base components. Interfaces reference these names and keep only
+   their own layout; they never write a colour, font family or radius.
+
+   Theme: light by default, dark when the system prefers it; a page can
+   pin one with <html data-theme="dark"> (or "light"). */
+
+:root {
+  color-scheme: light;
+  /* surfaces and text */
+  /* light is white throughout: cards stand out by border and shadow, as
+     on dark; fills (hover, insets, tracks) are a neutral grey */
+  --page: var(--brand-white);
+  --surface: var(--brand-white);
+  --surface-2: var(--brand-grey-50);
+  /* chips and pills, and panels inside a card (an expanded row, a form,
+     a history): outlined on light, filled on dark */
+  --chip: var(--brand-white);
+  --inset: var(--brand-white);
+  --inset-line: var(--border);
+  --card-shadow: 0 1px 2px color-mix(in srgb, var(--brand-graphite-950) 7%, transparent), 0 4px 14px color-mix(in srgb, var(--brand-graphite-950) 5%, transparent);
+  --ink: var(--brand-graphite-900);
+  --ink-2: color-mix(in srgb, var(--brand-graphite-900) 80%, var(--brand-white));
+  --muted: color-mix(in srgb, var(--brand-graphite-900) 64%, var(--brand-white));
+  --border: color-mix(in srgb, var(--brand-graphite-900) 14%, transparent);
+  --grid: color-mix(in srgb, var(--brand-graphite-900) 10%, var(--brand-white));
+  --axis: color-mix(in srgb, var(--brand-graphite-900) 26%, var(--brand-white));
+  /* accent: --fill is the teal of filled controls (text on it --on-fill);
+     --accent is teal for text, lines and focus, lighter on dark for AA */
+  --accent: var(--brand-teal);
+  --accent-wash: var(--brand-teal-wash-light);
+  /* the open item of a list (an expanded task): a faint accent tint over
+     the surface, in either theme */
+  --selected: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  --fill: var(--brand-teal);
+  --on-fill: var(--brand-white);
+  /* highlight: gold marks the one thing to do on a page */
+  --gold: var(--brand-gold);
+  --gold-hover: var(--brand-gold-light);
+  --gold-ink: var(--brand-gold-dark);
+  --on-gold: var(--brand-graphite-950);
+  /* status */
+  --good: var(--brand-green);
+  --good-ink: var(--brand-green-ink);
+  --warning: var(--brand-gold);
+  --serious: var(--brand-orange);
+  --critical: var(--brand-red);
+  /* knowledge categories */
+  --c-goal: var(--brand-teal);
+  --c-constraint: var(--brand-rust);
+  --c-decision: var(--brand-jade);
+  --c-open_question: var(--brand-ochre);
+  --c-fact: var(--brand-moss);
+  --c-convention: var(--brand-violet);
+  --c-warning: var(--brand-red);
+
+  /* type */
+  --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --text-display: clamp(34px, 6vw, 56px);
+  --leading: 1.5;
+  --leading-tight: 1.1;
+
+  /* shape and space */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+  --radius-round: 50%;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --content: 1040px;
+  --shadow-1: 0 1px 2px color-mix(in srgb, var(--brand-graphite-950) 10%, transparent);
+  --shadow-2: 0 8px 24px color-mix(in srgb, var(--brand-graphite-950) 18%, transparent);
+  --glow-gold: 0 8px 24px color-mix(in srgb, var(--brand-gold) 22%, transparent);
+  --motion: 0.12s;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: var(--brand-graphite-950);
+    --surface: var(--brand-graphite-900);
+    --surface-2: var(--brand-graphite-850);
+    --chip: var(--brand-graphite-850);
+    --inset: var(--brand-graphite-850);
+    --inset-line: transparent;
+    --card-shadow: none;
+    --ink: var(--brand-stone-150);
+    --ink-2: var(--brand-stone-500);
+    --muted: var(--brand-stone-600);
+    --border: color-mix(in srgb, var(--brand-stone-150) 10%, transparent);
+    --grid: var(--brand-graphite-800);
+    --axis: var(--brand-graphite-700);
+    --accent: var(--brand-teal-light);
+    --accent-wash: var(--brand-teal-wash-dark);
+    --on-fill: var(--brand-stone-150);
+    --gold-ink: var(--brand-gold-light);
+    --good: var(--brand-green-bright);
+    --good-ink: var(--brand-green-glow);
+    --serious: var(--brand-orange-glow);
+    --critical: var(--brand-red-glow);
+    --c-goal: var(--brand-teal-light);
+    --c-constraint: var(--brand-rust-glow);
+    --c-decision: var(--brand-jade-glow);
+    --c-open_question: var(--brand-gold);
+    --c-fact: var(--brand-moss-glow);
+    --c-convention: var(--brand-violet-glow);
+    --c-warning: var(--brand-red-soft);
+    --shadow-1: 0 1px 2px color-mix(in srgb, var(--brand-graphite-950) 40%, transparent);
+    --shadow-2: 0 12px 32px color-mix(in srgb, var(--brand-graphite-950) 55%, transparent);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: var(--brand-graphite-950);
+  --surface: var(--brand-graphite-900);
+  --surface-2: var(--brand-graphite-850);
+  --chip: var(--brand-graphite-850);
+  --inset: var(--brand-graphite-850);
+  --inset-line: transparent;
+  --card-shadow: none;
+  --ink: var(--brand-stone-150);
+  --ink-2: var(--brand-stone-500);
+  --muted: var(--brand-stone-600);
+  --border: color-mix(in srgb, var(--brand-stone-150) 10%, transparent);
+  --grid: var(--brand-graphite-800);
+  --axis: var(--brand-graphite-700);
+  --accent: var(--brand-teal-light);
+  --accent-wash: var(--brand-teal-wash-dark);
+  --on-fill: var(--brand-stone-150);
+  --gold-ink: var(--brand-gold-light);
+  --good: var(--brand-green-bright);
+  --good-ink: var(--brand-green-glow);
+  --serious: var(--brand-orange-glow);
+  --critical: var(--brand-red-glow);
+  --c-goal: var(--brand-teal-light);
+  --c-constraint: var(--brand-rust-glow);
+  --c-decision: var(--brand-jade-glow);
+  --c-open_question: var(--brand-gold);
+  --c-fact: var(--brand-moss-glow);
+  --c-convention: var(--brand-violet-glow);
+  --c-warning: var(--brand-red-soft);
+  --shadow-1: 0 1px 2px color-mix(in srgb, var(--brand-graphite-950) 40%, transparent);
+  --shadow-2: 0 12px 32px color-mix(in srgb, var(--brand-graphite-950) 55%, transparent);
+}
+
+/* --- base --- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: var(--text-md)/var(--leading) var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+code, kbd, pre, samp, .mono { font-family: var(--mono); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+
+/* --- components --- */
+
+/* buttons: neutral by default; .primary (teal fill) for the main action of
+   a form, .highlight (gold) for the one thing a page asks for, .danger for
+   destructive actions, .ghost for secondary ones, .lg for hero sizes */
+button, .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: var(--space-1) 10px; cursor: pointer; text-decoration: none;
+  transition: background var(--motion), border-color var(--motion), transform var(--motion);
+}
+button:hover, .btn:hover { background: var(--surface-2); }
+button:disabled, .btn[aria-disabled="true"] { opacity: 0.55; cursor: default; }
+.primary { background: var(--fill); border-color: var(--fill); color: var(--on-fill); font-weight: 500; }
+.primary:hover { background: var(--fill); filter: brightness(1.08); }
+.highlight { background: var(--gold); border-color: var(--gold); color: var(--on-gold); font-weight: 650; box-shadow: var(--glow-gold); }
+.highlight:hover { background: var(--gold-hover); border-color: var(--gold-hover); transform: translateY(-1px); }
+.danger { background: var(--critical); border-color: var(--critical); color: var(--on-fill); font-weight: 500; }
+.danger:hover { background: var(--critical); filter: brightness(1.08); }
+.ghost { background: transparent; }
+.lg { padding: 13px 22px; font-size: 16px; border-radius: var(--radius-lg); }
+
+select {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: var(--space-1) 10px; cursor: pointer;
+}
+
+/* form fields */
+.field { display: grid; gap: var(--space-1); font-size: var(--text-sm); color: var(--ink-2); }
+input[type="text"], input[type="search"], input:not([type]), textarea {
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px var(--space-2); width: 100%;
+}
+
+/* surfaces */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); min-width: 0; box-shadow: var(--card-shadow); }
+
+/* labels: .pill for a status or tag, .badge for a count */
+.pill {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  padding: 2px 10px; font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap;
+}
+.badge {
+  display: inline-block; min-width: 18px; padding: 0 6px; border-radius: var(--radius-pill);
+  background: var(--accent-wash); color: var(--ink); font-size: var(--text-xs); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* tables */
+.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--border); }
+.table th { border-top: none; color: var(--muted); font-weight: 500; font-size: var(--text-sm); }
+
+/* code */
+code.inline {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 1px 6px; font-size: 0.9em;
+}
+pre.block {
+  background: var(--page); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--space-3) 14px; overflow-x: auto; font-size: 13px; line-height: 1.65; margin: 0;
+}
+
+.muted { color: var(--muted); }

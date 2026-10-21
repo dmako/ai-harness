@@ -11,3 +11,8 @@
 *.xlsx filter=lfs diff=lfs merge=lfs -text
 *.pptx filter=lfs diff=lfs merge=lfs -text
 *.ico filter=lfs diff=lfs merge=lfs -text
+
+# Keep embedded frozen frontend/documentation bytes identical on every platform.
+# The frozen JavaScript includes four original trailing spaces; preserve those too.
+src/Harness.Web/Assets/** -text whitespace=cr-at-eol,-blank-at-eol
+src/Harness.Web/Documentation/*.md -text whitespace=cr-at-eol
