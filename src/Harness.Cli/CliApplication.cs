@@ -1,5 +1,6 @@
 using Harness.Infrastructure.Projects;
 using Harness.Cli.Memory;
+using Harness.Cli.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,6 +30,7 @@ public static class CliApplication
         builder.Services.AddSingleton(stdout);
         builder.Services.AddSingleton(new CliErrorOutput(stderr));
         builder.Services.AddSingleton<MemoryCommandRunner>();
+        builder.Services.AddSingleton<TaskCommandRunner>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -49,6 +51,19 @@ public static class CliApplication
             configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
+            configuration.AddBranch("tasks", tasks =>
+            {
+                tasks.AddCommand<TaskListCommand>("list");
+                tasks.AddCommand<TaskMilestonesCommand>("milestones");
+                tasks.AddCommand<TaskShowCommand>("show");
+                tasks.AddCommand<TaskNextCommand>("next");
+                tasks.AddCommand<TaskImportCommand>("import");
+                tasks.AddCommand<TaskExportCommand>("export");
+                tasks.AddCommand<TaskAddCommand>("add");
+                tasks.AddCommand<TaskBlockCommand>("block");
+                tasks.AddCommand<TaskDeferCommand>("defer");
+                tasks.AddCommand<TaskReadyCommand>("ready");
+            }).WithAlias("task");
             configuration.AddBranch("memory", memory =>
             {
                 memory.AddCommand<MemoryShowCommand>("show").WithDescription("Show a memory with history and audit trail");
@@ -133,10 +148,21 @@ public static class CliApplication
                 "-note" => "--note",
                 "-supersede" => "--supersede",
                 "-keep-both" => "--keep-both",
+                "-milestone" => "--milestone",
+                "-events" => "--events",
+                "-id" => "--id",
+                "-prefix" => "--prefix",
+                "-title" => "--title",
+                "-goal" => "--goal",
+                "-type" => "--type",
+                "-priority" => "--priority",
+                "-depends" => "--depends",
+                "-accept" => "--accept",
+                "-scope" => "--scope",
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede")
+            if (equals < 0 && replacement is "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope")
             {
                 index++; // A value is data, even when it resembles another option.
             }
