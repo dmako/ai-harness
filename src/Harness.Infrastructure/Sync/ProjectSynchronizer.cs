@@ -37,6 +37,9 @@ public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider
         try
         { await lifecycle.Registry.NoteSyncAsync(registration.Project, ProjectStore.Worktrees(database), lifecycle.Version, token).ConfigureAwait(false); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException) { /* Machine observations are best effort, as for MCP startup. */ }
+        try
+        { await new Harness.Infrastructure.Telemetry.TelemetryStore(database, clock).ResolveAsync(repository, worktree, head.Commit, "sync", token).ConfigureAwait(false); }
+        catch (Exception error) when (error is IOException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException) { /* Optional scoring cannot fail sync. */ }
         var findings = await new Harness.Infrastructure.Findings.FindingSets(location.Root, registration.Project.Id, database, lifecycle.GlobalConfigurationPath, lifecycle.Registry).SyncAsync(head.Commit, providers, token).ConfigureAwait(false);
         return new(location, registration, previous, removed, covered, run, state) { Findings = findings };
     }

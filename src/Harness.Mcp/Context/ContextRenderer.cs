@@ -68,7 +68,10 @@ public static class ContextRenderer
             var output = Build();
             var json = Measured(output);
             if (System.Text.Encoding.UTF8.GetByteCount(json) <= full)
+            {
+                RecordContext(project, request.Task, packed);
                 return new(json);
+            }
             // The original adds debug after measuring. Keep useful context and bound diagnostics first.
             if (request.Debug && (debugEntries > 0 || calls > 0))
             {
@@ -123,6 +126,17 @@ public static class ContextRenderer
             ContextFindings.Add(output, project?.Findings ?? [], full);
             return output;
         }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Optional telemetry must never fail a served answer.")]
+    private static void RecordContext(ContextProject? project, string task, PackedContext packed)
+    {
+        if (project?.RecordContext is not { } observe)
+            return;
+        var units = packed.Units.Where(u => u.Ranked.Candidate.Source is "code" && u.Ranked.Candidate.Path.Length > 0).SelectMany((unit, position) => unit.Ranked.Candidate.Provenance.Select(p => new Harness.Core.Telemetry.ContextUnitObservation(unit.Ranked.Candidate.Path, unit.Ranked.Candidate.Name, unit.Ranked.Candidate.Role, p.Provider, p.Capability, p.Rank, position, unit.Ranked.Tier, unit.Body.Length > 0))).ToArray();
+        try
+        { observe(new("", "", task, packed.Budget.Bytes, packed.Used, units)); }
+        catch (Exception) { /* Measurements cannot change the result. */ }
     }
 
     private static Dictionary<string, object?> Base(string task, IReadOnlyList<string> symbols, List<string> errors, string stale, IReadOnlyList<object>? workspace)

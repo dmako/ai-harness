@@ -227,7 +227,16 @@ internal sealed class GraphifyFixture : IDisposable
     public GraphifySessionManager Manager(TimeProvider? clock = null) => new(Options(), clock: clock);
     public void Write(string name, string content) => File.WriteAllText(Path.Combine(Data, name), content);
     public void Ready(string id) => Write("sessions.json", JsonSerializer.Serialize(new { success = true, sessions = new[] { new { session_id = id, process_id = Environment.ProcessId, reachability = "reachable", lifecycle_state = "ready", ready = true, repository_root = Root } } }));
-    public string[][] Calls() => File.Exists(Path.Combine(Data, "calls.log")) ? File.ReadAllLines(Path.Combine(Data, "calls.log")).Where(line => line.Length > 0).Select(line => JsonSerializer.Deserialize<string[]>(line)!).ToArray() : [];
+    public string[][] Calls()
+    {
+        var path = Path.Combine(Data, "calls.log");
+        if (!File.Exists(path))
+            return [];
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        // The worker appends newline-delimited records; ignore a record still being written.
+        return reader.ReadToEnd().Split('\n').SkipLast(1).Where(line => line.Length > 0).Select(line => JsonSerializer.Deserialize<string[]>(line)!).ToArray();
+    }
     public JsonObject Records() => JsonNode.Parse(File.ReadAllText(RecordsPath))!.AsObject();
     public void Dispose()
     {

@@ -32,7 +32,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             {
                 "claim" => ClaimAsync((TaskClaimSettings)settings, store, actor, requestedLease, cancellationToken),
                 "release" => ReleaseAsync((TaskReasonSettings)settings, store, actor, cancellationToken),
-                "complete" => CompleteAsync((TaskCompleteSettings)settings, store, actor, cancellationToken),
+                "complete" => CompleteAsync((TaskCompleteSettings)settings, store, actor, database, location, cancellationToken),
                 "proposals" => ListProposalsAsync((TaskProposalListSettings)settings, store, cancellationToken),
                 "approve" => ApproveAsync((TaskApproveSettings)settings, store, actor, cancellationToken),
                 "reject" => RejectAsync((TaskReadySettings)settings, store, actor, cancellationToken),
@@ -74,10 +74,12 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             await output.WriteLineAsync($"Released {released.Id} (now {released.Status}).");
     }
 
-    private async Task CompleteAsync(TaskCompleteSettings settings, TaskStore store, TaskActor actor, CancellationToken cancellationToken)
+    private async Task CompleteAsync(TaskCompleteSettings settings, TaskStore store, TaskActor actor, HarnessDatabase database, ProjectLocation location, CancellationToken cancellationToken)
     {
         var current = store.Get(settings.Id.ToUpperInvariant(), cancellationToken);
         var completed = store.Complete(current.Id, actor, TaskCliInput.Complete(settings, current), cancellationToken);
+        if (completed.Task.CompletionCommit.Length > 0 && location.Repository is { } repository && ProjectStore.Worktrees(database).FirstOrDefault(t => t.GitDir == repository.GitDir) is { } worktree)
+            await Harness.Infrastructure.Telemetry.TelemetryStore.ResolveBestEffortAsync(database, repository, worktree.Id, completed.Task.CompletionCommit, "task", cancellationToken);
         if (settings.Json)
             await JsonAsync(new { task = TaskViews.Task(completed.Task), unlocked = Nil(completed.Unlocked) });
         else

@@ -1,4 +1,5 @@
 using Harness.Cli.Workspaces;
+using Harness.Cli.Telemetry;
 using Harness.Infrastructure.Projects;
 using Harness.Cli.Memory;
 using Harness.Cli.Tasks;
@@ -33,6 +34,7 @@ public static class CliApplication
         builder.Services.AddSingleton<MemoryCommandRunner>();
         builder.Services.AddSingleton<TaskCommandRunner>();
         builder.Services.AddSingleton<WorkspaceCommandRunner>();
+        builder.Services.AddSingleton<ReportCommandRunner>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -54,6 +56,9 @@ public static class CliApplication
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
             configuration.AddCommand<SyncCommand>("sync").WithDescription("Refresh recorded project state (worktree, branch, HEAD)");
+            configuration.AddCommand<MetricsCommand>("metrics");
+            configuration.AddCommand<ReportCommand>("report");
+            configuration.AddBranch("context", context => context.AddCommand<ContextStatsCommand>("stats"));
             configuration.AddBranch("tasks", tasks =>
             {
                 tasks.AddCommand<TaskListCommand>("list");
@@ -170,6 +175,7 @@ public static class CliApplication
                 "-full" => "--full",
                 "-since" => "--since",
                 "-all" => "--all",
+                "-days" => "--days",
                 "-reason" => "--reason",
                 "-to" => "--to",
                 "-force" => "--force",

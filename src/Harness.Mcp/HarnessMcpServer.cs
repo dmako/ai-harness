@@ -25,8 +25,12 @@ public static class HarnessMcpServer
     private static readonly JsonSerializerOptions JsonOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     private static readonly IReadOnlyList<Tool> Tools = LoadTools();
 
+    public static Task RunAsync(Stream input, Stream output, IHarnessStateSession session, HarnessRuntime runtime,
+        ILoggerFactory loggerFactory, IServiceProvider? services = null, IProviderRegistry? providers = null, WorkspaceTools? workspaceTools = null, CancellationToken cancellationToken = default) =>
+        RunAsync(input, output, session, runtime, loggerFactory, services, providers, workspaceTools, null, cancellationToken);
+
     public static async Task RunAsync(Stream input, Stream output, IHarnessStateSession session, HarnessRuntime runtime,
-        ILoggerFactory loggerFactory, IServiceProvider? services = null, IProviderRegistry? providers = null, WorkspaceTools? workspaceTools = null, CancellationToken cancellationToken = default)
+        ILoggerFactory loggerFactory, IServiceProvider? services, IProviderRegistry? providers, WorkspaceTools? workspaceTools, Harness.Core.Telemetry.IToolObserver? observer, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
@@ -55,13 +59,23 @@ public static class HarnessMcpServer
                     var client = request.Server.ClientInfo;
                     var version = string.IsNullOrEmpty(client?.Version) ? "" : " " + client.Version;
                     var caller = string.IsNullOrEmpty(client?.Name) ? "unknown" : client.Name + version;
+                    var at = DateTimeOffset.UtcNow;
+                    var started = System.Diagnostics.Stopwatch.GetTimestamp();
+                    CallToolResult? result = null;
+                    Exception? failure = null;
                     try
-                    { return await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools, workspaceTools, couplingTools); }
-                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    { return result = await CallAsync(request.Params, session, runtime, token, caller, providerTools, contextTools, workspaceTools, couplingTools); }
+                    catch (OperationCanceledException error) when (token.IsCancellationRequested)
                     {
+                        failure = error;
                         // The C# SDK intentionally emits no reply for client-cancelled calls.
                         transport.CompleteCancelledRequest(request.JsonRpcRequest.Id);
                         throw;
+                    }
+                    catch (Exception error) { failure = error; throw; }
+                    finally
+                    {
+                        ToolMeasurements.Observe(observer, ToolMeasurements.Measure(request.Params.Name, request.Params.Arguments, client?.Name ?? "", at, (long)System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds, result, failure));
                     }
                 },
             },

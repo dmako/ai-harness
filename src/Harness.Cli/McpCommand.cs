@@ -10,6 +10,7 @@ using Harness.Mcp;
 using Harness.Infrastructure.Processes;
 using Harness.Providers.Packs;
 using Harness.Infrastructure.Providers;
+using Harness.Infrastructure.Telemetry;
 using Microsoft.Extensions.Logging;
 using Spectre.Console.Cli;
 
@@ -28,12 +29,12 @@ internal sealed class McpCommand(ProjectLifecycle lifecycle, BuildInformation in
         var location = await lifecycle.LocateAsync(settings.Project, allowNonGit: true, cancellationToken);
         var languages = Languages(location.Root, location.Configuration.Value.Providers);
         await using var providers = ConfiguredProviders.Build(location.Configuration.Value.Providers, location.Root, new ProviderProcessFactory(), detectedLanguages: languages);
-        await using var calls = new ProviderCallRecorder(location.DatabasePath, location.Configuration.Value.Storage.BusyTimeoutMs);
+        await using var calls = new TelemetryRecorder(location.DatabasePath, location.Configuration.Value.Storage.BusyTimeoutMs, name => providers.Providers().OfType<Core.Providers.IVersionedProvider>().FirstOrDefault(p => p is Core.Providers.IProvider provider && provider.Name == name)?.ServerVersion ?? "");
         providers.SetObserver(calls.Observe);
         var runtime = new HarnessRuntime(information.Version, information.Commit, information.Runtime, information.Platform);
         using var input = Console.OpenStandardInput();
         using var output = Console.OpenStandardOutput();
-        var session = new HarnessStateSession(location, lifecycle.Registry, runtime, lifecycle.GlobalConfigurationPath);
+        var session = new HarnessStateSession(location, lifecycle.Registry, runtime, lifecycle.GlobalConfigurationPath) { ContextObserver = calls };
         await using var workspace = new WorkspaceTools(session, membership => new WorkspaceSearchSession(membership, providers, (member, deep) =>
         {
             var configuration = ConfigurationLoader.LoadFiles(lifecycle.GlobalConfigurationPath, ConfigurationPaths.ProjectPath(member.Root));
@@ -41,7 +42,7 @@ internal sealed class McpCommand(ProjectLifecycle lifecycle, BuildInformation in
         }), providers, session);
         try
         {
-            await HarnessMcpServer.RunAsync(input, output, session, runtime, loggerFactory, services, providers, workspace, cancellationToken);
+            await HarnessMcpServer.RunAsync(input, output, session, runtime, loggerFactory, services, providers, workspace, calls, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

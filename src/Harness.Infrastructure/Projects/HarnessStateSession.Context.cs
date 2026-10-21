@@ -7,6 +7,7 @@ namespace Harness.Infrastructure.Projects;
 
 public sealed partial class HarnessStateSession
 {
+    public Harness.Core.Telemetry.IContextObserver? ContextObserver { get; init; }
     public async Task<ContextProject> ReadContextProjectAsync(CancellationToken cancellationToken)
     {
         var snapshot = await ReadProviderProjectAsync(cancellationToken).ConfigureAwait(false);
@@ -36,6 +37,7 @@ public sealed partial class HarnessStateSession
         var reader = new RetrievalFileReader(location.Root);
         return new(sources, reader.ReadBodyAsync, path => Directory.Exists(Path.Combine(location.Root, path)), snapshot.Stale, snapshot.CrossBranch, notes)
         {
+            RecordContext = call => ContextObserver?.Observe(call with { WorktreeId = _registration?.Worktree.Id ?? "", Head = snapshot.Commit }),
             ReadFindings = token => MemoryOperationAsync(async () => (await FindingSetsAsync(token).ConfigureAwait(false)).Context(token)),
         };
     }
