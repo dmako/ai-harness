@@ -120,6 +120,7 @@ public static class ContextRenderer
             ContextWire.Add(output, "note", string.Join("; ", messages));
             if (request.Debug)
                 output["debug"] = ContextWire.Debug(gathered, merged.Folded, packed, calls, debugEntries);
+            ContextFindings.Add(output, project?.Findings ?? [], full);
             return output;
         }
     }

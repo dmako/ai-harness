@@ -10,7 +10,7 @@ public sealed record RuleReference(
     [property: JsonPropertyName("line")] string Line = "",
     [property: JsonPropertyName("scope"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Scope = null,
     [property: JsonPropertyName("type"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Type = null);
-public sealed record ArchitectureFinding
+public record ArchitectureFinding
 {
     [JsonPropertyName("kind")] public string Kind { get; init; } = "";
     [JsonPropertyName("level")] public string Level { get; init; } = "";

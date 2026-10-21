@@ -1,0 +1,389 @@
+{
+  "description": "The architecture findings of this project (scope project, default) or between the services of its workspaces (scope workspace), read from the files now: kind, level, basis (fact, or heuristic: read from names or thresholds), title, why, what could help, evidence (file:line), status since the last change (new, changed, unchanged, gone) and the author's mark (by design with the reason, back for review, or a task); a boundary finding names the recorded rule it breaks. Boundary rules are knowledge: lines such as 'group Domain = *.Domain', 'layers: Api > BL > DAL', 'forbid: Domain -> *.DAL', 'only: Application -> Domain' in a constraint, decision or convention (propose new ones with memory_propose). Drift (a broken rule, or knowledge naming code that is gone: stale-knowledge) can be resolved either way: propose a corrected statement with memory_propose (supersedes = the rule's memory) or a task fixing the code with architecture_propose. Without a filter the answer is a summary by kind and one line per finding; filter by kind or area (a path prefix; for workspace findings also a member's name), or give a key, for findings in full (why, what could help, every place). Explain and suggest; never act on a finding until it is a task. Architectural tasks and by-design marks are the author's: propose them to the user, never create them. A finding marked by design is intended (its reason says why): do not raise it again; one back for review grew since it was marked.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "description": "project (default) or workspace: the system findings between the services of this project's workspaces"
+      },
+      "key": {
+        "type": "string",
+        "description": "one finding in full, by its key"
+      },
+      "full": {
+        "type": "boolean",
+        "description": "every finding in full (by default, without a kind, area or key filter, a summary and one short line each)"
+      },
+      "area": {
+        "type": "string",
+        "description": "only findings about this path prefix (the unit or any evidence); for workspace findings also a member's name"
+      },
+      "kind": {
+        "type": "string",
+        "description": "only this kind, e.g. cycle, layering, unused, deep-import, chatty, contract-unserved, shared-database"
+      },
+      "hide_marked": {
+        "type": "boolean",
+        "description": "leave out findings the author marked by design (by default they are listed with the reason)"
+      },
+      "gone": {
+        "type": "boolean",
+        "description": "also list findings gone since the last change (a task's shows it resolved)"
+      },
+      "snippets": {
+        "type": "boolean",
+        "description": "also the code at each listed finding's evidence (the function it names, a repeated run, lines around a line), within a size budget: to judge whether a finding is real"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "architecture_findings",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "groups": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "where": {
+              "type": "string"
+            },
+            "snapshot": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "commit": {
+                  "type": "string"
+                },
+                "taken_at": {
+                  "type": "string"
+                },
+                "found": {
+                  "type": "integer"
+                },
+                "added": {
+                  "type": "integer"
+                },
+                "changed": {
+                  "type": "integer"
+                },
+                "gone": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "taken_at",
+                "found",
+                "added",
+                "changed",
+                "gone"
+              ],
+              "additionalProperties": false
+            },
+            "summary": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "integer"
+                  },
+                  "worst": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "count",
+                  "worst"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "findings": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "why": {
+                    "type": "string"
+                  },
+                  "fix": {
+                    "type": "string"
+                  },
+                  "project": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "measure": {
+                    "type": "integer"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "basis": {
+                    "type": "string"
+                  },
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "rule": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "memory": {
+                        "type": "string"
+                      },
+                      "scope": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "line": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "memory",
+                      "line"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "rank": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "first_seen": {
+                    "type": "string"
+                  },
+                  "mark": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "level": {
+                        "type": "string"
+                      },
+                      "measure": {
+                        "type": "integer"
+                      },
+                      "review_reason": {
+                        "type": "string"
+                      },
+                      "memory_id": {
+                        "type": "string"
+                      },
+                      "task_id": {
+                        "type": "string"
+                      },
+                      "task_project": {
+                        "type": "string"
+                      },
+                      "marked_by": {
+                        "type": "string"
+                      },
+                      "marked_at": {
+                        "type": "string"
+                      },
+                      "proposed_by": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "level",
+                      "measure",
+                      "marked_by",
+                      "marked_at"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "kind",
+                  "level",
+                  "title",
+                  "why",
+                  "key",
+                  "measure",
+                  "source",
+                  "basis"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "brief": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "string"
+                  },
+                  "basis": {
+                    "type": "string"
+                  },
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "mark": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "more": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "key",
+                  "level",
+                  "basis",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "marked_hidden": {
+              "type": "integer"
+            },
+            "code": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "start": {
+                    "type": "integer"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "focus": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                },
+                "required": [
+                  "key",
+                  "at",
+                  "start",
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "code_left_out": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "where",
+            "summary"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "rule": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "groups",
+      "rule"
+    ],
+    "additionalProperties": false
+  }
+}

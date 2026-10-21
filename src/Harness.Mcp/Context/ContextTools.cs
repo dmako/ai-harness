@@ -35,6 +35,10 @@ public sealed class ContextTools(IProviderRegistry? providers = null, IContextPr
             var current = await freshness.ReadProviderProjectAsync(linked.Token).ConfigureAwait(false);
             context = context with { Stale = current.Stale, CrossBranch = current.CrossBranch };
         }
+        if (context.ReadFindings is { } readFindings)
+            try
+            { context = context with { Findings = await readFindings(linked.Token).ConfigureAwait(false) }; }
+            catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException) { /* Findings are optional context annotations. */ }
         var section = scope is "workspace" ? await workspace!.ContextAsync(task, gathered.Symbols, gathered.Phrases, String("depth") is "deep", bytes / 4, linked.Token).ConfigureAwait(false) : null;
         return await ContextRenderer.RenderAsync(request, gathered, context, section, linked.Token).ConfigureAwait(false);
 

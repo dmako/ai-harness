@@ -95,6 +95,8 @@ public static class HarnessMcpServer
         {
             try
             {
+                if (parameters.Name is "architecture_findings" or "architecture_propose")
+                    return session is Harness.Core.Findings.IFindingSession findings ? Success(await FindingsTools.CallAsync(parameters.Name, parameters.Arguments, findings, caller, cancellationToken)) : Error("finding session unavailable");
                 if (parameters.Name is "library_adoption" or "similar_concerns")
                     return workspaceTools is null ? Error("this project is not in a workspace; use 'harness workspace create' to add it") : Success(await workspaceTools.EvidenceAsync(parameters.Name, parameters.Arguments, cancellationToken));
                 if (parameters.Name is "change_coupling")
@@ -111,6 +113,8 @@ public static class HarnessMcpServer
             }
             catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
             {
+                if (parameters.Name is "architecture_findings" or "architecture_propose")
+                    return Error("architecture analysis timed out while matching source evidence");
                 if (parameters.Name is "library_adoption" or "similar_concerns")
                     return Error("workspace analysis timed out while matching source evidence");
                 var kind = parameters.Name.StartsWith("task_", StringComparison.Ordinal) ? "task" : "memory";

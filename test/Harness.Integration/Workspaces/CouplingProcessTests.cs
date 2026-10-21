@@ -22,7 +22,7 @@ public sealed class CouplingProcessTests
         environment["HARNESS_CONFIG_DIR"] = fixture.Global;
         await using var client = await McpClient.CreateAsync(new StdioClientTransport(new() { Command = "dotnet", Arguments = [binary, "mcp", "--project", fixture.Root], WorkingDirectory = fixture.Root, EnvironmentVariables = environment, InheritEnvironmentVariables = false }), cancellationToken: Token);
         var tools = await client.ListToolsAsync(cancellationToken: Token);
-        tools.Should().HaveCount(28);
+        tools.Should().HaveCount(30);
         var tool = JsonSerializer.SerializeToElement(tools.Single(tool => tool.Name == "change_coupling").ProtocolTool);
         using var baseline = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"), Token));
         var original = baseline.RootElement.GetProperty("cases").GetProperty("mcp").EnumerateArray().Single(row => row.GetProperty("name").GetString() == "tools_list").GetProperty("response").GetProperty("result").GetProperty("tools").EnumerateArray().Single(tool => tool.GetProperty("name").GetString() == "change_coupling");

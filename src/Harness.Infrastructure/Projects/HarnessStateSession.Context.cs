@@ -34,6 +34,9 @@ public sealed partial class HarnessStateSession
         else
             notes.Add("no project memory (run harness init to record decisions)");
         var reader = new RetrievalFileReader(location.Root);
-        return new(sources, reader.ReadBodyAsync, path => Directory.Exists(Path.Combine(location.Root, path)), snapshot.Stale, snapshot.CrossBranch, notes);
+        return new(sources, reader.ReadBodyAsync, path => Directory.Exists(Path.Combine(location.Root, path)), snapshot.Stale, snapshot.CrossBranch, notes)
+        {
+            ReadFindings = token => MemoryOperationAsync(async () => (await FindingSetsAsync(token).ConfigureAwait(false)).Context(token)),
+        };
     }
 }

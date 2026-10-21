@@ -6,9 +6,12 @@ using Harness.Infrastructure.Storage;
 namespace Harness.Infrastructure.Sync;
 
 public sealed record ProjectSyncResult(ProjectLocation Location, ProjectRegistration Registration, WorktreeIdentity? Previous,
-    IReadOnlyList<WorktreeIdentity> Removed, long CoveredBy, SyncRun? Files, SyncState State);
+    IReadOnlyList<WorktreeIdentity> Removed, long CoveredBy, SyncRun? Files, SyncState State)
+{
+    public IReadOnlyList<Harness.Infrastructure.Findings.FindingSync> Findings { get; init; } = [];
+}
 
-public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider? clock = null)
+public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider? clock = null, Harness.Core.Providers.IProviderRegistry? providers = null)
 {
     public async Task<ProjectSyncResult> RunAsync(string directory, SyncOptions? options = null, CancellationToken token = default)
     {
@@ -34,7 +37,8 @@ public sealed class ProjectSynchronizer(ProjectLifecycle lifecycle, TimeProvider
         try
         { await lifecycle.Registry.NoteSyncAsync(registration.Project, ProjectStore.Worktrees(database), lifecycle.Version, token).ConfigureAwait(false); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException) { /* Machine observations are best effort, as for MCP startup. */ }
-        return new(location, registration, previous, removed, covered, run, state);
+        var findings = await new Harness.Infrastructure.Findings.FindingSets(location.Root, registration.Project.Id, database, lifecycle.GlobalConfigurationPath, lifecycle.Registry).SyncAsync(head.Commit, providers, token).ConfigureAwait(false);
+        return new(location, registration, previous, removed, covered, run, state) { Findings = findings };
     }
 
     private static WorktreeIdentity[] RemoveGoneWorktrees(HarnessDatabase database, string current, CancellationToken token)

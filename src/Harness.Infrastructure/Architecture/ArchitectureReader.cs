@@ -77,6 +77,8 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         var allNotes = (system.Notes ?? []).Concat(notes).ToArray();
         return system with { Notes = allNotes.Length is 0 ? null : allNotes };
     }
+    public async Task<AnalysisRepository> RepositoryAsync(WorkspaceMember member, CancellationToken token) => (await _evidence.RepositoryAsync(member, token).ConfigureAwait(false)).Repository;
+
     private async Task<ProjectBuild?> BuildAsync(WorkspaceMember member, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

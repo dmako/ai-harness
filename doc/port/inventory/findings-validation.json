@@ -1,0 +1,298 @@
+{
+  "task": "TASK-0023",
+  "base_commit": "55eae723d97c47f0b997dfd74ced43f6dc8f3757",
+  "generated_at": "2026-10-21T17:54:31.283920+00:00",
+  "oracle_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "source_sha256": {
+    "doc/port/README.md": "3cec1d3359043c61e6f31c93775f02af4a4a0402d90b54cc5130c9f85622de85",
+    "doc/port/findings-lifecycle.md": "7efeb2406e52dca14f7a4a5865222c901a077922859f193afa79a78d5f684e92",
+    "src/Harness.Cli/SyncCommand.cs": "0e791d52dc32319953b1ee1acd2a86fe8fb9c47dedbe0f18a0158026627a90d0",
+    "src/Harness.Core/Architecture/ArchitectureModels.cs": "eb36dccd2d057f52d6ccd2bdfbe4fb9bbef4c792752640d8af1496b700430d3f",
+    "src/Harness.Core/Findings/FindingModels.cs": "381b3b5f84e825fc3a677cc0427f5f9e8182784581fa601ff69f10485773c3a5",
+    "src/Harness.Core/Retrieval/IContextProjectSession.cs": "3deb75a9fe4964be61ed458838de550d405b3b16784948fa1902a00cbd683a50",
+    "src/Harness.Infrastructure/Architecture/ArchitectureReader.cs": "558386100ae32a274c3d94a3fc6c325e51f3f26a3ab8d1fed7b4f68ccf820bb1",
+    "src/Harness.Infrastructure/Findings/FindingReview.cs": "f4aab7f9911e716a8469fceff1f1fba13dd05d6611bcc3a358ea868f55bc28a8",
+    "src/Harness.Infrastructure/Findings/FindingSets.cs": "131dfed3da584d4ad617db016db6c784eec723858dc05d34e3a71697d33386ed",
+    "src/Harness.Infrastructure/Findings/FindingStore.Proposals.cs": "988b32a168becd59cae4937e3fb8012e7889adf664d8a3fbd73c780d94b64632",
+    "src/Harness.Infrastructure/Findings/FindingStore.cs": "c12df0263894884ba082e94ea563e7ac7af6d2dfb2984ad68ee01fee1d9b0f7f",
+    "src/Harness.Infrastructure/Findings/KnowledgeDrift.cs": "7c4653902fbda57188176abcc00240848dd05ec84e6dc3ed0ee2c047f33bd413",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.Context.cs": "48741588947140ecd1d618ddbc603cdc98744c3e622df4782a892001a1e13383",
+    "src/Harness.Infrastructure/Projects/HarnessStateSession.Findings.cs": "17114a9f8bee0b117ecfbb5a1b87eab9c220d53c9b2f2d2a5731709d82caeefc",
+    "src/Harness.Infrastructure/Sync/ProjectSynchronizer.cs": "077f62fb40d5a934b922617597c5d8c038b9a14041276606ba7604caae225c81",
+    "src/Harness.Mcp/Architecture/FindingsTools.cs": "53b489f677ef650b9f41d0b938eced3903fa1af91a8081ab7b2ef2c9eedda91b",
+    "src/Harness.Mcp/Context/ContextFindings.cs": "03dfba2b82324532031ade2ea3babd11451548898373f69457cf04ade8a99bc3",
+    "src/Harness.Mcp/Context/ContextRenderer.cs": "1a6d53ab578134ee4a6c3a9b4b65cd2c09f511b5f5d254cbde9d39e402a2f453",
+    "src/Harness.Mcp/Context/ContextTools.cs": "138837b558f4e68c80246735741a24b130beae12d56be604375b8daf15b8b6c7",
+    "src/Harness.Mcp/HarnessMcpServer.cs": "6e0c0a7a755693b5793f22bf69d441e5869701526bce27ce9459b7d839b07a48",
+    "src/Harness.Mcp/Schemas/architecture_findings.json": "adcea1e8aea5d71919347361e9254ae26413dddeaba778cd6121eaf4b203c4f1",
+    "src/Harness.Mcp/Schemas/architecture_propose.json": "00cbe93c734ad46081ad01725d53d1a9111d3b6b36f0ccb66bf2439e79808d8c",
+    "test/Harness.Compatibility/Findings/build_oracle.py": "b6ccaa1bc8d11876bf4f8f5f03db96a0a5e0ff647e20d4217742f355d8a6ce12",
+    "test/Harness.Compatibility/Findings/main.go": "2c51840f98da96c2bea5140b307d7ed7592fe95a3edc2248d12854d7cb7c5e22",
+    "test/Harness.Compatibility/Findings/publish_smoke.py": "4363fbde23c23b2ac88f1e752bc6251cafc743458c73702118f73dee4dbf7f76",
+    "test/Harness.Integration/Findings/FindingsProcessTests.cs": "a1a7993a5c28e0c2659837e200af88a9d2d4f275ff1e3ef7fd84da46cb99f450",
+    "test/Harness.Integration/Memory/MemoryMcpProcessTests.cs": "0999910932821a687cb3ee35533935a5a288d402cd6b70e4c850d6141aa477fe",
+    "test/Harness.Integration/Workspaces/CouplingProcessTests.cs": "33faf975752e90213ea1ea421eb09fd480d8116350967ca40b3b23eb24d4b4b9",
+    "test/Harness.Unit/Findings/FindingTests.cs": "9247b9f09c57f0c79f4980449b001e31d6da6c51997ab59f9b12643bfd200914",
+    "test/Harness.Unit/Findings/FindingsToolsTests.cs": "d1f89277b5ce0ebf8036da93103408c4c8dfd91db5cc96d50a4606eae62158cc"
+  },
+  "oracle_sources": {
+    "internal/cli/sync.go": "9cc583a71a7e0f09684a574ac2b52173889505d808a62d7bbfbc4ade35e43e18",
+    "internal/findings/clones.go": "da3099f55a5369c5f94b227f1a56209b53f2eb95a5c3dee621f6cba1820ee739",
+    "internal/findings/clones_test.go": "59197e737c103bda6fe135b99860c96d0f8182ba4b896f6df5bd245d4ccaa317",
+    "internal/findings/coverage.go": "b88bcd6b895353e55735f9f72e4442ceed5deac7cc99c55af8bf5f1a5394e0eb",
+    "internal/findings/drift.go": "2081bcffc57cbd19ba98908d8517b3204d8778714a3041cdbd50e5c37455d4d9",
+    "internal/findings/drift_test.go": "d97ee70a2c4936c52170ba3ec4fc85b558d8acce24e2a705bc1d672c8d890f6d",
+    "internal/findings/findings.go": "bdbd40c273f8f04845bce878b9239d4c5723ca06eb954044014f97a4a00a7ff4",
+    "internal/findings/findings_test.go": "1cb482fcd91e17b090e3fe0669b37fdb394a3c9175e6d3d21fb985055e140caf",
+    "internal/findings/proposals.go": "80bb058d20b0765cd767a582ec15b7a89fd16a2302785e8d01a058d02c1538bd",
+    "internal/findings/read.go": "6fb27998e1917fc8d72d84e436a7ad477010fa596a755ad301cfe6bbf4c57a63",
+    "internal/findings/rules.go": "14e36d09e8de4a5a3429f700a850a99f1c826817e1e1b9449052ce29239d9cdb",
+    "internal/findings/sets.go": "9dbe3ad27afe1eaccc9d80cda5637cec66d53455b0acdf8150f54b51499e96d0",
+    "internal/findings/sets_test.go": "704abb7648d6810a613e16d12c04fc1b8e38f3db6bc8f2d44cfd4f952f61e102",
+    "internal/findings/shared.go": "00fdcb0ba5ebf95beb33a58c23ffc4396488940d16a0780565484b23e6b787fc",
+    "internal/findings/shared_test.go": "d743f2349d3440260dd343143b0fad57de51ffbfeed4b9dced98d7c9e2a3741f",
+    "internal/findings/snippet.go": "97326b2e829cf3eede596e8c12007d0cd41438c2e147e711a706663cef022c1b",
+    "internal/findings/snippet_test.go": "8b802593f18016bdef0f656cc6a9d5fdfdb2bcb2716fd2f119df08d8e712999a",
+    "internal/gui/findings.go": "6e1d947b377e6f22157406d2dd65d51f8becb2105a423d8bbce091d720b65dc4",
+    "internal/mcp/server/findings_tools.go": "b5fa6c64f10fb5c018aeb08d2add7164b9a0765540f1b0d5b390e99de5b72056"
+  },
+  "locks": {
+    "count": 11,
+    "semantic_equal_to_head": true,
+    "sha256": {
+      "src/Harness.Cli/packages.lock.json": "d4d84ca30bc0b474e0d7b0d07f56fe692ccc12974362c10f7cfea2e28fe06ba6",
+      "src/Harness.Core/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "src/Harness.Graphify/packages.lock.json": "79a73a25ec13072fd2f02aeb6d538fc3a3cc35bae95b4e93d42a310bc68e7ce2",
+      "src/Harness.Infrastructure/packages.lock.json": "6cd3dd55e3cddbaa75234490eddd16a6c670a664707ba076c47b9d3c2a7a80a2",
+      "src/Harness.Mcp/packages.lock.json": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "src/Harness.Providers/packages.lock.json": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+      "src/Harness.Web/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+      "test/Harness.Integration/Storage/Worker/packages.lock.json": "112ca61422e901e82b942eb5ad4f872610dc88b3c1f94b5b696c60118051430a",
+      "test/Harness.Integration/packages.lock.json": "7abd3ee7cbf1b33703dbea24880483d545bdf9765bc257a9ea879424de58c7b5",
+      "test/Harness.ProviderWorker/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+      "test/Harness.Unit/packages.lock.json": "f18d62e17038c1e6cb4930ed6f427f9af1d2e8ed39d6f0118a0047558b698dde"
+    }
+  },
+  "reports": {
+    "artifacts/findings-regression-01/Harness.Integration_net10.0_x64.trx": {
+      "sha256": "409ed4b742e9684b466044147dd0f565cc0615479422d56ee6e03b28e2bb3835",
+      "counters": {
+        "total": "284",
+        "executed": "281",
+        "passed": "281",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "3",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/findings-regression-01/Harness.Unit_net10.0_x64.trx": {
+      "sha256": "b6a543cc52f52d39f0e81eeb26649fd01018f838512611ab5a6ef33e93bb4471",
+      "counters": {
+        "total": "300",
+        "executed": "299",
+        "passed": "299",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "1",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/findings-tests-06/Harness.Unit_net10.0_x64.trx": {
+      "sha256": "736cfd4b1d9b44dffa498e6c15a10abec7f62a9f821f04a80c72f198314a5fe7",
+      "counters": {
+        "total": "29",
+        "executed": "29",
+        "passed": "29",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    "artifacts/findings-integration-06/Harness.Integration_net10.0_x64.trx": {
+      "sha256": "a00b7934ab7454ebadccaed2496c0b3954addf43d794063746ca520ce24b5aea",
+      "counters": {
+        "total": "4",
+        "executed": "4",
+        "passed": "4",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    }
+  },
+  "linux": {
+    "artifacts/findings-linux-unit-02.log": {
+      "sha256": "c05be3d9ea69e5b412edf1d5ab5cfd694b8c73bdc070a652020c9f0675aa9d49",
+      "counts": {
+        "total": 29,
+        "failed": 0,
+        "succeeded": 29,
+        "skipped": 0
+      }
+    },
+    "artifacts/findings-linux-integration-02.log": {
+      "sha256": "1661d137c2ec961c0e07f6092c9edded36d5de327cc65374cacf251eac952e70",
+      "counts": {
+        "total": 4,
+        "failed": 0,
+        "succeeded": 4,
+        "skipped": 0
+      }
+    }
+  },
+  "artifacts_sha256": {
+    "artifacts/compatibility/oracle/harness.exe": "249b3a500c5f6ae002c91d11d2578e4052d3ec7b09532b38db8510559819909c",
+    "artifacts/findings-build-01.binlog": "bee597937276f4881bbc0311084827071446b2ecb1be1cb368b76f8d81fe75b5",
+    "artifacts/findings-build-02.binlog": "de5029f1302ad6bb57be3b0e2d5989132e6e38ea82014a3ca235d47bfa74122d",
+    "artifacts/findings-format-01.binlog": "0ee11750086fafe0c44f4578119e31c113b443afb0a16da71edac8d0d3099a9e",
+    "artifacts/findings-format-02.binlog": "dce1c08899a7c72c058ab7cde9b73b9f1fee87a31d1d331de9e30f906cd88f3d",
+    "artifacts/findings-format-verify-01.binlog": "f4e903c17be183101948f6aa178bc27acd572124faf9a84285965170451ffd3d",
+    "artifacts/findings-integration-01.binlog": "cc55aa082122ee7b354a41cf3ab43e7836d8cde0de3ca812f4204f765827cd4e",
+    "artifacts/findings-integration-02.binlog": "02e7dc7676869a02823df7dee0624d786c172cc136f0b692fb8d4485430991df",
+    "artifacts/findings-integration-03.binlog": "baf845b61892f33f9c3253451245a1782e388706d303ef69a4da2641ec02967a",
+    "artifacts/findings-integration-04-dotnet-test.binlog": "eee3f7dba651cc496b579ae70d428248de5914f50e08fb11c9bc89d10ac5e19f",
+    "artifacts/findings-integration-04.binlog": "395540f72eb3d683bb93abbbac2723d678bb89e5452f125658ddd79de0348dbe",
+    "artifacts/findings-integration-05-dotnet-test.binlog": "993023dadc5bd56bc85cd8888f296a78aa69fdc33769827d112dcc52addeccec",
+    "artifacts/findings-integration-05.binlog": "afd3bfbe419893ee1daa840ccf9a38689f36055392d777155a9aeac7d37e0333",
+    "artifacts/findings-integration-06-dotnet-test.binlog": "5e6fa161faab344746e4063553d03cee0b7e1695a0ecfff57c371d4b5d82a10c",
+    "artifacts/findings-integration-06.binlog": "c07e6a0dacbcdcc80ef41233abe76b50a75a0a484fe47341d63cef934f68f080",
+    "artifacts/findings-oracle/findings-oracle-03.exe": "3be02c6403a62a1a69c8d3d3a71d4321884234d39fefc0300bae6af0fdd7ab71",
+    "artifacts/findings-oracle/findings-oracle-linux-02": "7e6d13967ea851e49df1b104a110bc211eaa997f688a9bcb566cde603d7c8493",
+    "artifacts/findings-oracle/harness-linux": "b6f624451669243489542ce3e948b6ebab842b0bbc3985520eb7b4d295cfd4ce",
+    "artifacts/findings-publish/harness.exe": "30a368ea25c17a41348f0f4ab6d1dd198c92a4a57be6651794532cae226b9fb9",
+    "artifacts/findings-publish-01.binlog": "86f5320986e23e7e16ef00dd6ded9177428497adfbf11f28af1c113238d56c17",
+    "artifacts/findings-published-smoke.json": "c6aa2c40cefa1c6d0280cfe3b8818272e2f858751a18adf9a77c0d74b7c9e37b",
+    "artifacts/findings-regression-01-dotnet-test.binlog": "dc5303484031d13ea700b8298a1dcb9e7d35af56928ac659ca1cc761908ea910",
+    "artifacts/findings-regression-01.binlog": "709b7f73b9118100bbdac7994436df351d80cca8f62c48bc81939fb52c826033",
+    "artifacts/findings-restore-normal-01.binlog": "6908c92c284b082bb21ddc9bda964e8373b9cb0fc95147d2a84abe9f8e57347d",
+    "artifacts/findings-restore-publish-01.binlog": "7cb7d09ec5a348d3045273199ce4a630b90d0f25a9e656a858b541241853d69e",
+    "artifacts/findings-tests-01.binlog": "28b788be74d74dcf994495606630300d9cd16a6404f2048201877c710079f600",
+    "artifacts/findings-tests-02-dotnet-test.binlog": "c79436b7745a832d9b4e0dec68fd3ca9cb847eacc9b6d2aab5c0dde4d2ed204c",
+    "artifacts/findings-tests-02.binlog": "17362ba786f33351049838a6f1b7393245b1d34b571b2710c54813c25089a99e",
+    "artifacts/findings-tests-03-dotnet-test.binlog": "60c418ed8410c4d152b934b54ced0c1674c158314aa9a9fb2e656cedca501f6a",
+    "artifacts/findings-tests-03.binlog": "448f2a1cf7575ad2b2124eb2b5ee412c187011d0b9e51e2a88fb1466ee8a5d30",
+    "artifacts/findings-tests-04-dotnet-test.binlog": "663ea26b7ba7a65d2c6fb539f98de550a285a6580ae752035bd59a2bfc38dff3",
+    "artifacts/findings-tests-04.binlog": "9ec6d8de0d62308383ef18ddbbb79623d2fdf9d9b13cc8e8cb60a61b5efcc3d5",
+    "artifacts/findings-tests-05-dotnet-test.binlog": "c0e7bcbc6487fb37ba1bc9ec8e78a5a1dc4d39881b43155bf41a49b6aa43313e",
+    "artifacts/findings-tests-05.binlog": "3175bba4b10bbfcaf38292fc5dfae58443a21f389a5a66e10e7a85df16193558",
+    "artifacts/findings-tests-06-dotnet-test.binlog": "5a3b3ce70327b418dc46f66aaf254e6056850896cf46dc2a733ed74ea8bb09c0",
+    "artifacts/findings-tests-06.binlog": "d0c9b13722ba5cf54d33a507cd148325fcd630497ee0918c3cc5cfaaaf618ce5"
+  },
+  "commands": [
+    {
+      "command": "python test/Harness.Compatibility/Findings/build_oracle.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --modules artifacts/compatibility/oracle/modules --output artifacts/findings-oracle/findings-oracle-03.exe",
+      "result": "pass"
+    },
+    {
+      "command": "python test/Harness.Compatibility/Findings/build_oracle.py --source artifacts/compatibility/oracle/source --go artifacts/compatibility/toolchain/go/bin/go.exe --modules artifacts/compatibility/oracle/modules --output artifacts/findings-oracle/findings-oracle-linux-02 --goos linux",
+      "result": "pass"
+    },
+    {
+      "command": "artifacts/compatibility/toolchain/go/bin/go.exe test -C artifacts/compatibility/oracle/source ./internal/findings -count=1",
+      "result": "pass",
+      "output": "ok harness/internal/findings 3.381s; GOTOOLCHAIN=local, isolated module/build caches"
+    },
+    {
+      "command": "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/findings-regression-01.binlog --report-trx --results-directory artifacts/findings-regression-01",
+      "result": "pass",
+      "output": "584 total, 580 passed, 4 expected Windows skips; all 13 frozen oracles and installed codebase-memory/graphify integration environment variables configured"
+    },
+    {
+      "command": "dotnet test --project test/Harness.Unit/Harness.Unit.csproj --no-restore --filter-namespace Harness.Unit.Findings -bl:artifacts/findings-tests-06.binlog --report-trx --results-directory artifacts/findings-tests-06",
+      "result": "pass",
+      "output": "29 passed; HARNESS_GO_FINDINGS_ORACLE=artifacts/findings-oracle/findings-oracle-03.exe"
+    },
+    {
+      "command": "dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --filter-class '*FindingsProcessTests' -bl:artifacts/findings-integration-06.binlog --report-trx --results-directory artifacts/findings-integration-06",
+      "result": "pass",
+      "output": "4 passed; HARNESS_GO_FINDINGS_SERVER=artifacts/compatibility/oracle/harness.exe"
+    },
+    {
+      "command": "WSL Ubuntu: HARNESS_GO_FINDINGS_ORACLE=$PWD/artifacts/findings-oracle/findings-oracle-linux-02 dotnet test/Harness.Unit/bin/Debug/net10.0/Harness.Unit.dll --filter-namespace Harness.Unit.Findings",
+      "result": "pass",
+      "output": "29 passed"
+    },
+    {
+      "command": "WSL Ubuntu: HARNESS_GO_FINDINGS_SERVER=$PWD/artifacts/findings-oracle/harness-linux dotnet test/Harness.Integration/bin/Debug/net10.0/Harness.Integration.dll --filter-class '*FindingsProcessTests'",
+      "result": "pass",
+      "output": "4 passed, including native Go MCP comparisons"
+    },
+    {
+      "command": "dotnet restore src/Harness.Cli/Harness.Cli.csproj --locked-mode -p:RuntimeIdentifier=win-x64 -p:PublishProfile=Release -bl:artifacts/findings-restore-publish-01.binlog",
+      "result": "pass"
+    },
+    {
+      "command": "dotnet publish src/Harness.Cli/Harness.Cli.csproj -c Release -r win-x64 -p:PublishProfile=Release --no-restore -o artifacts/findings-publish -bl:artifacts/findings-publish-01.binlog",
+      "result": "pass"
+    },
+    {
+      "command": "python test/Harness.Compatibility/Findings/publish_smoke.py --executable artifacts/findings-publish/harness.exe --artifacts artifacts",
+      "result": "pass",
+      "output": "30 tools; pending proposals/deduplication; no task, mark or decision created; boundary snippets; sync snapshot/CLI"
+    },
+    {
+      "command": "dotnet restore Harness.slnx --locked-mode -bl:artifacts/findings-restore-normal-01.binlog",
+      "result": "pass",
+      "output": "Normal assets restored; lock files unchanged"
+    },
+    {
+      "command": "dotnet format whitespace Harness.slnx --no-restore --include <all changed/new C# files> --verify-no-changes --binarylog artifacts/findings-format-verify-01.binlog",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check HEAD",
+      "result": "pass"
+    }
+  ],
+  "validation_sequence": [
+    "Full suite passed with 32 new tests before the final quick-read guard test and CLI findings wording refinement.",
+    "After those changes, all 33 focused Windows tests passed, all 33 focused Linux tests passed, Release publish/smoke passed, formatting verified.",
+    "Earlier compile/analyzer/test-fixture iterations were corrected. A filter-class wildcard invocation exited during runner handshake; the exact namespace filter and subsequent full/focused runs passed. No unresolved failures remain."
+  ],
+  "limits": [
+    "macOS not run. Linux tests use portable Windows-built managed assemblies on .NET runtime 10.0.13, with native Go binaries.",
+    "HTTP inbox and triage wiring remains PORT-027/028; author-side services are implemented/tested here.",
+    "Go-compatible workspace approval is not a distributed transaction across workspace/project databases.",
+    "UTF-8 knowledge excerpts clip at a scalar boundary; strict bounded/contained readers reject malformed or external-link evidence.",
+    "No package changes; no user knowledge, databases or binary artifacts committed."
+  ]
+}
