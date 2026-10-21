@@ -375,11 +375,12 @@ async function renderMain(opts) {
   const live = !!(opts && opts.live);
   const n = ++renderSeq;
   const main = document.getElementById("main");
+  if (live && main.querySelector(".aform, .decide")) return;
   renderCrumbs();
   if (!live) return drawMain(main, false);
   const next = h("div", {});
   await drawMain(next, true);
-  if (n !== renderSeq) return; // a newer render (navigation, Refresh) won
+  if (n !== renderSeq || main.querySelector(".aform, .decide")) return; // navigation or a review opened while loading
   const x = window.scrollX, y = window.scrollY;
   const focus = focusOf(main);
   fill(main, ...next.childNodes);
@@ -421,14 +422,16 @@ function mount(o) {
   const el = h("div", { class: "msec" });
   const m = { el, o, seq: 0 };
   m.run = async (first, force) => {
-    if (!first && !force && el.querySelector(".aform, .decide")) return; // a form is open: leave it be
+    const review = el.querySelector(".aform, .decide");
+    if (!first && !force && review) return; // a form is open: leave it be
     const n = ++m.seq;
     if (o.draw) return put(m, o.draw);
     if (first) fill(el, h("div", { class: "loadbar", role: "progressbar", "aria-label": "Loading" }));
     const busy = first ? 0 : setTimeout(() => el.classList.add("busy"), 150);
     try {
       const node = await o.load();
-      if (n === m.seq) put(m, () => node);
+      const currentReview = el.querySelector(".aform, .decide");
+      if (n === m.seq && (!currentReview || currentReview === review)) put(m, () => node);
     } catch (e) {
       if (n === m.seq) fill(el, h("div", { class: "secerr" }, h("p", { class: "error" }, e.message), h("button", { class: "ghost", onclick: () => m.run(false) }, "Retry")));
     } finally {
@@ -3538,7 +3541,14 @@ function taskProposalCard(p, x) {
       x.note && h("span", {}, h("b", {}, "note "), x.note),
       h("code", { class: "id" }, x.id)),
     x.status === "pending" && h("div", { class: "review" },
-      h("button", { class: "primary", onclick: async () => fill(panel, await approveForm()) }, "Create the task…"),
+      h("button", { class: "primary", onclick: async () => {
+        const opening = h("div", { class: "aform" }, h("p", { class: "hint" }, "Loading review…"));
+        fill(panel, opening);
+        try {
+          const form = await approveForm();
+          if (opening.parentNode === panel) fill(panel, form);
+        } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
+      } }, "Create the task…"),
       h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
     panel);
 }

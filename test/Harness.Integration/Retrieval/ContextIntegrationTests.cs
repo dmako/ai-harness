@@ -21,6 +21,25 @@ public sealed class ContextIntegrationTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task RepeatedContextHistoryRefreshesAfterACommitAndKeepsPathFiltersSeparate()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        var location = await fixture.Lifecycle.LocateAsync(fixture.Root, cancellationToken: Token);
+        await using var session = new HarnessStateSession(location, fixture.Lifecycle.Registry, new("test", "", "test", "test"), fixture.Lifecycle.GlobalConfigurationPath);
+        var context = await session.ReadContextProjectAsync(Token);
+        var first = await context.Sources.RecentChanges!(["a.cs"], 5, Token);
+        var repeated = await context.Sources.RecentChanges!(["a.cs"], 5, Token);
+        repeated.Should().BeSameAs(first, "the same immutable commit/path history should avoid another Git subprocess");
+        var other = await context.Sources.RecentChanges!(["b.cs"], 5, Token);
+        other.SelectMany(c => c.Paths).Should().OnlyContain(p => p == "b.cs");
+        fixture.Write("a.cs", "class Changed {}");
+        await fixture.CommitAsync("new context history");
+        var refreshed = await context.Sources.RecentChanges!(["a.cs"], 5, Token);
+        refreshed[0].Subject.Should().Be("new context history");
+        refreshed.Should().NotBeSameAs(first);
+    }
+
+    [Fact]
     public async Task InitializedContextIncludesBodiesMemoryChangesProposalsAndWithholdsCrossBranchCode()
     {
         using var fixture = await SyncFixture.CreateAsync();

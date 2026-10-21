@@ -115,7 +115,7 @@ internal sealed class ExportCommandRunner(ProjectLifecycle lifecycle, ReportComm
             { return; }
             var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
             if (Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
-            { start.ArgumentList.Add(typeof(CliApplication).Assembly.Location); }
+            { start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "harness.dll")); }
             start.ArgumentList.Add("telemetry");
             start.ArgumentList.Add("send");
             start.ArgumentList.Add("--auto");

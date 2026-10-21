@@ -62,7 +62,31 @@ public sealed class UiBrowserTests
             await ProviderFixture.EventuallyAsync(() => memories.GetProposal(proposal.Id, Token).Proposal.Status is "approved");
             await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/inbox'");
             await page.WaitAsync("[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the task…')");
+            await page.EvaluateAsync("""
+                window.originalReviewFetch = window.fetch;
+                window.holdTaskRefresh = true;
+                window.holdReviewRead = true;
+                window.fetch = async (...args) => {
+                  const response = await window.originalReviewFetch(...args);
+                  const url = String(args[0]);
+                  if (window.holdTaskRefresh && url.includes('/task-proposals?')) {
+                    window.holdTaskRefresh = false;
+                    window.taskRefreshWaiting = true;
+                    await new Promise(resolve => { window.releaseTaskRefresh = resolve; });
+                  }
+                  if (window.holdReviewRead && url.includes('/milestones')) {
+                    window.holdReviewRead = false;
+                    window.reviewReadWaiting = true;
+                    await new Promise(resolve => { window.releaseReviewRead = resolve; });
+                  }
+                  return response;
+                };
+                """);
+            tasks.Propose(new TaskDefinition { Title = "Concurrent refresh proposal", Goal = "A pending refresh must preserve the review being opened", Acceptance = ["Form stays connected"] }, "Review race", "agent:test", Token);
+            await page.WaitAsync("window.taskRefreshWaiting === true");
             await page.EvaluateAsync("[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task…').click()");
+            await page.WaitAsync("window.reviewReadWaiting === true");
+            await page.EvaluateAsync("window.releaseTaskRefresh(); window.releaseReviewRead();");
             await page.WaitAsync("!!document.querySelector('input[aria-label=Title]')");
             tasks.GetProposal(taskProposal.Id, Token).Status.Should().Be("pending", "opening the review form must not create the task");
             await page.EvaluateAsync("document.querySelector('input[aria-label=Title]').value = 'Browser reviewed task'");

@@ -6,14 +6,16 @@ namespace Harness.Infrastructure.Git;
 
 public sealed partial record GitRepository
 {
-    public async Task<IReadOnlyList<RetrievalCommit>> RecentCommitsAsync(IReadOnlyList<string> paths, int limit, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<RetrievalCommit>> RecentCommitsAsync(IReadOnlyList<string> paths, int limit, CancellationToken cancellationToken = default) => RecentCommitsAtAsync("HEAD", paths, limit, cancellationToken);
+    internal async Task<IReadOnlyList<RetrievalCommit>> RecentCommitsAtAsync(string revision, IReadOnlyList<string> paths, int limit, CancellationToken cancellationToken)
     {
         if (paths.Count is 0 || limit <= 0)
         {
             return [];
         }
 
-        var output = await ReadGitAsync(["log", "-n", limit.ToString(CultureInfo.InvariantCulture), "--no-merges", "--format=%x1e%H%x1f%ct%x1f%s", "--name-only", "--", .. paths], cancellationToken).ConfigureAwait(false);
+        ValidateRevision(revision);
+        var output = await ReadGitAsync(["log", "-n", limit.ToString(CultureInfo.InvariantCulture), "--no-merges", "--format=%x1e%H%x1f%ct%x1f%s", "--name-only", revision, "--", .. paths], cancellationToken).ConfigureAwait(false);
         var wanted = paths.ToHashSet(StringComparer.Ordinal);
         List<RetrievalCommit> commits = [];
         foreach (var record in output.Split('\x1e'))

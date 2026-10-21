@@ -114,6 +114,7 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
     {
         await _background;
         _database?.Dispose();
+        _recentChanges.Dispose();
         _gate.Dispose();
     }
 

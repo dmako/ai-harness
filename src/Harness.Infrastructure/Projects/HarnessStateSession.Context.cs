@@ -7,6 +7,7 @@ namespace Harness.Infrastructure.Projects;
 
 public sealed partial class HarnessStateSession
 {
+    private readonly RecentChangesCache _recentChanges = new();
     public Harness.Core.Telemetry.IContextObserver? ContextObserver { get; init; }
     public async Task<ContextProject> ReadContextProjectAsync(CancellationToken cancellationToken)
     {
@@ -15,7 +16,7 @@ public sealed partial class HarnessStateSession
         var sources = new RetrievalSources(Branch: snapshot.Branch);
         if (location.Repository is { } repository)
         {
-            sources = sources with { RecentChanges = repository.RecentCommitsAsync };
+            sources = sources with { RecentChanges = (paths, limit, token) => _recentChanges.ReadAsync(repository, paths, limit, token) };
         }
 
         if (File.Exists(location.DatabasePath))

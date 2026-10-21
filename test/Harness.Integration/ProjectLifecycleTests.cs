@@ -15,6 +15,22 @@ namespace Harness.Integration;
 public sealed class ProjectLifecycleTests
 {
     [Fact]
+    public async Task MinimalMetadataRepositorySupportsInitializationAndMemoryWithoutGitCommands()
+    {
+        using var fixture = new ProjectFixture();
+        var root = Path.Combine(fixture.Root, "metadata-only");
+        Directory.CreateDirectory(Path.Combine(root, ".git/refs/heads"));
+        Directory.CreateDirectory(Path.Combine(root, ".git/objects"));
+        await File.WriteAllTextAsync(Path.Combine(root, ".git/HEAD"), "ref: refs/heads/main\n", TestContext.Current.CancellationToken);
+        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
+        initialized.Head.Unborn.Should().BeTrue();
+        await using var session = new HarnessStateSession(initialized.Location, fixture.Lifecycle.Registry, new("test", "", "test", "test"), fixture.GlobalConfig);
+        var saved = await session.PutMemoryAsync(new() { Type = "decision", Content = "Use metadata without external tools" }, TestContext.Current.CancellationToken);
+        saved.Status.Should().Be("created");
+        var context = await session.ReadContextProjectAsync(TestContext.Current.CancellationToken);
+        context.Sources.Branch.Should().Be("main");
+    }
+    [Fact]
     public async Task ProviderFacadeReadsStalenessAcrossSyncHeadMovementAndBranchSwitch()
     {
         using var fixture = new ProjectFixture();

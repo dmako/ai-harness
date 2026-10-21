@@ -25,7 +25,7 @@ public sealed class GraphifyGoContractTests
         var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_GRAPHIFY_ORACLE");
         if (string.IsNullOrWhiteSpace(oracle))
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_GRAPHIFY_ORACLE using Graphify/build_oracle.py; the fake CLI oracle currently uses the Windows worker apphost.");
+            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_GRAPHIFY_ORACLE using Graphify/build_oracle.py; the fake CLI oracle uses the current platform worker.");
         }
 
         var token = TestContext.Current.CancellationToken;
@@ -53,11 +53,19 @@ public sealed class GraphifyGoContractTests
         await using var provider = new GraphifyProvider(fixture.Options(), manager);
         var result = await provider.ExecuteAsync(request, token);
         var actual = JsonSerializer.SerializeToElement(new { capabilities = provider.Capabilities(), items = result.Items, truncated = result.Truncated, bytes = result.Bytes, error = result.Error?.Message ?? "" });
+        var command = Path.ChangeExtension(ProviderFixture.Worker, ".exe");
+        if (!OperatingSystem.IsWindows())
+        {
+            command = Path.Combine(fixture.DirectoryRoot, "graphify-worker");
+            await File.WriteAllTextAsync(command, "#!/bin/sh\nexec dotnet \"$HARNESS_GRAPHIFY_TEST_WORKER\" \"$@\"\n", token);
+            File.SetUnixFileMode(command, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
         var input = Path.Combine(fixture.DirectoryRoot, "oracle-input.json");
-        await File.WriteAllTextAsync(input, JsonSerializer.Serialize(new { Root = fixture.Root, Command = Path.ChangeExtension(ProviderFixture.Worker, ".exe"), Request = request }), token);
+        await File.WriteAllTextAsync(input, JsonSerializer.Serialize(new { Root = fixture.Root, Command = command, Request = request }), token);
         using var process = new Process { StartInfo = new(oracle) { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true } };
         process.StartInfo.ArgumentList.Add(input);
         process.StartInfo.Environment["HARNESS_FAKE_GRAPHIFY"] = fixture.Data;
+        process.StartInfo.Environment["HARNESS_GRAPHIFY_TEST_WORKER"] = ProviderFixture.Worker;
         process.StartInfo.Environment["HARNESS_CONFIG_DIR"] = Path.GetDirectoryName(fixture.RecordsPath);
         process.Start().Should().BeTrue();
         process.StandardInput.Close();
@@ -65,7 +73,9 @@ public sealed class GraphifyGoContractTests
         var error = process.StandardError.ReadToEndAsync(token);
         try
         { await process.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(30), token); }
-        finally { if (!process.HasExited)
+        finally
+        {
+            if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
             }

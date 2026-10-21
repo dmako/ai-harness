@@ -1,0 +1,22 @@
+[
+  {
+    "go": "  const main = document.getElementById(\"main\");\n  renderCrumbs();\n  if (!live)",
+    "port": "  const main = document.getElementById(\"main\");\n  if (live && main.querySelector(\".aform, .decide\")) return;\n  renderCrumbs();\n  if (!live)"
+  },
+  {
+    "go": "  if (n !== renderSeq) return; // a newer render (navigation, Refresh) won",
+    "port": "  if (n !== renderSeq || main.querySelector(\".aform, .decide\")) return; // navigation or a review opened while loading"
+  },
+  {
+    "go": "    if (!first && !force && el.querySelector(\".aform, .decide\")) return; // a form is open: leave it be",
+    "port": "    const review = el.querySelector(\".aform, .decide\");\n    if (!first && !force && review) return; // a form is open: leave it be"
+  },
+  {
+    "go": "      if (n === m.seq) put(m, () => node);",
+    "port": "      const currentReview = el.querySelector(\".aform, .decide\");\n      if (n === m.seq && (!currentReview || currentReview === review)) put(m, () => node);"
+  },
+  {
+    "go": "h(\"button\", { class: \"primary\", onclick: async () => fill(panel, await approveForm()) }, \"Create the task…\"),",
+    "port": "h(\"button\", { class: \"primary\", onclick: async () => {\n        const opening = h(\"div\", { class: \"aform\" }, h(\"p\", { class: \"hint\" }, \"Loading review…\"));\n        fill(panel, opening);\n        try {\n          const form = await approveForm();\n          if (opening.parentNode === panel) fill(panel, form);\n        } catch (e) { if (opening.parentNode === panel) fill(panel, h(\"p\", { class: \"error\" }, e.message)); }\n      } }, \"Create the task…\"),"
+  }
+]

@@ -19,36 +19,54 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
 {
     public string StateRoot => Path.GetFileName(CommonDir) == ".git" ? Path.GetDirectoryName(CommonDir)! : Root;
 
-    public static async Task<GitRepository> DiscoverAsync(string directory, CancellationToken cancellationToken = default)
+    public static Task<GitRepository> DiscoverAsync(string directory, CancellationToken cancellationToken = default)
     {
-        var root = Path.GetFullPath(directory);
-        var top = await RunAsync(root, ["rev-parse", "--show-toplevel"], cancellationToken);
-        if (top.Code != 0)
+        cancellationToken.ThrowIfCancellationRequested();
+        var root = PhysicalDirectory(Path.GetFullPath(directory));
+        for (var current = new DirectoryInfo(root); current is not null; current = current.Parent)
         {
-            // Distinguish invalid/broken repositories from genuinely non-Git directories.
-            for (var ancestor = new DirectoryInfo(root); ancestor is not null; ancestor = ancestor.Parent)
-            {
-                if (Path.Exists(Path.Combine(ancestor.FullName, ".git")))
-                {
-                    throw new InvalidDataException($"Cannot discover Git repository: {top.Error.Trim()}");
-                }
-            }
-
-            throw new NotRepositoryException(root);
+            cancellationToken.ThrowIfCancellationRequested();
+            var marker = Path.Combine(current.FullName, ".git");
+            if (Directory.Exists(marker))
+            { return Task.FromResult(new GitRepository(current.FullName, marker, marker, false)); }
+            if (!File.Exists(marker))
+            { continue; }
+            var content = ReadRefFile(marker);
+            if (!content.StartsWith("gitdir:", StringComparison.Ordinal))
+            { throw new InvalidDataException("Unrecognized .git file (expected 'gitdir: <path>')."); }
+            var gitDirectory = PhysicalDirectory(Path.GetFullPath(content[7..].Trim(), current.FullName));
+            var commonFile = Path.Combine(gitDirectory, "commondir");
+            var common = File.Exists(commonFile) ? PhysicalDirectory(Path.GetFullPath(ReadRefFile(commonFile), gitDirectory)) : gitDirectory;
+            return Task.FromResult(new GitRepository(current.FullName, gitDirectory, common, File.Exists(commonFile)));
         }
-
-        root = Path.GetFullPath(top.Output.TrimEnd('\r', '\n'));
-        var dirs = await RunAsync(root, ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"], cancellationToken);
-        if (dirs.Code != 0)
-        {
-            throw new InvalidDataException($"Cannot discover Git directories: {dirs.Error.Trim()}");
-        }
-
-        var paths = dirs.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(path => Path.GetFullPath(path.TrimEnd('\r'))).ToArray();
-        return new GitRepository(root, paths[0], paths[1], !PathEquals(paths[0], paths[1]));
+        throw new NotRepositoryException(root);
     }
 
-    public async Task<GitHead> ReadHeadAsync(CancellationToken cancellationToken = default)
+    private static string PhysicalDirectory(string path)
+    {
+        if (!Directory.Exists(path))
+        { throw new DirectoryNotFoundException("Git directory does not exist: " + path); }
+        var root = Path.GetPathRoot(path)!;
+        var resolved = root;
+        foreach (var part in path[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var directory = new DirectoryInfo(Path.Combine(resolved, part));
+            resolved = directory.LinkTarget is null ? directory.FullName : directory.ResolveLinkTarget(true)?.FullName ?? throw new IOException("Cannot resolve Git directory link.");
+        }
+        return resolved;
+    }
+
+    public Task<GitHead> ReadHeadAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // Reftable repositories need Git's backend; ordinary refs are read directly,
+        // as in the frozen implementation, without spawning processes on MCP calls.
+        return Directory.Exists(Path.Combine(CommonDir, "reftable"))
+            ? ReadHeadWithGitAsync(cancellationToken)
+            : Task.FromResult(ReadHeadFiles(cancellationToken));
+    }
+
+    private async Task<GitHead> ReadHeadWithGitAsync(CancellationToken cancellationToken = default)
     {
         var symbolic = await RunAsync(Root, ["symbolic-ref", "--quiet", "--short", "HEAD"], cancellationToken);
         var commit = await RunAsync(Root, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], cancellationToken);

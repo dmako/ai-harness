@@ -6,6 +6,7 @@ using Harness.Core.Tasks;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Tasks;
 using Harness.Infrastructure.Workspaces;
+using Harness.Integration.Providers;
 using Harness.Integration.Sync;
 using Xunit;
 
@@ -60,7 +61,7 @@ public sealed class UiGoContractTests
             var actual = await target.Client.GetByteArrayAsync(asset, Token);
             if (asset is "/app.js")
             {
-                // PORT-028 adds offline polling; all review screens remain frozen.
+                // PORT-028 adds offline polling; PORT-030 guards asynchronous review loading; all other bytes remain frozen.
                 var script = Encoding.UTF8.GetString(actual);
                 var newline = script.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
                 script = script.Replace(string.Join(newline,
@@ -72,6 +73,13 @@ public sealed class UiGoContractTests
                     "  if (!window.EventSource) { startPolling(); return; }"), "  if (!window.EventSource) return;", StringComparison.Ordinal)
                     .Replace("      stopPolling();" + newline, "", StringComparison.Ordinal)
                     .Replace("      startPolling();" + newline, "", StringComparison.Ordinal);
+                var reviewChanges = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/ui-review-port-changes.json"), Token))!.AsArray();
+                foreach (var change in reviewChanges.Reverse())
+                {
+                    var port = change!["port"]!.GetValue<string>().ReplaceLineEndings(newline);
+                    script.Should().Contain(port, "the documented review-race patch must be present");
+                    script = script.Replace(port, change["go"]!.GetValue<string>().ReplaceLineEndings(newline), StringComparison.Ordinal);
+                }
                 actual = Encoding.UTF8.GetBytes(script);
             }
             actual.Should().Equal(expected, asset);
