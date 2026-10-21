@@ -1,0 +1,221 @@
+{
+  "description": "Replace a current memory (e.g. a changed decision) with a new statement. The old one stays in history.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "current memory to replace"
+      },
+      "content": {
+        "type": "string",
+        "description": "the new statement"
+      },
+      "reason": {
+        "type": "string",
+        "description": "why it changed"
+      },
+      "type": {
+        "type": "string",
+        "description": "defaults to the old memory's type"
+      },
+      "scope": {
+        "type": "string",
+        "description": "defaults to the old memory's scope"
+      },
+      "source_ref": {
+        "type": "string"
+      },
+      "source_type": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "content",
+      "reason"
+    ],
+    "additionalProperties": false
+  },
+  "name": "memory_supersede",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string"
+      },
+      "memory": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "recorded_by": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "superseded_by": {
+            "type": "string"
+          },
+          "supersede_reason": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string"
+          },
+          "valid_until": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "overrides": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "scope",
+          "source_type",
+          "source_ref",
+          "recorded_by",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "similar": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "memory": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "source_ref": {
+                  "type": "string"
+                },
+                "recorded_by": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "superseded_by": {
+                  "type": "string"
+                },
+                "supersede_reason": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string"
+                },
+                "valid_until": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "overrides": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "content",
+                "scope",
+                "source_type",
+                "source_ref",
+                "recorded_by",
+                "created_at"
+              ],
+              "additionalProperties": false
+            },
+            "similarity": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "memory",
+            "similarity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "superseded": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "additionalProperties": false
+  }
+}

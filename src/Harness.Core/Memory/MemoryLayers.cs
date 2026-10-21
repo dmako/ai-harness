@@ -16,7 +16,8 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
         Dictionary<string, int> index = new(StringComparer.Ordinal);
         if (project is not null)
         {
-            foreach (var memory in project.Search(query, cancellationToken)) Add(memory);
+            foreach (var memory in project.Search(query, cancellationToken))
+                Add(memory);
         }
 
         var widerQuery = query with { Branch = "" };
@@ -25,7 +26,8 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
             cancellationToken.ThrowIfCancellationRequested();
             var current = wider[level];
             IReadOnlyList<MemoryRecord> memories;
-            try { memories = current.Store.Search(widerQuery, cancellationToken); }
+            try
+            { memories = current.Store.Search(widerQuery, cancellationToken); }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 errors.Add(new MemoryLayerError(current.Scope, exception));
@@ -41,7 +43,8 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
         }
 
         IEnumerable<MemoryRecord> sorted = output;
-        if (query.Scope is not null && string.IsNullOrWhiteSpace(query.Text)) sorted = output.OrderByDescending(memory => memory.Scope.Specificity);
+        if (query.Scope is not null && string.IsNullOrWhiteSpace(query.Text))
+            sorted = output.OrderByDescending(memory => memory.Scope.Specificity);
         return new LayeredMemories(sorted.Take(query.Limit <= 0 ? 20 : query.Limit).ToArray(), errors);
 
         void Add(MemoryRecord memory)
@@ -61,29 +64,33 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
     {
         if (project is not null)
         {
-            try { project.Get(id, cancellationToken); return new LocatedMemory(project, null); }
+            try
+            { project.Get(id, cancellationToken); return new LocatedMemory(project, null); }
             catch (KeyNotFoundException) { /* Continue to the wider stores, as in Go Layers.Find. */ }
         }
 
         foreach (var level in wider)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try { level.Store.Get(id, cancellationToken); return new LocatedMemory(level.Store, level.Scope); }
+            try
+            { level.Store.Get(id, cancellationToken); return new LocatedMemory(level.Store, level.Scope); }
             catch (Exception exception) when (exception is not OperationCanceledException) { /* Go treats any wider-store lookup failure as a miss. */ }
         }
 
-        throw new KeyNotFoundException($"{id}: memory not found");
+        throw new KeyNotFoundException($"memory {id}: memory not found");
     }
 
     public IMemoryStore? Level(MemoryScope scope) => wider.FirstOrDefault(level => level.Scope == scope)?.Store;
 
     private MemoryRecord? Overriding(int level, MemoryRecord memory, CancellationToken cancellationToken)
     {
-        if (project is not null && Similar(project) is { } projectMemory) return projectMemory;
+        if (project is not null && Similar(project) is { } projectMemory)
+            return projectMemory;
         for (var index = 0; index < level; index++)
         {
             var narrower = wider[index];
-            if (Similar(narrower.Store) is { } found) return found with { Scope = narrower.Scope };
+            if (Similar(narrower.Store) is { } found)
+                return found with { Scope = narrower.Scope };
         }
 
         return null;

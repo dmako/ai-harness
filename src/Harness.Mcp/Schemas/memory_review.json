@@ -1,0 +1,279 @@
+{
+  "description": "Approve (optionally edited) or reject a memory proposal on the user's behalf. If it resembles current memories, approval returns them: approve again with supersedes=[id] to replace one, or keep_both=true.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "proposal id"
+      },
+      "action": {
+        "type": "string",
+        "description": "approve or reject"
+      },
+      "content": {
+        "type": "string",
+        "description": "approve: edited statement (default: as proposed)"
+      },
+      "type": {
+        "type": "string",
+        "description": "approve: changed type"
+      },
+      "scope": {
+        "type": "string",
+        "description": "approve: changed scope"
+      },
+      "supersedes": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "approve: current memories this replaces (default: the one proposed)"
+      },
+      "keep_both": {
+        "type": "boolean",
+        "description": "approve even though similar memories exist, replacing none"
+      },
+      "note": {
+        "type": "string",
+        "description": "why (recorded with the decision)"
+      }
+    },
+    "required": [
+      "id",
+      "action"
+    ],
+    "additionalProperties": false
+  },
+  "name": "memory_review",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string"
+      },
+      "proposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "proposed_by": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "supersedes": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "decided_by": {
+            "type": "string"
+          },
+          "decision_note": {
+            "type": "string"
+          },
+          "memory_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "scope",
+          "source_ref",
+          "proposed_by",
+          "status",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "memory": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "recorded_by": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "superseded_by": {
+            "type": "string"
+          },
+          "supersede_reason": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string"
+          },
+          "valid_until": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "overrides": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "scope",
+          "source_type",
+          "source_ref",
+          "recorded_by",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "similar": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "memory": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "source_ref": {
+                  "type": "string"
+                },
+                "recorded_by": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "superseded_by": {
+                  "type": "string"
+                },
+                "supersede_reason": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string"
+                },
+                "valid_until": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "overrides": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "content",
+                "scope",
+                "source_type",
+                "source_ref",
+                "recorded_by",
+                "created_at"
+              ],
+              "additionalProperties": false
+            },
+            "similarity": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "memory",
+            "similarity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "proposal"
+    ],
+    "additionalProperties": false
+  }
+}

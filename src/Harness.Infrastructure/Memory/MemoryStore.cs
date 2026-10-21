@@ -7,7 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace Harness.Infrastructure.Memory;
 
 /// <summary>Compatible memory operations over a caller-owned database; one connection per operation.</summary>
-public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProvider = null) : IMemoryStore
+public sealed partial class MemoryStore(HarnessDatabase database, TimeProvider? timeProvider = null) : IMemoryStore
 {
     private const string Columns = "m.id, m.type, m.content, m.scope_kind, m.scope_value, m.source_type, m.source_ref, m.created_by, m.confidence, COALESCE(m.superseded_by, ''), COALESCE(m.supersede_reason, ''), m.valid_from, m.valid_until, m.created_at, m.updated_at";
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -35,13 +35,16 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
     {
         ArgumentNullException.ThrowIfNull(reason);
         reason = reason.Trim();
-        if (reason.Length is 0) throw new ArgumentException("a reason is required to retire a memory", nameof(reason));
-        if (string.IsNullOrWhiteSpace(by)) by = "unknown";
+        if (reason.Length is 0)
+            throw new ArgumentException("a reason is required to retire a memory");
+        if (string.IsNullOrWhiteSpace(by))
+            by = "unknown";
         return database.WithTransaction((connection, transaction) =>
         {
             var current = Get(connection, transaction, id);
             var now = Now();
-            if (!current.Current(now)) throw new InvalidOperationException($"memory {id} is not current (superseded or expired)");
+            if (!current.Current(now))
+                throw new InvalidOperationException($"memory {id} is not current (superseded or expired)");
             var stamp = now.ToString();
             Execute(connection, transaction, "UPDATE memories SET valid_until=$stamp, updated_at=$stamp WHERE id=$id", ("$stamp", stamp), ("$id", id));
             AddEvent(connection, transaction, id, "retired", "", by, reason, stamp);
@@ -63,7 +66,8 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 using var previous = Command(connection, transaction, "SELECT id FROM memories WHERE superseded_by=$id ORDER BY created_at DESC LIMIT 1", ("$id", current));
-                if (previous.ExecuteScalar() is not string predecessor || !seen.Add(predecessor)) break;
+                if (previous.ExecuteScalar() is not string predecessor || !seen.Add(predecessor))
+                    break;
                 chain.Insert(0, Get(connection, transaction, predecessor));
                 current = predecessor;
             }
@@ -85,7 +89,8 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
         ArgumentNullException.ThrowIfNull(query);
         cancellationToken.ThrowIfCancellationRequested();
         var fullText = MemoryText.FullTextQuery(query.Text);
-        if (fullText.Length is 0 && !string.IsNullOrWhiteSpace(query.Text)) return [];
+        if (fullText.Length is 0 && !string.IsNullOrWhiteSpace(query.Text))
+            return [];
         var limit = query.Limit <= 0 ? 20 : query.Limit;
         var scoped = query.Scope is not null && string.IsNullOrWhiteSpace(query.Text);
         List<string> where = [];
@@ -127,12 +132,14 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
             cancellationToken.ThrowIfCancellationRequested();
             var memory = Read(reader);
             if (query.Scope is not null && !memory.Scope.AppliesTo(query.Scope) &&
-                !(query.Branch.Length is not 0 && memory.Scope == new MemoryScope("branch", query.Branch))) continue;
+                !(query.Branch.Length is not 0 && memory.Scope == new MemoryScope("branch", query.Branch)))
+                continue;
             output.Add(memory);
         }
 
         IEnumerable<MemoryRecord> sorted = output;
-        if (scoped) sorted = output.OrderByDescending(memory => memory.Scope.Specificity);
+        if (scoped)
+            sorted = output.OrderByDescending(memory => memory.Scope.Specificity);
         return sorted.Take(limit).ToArray();
     }
 
@@ -184,13 +191,15 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
         {
             cancellationToken.ThrowIfCancellationRequested();
             var old = Get(connection, transaction, id);
-            if (old.SupersededBy.Length is not 0) throw new InvalidOperationException($"{id} is already superseded by {old.SupersededBy}; supersede that one instead");
+            if (old.SupersededBy.Length is not 0)
+                throw new InvalidOperationException($"{id} is already superseded by {old.SupersededBy}; supersede that one instead");
         }
 
         if (!input.Force && input.Supersedes.Count is 0)
         {
             var similar = FindSimilar(connection, transaction, input.Type, input.Content, now, cancellationToken);
-            if (similar.Length is not 0) return new MemoryPutResult("needs_decision") { Similar = similar };
+            if (similar.Length is not 0)
+                return new MemoryPutResult("needs_decision") { Similar = similar };
         }
 
         var newId = "mem_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -214,7 +223,8 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
     private static SimilarMemory[] FindSimilar(SqliteConnection connection, SqliteTransaction transaction, string type, string content, MemoryTimestamp now, CancellationToken cancellationToken)
     {
         var fullText = MemoryText.FullTextQuery(content);
-        if (fullText.Length is 0) return [];
+        if (fullText.Length is 0)
+            return [];
         using var command = Command(connection, transaction, "SELECT " + Columns + """
              FROM memories_fts f JOIN memories m ON m.rowid=f.rowid
              WHERE memories_fts MATCH $fts AND m.type=$type AND m.superseded_by IS NULL
@@ -228,7 +238,8 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
             cancellationToken.ThrowIfCancellationRequested();
             var memory = Read(reader);
             var similarity = MemoryText.Similarity(content, memory.Content);
-            if (similarity >= MemoryText.SimilarThreshold) output.Add(new SimilarMemory(memory, similarity));
+            if (similarity >= MemoryText.SimilarThreshold)
+                output.Add(new SimilarMemory(memory, similarity));
         }
 
         return output.OrderByDescending(similar => similar.Similarity).Take(5).ToArray();
@@ -268,7 +279,8 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
 
     private static MemoryTimestamp? ParseTime(string value)
     {
-        try { return MemoryTimestamp.Parse(value); }
+        try
+        { return MemoryTimestamp.Parse(value); }
         catch (FormatException) { return null; }
     }
 
@@ -282,7 +294,8 @@ public sealed class MemoryStore(HarnessDatabase database, TimeProvider? timeProv
         var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = sql;
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        foreach (var (name, value) in parameters)
+            command.Parameters.AddWithValue(name, value ?? DBNull.Value);
         return command;
     }
 

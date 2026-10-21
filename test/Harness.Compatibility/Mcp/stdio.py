@@ -64,7 +64,7 @@ def main():
         left = go.request("tools/list")["result"]
         right = cs.request("tools/list")["result"]
         expected = {tool["name"]: tool for tool in left["tools"] if tool["name"] in ("ping", "diagnostics", "state_put_test", "state_get_test")}
-        check("four-exact-tool-schemas", expected == {tool["name"]: tool for tool in right["tools"]}, count=len(right["tools"]))
+        check("four-bootstrap-tool-schemas", expected == {tool["name"]: tool for tool in right["tools"] if tool["name"] in expected}, count=len(right["tools"]))
         check("tool-list-cache-envelope", {key: value for key, value in left.items() if key != "tools"} == {key: value for key, value in right.items() if key != "tools"})
         compare("ping", "ping", {})
         diagnostics = result(cs, "diagnostics", {})["result"]["structuredContent"]

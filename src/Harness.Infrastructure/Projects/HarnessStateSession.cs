@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime) : IHarnessStateSession
+public sealed partial class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime, string? globalConfigurationPath = null) : IHarnessStateSession, Harness.Core.Memory.IMemorySession
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private HarnessDatabase? _database;
@@ -16,7 +16,8 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
     {
         var database = await StateDatabaseAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        try { database.PutDiagnostic(key, value); }
+        try
+        { database.PutDiagnostic(key, value); }
         catch (SqliteException exception) { throw new IOException("store value: " + exception.Message, exception); }
         cancellationToken.ThrowIfCancellationRequested();
     }
@@ -40,9 +41,14 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
     {
         Dictionary<string, object?> result = new(StringComparer.Ordinal)
         {
-            ["version"] = runtime.Version, ["commit"] = runtime.Commit, ["go_version"] = runtime.Runtime,
-            ["platform"] = runtime.Platform, ["project_root"] = location.Root, ["state_root"] = location.StateRoot,
-            ["db_path"] = location.DatabasePath, ["schema_version"] = 0,
+            ["version"] = runtime.Version,
+            ["commit"] = runtime.Commit,
+            ["go_version"] = runtime.Runtime,
+            ["platform"] = runtime.Platform,
+            ["project_root"] = location.Root,
+            ["state_root"] = location.StateRoot,
+            ["db_path"] = location.DatabasePath,
+            ["schema_version"] = 0,
         };
         Add(result, "config_global", location.Configuration.Sources.Global);
         Add(result, "config_project", location.Configuration.Sources.Project);
@@ -54,9 +60,12 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
                 head = await repository.ReadHeadAsync(cancellationToken);
                 Add(result, "git_branch", head.Branch);
                 Add(result, "git_commit", head.Commit);
-                if (head.Detached) result["git_detached"] = true;
-                if (head.Unborn) result["git_unborn"] = true;
-                if (repository.Linked) result["git_linked_worktree"] = true;
+                if (head.Detached)
+                    result["git_detached"] = true;
+                if (head.Unborn)
+                    result["git_unborn"] = true;
+                if (repository.Linked)
+                    result["git_linked_worktree"] = true;
             }
             catch (Exception exception) when (exception is IOException or InvalidDataException)
             {
@@ -139,7 +148,8 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
 
     private async Task<HarnessDatabase> StateDatabaseAsync(CancellationToken cancellationToken)
     {
-        try { return await DatabaseAsync(cancellationToken); }
+        try
+        { return await DatabaseAsync(cancellationToken); }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or SqliteException or ArgumentException)
         {
             throw new IOException("storage unavailable: " + exception.Message, exception);
@@ -161,7 +171,8 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
 
     private static void Add(Dictionary<string, object?> result, string key, string value)
     {
-        if (value.Length > 0) result[key] = value;
+        if (value.Length > 0)
+            result[key] = value;
     }
 
     private static Dictionary<string, object?> ReadSync(HarnessDatabase database, string worktree, GitHead? head)
@@ -202,7 +213,8 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
     private static string SecondPrecision(string value)
     {
         var dot = value.IndexOf('.', StringComparison.Ordinal);
-        if (dot < 0) return value;
+        if (dot < 0)
+            return value;
         var offset = value.AsSpan(dot + 1).IndexOfAny('Z', '+', '-');
         return offset < 0 ? value : value[..dot] + value[(dot + 1 + offset)..];
     }
@@ -219,12 +231,18 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
         {
             Dictionary<string, object?> run = new(StringComparer.Ordinal)
             {
-                ["id"] = reader.GetInt64(0), ["started_at"] = JsonTime(reader.GetString(1)), ["mode"] = reader.GetString(3),
-                ["added"] = reader.GetInt64(7), ["changed"] = reader.GetInt64(8), ["removed"] = reader.GetInt64(9), ["status"] = reader.GetString(11),
+                ["id"] = reader.GetInt64(0),
+                ["started_at"] = JsonTime(reader.GetString(1)),
+                ["mode"] = reader.GetString(3),
+                ["added"] = reader.GetInt64(7),
+                ["changed"] = reader.GetInt64(8),
+                ["removed"] = reader.GetInt64(9),
+                ["status"] = reader.GetString(11),
             };
             foreach (var (column, key) in new[] { (2, "finished_at"), (4, "reason"), (5, "base_commit"), (6, "head_commit"), (12, "error") })
             {
-                if (!reader.IsDBNull(column)) Add(run, key, column == 2 ? JsonTime(reader.GetString(column)) : reader.GetString(column));
+                if (!reader.IsDBNull(column))
+                    Add(run, key, column == 2 ? JsonTime(reader.GetString(column)) : reader.GetString(column));
             }
 
             using var providers = System.Text.Json.JsonDocument.Parse(reader.GetString(10));
@@ -238,9 +256,11 @@ public sealed class HarnessStateSession(ProjectLocation location, MachineRegistr
     private static string JsonTime(string value)
     {
         var dot = value.IndexOf('.', StringComparison.Ordinal);
-        if (dot < 0) return value;
+        if (dot < 0)
+            return value;
         var offset = value.AsSpan(dot + 1).IndexOfAny('Z', '+', '-');
-        if (offset < 0) return value;
+        if (offset < 0)
+            return value;
         var suffix = dot + 1 + offset;
         var fraction = value[(dot + 1)..suffix].TrimEnd('0');
         return value[..dot] + (fraction.Length == 0 ? "" : "." + fraction) + value[suffix..];

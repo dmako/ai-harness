@@ -5,6 +5,10 @@ TASK-0007 / PORT-007 adds `harness mcp --project <directory>` through the offici
 `ping`, `diagnostics`, `state_put_test` and `state_get_test`. The remaining tools
 retain their own port tasks; this bootstrap does not claim full harness parity.
 
+[PORT-009](memory-workflows.md) now adds ten memory tools to this bootstrap,
+bringing the implemented tool list to 14. The validation below records PORT-007's
+original four-tool milestone; its schemas and behavior remain regression checks.
+
 ```powershell
 dotnet src/Harness.Cli/bin/Debug/net10.0/harness.dll mcp --project C:/path/to/repository
 ```

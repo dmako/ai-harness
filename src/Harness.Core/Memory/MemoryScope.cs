@@ -20,10 +20,13 @@ public sealed record MemoryScope(string Kind, string Value = "")
     {
         ArgumentNullException.ThrowIfNull(text);
         text = text.Trim();
-        if (text.Length is 0 || text is "project") return Project;
-        if (text is "user") return User;
+        if (text.Length is 0 || text is "project")
+            return Project;
+        if (text is "user")
+            return User;
         var separator = text.IndexOf(':', StringComparison.Ordinal);
-        if (separator < 0) throw new ArgumentException("Invalid memory scope.", nameof(text));
+        if (separator < 0)
+            throw new ArgumentException("invalid scope " + MemoryText.Quote(text) + " (want project, path:<dir or file>, subsystem:<name>, branch:<name>, workspace:<name> or user)");
         return new MemoryScope(text[..separator].Trim(), text[(separator + 1)..].Trim()).Normalize();
     }
 
@@ -32,30 +35,37 @@ public sealed record MemoryScope(string Kind, string Value = "")
         switch (Kind)
         {
             case "project" or "user":
-                if (Value.Length is not 0) throw new ArgumentException($"{Kind} scope takes no value");
+                if (Value.Length is not 0)
+                    throw new ArgumentException($"{Kind} scope takes no value");
                 return this;
             case "path":
                 var path = Value.Replace('\\', '/');
-                if (path.Length is 0 || path.StartsWith('/')) throw new ArgumentException("path scope must be relative to the project root");
+                if (path.Length is 0 || path.StartsWith('/'))
+                    throw new ArgumentException("path scope must be a path relative to the project root, got " + MemoryText.Quote(Value));
                 List<string> parts = [];
                 foreach (var part in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    if (part is ".") continue;
+                    if (part is ".")
+                        continue;
                     if (part is "..")
                     {
-                        if (parts.Count is 0) throw new ArgumentException("path scope must stay inside the project");
+                        if (parts.Count is 0)
+                            throw new ArgumentException("path scope must stay inside the project, got " + MemoryText.Quote(Value));
                         parts.RemoveAt(parts.Count - 1);
                     }
-                    else parts.Add(part);
+                    else
+                        parts.Add(part);
                 }
 
-                if (parts.Count is 0) throw new ArgumentException("path scope '.' is the whole project; use project scope");
+                if (parts.Count is 0)
+                    throw new ArgumentException("path scope '.' is the whole project; use project scope");
                 return this with { Value = string.Join('/', parts) };
             case "subsystem" or "branch" or "workspace":
-                if (Value.Length is 0) throw new ArgumentException($"{Kind} scope needs a name");
+                if (Value.Length is 0)
+                    throw new ArgumentException($"{Kind} scope needs a name");
                 return this;
             default:
-                throw new ArgumentException("Invalid memory scope kind.");
+                throw new ArgumentException("invalid scope kind " + MemoryText.Quote(Kind) + " (want project, path, subsystem, branch, workspace or user)");
         }
     }
 

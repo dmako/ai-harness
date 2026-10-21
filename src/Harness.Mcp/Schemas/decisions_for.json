@@ -1,0 +1,197 @@
+{
+  "description": "Current decisions, conventions and warnings that apply to a scope (a file or directory path, subsystem or branch), including project-wide ones and the current branch's. Check before changing that area.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "description": "path:<dir or file>, subsystem:<name>, branch:<name> or project"
+      }
+    },
+    "required": [
+      "scope"
+    ],
+    "additionalProperties": false
+  },
+  "name": "decisions_for",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "memories": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_type": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "recorded_by": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "superseded_by": {
+              "type": "string"
+            },
+            "supersede_reason": {
+              "type": "string"
+            },
+            "valid_from": {
+              "type": "string"
+            },
+            "valid_until": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "overrides": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_type",
+            "source_ref",
+            "recorded_by",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "scope": {
+        "type": "string"
+      },
+      "branch": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "hint": {
+        "type": "string"
+      },
+      "elsewhere": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "memory": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "source_ref": {
+                  "type": "string"
+                },
+                "recorded_by": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "superseded_by": {
+                  "type": "string"
+                },
+                "supersede_reason": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string"
+                },
+                "valid_until": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "overrides": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "content",
+                "scope",
+                "source_type",
+                "source_ref",
+                "recorded_by",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "project",
+            "memory"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "memories"
+    ],
+    "additionalProperties": false
+  }
+}

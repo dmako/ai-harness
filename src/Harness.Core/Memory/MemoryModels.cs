@@ -40,6 +40,7 @@ public sealed record MemoryQuery
 public sealed record SimilarMemory(MemoryRecord Memory, double Similarity);
 public sealed record MemoryPutResult(string Status, MemoryRecord? Memory = null)
 {
+    public string Hint { get; init; } = "";
     public IReadOnlyList<SimilarMemory> Similar { get; init; } = [];
     public IReadOnlyList<string> Superseded { get; init; } = [];
 }

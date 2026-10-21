@@ -2,6 +2,8 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text;
 using Harness.Core.Projects;
+using Harness.Core.Memory;
+using Harness.Mcp.Memory;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -38,7 +40,11 @@ public static class HarnessMcpServer
                 },
                 CallToolHandler = async (request, token) =>
                 {
-                    try { return await CallAsync(request.Params, session, runtime, token); }
+                    var client = request.Server.ClientInfo;
+                    var version = string.IsNullOrEmpty(client?.Version) ? "" : " " + client.Version;
+                    var caller = string.IsNullOrEmpty(client?.Name) ? "unknown" : client.Name + version;
+                    try
+                    { return await CallAsync(request.Params, session, runtime, token, caller); }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
                         // The C# SDK intentionally emits no reply for client-cancelled calls.
@@ -53,7 +59,7 @@ public static class HarnessMcpServer
     }
 
     internal static async ValueTask<CallToolResult> CallAsync(CallToolRequestParams parameters, IHarnessStateSession session,
-        HarnessRuntime runtime, CancellationToken cancellationToken)
+        HarnessRuntime runtime, CancellationToken cancellationToken, string caller = "unknown")
     {
         var tool = Tools.FirstOrDefault(tool => tool.Name == parameters.Name)
             ?? throw new McpProtocolException($"unknown tool {JsonSerializer.Serialize(parameters.Name)}", McpErrorCode.InvalidParams);
@@ -73,11 +79,32 @@ public static class HarnessMcpServer
             return Success(await session.DiagnosticsAsync(cancellationToken));
         }
 
+        if (parameters.Name is not ("state_put_test" or "state_get_test"))
+        {
+            try
+            {
+                if (session is not IMemorySession memory)
+                    return Error("memory session unavailable");
+                return Success(await MemoryTools.CallAsync(parameters.Name, parameters.Arguments, memory, caller, cancellationToken));
+            }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                return Error("memory content rejected: credential validation timed out");
+            }
+            catch (Exception exception) when (exception is IOException or InvalidDataException or JsonException or ArgumentException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException or UnauthorizedAccessException)
+            {
+                return Error(exception.Message);
+            }
+        }
+
         var key = parameters.Arguments!["key"].GetString()!;
-        if (key.Length == 0) return Error("key must not be empty");
-        if (key.EnumerateRunes().Count() > 256) return Error("key exceeds 256 characters");
+        if (key.Length == 0)
+            return Error("key must not be empty");
+        if (key.EnumerateRunes().Count() > 256)
+            return Error("key exceeds 256 characters");
         var value = parameters.Name == "state_put_test" ? parameters.Arguments["value"].GetString()! : null;
-        if (value is not null && Encoding.UTF8.GetByteCount(value) > 64 * 1024) return Error("value exceeds 65536 bytes");
+        if (value is not null && Encoding.UTF8.GetByteCount(value) > 64 * 1024)
+            return Error("value exceeds 65536 bytes");
         try
         {
             if (value is not null)
@@ -88,7 +115,8 @@ public static class HarnessMcpServer
 
             var stored = await session.GetAsync(key, cancellationToken);
             SortedDictionary<string, object?> result = new(StringComparer.Ordinal) { ["key"] = key, ["found"] = stored is not null };
-            if (!string.IsNullOrEmpty(stored)) result["value"] = stored;
+            if (!string.IsNullOrEmpty(stored))
+                result["value"] = stored;
             return Success(result);
         }
         catch (IOException exception)
@@ -114,36 +142,16 @@ public static class HarnessMcpServer
         _ => element,
     };
 
-    private static CallToolResult Error(string message) => new() { IsError = true, Content = [new TextContentBlock { Text = message }] };
-
-    private static string? ValidateArguments(Tool tool, IDictionary<string, JsonElement>? arguments)
+    private static CallToolResult Error(string message)
     {
-        var required = tool.InputSchema.TryGetProperty("required", out var list) ? list.EnumerateArray().Select(item => item.GetString()!).ToArray() : [];
-        var given = arguments ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        var expected = "\nexpected arguments: required " + (required.Length == 0 ? "nothing" : string.Join(", ", required));
-        var prefix = "validating \"arguments\": validating root: ";
-        var missing = required.Where(name => !given.ContainsKey(name)).Order(StringComparer.Ordinal).ToArray();
-        if (missing.Length > 0) return prefix + "required: missing properties: " + JsonSerializer.Serialize(missing) + expected;
-        var extra = given.Keys.Except(required, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        if (extra.Length > 0) return prefix + "unexpected additional properties " + JsonSerializer.Serialize(extra) + expected;
-        foreach (var name in required)
-        {
-            var value = given[name];
-            if (value.ValueKind == JsonValueKind.String) continue;
-            var type = value.ValueKind switch
-            {
-                JsonValueKind.True or JsonValueKind.False => "boolean",
-                JsonValueKind.Number => value.TryGetInt64(out _) ? "integer" : "number",
-                JsonValueKind.Null => "null",
-                JsonValueKind.Array => "array",
-                _ => "object",
-            };
-            var display = value.ValueKind == JsonValueKind.Null ? "<invalid reflect.Value>" : value.GetRawText();
-            return prefix + $"validating /properties/{name}: type: {display} has type \"{type}\", want \"string\"" + expected;
-        }
-
-        return null;
+        string safe;
+        try
+        { safe = message.StartsWith("validating \"arguments\"", StringComparison.Ordinal) ? CredentialRedactor.Redact(message) : message; }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException) { safe = "request rejected: diagnostic redaction timed out"; }
+        return new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = safe }] };
     }
+
+    private static string? ValidateArguments(Tool tool, IDictionary<string, JsonElement>? arguments) => MemoryArguments.Validate(tool, arguments);
 
     private static Tool[] LoadTools()
     {

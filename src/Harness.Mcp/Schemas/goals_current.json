@@ -1,0 +1,194 @@
+{
+  "description": "Current project goals, optionally only those applicable to a scope. Cheap; check before planning work.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "description": "project (default: all scopes), path:<dir or file>, subsystem:<name> or branch:<name>"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "goals_current",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "memories": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_type": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "recorded_by": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "superseded_by": {
+              "type": "string"
+            },
+            "supersede_reason": {
+              "type": "string"
+            },
+            "valid_from": {
+              "type": "string"
+            },
+            "valid_until": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "overrides": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_type",
+            "source_ref",
+            "recorded_by",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "scope": {
+        "type": "string"
+      },
+      "branch": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "hint": {
+        "type": "string"
+      },
+      "elsewhere": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "memory": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "source_ref": {
+                  "type": "string"
+                },
+                "recorded_by": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "superseded_by": {
+                  "type": "string"
+                },
+                "supersede_reason": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string"
+                },
+                "valid_until": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "overrides": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "content",
+                "scope",
+                "source_type",
+                "source_ref",
+                "recorded_by",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "project",
+            "memory"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "memories"
+    ],
+    "additionalProperties": false
+  }
+}

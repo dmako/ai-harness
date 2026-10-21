@@ -1,4 +1,5 @@
 using Harness.Infrastructure.Projects;
+using Harness.Cli.Memory;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -26,6 +27,8 @@ public static class CliApplication
         builder.Services.AddSingleton(BuildInformation.Current());
         builder.Services.AddSingleton(services => new ProjectLifecycle(version: services.GetRequiredService<BuildInformation>().Version));
         builder.Services.AddSingleton(stdout);
+        builder.Services.AddSingleton(new CliErrorOutput(stderr));
+        builder.Services.AddSingleton<MemoryCommandRunner>();
         configureHost?.Invoke(builder);
         await using var registrar = new HostTypeRegistrar(builder);
         var app = new CommandApp(registrar);
@@ -46,6 +49,19 @@ public static class CliApplication
             configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
             configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
+            configuration.AddBranch("memory", memory =>
+            {
+                memory.AddCommand<MemoryShowCommand>("show").WithDescription("Show a memory with history and audit trail");
+                memory.AddCommand<MemoryRetireCommand>("retire").WithDescription("End a memory's validity without deleting its history");
+                memory.AddCommand<MemoryPromoteCommand>("promote").WithDescription("Promote a project memory to workspace or user scope");
+            });
+            configuration.AddBranch("proposals", proposals =>
+            {
+                proposals.AddCommand<ProposalsListCommand>("list").WithDescription("List memory proposals");
+                proposals.AddCommand<ProposalsShowCommand>("show").WithDescription("Show a proposal and look-alike memories");
+                proposals.AddCommand<ProposalsApproveCommand>("approve").WithDescription("Approve a proposal, optionally edited");
+                proposals.AddCommand<ProposalsRejectCommand>("reject").WithDescription("Reject a proposal");
+            });
             configureCommands?.Invoke(configuration);
         });
 
@@ -109,10 +125,18 @@ public static class CliApplication
                 "-json" => "--json",
                 "-syncs" => "--syncs",
                 "-all" => "--all",
+                "-reason" => "--reason",
+                "-to" => "--to",
+                "-force" => "--force",
+                "-status" => "--status",
+                "-content" => "--content",
+                "-note" => "--note",
+                "-supersede" => "--supersede",
+                "-keep-both" => "--keep-both",
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--project" or "--syncs")
+            if (equals < 0 && replacement is "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede")
             {
                 index++; // A value is data, even when it resembles another option.
             }

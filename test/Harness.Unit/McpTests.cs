@@ -47,6 +47,18 @@ public sealed class McpTests
     }
 
     [Fact]
+    public async Task SchemaErrorsRedactCredentialLikeValuesBeforeReturningDiagnostics()
+    {
+        await using var session = new FakeSession();
+        var result = await Call("memory_put", "{\"type\":\"fact\",\"content\":\"safe statement\",\"force\":\"API_KEY=synthetic-fixture\"}", session);
+        Assert.True(result.IsError);
+        var error = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        Assert.Contains("[redacted]", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("synthetic-fixture", error, StringComparison.Ordinal);
+        Assert.Equal(0, session.Calls);
+    }
+
+    [Fact]
     public async Task LimitsCountKeyRunesAndValueUtf8BytesAndEmptyFoundValueIsOmitted()
     {
         await using var session = new FakeSession();
@@ -90,13 +102,15 @@ public sealed class McpTests
             {
                 var operation = client.SendRequestAsync(new JsonRpcRequest
                 {
-                    Id = new RequestId(42), Method = "tools/call",
+                    Id = new RequestId(42),
+                    Method = "tools/call",
                     Params = new JsonObject { ["name"] = "state_get_test", ["arguments"] = new JsonObject { ["key"] = "wait" } },
                 }, TestContext.Current.CancellationToken);
                 await session.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
                 await client.SendMessageAsync(new JsonRpcNotification
                 {
-                    Method = "notifications/cancelled", Params = new JsonObject { ["requestId"] = 42 },
+                    Method = "notifications/cancelled",
+                    Params = new JsonObject { ["requestId"] = 42 },
                 }, TestContext.Current.CancellationToken);
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
                 await session.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -110,7 +124,8 @@ public sealed class McpTests
         finally
         {
             await lifetime.CancelAsync();
-            try { await running; }
+            try
+            { await running; }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { /* Cleanup after an assertion failure. */ }
         }
     }
@@ -181,7 +196,8 @@ public sealed class McpTests
             Started.TrySetResult();
             if (Wait)
             {
-                try { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
+                try
+                { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
                 finally { if (cancellationToken.IsCancellationRequested) Cancelled.TrySetResult(); }
             }
             return _values.GetValueOrDefault(key);

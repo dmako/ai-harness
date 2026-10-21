@@ -1,0 +1,216 @@
+{
+  "description": "Search current project memories by text, type and scope (superseded/expired ones only if include_inactive).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "words to match (any); empty lists newest first"
+      },
+      "types": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "filter by type: goal, constraint, decision, fact, open_question, warning, convention"
+      },
+      "scope": {
+        "type": "string",
+        "description": "only memories applicable to this scope (plus the current branch's)"
+      },
+      "include_inactive": {
+        "type": "boolean",
+        "description": "include superseded and expired memories"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "default 20, max 100"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "memory_search",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "memories": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_type": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "recorded_by": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "superseded_by": {
+              "type": "string"
+            },
+            "supersede_reason": {
+              "type": "string"
+            },
+            "valid_from": {
+              "type": "string"
+            },
+            "valid_until": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "overrides": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_type",
+            "source_ref",
+            "recorded_by",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "scope": {
+        "type": "string"
+      },
+      "branch": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "hint": {
+        "type": "string"
+      },
+      "elsewhere": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "memory": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "source_ref": {
+                  "type": "string"
+                },
+                "recorded_by": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "superseded_by": {
+                  "type": "string"
+                },
+                "supersede_reason": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string"
+                },
+                "valid_until": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "overrides": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "content",
+                "scope",
+                "source_type",
+                "source_ref",
+                "recorded_by",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "project",
+            "memory"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "memories"
+    ],
+    "additionalProperties": false
+  }
+}

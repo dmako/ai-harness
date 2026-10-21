@@ -21,7 +21,7 @@ internal sealed class McpCommand(ProjectLifecycle lifecycle, BuildInformation in
         var runtime = new HarnessRuntime(information.Version, information.Commit, information.Runtime, information.Platform);
         using var input = Console.OpenStandardInput();
         using var output = Console.OpenStandardOutput();
-        var session = new HarnessStateSession(location, lifecycle.Registry, runtime);
+        var session = new HarnessStateSession(location, lifecycle.Registry, runtime, lifecycle.GlobalConfigurationPath);
         try
         {
             await HarnessMcpServer.RunAsync(input, output, session, runtime, loggerFactory, services, cancellationToken);
