@@ -1,0 +1,313 @@
+{
+  "schema_version": 1,
+  "task": "TASK-0008",
+  "validated_on_local": "2026-10-21",
+  "host": "Windows x64",
+  "sdk": "10.0.402",
+  "source_commit": "9cb401dd2de4f85dd089fea86a0b139d81b178c6",
+  "summary": {
+    "total_tests": 133,
+    "passed_tests": 132,
+    "skipped_tests": 1,
+    "failed_tests": 0,
+    "new_memory_tests_passed": 52,
+    "go_oracle_tests_passed": 5,
+    "release_warnings": 0,
+    "release_errors": 0,
+    "locked_restore": "pass"
+  },
+  "oracle": {
+    "compiler": "go1.27.1 windows/amd64",
+    "executable": "artifacts/memory-oracle/memory-oracle-04.exe",
+    "sha256": "683dd5b02ac428daa309bc0b0f9e2af0a3b44b5eee522e617cf42ad9a8709951",
+    "unmodified_source_sha256": {
+      "internal/memory/memory.go": "471b055a1876c4a962b9a118f38285d76d536c9c10536bcf2e1328b495de9435",
+      "internal/memory/store.go": "6e5c72c97a7f6ad5cbad80b7bbc93a3002f1eea81951d7dc7d81e333d86add52",
+      "internal/memory/layers.go": "e29fd7aa5466b4d3cb5e9163330bf799f0f1bc28ab756364b453f80b4bf3c6d8",
+      "internal/memory/view.go": "77192332a4fe71c8054cb0d820fe293ee8cd381770998677a15278ad31fa09db",
+      "internal/redact/redact.go": "f3e8a965c5eb4f183d77770fd2877b9ab6d31b4458cdc0691199585f5f8073fe",
+      "internal/redact/redact_test.go": "d9591dfbcb7f0fb34b43c83bfc52e8c57c4f66a3e987b2c75ebaed04f2da4b91"
+    },
+    "queries_per_database_report": 8,
+    "layer_queries": 5,
+    "lowercase_mappings": 1488,
+    "compressed_case_ranges": 186,
+    "letter_digit_ranges": 736,
+    "credential_cases_compared_to_go": 18,
+    "unicode_regeneration": "byte-identical"
+  },
+  "reports": [
+    {
+      "path": "artifacts/memory-results-final/Harness.Integration_net10.0_x64.trx",
+      "sha256": "c5aef82e81236a61f537bbeca90199f2161bceebe2b702dfb203cde0e85776e9"
+    },
+    {
+      "path": "artifacts/memory-results-final/Harness.Unit_net10.0_x64.trx",
+      "sha256": "ae076ea9e317ea75ef3e5a128488c5e639939c4de21d94946e1d691a33bae8d9"
+    }
+  ],
+  "memory_tests": [
+    {
+      "name": "Harness.Integration.Memory.MemoryOracleTests.GoDatabaseRoundtripsThroughCSharpWithIdenticalSearchHistoryAndAudit",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Memory.MemoryOracleTests.RedactionMatchesGoIncludingAsciiBoundariesAndWhitespace",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Memory.MemoryOracleTests.AllGoSimpleLowercaseMappingsKeepLegacyHashesCompatible",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Memory.MemoryOracleTests.UnicodeWordRangeBoundariesMatchGoSimilarityTokenization",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.LayersKeepPrecedenceAndTheOriginalUnfilteredOverrideRules",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.SupersessionAndRetirementKeepHistoryAndRollbackRejectedWrites",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.DuplicatesExpiryAndFutureSimilarityPreserveGoQuirks",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.RestartPreservesProvenanceReaffirmationAndRawNanoseconds",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.Memory.MemoryOracleTests.LayersAgreeWithGoForConflictsExpiryBranchTextAndLimits",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.ScopeSpecificityBranchAndFtsOrderingAreAppliedBeforeLimits",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.RejectedContentAndCancellationNeverWriteRows",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Integration.MemoryTests.ConcurrentIndependentConnectionsAbsorbExactDuplicatesAtomically",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.WiderFailuresArePartialButProjectFailuresAndCancellationPropagate",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.NormalizationHashesAndSimilarityMatchLegacyRules",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"project:x\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"internal/storage\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"path:/etc\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"path:../x\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"team:core\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"path:.\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"path:a/../../b\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"path:\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.InvalidScopesAreRejected(input: \"subsystem:\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ValidationDefaultsAlwaysRecordSourceAndActor",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.NanosecondTimesSurviveOffsetsAndCompareWithoutTickTruncation",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"path:./a/../b\", expected: \"path:b\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"path:internal\\\\git\", expected: \"path:internal/git\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"branch:feature/x\", expected: \"branch:feature/x\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"workspace:home\", expected: \"workspace:home\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"user\", expected: \"user\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"subsystem:auth\", expected: \"subsystem:auth\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"path:internal/storage/\", expected: \"path:internal/storage\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \" project \", expected: \"project\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ScopesNormalizeLikeGo(input: \"\", expected: \"project\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"aws AKIAIOSFODNN7EXAMPLE key\", expected: \"aws [redacted] key\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"DB_PASSWORD=s3cr3t! and API_KEY: 'abc def'\", expected: \"DB_PASSWORD=[redacted] and API_KEY: [redacted]\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"use key sk-ant-api03-abcdefghijklmnopqrstuvwxyz012\"···, expected: \"use key [redacted] for the call\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"-----BEGIN RSA PRIVATE KEY-----\\nMIIabc\\n-----END RS\"···, expected: \"[redacted]\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwI\"···, expected: \"jwt [redacted]\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"{\\\"client_secret\\\": \\\"xyz\\\"}\", expected: \"{\\\"client_secret\\\": [redacted]}\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0123 lea\"···, expected: \"token [redacted] leaked\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"curl -H 'Authorization: Bearer abcdefghijklmnop123\"···, expected: \"curl -H 'Authorization: Bearer [redacted]'\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"glpat-abcdefghijklmnopqrstu in the CI\", expected: \"[redacted] in the CI\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.GoRedactionFixturesRejectCredentialsWithoutEchoingThem(input: \"clone https://zaki:hunter2pass@gitlab.com/x.git pl\"···, expected: \"clone https://zaki:[redacted]@gitlab.com/x.git ple\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ValidationBoundsUtf8RejectsInvalidEncodingAndNonfiniteConfidence",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.OrdinaryGoRedactionFixturesRemainUsable(input: \"tokenizer splits task words; password reset page s\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.OrdinaryGoRedactionFixturesRemainUsable(input: \"Fix OrderService.Confirm: stale Revision after PUT\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.OrdinaryGoRedactionFixturesRemainUsable(input: \"get_context budget=6000 path=internal/retrieval\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.OrdinaryGoRedactionFixturesRemainUsable(input: \"https://gitlab.com/matus.zakarovsky/ai-harness/-/m\"···)",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.OrdinaryGoRedactionFixturesRemainUsable(input: \"sk-learn style model\")",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ApplicabilityRespectsPathBoundariesAndCase",
+      "outcome": "Passed"
+    },
+    {
+      "name": "Harness.Unit.MemoryTests.ValidityWindowIncludesStartAndExcludesEnd",
+      "outcome": "Passed"
+    }
+  ],
+  "source_sha256": {
+    "doc/port/memory-storage.md": "8067288a7c26e6efb21f0f6c2d47229c65dda70b47ff992834e4c013a51bc52d",
+    "doc/port/README.md": "ecb6d4f70ed8ee9c6ab613f19b06cbb053801e655d4a75339054380104de8439",
+    "src/Harness.Core/Harness.Core.csproj": "8486e3b915bd7ec8ac6e8e39deb08a7c210820bfcf8a0df8c1cbefd6da2bb76b",
+    "src/Harness.Core/Memory/CredentialRedactor.cs": "3dc7ed4f0047cd31b8ee1d09eb91bd351678c4deb4524fd289d46c00e36d84a9",
+    "src/Harness.Core/Memory/GoUnicode.cs": "7e0927e4391270a3d441296fa508e147de51620911521892ff3d67fbe1f35cb7",
+    "src/Harness.Core/Memory/LICENSE.txt": "bd033a64a189ad7c86a9f4186ba5bc5189f9c832b589c641dd1c75e3b5f2c5f4",
+    "src/Harness.Core/Memory/MemoryLayers.cs": "8610a5ef60ab8e5f25c263bfbc14985842920eedd6738a7ea89070adb919ed7c",
+    "src/Harness.Core/Memory/MemoryModels.cs": "18921388de817661ff98fcb27d335818df96c80b9da91fd85a477760936c12bb",
+    "src/Harness.Core/Memory/MemoryScope.cs": "298190ac71cf2f678cf2a1d6133f8f1a3da178d241d0647f0834a8b0188c8eb7",
+    "src/Harness.Core/Memory/MemoryText.cs": "a6f04c4e451a092831c51994c4329ecbf6d65ba929340dcee414db5d1d1e29da",
+    "src/Harness.Core/Memory/MemoryTimestamp.cs": "80876d4860c726f3dd1c5bbfbbf42966f1241271a80e2860ef7cf56b288a9cdc",
+    "src/Harness.Infrastructure/Memory/MemoryStore.cs": "75f6eaa31fa9b97fc6d8b21bbc9e11ae466c7d92e8e8034c3c0209e3b0ef4c70",
+    "test/Harness.Integration/Memory/Go/build-oracle.ps1": "f9be64dcae776e85bb05ef404bd09cf8e13c735f8be2520f75b3b29ff31f6059",
+    "test/Harness.Integration/Memory/Go/generate-unicode.py": "9727e451ba5806f9936e958a2215ddc98d047f170ac13961dc7742cea2dabbe1",
+    "test/Harness.Integration/Memory/Go/main.go": "753a93e5b19f5aeae984c1a39bb7acd86c3b4c3ff1f2bd651510c2dc727c74b2",
+    "test/Harness.Integration/Memory/MemoryOracleTests.cs": "f41d001e8263faa295e9c1792836800250cfb59a9a093bc335406ea209dfdd30",
+    "test/Harness.Integration/MemoryTests.cs": "879c6e7404267bf130bd26d07e8c1697c66d921ed212cf30ba553d52fa3b2a12",
+    "test/Harness.Unit/MemoryTests.cs": "0eb01ac438950aa057c22f9e6e983be3f2fa00bf5186a937c9ead94c4ecd50c7"
+  },
+  "binlog_sha256": {
+    "artifacts/memory-test-final.binlog": "f19efcb65efd6d8418da9da8b8ceb2538e638f931be22663bcc98dc402e88cb9",
+    "artifacts/memory-test-final-dotnet-test.binlog": "c97557e4e8c6de070099b6d5a3652c10c11475cd272b9542d22f7e5cb3d3c5ba",
+    "artifacts/memory-release-01.binlog": "b0e7928c7bd38d78db3bd89b638df5fa2f5b2658ba8972fcaeb525d972408692",
+    "artifacts/memory-locked-restore-01.binlog": "639c4569d5b0bca57d4c72ca349e9f078838f82c75970a93975d585ecd32e561"
+  },
+  "lock_sha256": {
+    "src/Harness.Cli/packages.lock.json": "938610ed9028aeadf02bb66c834997704fba35a966535825a76675db30771100",
+    "src/Harness.Cli/packages.publish.lock.json": "79cb79326ce9111a7cf9a9c6e1b6c015c72390d8a44d7a39028e7f1ca95ab8aa",
+    "src/Harness.Core/packages.lock.json": "2f1c5475c1239cc11f2dca6e09c840b261c8630b73fd863818744ee7a63a5147",
+    "src/Harness.Infrastructure/packages.lock.json": "8800c8a934fc90f13cdc404b1399a7a04ea1271a9679745deba99507ccc58f20",
+    "src/Harness.Mcp/packages.lock.json": "860afdb31855055dd27217c472a1d6d522c73a0a775d05cf35db0a8dd9c2dda3",
+    "src/Harness.Providers/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "src/Harness.Web/packages.lock.json": "59357b1eccd97ee2f740b1f618750fc188ea175aa037445bca95c1ed93338fae",
+    "test/Harness.Integration/packages.lock.json": "0f7dfb90b5e9340d9a9b6cfc2e9c948614ac2ab4ee88ddca9f28d1d36ac0562f",
+    "test/Harness.Integration/Storage/Worker/packages.lock.json": "c709535b9e8d938d00256ed29e48f20b00a0aa8c26abaf9b7b765bd0f0931f7d",
+    "test/Harness.Unit/packages.lock.json": "aa57af273927fead94c69630772bbafcf0241dcf23da8dc5efc56f597c2b5463"
+  },
+  "commands": [
+    "./test/Harness.Integration/Memory/Go/build-oracle.ps1 -Go artifacts/compatibility/toolchain/go/bin/go.exe",
+    "Go bridge rebuilt as memory-oracle-04.exe after Unicode and redaction cases were added; same -mod=readonly -buildvcs=false -trimpath options and pinned source.",
+    "Set HARNESS_GO_MEMORY_ORACLE=artifacts/memory-oracle/memory-oracle-04.exe and HARNESS_GO_STORAGE_ORACLE=artifacts/storage-oracle/storage-oracle.exe for acceptance tests.",
+    "dotnet test --solution Harness.slnx --no-restore -bl:artifacts/memory-test-final.binlog --report-trx --results-directory artifacts/memory-results-final",
+    "dotnet restore Harness.slnx --locked-mode -p:ContinuousIntegrationBuild=true -bl:artifacts/memory-locked-restore-01.binlog",
+    "dotnet build Harness.slnx -c Release --no-restore -m -p:ContinuousIntegrationBuild=true -bl:artifacts/memory-release-01.binlog",
+    "python test/Harness.Integration/Memory/Go/generate-unicode.py artifacts/memory-oracle/go-unicode.json --output artifacts/memory-oracle/GoUnicode.verify.cs (verified byte-identical to Core source)",
+    "git diff HEAD --check; UTF-8/CRLF/trailing-whitespace checks also include every new source/test file."
+  ],
+  "limits": [
+    "Native Linux/macOS execution remains unverified.",
+    "Memory MCP tools, proposal workflow, human review and wider-store filesystem discovery are TASK-0009.",
+    "Credential heuristics match the original content guard; no claim of exhaustive secret discovery.",
+    "Synchronous native SQLite work observes cancellation around calls; lock waits are bounded by configured busy timeout."
+  ]
+}

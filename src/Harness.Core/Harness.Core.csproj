@@ -1,1 +1,5 @@
-<Project Sdk="Microsoft.NET.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <EmbeddedResource Include="Memory/LICENSE.txt" LogicalName="Harness.Memory.License.txt" />
+  </ItemGroup>
+</Project>
