@@ -10,11 +10,15 @@ namespace Harness.Cli.Hooks;
 
 internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error, SetupTerminal terminal)
 {
-    private static readonly EditWords GitWords = new("harness hook block", "installed", "not installed");
+    private static readonly EditWords GitWords = new(
+        Thing: "harness hook block",
+        Unchanged: "installed",
+        Absent: "not installed"
+    );
     private static readonly EditWords ClientWords = new(
-        "harness hook",
-        "installed, unchanged",
-        "not installed, nothing to remove"
+        Thing: "harness hook",
+        Unchanged: "installed, unchanged",
+        Absent: "not installed, nothing to remove"
     );
     private readonly ClientPaths _paths = ClientPaths.Current();
 
@@ -66,7 +70,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
         await output.WriteLineAsync("Git sync hooks (" + hooks.DirectoryPath + "):");
         var changes = verb is "status"
             ? hooks.Status()
-            : GitHooks
+            : [.. GitHooks
                 .Names.Select(name =>
                     hooks.Set(
                         name,
@@ -74,8 +78,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
                         settings.Command.Length is 0 ? "harness" : settings.Command,
                         settings.DryRun
                     )
-                )
-                .ToArray();
+                )];
         foreach (var change in changes)
         {
             await EditOutput.PrintAsync(output, "  " + change.Path, GitWords, change, settings.DryRun);

@@ -32,8 +32,6 @@ internal sealed record BuildInformation(
         {
             Architecture.X64 => "amd64",
             Architecture.Arm64 => "arm64",
-            Architecture.X86 => "386",
-            Architecture.Arm => "arm",
             _ => throw new PlatformNotSupportedException("Unsupported process architecture."),
         };
         return new BuildInformation(

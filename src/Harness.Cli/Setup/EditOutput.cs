@@ -4,9 +4,16 @@ namespace Harness.Cli.Setup;
 
 internal sealed record EditWords(string Thing, string Unchanged, string Absent)
 {
-    public static EditWords Server { get; } =
-        new("harness server", "already configured, unchanged", "not configured, nothing to remove");
-    public static EditWords Instructions { get; } = new("harness section", "up to date", "no harness section");
+    public static EditWords Server { get; } = new(
+        Thing: "harness server",
+        Unchanged: "already configured, unchanged",
+        Absent: "not configured, nothing to remove"
+    );
+    public static EditWords Instructions { get; } = new(
+        Thing: "harness section",
+        Unchanged: "up to date",
+        Absent: "no harness section"
+    );
 }
 
 internal static class EditOutput

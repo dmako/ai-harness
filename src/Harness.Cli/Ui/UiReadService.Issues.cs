@@ -8,13 +8,32 @@ namespace Harness.Cli.Ui;
 
 internal sealed partial class UiReadService
 {
-    [System.Text.RegularExpressions.GeneratedRegex(
-        "(test|nunit|xunit|mstest|fluentassertions|shouldly|coverlet|moq|nsubstitute|fakeiteasy|bogus|autofixture|analyzer|sonar|stylecop|benchmark|jest|vitest|mocha|eslint|prettier)",
-        System.Text.RegularExpressions.RegexOptions.IgnoreCase
-            | System.Text.RegularExpressions.RegexOptions.CultureInvariant
-            | System.Text.RegularExpressions.RegexOptions.NonBacktracking
-    )]
-    private static partial System.Text.RegularExpressions.Regex ToolingPackage();
+    private static readonly string[] ToolingPackagenames =
+    [
+        "test",
+        "nunit",
+        "xunit",
+        "tunit",
+        "mstest",
+        "fluentassertions",
+        "awesome1ssertions",
+        "shouldly",
+        "coverlet",
+        "moq",
+        "nsubstitute",
+        "fakeiteasy",
+        "bogus",
+        "autofixture",
+        "analyzer",
+        "sonar",
+        "stylecop",
+        "benchmark",
+        "jest",
+        "vitest",
+        "mocha",
+        "eslint",
+        "prettier"
+    ];
 
     private static JsonObject Issue(
         string kind,
@@ -263,7 +282,7 @@ internal sealed partial class UiReadService
                 .Select(g => g.Key.Split('.')[0].TrimStart('~', '^', 'v'))
                 .Distinct(StringComparer.Ordinal)
                 .Count();
-            var tooling = package.All(u => u.Test) || ToolingPackage().IsMatch(package.Key);
+            var tooling = package.All(u => u.Test) || ToolingPackagenames.Contains(package.Key, StringComparer.OrdinalIgnoreCase);
             var why = (tooling, majors > 1) switch
             {
                 (true, _) =>
@@ -297,7 +316,7 @@ internal sealed partial class UiReadService
                 )
             );
         }
-        return result.OrderBy(i => i["title"]!.GetValue<string>(), StringComparer.Ordinal).ToList();
+        return [.. result.OrderBy(i => i["title"]!.GetValue<string>(), StringComparer.Ordinal)];
     }
 
     private static List<List<string>> Cycles(WorkspaceDependencyGraph graph)
