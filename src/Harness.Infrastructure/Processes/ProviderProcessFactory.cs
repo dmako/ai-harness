@@ -10,24 +10,46 @@ public sealed class ProviderProcessFactory : IProviderProcessFactory
     {
         var (executable, directory, environment) = Prepare(options);
         return OperatingSystem.IsWindows()
-            ? WindowsProviderProcess.Start(executable, options.Arguments, directory, environment, options.AllowDetachedChildren)
+            ? WindowsProviderProcess.Start(
+                executable,
+                options.Arguments,
+                directory,
+                environment,
+                options.AllowDetachedChildren
+            )
             : UnixProviderProcess.Start(executable, options.Arguments, directory, environment);
     }
 
-    internal static (string Executable, string Directory, Dictionary<string, string> Environment) Prepare(ProviderProcessOptions options)
+    internal static (string Executable, string Directory, Dictionary<string, string> Environment) Prepare(
+        ProviderProcessOptions options
+    )
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Command);
-        if (options.Command.Contains('\0', StringComparison.Ordinal) || options.Arguments.Any(argument => argument.Contains('\0', StringComparison.Ordinal)))
+        if (
+            options.Command.Contains('\0', StringComparison.Ordinal)
+            || options.Arguments.Any(argument => argument.Contains('\0', StringComparison.Ordinal))
+        )
         {
             throw new ArgumentException("Process arguments must not contain NUL.", nameof(options));
         }
 
-        var environment = System.Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
-            .ToDictionary(entry => (string)entry.Key, entry => (string)entry.Value!, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        var environment = System
+            .Environment.GetEnvironmentVariables()
+            .Cast<System.Collections.DictionaryEntry>()
+            .ToDictionary(
+                entry => (string)entry.Key,
+                entry => (string)entry.Value!,
+                OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal
+            );
         foreach (var (key, value) in options.Environment)
         {
-            if (key.Length is 0 || key.Contains('=', StringComparison.Ordinal) || key.Contains('\0', StringComparison.Ordinal) || value?.Contains('\0', StringComparison.Ordinal) is true)
+            if (
+                key.Length is 0
+                || key.Contains('=', StringComparison.Ordinal)
+                || key.Contains('\0', StringComparison.Ordinal)
+                || value?.Contains('\0', StringComparison.Ordinal) is true
+            )
             {
                 throw new ArgumentException("Invalid process environment entry.", nameof(options));
             }
@@ -41,20 +63,29 @@ public sealed class ProviderProcessFactory : IProviderProcessFactory
                 environment[key] = value;
             }
         }
-        var directory = options.WorkingDirectory.Length is 0 ? System.Environment.CurrentDirectory : Path.GetFullPath(options.WorkingDirectory);
+        var directory = options.WorkingDirectory.Length is 0
+            ? System.Environment.CurrentDirectory
+            : Path.GetFullPath(options.WorkingDirectory);
         var executable = ResolveExecutable(options.Command, environment);
         return (executable, directory, environment);
     }
 
     private static string ResolveExecutable(string command, Dictionary<string, string> environment)
     {
-        if (command.Contains(Path.DirectorySeparatorChar, StringComparison.Ordinal) || command.Contains(Path.AltDirectorySeparatorChar, StringComparison.Ordinal))
+        if (
+            command.Contains(Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            || command.Contains(Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
+        )
         {
             return Path.GetFullPath(command);
         }
 
         var extensions = OperatingSystem.IsWindows() ? new[] { "", ".exe", ".com" } : [""];
-        foreach (var directory in environment.GetValueOrDefault("PATH", "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        foreach (
+            var directory in environment
+                .GetValueOrDefault("PATH", "")
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+        )
         {
             foreach (var extension in extensions)
             {

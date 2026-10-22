@@ -4,12 +4,20 @@ namespace Harness.Cli.Setup;
 
 internal sealed record EditWords(string Thing, string Unchanged, string Absent)
 {
-    public static EditWords Server { get; } = new("harness server", "already configured, unchanged", "not configured, nothing to remove");
+    public static EditWords Server { get; } =
+        new("harness server", "already configured, unchanged", "not configured, nothing to remove");
     public static EditWords Instructions { get; } = new("harness section", "up to date", "no harness section");
 }
+
 internal static class EditOutput
 {
-    public static async Task PrintAsync(TextWriter output, string label, EditWords words, FileChange change, bool dryRun)
+    public static async Task PrintAsync(
+        TextWriter output,
+        string label,
+        EditWords words,
+        FileChange change,
+        bool dryRun
+    )
     {
         var message = change.Action switch
         {
@@ -47,6 +55,7 @@ internal static class EditOutput
             await output.WriteLineAsync("    backup: " + change.Backup);
         }
     }
+
     internal static IEnumerable<string> Diff(string before, string after)
     {
         var a = before.Split('\n');
@@ -63,6 +72,8 @@ internal static class EditOutput
             suffix++;
         }
 
-        return a[prefix..(a.Length - suffix)].Select(s => "- " + s).Concat(b[prefix..(b.Length - suffix)].Select(s => "+ " + s));
+        return a[prefix..(a.Length - suffix)]
+            .Select(s => "- " + s)
+            .Concat(b[prefix..(b.Length - suffix)].Select(s => "+ " + s));
     }
 }

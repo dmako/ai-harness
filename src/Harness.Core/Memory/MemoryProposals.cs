@@ -1,11 +1,29 @@
 namespace Harness.Core.Memory;
 
-public sealed record MemoryProposal(string Id, string Type, string Content, MemoryScope Scope, MemorySource Source,
-    string Rationale, string Supersedes, string Status, string DecidedBy, MemoryTimestamp? DecidedAt,
-    string DecisionNote, string MemoryId, MemoryTimestamp CreatedAt);
+public sealed record MemoryProposal(
+    string Id,
+    string Type,
+    string Content,
+    MemoryScope Scope,
+    MemorySource Source,
+    string Rationale,
+    string Supersedes,
+    string Status,
+    string DecidedBy,
+    MemoryTimestamp? DecidedAt,
+    string DecisionNote,
+    string MemoryId,
+    MemoryTimestamp CreatedAt
+);
 
-public sealed record MemoryProposalInput(string Type, string Content, MemoryScope? Scope = null,
-    MemorySource? Source = null, string Rationale = "", string Supersedes = "");
+public sealed record MemoryProposalInput(
+    string Type,
+    string Content,
+    MemoryScope? Scope = null,
+    MemorySource? Source = null,
+    string Rationale = "",
+    string Supersedes = ""
+);
 
 public sealed record MemoryProposalResult(string Status, MemoryProposal? Proposal = null, MemoryRecord? Memory = null)
 {
@@ -30,4 +48,5 @@ public sealed record MemoryApprovalResult(string Status, MemoryProposal Proposal
 }
 
 public sealed record MemoryProposalDetail(MemoryProposal Proposal, IReadOnlyList<SimilarMemory> Related);
+
 public sealed record MemoryPending(int Count, MemoryTimestamp? Oldest);

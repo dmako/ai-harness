@@ -6,11 +6,18 @@ namespace Harness.Infrastructure.Projects;
 
 public sealed partial class HarnessStateSession : IChangeCouplingSession
 {
-    public async Task<ChangeCouplingReport> ChangeCouplingAsync(ChangeCouplingRequest request, IProviderRegistry? registry, CancellationToken token)
+    public async Task<ChangeCouplingReport> ChangeCouplingAsync(
+        ChangeCouplingRequest request,
+        IProviderRegistry? registry,
+        CancellationToken token
+    )
     {
         var limit = request.Limit <= 0 ? 10 : request.Limit;
         List<string> notes = [];
-        if (registry is null || !registry.Capabilities().Any(capability => capability.Capability == Capabilities.ArchChangeCoupling))
+        if (
+            registry is null
+            || !registry.Capabilities().Any(capability => capability.Capability == Capabilities.ArchChangeCoupling)
+        )
         {
             notes.Add("no provider offers arch.change_coupling (ripwire does): partners are unknown");
         }
@@ -37,7 +44,11 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
                 changed = await location.Repository.DirtyPathsAsync(token).ConfigureAwait(false);
             }
             var result = await ChangeCoupling.CheckAsync(registry, location.Root, changed, token).ConfigureAwait(false);
-            report = report with { Changed = changed.Count is 0 ? null : changed, Missing = result.Missing.Count is 0 ? null : result.Missing };
+            report = report with
+            {
+                Changed = changed.Count is 0 ? null : changed,
+                Missing = result.Missing.Count is 0 ? null : result.Missing,
+            };
             errors = result.Errors;
             if (result.Missing.Count is 0 && changed.Count > 0)
             {
@@ -51,8 +62,14 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
                 throw new InvalidOperationException("hotspots need a Git repository");
             }
 
-            var result = await ChangeCoupling.HotspotsAsync(location.Repository, registry, limit, 3, token).ConfigureAwait(false);
-            report = report with { Hotspots = result.Hotspots.Count is 0 ? null : result.Hotspots, Commits = result.Commits };
+            var result = await ChangeCoupling
+                .HotspotsAsync(location.Repository, registry, limit, 3, token)
+                .ConfigureAwait(false);
+            report = report with
+            {
+                Hotspots = result.Hotspots.Count is 0 ? null : result.Hotspots,
+                Commits = result.Commits,
+            };
             errors = result.Errors;
         }
         var note = string.Join("; ", notes.Concat(errors));

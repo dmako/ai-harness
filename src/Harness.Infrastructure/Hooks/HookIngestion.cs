@@ -19,8 +19,16 @@ public sealed class HookIngestion(ProjectLifecycle lifecycle)
         }
         var directory = call.Cwd.Length is 0 ? "." : call.Cwd;
         var location = await LocateAsync(directory, token);
-        using var database = HarnessDatabase.OpenExisting(location.DatabasePath, new StorageOptions { BusyTimeout = TimeSpan.FromSeconds(1) });
-        var worktree = ProjectStore.Worktrees(database).FirstOrDefault(w => GitRepository.PathEquals(w.GitDir, location.Repository!.GitDir))?.Id ?? "";
+        using var database = HarnessDatabase.OpenExisting(
+            location.DatabasePath,
+            new StorageOptions { BusyTimeout = TimeSpan.FromSeconds(1) }
+        );
+        var worktree =
+            ProjectStore
+                .Worktrees(database)
+                .FirstOrDefault(w => GitRepository.PathEquals(w.GitDir, location.Repository!.GitDir))
+                ?.Id
+            ?? "";
         List<string> paths = [];
         foreach (var path in call.Paths)
         {
@@ -30,8 +38,23 @@ public sealed class HookIngestion(ProjectLifecycle lifecycle)
                 paths.Add(relative);
             }
         }
-        new TelemetryStore(database).RecordEvent(new ClientToolEvent(DateTimeOffset.UtcNow, client, call.Session, worktree, call.Tool, call.Kind, call.McpServer, call.McpTool, paths, call.Task), token);
+        new TelemetryStore(database).RecordEvent(
+            new ClientToolEvent(
+                DateTimeOffset.UtcNow,
+                client,
+                call.Session,
+                worktree,
+                call.Tool,
+                call.Kind,
+                call.McpServer,
+                call.McpTool,
+                paths,
+                call.Task
+            ),
+            token
+        );
     }
+
     public async Task<ProjectLocation> LocateAsync(string directory, CancellationToken token)
     {
         var location = await lifecycle.LocateAsync(directory, cancellationToken: token);
@@ -41,13 +64,19 @@ public sealed class HookIngestion(ProjectLifecycle lifecycle)
         }
         return location;
     }
+
     public static string? Relative(string root, string cwd, string path)
     {
         var absolute = Path.GetFullPath(path, Path.GetFullPath(cwd));
         static string? Try(string root, string path)
         {
             var relative = Path.GetRelativePath(root, path);
-            return relative is "." or ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative) ? null : relative.Replace(Path.DirectorySeparatorChar, '/');
+            return
+                relative is "." or ".."
+                || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                || Path.IsPathRooted(relative)
+                ? null
+                : relative.Replace(Path.DirectorySeparatorChar, '/');
         }
         return Try(root, absolute) ?? Try(root, FileEditor.Resolve(absolute));
     }

@@ -8,15 +8,21 @@ public static class DatabaseBackups
 {
     public const int KeepBackups = 5;
 
-    public static string DirectoryPath(string databasePath) => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, "backups");
+    public static string DirectoryPath(string databasePath) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, "backups");
 
     public static IReadOnlyList<string> List(string databasePath)
     {
         try
         {
-            return Directory.EnumerateFileSystemEntries(DirectoryPath(databasePath))
-                .Where(path => Path.GetFileName(path).StartsWith("schema-", StringComparison.Ordinal) && path.EndsWith(".db", StringComparison.Ordinal))
-                .OrderDescending(StringComparer.Ordinal).ToArray();
+            return Directory
+                .EnumerateFileSystemEntries(DirectoryPath(databasePath))
+                .Where(path =>
+                    Path.GetFileName(path).StartsWith("schema-", StringComparison.Ordinal)
+                    && path.EndsWith(".db", StringComparison.Ordinal)
+                )
+                .OrderDescending(StringComparer.Ordinal)
+                .ToArray();
         }
         catch (IOException)
         {

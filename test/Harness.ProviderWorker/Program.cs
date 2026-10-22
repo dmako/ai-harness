@@ -24,7 +24,9 @@ if (mode is "stderr")
 {
     await Console.Error.WriteAsync(new string('x', 1024 * 1024));
     await Console.Error.WriteLineAsync("\nline-1\nline-2");
-    await Console.Error.WriteLineAsync(Environment.GetEnvironmentVariable("HARNESS_PROVIDER_STDERR_FIXTURE") ?? "line-3");
+    await Console.Error.WriteLineAsync(
+        Environment.GetEnvironmentVariable("HARNESS_PROVIDER_STDERR_FIXTURE") ?? "line-3"
+    );
     await Console.Error.WriteLineAsync("line-4\nlast-line");
     await Console.Error.FlushAsync();
 }
@@ -69,7 +71,12 @@ async Task HandleAsync(string line)
                 await Console.Error.WriteLineAsync("cannot initialize fixture");
                 Environment.Exit(23);
             }
-            result = new JsonObject { ["protocolVersion"] = request["params"]!["protocolVersion"]!.DeepClone(), ["serverInfo"] = new JsonObject { ["name"] = "provider-fixture", ["version"] = "1.0" }, ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() } };
+            result = new JsonObject
+            {
+                ["protocolVersion"] = request["params"]!["protocolVersion"]!.DeepClone(),
+                ["serverInfo"] = new JsonObject { ["name"] = "provider-fixture", ["version"] = "1.0" },
+                ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
+            };
         }
         else if (method is "tools/list")
         {
@@ -81,8 +88,24 @@ async Task HandleAsync(string line)
             }
             else
             {
-                var names = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json").Select(Path.GetFileNameWithoutExtension).Select(name => name!.Replace(".result", "", StringComparison.Ordinal)) : [];
-                var tools = names.Concat(new[] { "echo", "hang", "crash", "oversized", "spawn", "exit-after-spawn" }).Distinct(StringComparer.Ordinal).Select(name => (JsonNode)new JsonObject { ["name"] = name, ["inputSchema"] = new JsonObject { ["type"] = "object" } }).ToArray();
+                var names = Directory.Exists(directory)
+                    ? Directory
+                        .GetFiles(directory, "*.json")
+                        .Select(Path.GetFileNameWithoutExtension)
+                        .Select(name => name!.Replace(".result", "", StringComparison.Ordinal))
+                    : [];
+                var tools = names
+                    .Concat(new[] { "echo", "hang", "crash", "oversized", "spawn", "exit-after-spawn" })
+                    .Distinct(StringComparer.Ordinal)
+                    .Select(name =>
+                        (JsonNode)
+                            new JsonObject
+                            {
+                                ["name"] = name,
+                                ["inputSchema"] = new JsonObject { ["type"] = "object" },
+                            }
+                    )
+                    .ToArray();
                 result = new JsonObject { ["tools"] = new JsonArray(tools) };
             }
         }
@@ -99,8 +122,13 @@ async Task HandleAsync(string line)
             {
                 await writes.WaitAsync(CancellationToken.None);
                 try
-                { await File.WriteAllTextAsync(Path.Combine(directory, tool + ".args"), arguments.ToJsonString()); }
-                finally { writes.Release(); }
+                {
+                    await File.WriteAllTextAsync(Path.Combine(directory, tool + ".args"), arguments.ToJsonString());
+                }
+                finally
+                {
+                    writes.Release();
+                }
             }
             if (tool is "crash")
             {
@@ -121,7 +149,10 @@ async Task HandleAsync(string line)
             var delay = Path.Combine(directory, tool + ".delay");
             if (File.Exists(delay))
             {
-                await Task.Delay(int.Parse(await File.ReadAllTextAsync(delay), CultureInfo.InvariantCulture), CancellationToken.None);
+                await Task.Delay(
+                    int.Parse(await File.ReadAllTextAsync(delay), CultureInfo.InvariantCulture),
+                    CancellationToken.None
+                );
             }
 
             if (tool is "spawn" or "exit-after-spawn")
@@ -132,7 +163,18 @@ async Task HandleAsync(string line)
             var protocolError = Path.Combine(directory, tool + ".protocol-error");
             if (File.Exists(protocolError))
             {
-                await SendAsync(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["error"] = new JsonObject { ["code"] = -32603, ["message"] = await File.ReadAllTextAsync(protocolError) } });
+                await SendAsync(
+                    new JsonObject
+                    {
+                        ["jsonrpc"] = "2.0",
+                        ["id"] = id,
+                        ["error"] = new JsonObject
+                        {
+                            ["code"] = -32603,
+                            ["message"] = await File.ReadAllTextAsync(protocolError),
+                        },
+                    }
+                );
                 return;
             }
             var fullResult = Path.Combine(directory, tool + ".result.json");
@@ -143,8 +185,21 @@ async Task HandleAsync(string line)
             else
             {
                 var fixture = Path.Combine(directory, tool + ".json");
-                var body = File.Exists(fixture) ? await File.ReadAllTextAsync(fixture) : JsonSerializer.Serialize(new { arguments, cwd = Environment.CurrentDirectory, environment = Environment.GetEnvironmentVariable("HARNESS_PROVIDER_TEST"), process_arguments = args });
-                result = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = body }) };
+                var body = File.Exists(fixture)
+                    ? await File.ReadAllTextAsync(fixture)
+                    : JsonSerializer.Serialize(
+                        new
+                        {
+                            arguments,
+                            cwd = Environment.CurrentDirectory,
+                            environment = Environment.GetEnvironmentVariable("HARNESS_PROVIDER_TEST"),
+                            process_arguments = args,
+                        }
+                    );
+                result = new JsonObject
+                {
+                    ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = body }),
+                };
                 if (File.Exists(Path.Combine(directory, tool + ".error")))
                 {
                     result["isError"] = true;
@@ -152,7 +207,14 @@ async Task HandleAsync(string line)
             }
             if (tool is "exit-after-spawn")
             {
-                await SendAsync(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["result"] = result });
+                await SendAsync(
+                    new JsonObject
+                    {
+                        ["jsonrpc"] = "2.0",
+                        ["id"] = id,
+                        ["result"] = result,
+                    }
+                );
                 Environment.Exit(0);
             }
         }
@@ -162,10 +224,24 @@ async Task HandleAsync(string line)
         }
         else
         {
-            await SendAsync(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["error"] = new JsonObject { ["code"] = -32601, ["message"] = "method not found" } });
+            await SendAsync(
+                new JsonObject
+                {
+                    ["jsonrpc"] = "2.0",
+                    ["id"] = id,
+                    ["error"] = new JsonObject { ["code"] = -32601, ["message"] = "method not found" },
+                }
+            );
             return;
         }
-        await SendAsync(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["result"] = result });
+        await SendAsync(
+            new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = id,
+                ["result"] = result,
+            }
+        );
     }
     catch (Exception error) when (error is IOException or JsonException or InvalidOperationException)
     {
@@ -177,14 +253,26 @@ async Task SendAsync(JsonObject response)
 {
     await writes.WaitAsync(CancellationToken.None);
     try
-    { await Console.Out.WriteLineAsync(response.ToJsonString()); await Console.Out.FlushAsync(); }
-    finally { writes.Release(); }
+    {
+        await Console.Out.WriteLineAsync(response.ToJsonString());
+        await Console.Out.FlushAsync();
+    }
+    finally
+    {
+        writes.Release();
+    }
 }
 
 static async Task SpawnAsync(string pidFile)
 {
     var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
-    if (string.Equals(Path.GetFileNameWithoutExtension(Environment.ProcessPath), "dotnet", StringComparison.OrdinalIgnoreCase))
+    if (
+        string.Equals(
+            Path.GetFileNameWithoutExtension(Environment.ProcessPath),
+            "dotnet",
+            StringComparison.OrdinalIgnoreCase
+        )
+    )
     {
         start.ArgumentList.Add(typeof(Program).Assembly.Location);
     }

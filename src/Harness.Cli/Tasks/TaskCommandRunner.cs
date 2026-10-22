@@ -14,50 +14,97 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public async Task<int> RunAsync(string verb, InspectSettings settings, CancellationToken cancellationToken)
     {
         try
         {
-            var requestedLease = settings is TaskClaimSettings leaseSettings ? TaskCliInput.Lease(leaseSettings.Lease) : TimeSpan.Zero;
+            var requestedLease = settings is TaskClaimSettings leaseSettings
+                ? TaskCliInput.Lease(leaseSettings.Lease)
+                : TimeSpan.Zero;
             var location = await lifecycle.LocateAsync(settings.Project, cancellationToken: cancellationToken);
             if (!System.IO.File.Exists(location.DatabasePath))
             {
                 throw new IOException("project not initialized (run 'harness init'): " + location.DatabasePath);
             }
 
-            using var database = HarnessDatabase.Open(location.DatabasePath, new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs) }, cancellationToken);
+            using var database = HarnessDatabase.Open(
+                location.DatabasePath,
+                new StorageOptions
+                {
+                    BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs),
+                },
+                cancellationToken
+            );
             var store = new TaskStore(database);
             var actor = new TaskActor(HumanActor.Current(), Privileged: true);
-            await (verb switch
-            {
-                "claim" => ClaimAsync((TaskClaimSettings)settings, store, actor, requestedLease, cancellationToken),
-                "release" => ReleaseAsync((TaskReasonSettings)settings, store, actor, cancellationToken),
-                "complete" => CompleteAsync((TaskCompleteSettings)settings, store, actor, database, location, cancellationToken),
-                "proposals" => ListProposalsAsync((TaskProposalListSettings)settings, store, cancellationToken),
-                "approve" => ApproveAsync((TaskApproveSettings)settings, store, actor, cancellationToken),
-                "reject" => RejectAsync((TaskReadySettings)settings, store, actor, cancellationToken),
-                "import" or "export" => FileAsync(verb, (TaskFileSettings)settings, location.Root, store, cancellationToken),
-                "list" => ListAsync((TaskListSettings)settings, store, cancellationToken),
-                "milestones" => MilestonesAsync(settings, store, cancellationToken),
-                "next" => NextAsync((TaskNextSettings)settings, store, cancellationToken),
-                "show" => ShowAsync((TaskShowSettings)settings, store, cancellationToken),
-                "add" => AddAsync((TaskAddSettings)settings, store, actor, cancellationToken),
-                "block" or "defer" or "ready" => ChangeStateAsync((TaskIdSettings)settings, store, actor, verb, cancellationToken),
-                _ => Task.CompletedTask
-            });
+            await (
+                verb switch
+                {
+                    "claim" => ClaimAsync((TaskClaimSettings)settings, store, actor, requestedLease, cancellationToken),
+                    "release" => ReleaseAsync((TaskReasonSettings)settings, store, actor, cancellationToken),
+                    "complete" => CompleteAsync(
+                        (TaskCompleteSettings)settings,
+                        store,
+                        actor,
+                        database,
+                        location,
+                        cancellationToken
+                    ),
+                    "proposals" => ListProposalsAsync((TaskProposalListSettings)settings, store, cancellationToken),
+                    "approve" => ApproveAsync((TaskApproveSettings)settings, store, actor, cancellationToken),
+                    "reject" => RejectAsync((TaskReadySettings)settings, store, actor, cancellationToken),
+                    "import" or "export" => FileAsync(
+                        verb,
+                        (TaskFileSettings)settings,
+                        location.Root,
+                        store,
+                        cancellationToken
+                    ),
+                    "list" => ListAsync((TaskListSettings)settings, store, cancellationToken),
+                    "milestones" => MilestonesAsync(settings, store, cancellationToken),
+                    "next" => NextAsync((TaskNextSettings)settings, store, cancellationToken),
+                    "show" => ShowAsync((TaskShowSettings)settings, store, cancellationToken),
+                    "add" => AddAsync((TaskAddSettings)settings, store, actor, cancellationToken),
+                    "block" or "defer" or "ready" => ChangeStateAsync(
+                        (TaskIdSettings)settings,
+                        store,
+                        actor,
+                        verb,
+                        cancellationToken
+                    ),
+                    _ => Task.CompletedTask,
+                }
+            );
             return 0;
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or KeyNotFoundException or JsonException or Microsoft.Data.Sqlite.SqliteException or TaskUsageException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or UnauthorizedAccessException
+                        or ArgumentException
+                        or InvalidOperationException
+                        or KeyNotFoundException
+                        or JsonException
+                        or Microsoft.Data.Sqlite.SqliteException
+                        or TaskUsageException
+            )
         {
             await error.Writer.WriteLineAsync($"harness tasks {verb}: {exception.Message}");
             return exception is TaskUsageException ? 2 : 1;
         }
     }
 
-    private async Task ClaimAsync(TaskClaimSettings settings, TaskStore store, TaskActor actor, TimeSpan requestedLease, CancellationToken cancellationToken)
+    private async Task ClaimAsync(
+        TaskClaimSettings settings,
+        TaskStore store,
+        TaskActor actor,
+        TimeSpan requestedLease,
+        CancellationToken cancellationToken
+    )
     {
         var claimed = store.Claim(settings.Id.ToUpperInvariant(), actor, requestedLease, cancellationToken);
         if (settings.Json)
@@ -66,14 +113,22 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
         else
         {
-            await output.WriteLineAsync($"Claimed {claimed.Task.Id} as {claimed.Task.Claimant} until {Local(claimed.Task.LeaseUntil!.Value)}.");
+            await output.WriteLineAsync(
+                $"Claimed {claimed.Task.Id} as {claimed.Task.Claimant} until {Local(claimed.Task.LeaseUntil!.Value)}."
+            );
         }
     }
 
-    private async Task ReleaseAsync(TaskReasonSettings settings, TaskStore store, TaskActor actor, CancellationToken cancellationToken)
+    private async Task ReleaseAsync(
+        TaskReasonSettings settings,
+        TaskStore store,
+        TaskActor actor,
+        CancellationToken cancellationToken
+    )
     {
         var releasing = store.Get(settings.Id.ToUpperInvariant(), cancellationToken);
-        var releaseReason = releasing.Claimant == actor.Name && settings.Reason.Length is 0 ? "released by claimant" : settings.Reason;
+        var releaseReason =
+            releasing.Claimant == actor.Name && settings.Reason.Length is 0 ? "released by claimant" : settings.Reason;
         var released = store.Release(releasing.Id, actor, releaseReason, cancellationToken);
         if (settings.Json)
         {
@@ -85,13 +140,31 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
     }
 
-    private async Task CompleteAsync(TaskCompleteSettings settings, TaskStore store, TaskActor actor, HarnessDatabase database, ProjectLocation location, CancellationToken cancellationToken)
+    private async Task CompleteAsync(
+        TaskCompleteSettings settings,
+        TaskStore store,
+        TaskActor actor,
+        HarnessDatabase database,
+        ProjectLocation location,
+        CancellationToken cancellationToken
+    )
     {
         var current = store.Get(settings.Id.ToUpperInvariant(), cancellationToken);
         var completed = store.Complete(current.Id, actor, TaskCliInput.Complete(settings, current), cancellationToken);
-        if (completed.Task.CompletionCommit.Length > 0 && location.Repository is { } repository && ProjectStore.Worktrees(database).FirstOrDefault(t => t.GitDir == repository.GitDir) is { } worktree)
+        if (
+            completed.Task.CompletionCommit.Length > 0
+            && location.Repository is { } repository
+            && ProjectStore.Worktrees(database).FirstOrDefault(t => t.GitDir == repository.GitDir) is { } worktree
+        )
         {
-            await Harness.Infrastructure.Telemetry.TelemetryStore.ResolveBestEffortAsync(database, repository, worktree.Id, completed.Task.CompletionCommit, "task", cancellationToken);
+            await Harness.Infrastructure.Telemetry.TelemetryStore.ResolveBestEffortAsync(
+                database,
+                repository,
+                worktree.Id,
+                completed.Task.CompletionCommit,
+                "task",
+                cancellationToken
+            );
         }
 
         if (settings.Json)
@@ -108,7 +181,11 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
     }
 
-    private async Task ListProposalsAsync(TaskProposalListSettings settings, TaskStore store, CancellationToken cancellationToken)
+    private async Task ListProposalsAsync(
+        TaskProposalListSettings settings,
+        TaskStore store,
+        CancellationToken cancellationToken
+    )
     {
         var proposalStatus = settings.Status;
         var proposals = store.Proposals(proposalStatus, cancellationToken);
@@ -124,7 +201,9 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         {
             foreach (var proposal in proposals)
             {
-                await output.WriteLineAsync($"{proposal.Id}  [{proposal.Status}] {proposal.Task.Title}  (by {proposal.ProposedBy})");
+                await output.WriteLineAsync(
+                    $"{proposal.Id}  [{proposal.Status}] {proposal.Task.Title}  (by {proposal.ProposedBy})"
+                );
                 if (proposal.Task.Goal.Length is not 0)
                 {
                     await output.WriteLineAsync("    goal: " + proposal.Task.Goal);
@@ -137,7 +216,9 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
                 for (var i = 0; i < proposal.Task.Acceptance.Count; i++)
                 {
-                    await output.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"    {i + 1}. {proposal.Task.Acceptance[i]}"));
+                    await output.WriteLineAsync(
+                        string.Create(CultureInfo.InvariantCulture, $"    {i + 1}. {proposal.Task.Acceptance[i]}")
+                    );
                 }
 
                 if (proposal.Result.Length is not 0)
@@ -148,25 +229,41 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
             if (proposalStatus is "pending")
             {
-                await output.WriteLineAsync("\nharness tasks approve <id> creates the task; harness tasks reject <id> --note \"why\" closes it.");
+                await output.WriteLineAsync(
+                    "\nharness tasks approve <id> creates the task; harness tasks reject <id> --note \"why\" closes it."
+                );
             }
         }
     }
 
-    private async Task ApproveAsync(TaskApproveSettings settings, TaskStore store, TaskActor actor, CancellationToken cancellationToken)
+    private async Task ApproveAsync(
+        TaskApproveSettings settings,
+        TaskStore store,
+        TaskActor actor,
+        CancellationToken cancellationToken
+    )
     {
         var approved = store.Approve(settings.Id, null, settings.Prefix, actor.Name, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { proposal = TaskViews.Proposal(approved.Proposal), task = TaskViews.Task(approved.Task) });
+            await JsonAsync(
+                new { proposal = TaskViews.Proposal(approved.Proposal), task = TaskViews.Task(approved.Task) }
+            );
         }
         else
         {
-            await output.WriteLineAsync($"Approved {approved.Proposal.Id}: {approved.Task.Id} ({approved.Task.Status}) {approved.Task.Definition.Title}");
+            await output.WriteLineAsync(
+                $"Approved {approved.Proposal.Id}: {approved.Task.Id} ({approved.Task.Status}) {approved.Task.Definition.Title}"
+            );
         }
     }
 
-    private async Task RejectAsync(TaskReadySettings settings, TaskStore store, TaskActor actor, CancellationToken cancellationToken)
+    private async Task RejectAsync(
+        TaskReadySettings settings,
+        TaskStore store,
+        TaskActor actor,
+        CancellationToken cancellationToken
+    )
     {
         var rejected = store.Reject(settings.Id, settings.Note, actor.Name, cancellationToken);
         if (settings.Json)
@@ -207,7 +304,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
         else
         {
-            await output.WriteLineAsync($"{"ID",-10} {"STATUS",-11} {"MS",-6} {"PRIORITY",-8} TITLE");
+            await output.WriteLineAsync($"{"ID", -10} {"STATUS", -11} {"MS", -6} {"PRIORITY", -8} TITLE");
             foreach (var t in tasks)
             {
                 var extra = t switch
@@ -216,7 +313,9 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                     { Claimant.Length: > 0 } => $"  [{t.Claimant}]",
                     _ => "",
                 };
-                await output.WriteLineAsync($"{t.Id,-10} {t.Status,-11} {t.Definition.Milestone,-6} {t.Definition.Priority,-8} {t.Definition.Title}{extra}");
+                await output.WriteLineAsync(
+                    $"{t.Id, -10} {t.Status, -11} {t.Definition.Milestone, -6} {t.Definition.Priority, -8} {t.Definition.Title}{extra}"
+                );
             }
         }
     }
@@ -239,7 +338,12 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                     await output.WriteLineAsync();
                 }
 
-                await output.WriteLineAsync(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{d.Id,-6} {(d.Title.Length is 0 ? "(not defined in the backlog)" : d.Title)}  [{m.Tasks.GetValueOrDefault("done")}/{m.Total} done]"));
+                await output.WriteLineAsync(
+                    string.Create(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        $"{d.Id, -6} {(d.Title.Length is 0 ? "(not defined in the backlog)" : d.Title)}  [{m.Tasks.GetValueOrDefault("done")}/{m.Total} done]"
+                    )
+                );
                 if (d.Goal.Length is not 0)
                 {
                     await output.WriteLineAsync("       goal: " + d.Goal);
@@ -282,10 +386,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var events = settings.Events ? store.Events(task.Id, cancellationToken) : [];
         if (settings.Json)
         {
-            Dictionary<string, object?> view = new()
-            {
-                ["task"] = TaskViews.Task(task)
-            };
+            Dictionary<string, object?> view = new() { ["task"] = TaskViews.Task(task) };
             if (settings.Events)
             {
                 view["events"] = events.Select(TaskViews.Event).ToArray();
@@ -302,31 +403,44 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                 foreach (var e in events)
                 {
                     var move = e.From.Length is not 0 || e.To.Length is not 0 ? $" {e.From} -> {e.To}" : "";
-                    await output.WriteLineAsync($"  {Local(e.At)}  {e.Event,-18}{move}  by {e.Actor}  {e.Detail}");
+                    await output.WriteLineAsync($"  {Local(e.At)}  {e.Event, -18}{move}  by {e.Actor}  {e.Detail}");
                 }
             }
         }
     }
 
-    private async Task AddAsync(TaskAddSettings settings, TaskStore store, TaskActor actor, CancellationToken cancellationToken)
+    private async Task AddAsync(
+        TaskAddSettings settings,
+        TaskStore store,
+        TaskActor actor,
+        CancellationToken cancellationToken
+    )
     {
         if (string.IsNullOrWhiteSpace(settings.Title))
         {
             throw new TaskUsageException("--title is required");
         }
 
-        var created = store.Create(new()
-        {
-            Id = settings.Id,
-            Title = settings.Title,
-            Goal = settings.Goal.Trim(),
-            Type = settings.Type,
-            Priority = settings.Priority,
-            Milestone = settings.Milestone,
-            DependsOn = Split(settings.Depends).Select(dependency => dependency.ToUpperInvariant()).ToArray(),
-            Scope = Split(settings.Scope),
-            Acceptance = settings.Accept.Select(criterion => criterion.Trim()).Where(criterion => criterion.Length is not 0).ToArray(),
-        }, settings.Prefix, new(actor.Name, "cli", "added with harness tasks add"), cancellationToken);
+        var created = store.Create(
+            new()
+            {
+                Id = settings.Id,
+                Title = settings.Title,
+                Goal = settings.Goal.Trim(),
+                Type = settings.Type,
+                Priority = settings.Priority,
+                Milestone = settings.Milestone,
+                DependsOn = Split(settings.Depends).Select(dependency => dependency.ToUpperInvariant()).ToArray(),
+                Scope = Split(settings.Scope),
+                Acceptance = settings
+                    .Accept.Select(criterion => criterion.Trim())
+                    .Where(criterion => criterion.Length is not 0)
+                    .ToArray(),
+            },
+            settings.Prefix,
+            new(actor.Name, "cli", "added with harness tasks add"),
+            cancellationToken
+        );
         if (settings.Json)
         {
             await JsonAsync(new { task = TaskViews.Task(created) });
@@ -338,7 +452,13 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
     }
 
-    private async Task ChangeStateAsync(TaskIdSettings settings, TaskStore store, TaskActor actor, string verb, CancellationToken cancellationToken)
+    private async Task ChangeStateAsync(
+        TaskIdSettings settings,
+        TaskStore store,
+        TaskActor actor,
+        string verb,
+        CancellationToken cancellationToken
+    )
     {
         var reason = settings is TaskReasonSettings withReason ? withReason.Reason : "";
         var note = settings is TaskReadySettings withNote ? withNote.Note : "";
@@ -352,7 +472,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         {
             "block" => store.Block(id, actor, reason, cancellationToken),
             "defer" => store.Defer(id, actor, reason, cancellationToken),
-            _ => store.Unblock(id, actor, note, cancellationToken)
+            _ => store.Unblock(id, actor, note, cancellationToken),
         };
         if (settings.Json)
         {
@@ -360,16 +480,26 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
         else
         {
-            await output.WriteLineAsync(verb switch
-            {
-                "block" => $"Blocked {id}: {changed.BlockedReason}",
-                "defer" => $"Deferred {id}: {changed.BlockedReason}",
-                _ => changed.Status is "ready" ? $"{id} is ready." : $"{id} unblocked; waiting for dependencies (status {changed.Status})."
-            });
+            await output.WriteLineAsync(
+                verb switch
+                {
+                    "block" => $"Blocked {id}: {changed.BlockedReason}",
+                    "defer" => $"Deferred {id}: {changed.BlockedReason}",
+                    _ => changed.Status is "ready"
+                        ? $"{id} is ready."
+                        : $"{id} unblocked; waiting for dependencies (status {changed.Status}).",
+                }
+            );
         }
     }
 
-    private async Task FileAsync(string verb, TaskFileSettings settings, string root, TaskStore store, CancellationToken cancellationToken)
+    private async Task FileAsync(
+        string verb,
+        TaskFileSettings settings,
+        string root,
+        TaskStore store,
+        CancellationToken cancellationToken
+    )
     {
         var file = settings.File.Length is 0 ? Path.Combine(root, "docs", "backlog.yaml") : settings.File;
         if (verb is "export")
@@ -377,7 +507,18 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             var result = store.Export(file, settings.DryRun, cancellationToken);
             if (settings.Json)
             {
-                await JsonAsync(new { dry_run = settings.DryRun, export = new { path = result.Path, added = result.Added, created = result.Created } });
+                await JsonAsync(
+                    new
+                    {
+                        dry_run = settings.DryRun,
+                        export = new
+                        {
+                            path = result.Path,
+                            added = result.Added,
+                            created = result.Created,
+                        },
+                    }
+                );
             }
             else if (result.Added.Count is 0 && !result.Created)
             {
@@ -385,7 +526,12 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             }
             else
             {
-                await output.WriteLineAsync(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{(settings.DryRun ? "Would write" : "Wrote")} {result.Added.Count} task(s) into {file}: {string.Join(", ", result.Added)}"));
+                await output.WriteLineAsync(
+                    string.Create(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        $"{(settings.DryRun ? "Would write" : "Wrote")} {result.Added.Count} task(s) into {file}: {string.Join(", ", result.Added)}"
+                    )
+                );
             }
 
             return;
@@ -398,14 +544,35 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var milestones = store.ImportMilestones(backlog.Milestones, source, settings.DryRun, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { dry_run = settings.DryRun, added = Nil(imported.Added), updated = Nil(imported.Updated), unchanged = imported.Unchanged.Count, orphaned = Nil(imported.Orphaned), unlocked = Nil(imported.Unlocked), milestones_changed = milestones });
+            await JsonAsync(
+                new
+                {
+                    dry_run = settings.DryRun,
+                    added = Nil(imported.Added),
+                    updated = Nil(imported.Updated),
+                    unchanged = imported.Unchanged.Count,
+                    orphaned = Nil(imported.Orphaned),
+                    unlocked = Nil(imported.Unlocked),
+                    milestones_changed = milestones,
+                }
+            );
         }
         else
         {
-            await output.WriteLineAsync(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{(settings.DryRun ? "Would import" : "Imported")} {source}: {imported.Added.Count} added, {imported.Updated.Count} updated, {imported.Unchanged.Count} unchanged."));
+            await output.WriteLineAsync(
+                string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"{(settings.DryRun ? "Would import" : "Imported")} {source}: {imported.Added.Count} added, {imported.Updated.Count} updated, {imported.Unchanged.Count} unchanged."
+                )
+            );
             if (milestones > 0)
             {
-                await output.WriteLineAsync(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Milestones added or changed: {milestones}"));
+                await output.WriteLineAsync(
+                    string.Create(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        $"Milestones added or changed: {milestones}"
+                    )
+                );
             }
 
             if (imported.Updated.Count > 0)
@@ -420,20 +587,33 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
             if (imported.Orphaned.Count > 0)
             {
-                await output.WriteLineAsync("In the database but not in the file (kept): " + string.Join(", ", imported.Orphaned));
+                await output.WriteLineAsync(
+                    "In the database but not in the file (kept): " + string.Join(", ", imported.Orphaned)
+                );
             }
         }
     }
 
     private Task JsonAsync(object value) => output.WriteLineAsync(JsonSerializer.Serialize(value, JsonOptions));
+
     private static IReadOnlyList<string>? Nil(IReadOnlyList<string> values) => values.Count is 0 ? null : values;
-    private static string[] Split(string[] values) => values.SelectMany(v => v.Split(',')).Select(v => v.Trim()).Where(v => v.Length is not 0).ToArray();
-    private static string Local(Harness.Core.Memory.MemoryTimestamp time) => DateTimeOffset.Parse(time.ToRfc3339(), CultureInfo.InvariantCulture).ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    private static string[] Split(string[] values) =>
+        values.SelectMany(v => v.Split(',')).Select(v => v.Trim()).Where(v => v.Length is not 0).ToArray();
+
+    private static string Local(Harness.Core.Memory.MemoryTimestamp time) =>
+        DateTimeOffset
+            .Parse(time.ToRfc3339(), CultureInfo.InvariantCulture)
+            .ToLocalTime()
+            .ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
     private async Task PrintTaskAsync(TaskRecord t)
     {
         var d = t.Definition;
         await output.WriteLineAsync($"{t.Id}  {d.Title}");
-        await output.WriteLineAsync($"  status:     {t.Status}{(t.BlockedReason.Length is 0 ? "" : " (" + t.BlockedReason + ")")}");
+        await output.WriteLineAsync(
+            $"  status:     {t.Status}{(t.BlockedReason.Length is 0 ? "" : " (" + t.BlockedReason + ")")}"
+        );
         await output.WriteLineAsync($"  milestone:  {d.Milestone}   priority: {d.Priority}   type: {d.Type}");
         if (d.Goal.Length is not 0)
         {
@@ -447,12 +627,16 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
         if (t.Dependencies.Count is not 0)
         {
-            await output.WriteLineAsync("  depends on: " + string.Join(", ", t.Dependencies.Select(dep => $"{dep.Id} ({dep.Status})")));
+            await output.WriteLineAsync(
+                "  depends on: " + string.Join(", ", t.Dependencies.Select(dep => $"{dep.Id} ({dep.Status})"))
+            );
         }
 
         if (t.Claimant.Length is not 0)
         {
-            await output.WriteLineAsync($"  claimed by: {t.Claimant}{(t.LeaseUntil is { } until ? ", lease until " + Local(until) : "")}");
+            await output.WriteLineAsync(
+                $"  claimed by: {t.Claimant}{(t.LeaseUntil is { } until ? ", lease until " + Local(until) : "")}"
+            );
         }
 
         if (t.Criteria.Count is not 0)
@@ -460,7 +644,12 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             await output.WriteLineAsync("  acceptance:");
             foreach (var a in t.Criteria)
             {
-                await output.WriteLineAsync(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"    {a.Index,2}. [{a.Result,-7}] {a.Criterion}{(a.Evidence.Length is 0 ? "" : " — " + a.Evidence)}"));
+                await output.WriteLineAsync(
+                    string.Create(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        $"    {a.Index, 2}. [{a.Result, -7}] {a.Criterion}{(a.Evidence.Length is 0 ? "" : " — " + a.Evidence)}"
+                    )
+                );
             }
         }
 
@@ -476,10 +665,10 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
         if (t.CompletedAt is { } done)
         {
-            await output.WriteLineAsync($"  completed:  {Local(done)} by {t.CompletedBy}{(t.CompletionCommit.Length is 0 ? "" : " (commit " + t.CompletionCommit + ")")}");
+            await output.WriteLineAsync(
+                $"  completed:  {Local(done)} by {t.CompletedBy}{(t.CompletionCommit.Length is 0 ? "" : " (commit " + t.CompletionCommit + ")")}"
+            );
             await output.WriteLineAsync("  summary:    " + t.CompletionSummary);
         }
     }
-
-
 }

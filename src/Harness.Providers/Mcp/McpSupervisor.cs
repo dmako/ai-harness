@@ -13,7 +13,12 @@ public sealed record McpRestartPolicy
 }
 
 /// <summary>Single-flight lazy startup with fail-fast backoff and bounded failure history.</summary>
-public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOptions options, McpRestartPolicy? policy = null, TimeProvider? timeProvider = null) : IAsyncDisposable
+public sealed class McpSupervisor(
+    IProviderProcessFactory factory,
+    McpProcessOptions options,
+    McpRestartPolicy? policy = null,
+    TimeProvider? timeProvider = null
+) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly object _gate = new();
@@ -30,7 +35,16 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
     private Task? _closeTask;
     private readonly List<McpProcessClient> _retired = [];
 
-    public string ServerVersion { get { lock (_gate) { return _current?.ServerVersion ?? ""; } } }
+    public string ServerVersion
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _current?.ServerVersion ?? "";
+            }
+        }
+    }
 
     public async Task<McpProcessClient> ClientAsync(CancellationToken cancellationToken = default)
     {
@@ -69,7 +83,9 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
             }
 
             lock (_gate)
-            { CheckGate(); }
+            {
+                CheckGate();
+            }
             McpProcessClient started;
             try
             {
@@ -95,11 +111,20 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
             _ = WatchAsync(started);
             return started;
         }
-        finally { _startGate.Release(); }
+        finally
+        {
+            _startGate.Release();
+        }
     }
 
-    public async Task<CallToolResult> CallToolAsync(string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken = default) =>
-        await (await ClientAsync(cancellationToken).ConfigureAwait(false)).CallToolAsync(tool, arguments, cancellationToken).ConfigureAwait(false);
+    public async Task<CallToolResult> CallToolAsync(
+        string tool,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken = default
+    ) =>
+        await (await ClientAsync(cancellationToken).ConfigureAwait(false))
+            .CallToolAsync(tool, arguments, cancellationToken)
+            .ConfigureAwait(false);
 
     public ProviderHealth Health()
     {
@@ -109,9 +134,28 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
             return (_closed, _current?.Alive, _failures.Count >= _policy.MaxFailures, _lastError) switch
             {
                 (true, _, _, _) => new("unavailable", "closed"),
-                (_, true, _, _) => new("ready", string.Create(CultureInfo.InvariantCulture, $"running (pid {_current.Id})") + (_starts > 1 ? string.Create(CultureInfo.InvariantCulture, $", restarted {_starts - 1} time(s)") : "")),
-                (_, _, true, _) => new("unavailable", string.Create(CultureInfo.InvariantCulture, $"failed {_failures.Count} times in {_policy.Window}: {_lastError?.Message}"), "check that the configured command runs on its own; retries resume after " + _failures.Peek().Add(_policy.Window).ToString("HH:mm:ss", CultureInfo.InvariantCulture)),
-                (_, _, _, { } error) => new("degraded", "not running after a failure (will restart on next use): " + error.Message),
+                (_, true, _, _) => new(
+                    "ready",
+                    string.Create(CultureInfo.InvariantCulture, $"running (pid {_current.Id})")
+                        + (
+                            _starts > 1
+                                ? string.Create(CultureInfo.InvariantCulture, $", restarted {_starts - 1} time(s)")
+                                : ""
+                        )
+                ),
+                (_, _, true, _) => new(
+                    "unavailable",
+                    string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"failed {_failures.Count} times in {_policy.Window}: {_lastError?.Message}"
+                    ),
+                    "check that the configured command runs on its own; retries resume after "
+                        + _failures.Peek().Add(_policy.Window).ToString("HH:mm:ss", CultureInfo.InvariantCulture)
+                ),
+                (_, _, _, { } error) => new(
+                    "degraded",
+                    "not running after a failure (will restart on next use): " + error.Message
+                ),
                 _ => new("idle", "starts on first use"),
             };
         }
@@ -142,10 +186,18 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
         {
             McpProcessClient[] clients;
             lock (_gate)
-            { clients = _current is { } current ? [.. _retired, current] : [.. _retired]; _current = null; }
+            {
+                clients = _current is { } current ? [.. _retired, current] : [.. _retired];
+                _current = null;
+            }
             await Task.WhenAll(clients.Select(client => client.DisposeAsync().AsTask())).ConfigureAwait(false);
         }
-        finally { _startGate.Release(); _lifetime.Dispose(); _startGate.Dispose(); }
+        finally
+        {
+            _startGate.Release();
+            _lifetime.Dispose();
+            _startGate.Dispose();
+        }
     }
 
     private async Task WatchAsync(McpProcessClient client)
@@ -163,13 +215,23 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
             Fail(new IOException(options.Name + ": provider process exited; stderr: " + client.StderrTail(3)));
         }
         try
-        { await client.DisposeAsync().ConfigureAwait(false); }
+        {
+            await client.DisposeAsync().ConfigureAwait(false);
+        }
         catch (Exception error) when (error is IOException or TimeoutException or ObjectDisposedException)
         {
             lock (_gate)
-            { _lastError = error; }
+            {
+                _lastError = error;
+            }
         }
-        finally { lock (_gate) { _retired.Remove(client); } }
+        finally
+        {
+            lock (_gate)
+            {
+                _retired.Remove(client);
+            }
+        }
     }
 
     private void Prune()
@@ -185,7 +247,12 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
         Prune();
         if (_failures.Count >= _policy.MaxFailures)
         {
-            throw new IOException(string.Create(CultureInfo.InvariantCulture, $"{options.Name} failed {_failures.Count} times in {_policy.Window}; not retrying until {_failures.Peek().Add(_policy.Window):HH:mm:ss}. Last error: {_lastError?.Message}"));
+            throw new IOException(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{options.Name} failed {_failures.Count} times in {_policy.Window}; not retrying until {_failures.Peek().Add(_policy.Window):HH:mm:ss}. Last error: {_lastError?.Message}"
+                )
+            );
         }
 
         if (_clock.GetUtcNow() < _nextAttempt)
@@ -200,15 +267,19 @@ public sealed class McpSupervisor(IProviderProcessFactory factory, McpProcessOpt
         _failures.Enqueue(_clock.GetUtcNow());
         _consecutive++;
         _lastError = error;
-        var ticks = Math.Min(_policy.MaxBackoff.Ticks, _policy.BaseBackoff.Ticks * Math.Pow(2, Math.Min(_consecutive - 1, 30)));
+        var ticks = Math.Min(
+            _policy.MaxBackoff.Ticks,
+            _policy.BaseBackoff.Ticks * Math.Pow(2, Math.Min(_consecutive - 1, 30))
+        );
         _nextAttempt = _clock.GetUtcNow().AddTicks((long)ticks);
     }
 
-    private static McpRestartPolicy Defaults(McpRestartPolicy policy) => policy with
-    {
-        MaxFailures = policy.MaxFailures > 0 ? policy.MaxFailures : 3,
-        Window = policy.Window > TimeSpan.Zero ? policy.Window : TimeSpan.FromMinutes(5),
-        BaseBackoff = policy.BaseBackoff > TimeSpan.Zero ? policy.BaseBackoff : TimeSpan.FromMilliseconds(500),
-        MaxBackoff = policy.MaxBackoff > TimeSpan.Zero ? policy.MaxBackoff : TimeSpan.FromSeconds(8),
-    };
+    private static McpRestartPolicy Defaults(McpRestartPolicy policy) =>
+        policy with
+        {
+            MaxFailures = policy.MaxFailures > 0 ? policy.MaxFailures : 3,
+            Window = policy.Window > TimeSpan.Zero ? policy.Window : TimeSpan.FromMinutes(5),
+            BaseBackoff = policy.BaseBackoff > TimeSpan.Zero ? policy.BaseBackoff : TimeSpan.FromMilliseconds(500),
+            MaxBackoff = policy.MaxBackoff > TimeSpan.Zero ? policy.MaxBackoff : TimeSpan.FromSeconds(8),
+        };
 }

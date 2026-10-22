@@ -8,15 +8,31 @@ namespace Harness.Cli.Setup;
 internal static class SetupCleanup
 {
     internal sealed record Removal(string Path, Func<FileChange> Apply);
-    public static IEnumerable<Removal> ClientHooks(ClientPaths paths, string? root, bool dryRun) => new[] { "claude-code", "codex" }
-        .SelectMany(client => ClientHookCleanup.Targets(paths, client, "all", root ?? ""))
-        .Where(target => root is not null || target.Scope is "user")
-        .Select(target => new Removal(target.Path, () => ClientHookCleanup.Remove(target.Path, target.Client, dryRun)));
-    public static async Task<IReadOnlyList<Removal>> GitHooksAsync(GitRepository repository, bool dryRun, CancellationToken token)
+
+    public static IEnumerable<Removal> ClientHooks(ClientPaths paths, string? root, bool dryRun) =>
+        new[] { "claude-code", "codex" }
+            .SelectMany(client => ClientHookCleanup.Targets(paths, client, "all", root ?? ""))
+            .Where(target => root is not null || target.Scope is "user")
+            .Select(target => new Removal(
+                target.Path,
+                () => ClientHookCleanup.Remove(target.Path, target.Client, dryRun)
+            ));
+
+    public static async Task<IReadOnlyList<Removal>> GitHooksAsync(
+        GitRepository repository,
+        bool dryRun,
+        CancellationToken token
+    )
     {
         var hooks = await GitHooks.ForAsync(repository, token);
-        return GitHooks.Names.Select(name => new Removal(Path.Combine(hooks.DirectoryPath, name), () => hooks.Set(name, false, dryRun: dryRun))).ToArray();
+        return GitHooks
+            .Names.Select(name => new Removal(
+                Path.Combine(hooks.DirectoryPath, name),
+                () => hooks.Set(name, false, dryRun: dryRun)
+            ))
+            .ToArray();
     }
+
     public static async Task<IReadOnlyList<Removal>> CompletionsAsync(string home, bool dryRun, CancellationToken token)
     {
         var manager = new CompletionManager(home);

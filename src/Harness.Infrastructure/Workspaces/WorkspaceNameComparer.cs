@@ -6,5 +6,7 @@ namespace Harness.Infrastructure.Workspaces;
 internal sealed class WorkspaceNameComparer : IComparer<string>
 {
     internal static WorkspaceNameComparer Instance { get; } = new();
-    public int Compare(string? x, string? y) => Encoding.UTF8.GetBytes(x ?? "").AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(y ?? ""));
+
+    public int Compare(string? x, string? y) =>
+        Encoding.UTF8.GetBytes(x ?? "").AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(y ?? ""));
 }

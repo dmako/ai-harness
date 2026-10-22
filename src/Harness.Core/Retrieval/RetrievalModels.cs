@@ -67,38 +67,40 @@ public sealed record Candidate
         };
     }
 
-    public static Candidate FromMemory(MemoryRecord memory, double scopeScore) => new()
-    {
-        Id = "memory:" + memory.Id,
-        Source = "memory",
-        Role = memory.Type,
-        Text = memory.Content,
-        Size = Encoding.UTF8.GetByteCount(memory.Content),
-        Scores = new(StringComparer.Ordinal) { ["scope"] = scopeScore },
-        Evidence = "exact",
-        Freshness = "live",
-        When = memory.CreatedAt,
-        Path = memory.Scope.Kind is "path" ? memory.Scope.Value : "",
-        MemoryScope = memory.Scope.Wider ? memory.Scope.ToString() : "",
-        Overrides = memory.Overrides.ToArray(),
-        Provenance = [new("harness", "memory", "memory")],
-    };
+    public static Candidate FromMemory(MemoryRecord memory, double scopeScore) =>
+        new()
+        {
+            Id = "memory:" + memory.Id,
+            Source = "memory",
+            Role = memory.Type,
+            Text = memory.Content,
+            Size = Encoding.UTF8.GetByteCount(memory.Content),
+            Scores = new(StringComparer.Ordinal) { ["scope"] = scopeScore },
+            Evidence = "exact",
+            Freshness = "live",
+            When = memory.CreatedAt,
+            Path = memory.Scope.Kind is "path" ? memory.Scope.Value : "",
+            MemoryScope = memory.Scope.Wider ? memory.Scope.ToString() : "",
+            Overrides = memory.Overrides.ToArray(),
+            Provenance = [new("harness", "memory", "memory")],
+        };
 
-    public static Candidate FromCommit(RetrievalCommit commit, string path, double recency) => new()
-    {
-        Id = "git:" + commit.Id + ":" + path,
-        Source = "git",
-        Role = "change",
-        Name = commit.Id[..Math.Min(10, commit.Id.Length)],
-        Path = path,
-        Text = commit.Subject,
-        Size = Encoding.UTF8.GetByteCount(commit.Subject),
-        Scores = new(StringComparer.Ordinal) { ["recency"] = recency },
-        Evidence = "exact",
-        Freshness = "live",
-        When = commit.When,
-        Provenance = [new("harness", "git", "git")],
-    };
+    public static Candidate FromCommit(RetrievalCommit commit, string path, double recency) =>
+        new()
+        {
+            Id = "git:" + commit.Id + ":" + path,
+            Source = "git",
+            Role = "change",
+            Name = commit.Id[..Math.Min(10, commit.Id.Length)],
+            Path = path,
+            Text = commit.Subject,
+            Size = Encoding.UTF8.GetByteCount(commit.Subject),
+            Scores = new(StringComparer.Ordinal) { ["recency"] = recency },
+            Evidence = "exact",
+            Freshness = "live",
+            When = commit.When,
+            Provenance = [new("harness", "git", "git")],
+        };
 
     private static string CodeId(ProviderItem item, string capability)
     {
@@ -111,28 +113,57 @@ public sealed record Candidate
 
         return (capability, item.Path ?? "", name) switch
         {
-            (Capabilities.Callers or Capabilities.Impact or Capabilities.Flow, { Length: > 0 } path, { Length: > 0 }) => "code:" + path + "#" + name,
+            (Capabilities.Callers or Capabilities.Impact or Capabilities.Flow, { Length: > 0 } path, { Length: > 0 }) =>
+                "code:" + path + "#" + name,
             (_, "", _) => "code:" + item.QualifiedName + "#" + name,
-            (_, var path, _) when item.StartLine > 0 => "code:" + path + ":" + item.StartLine.ToString(CultureInfo.InvariantCulture),
+            (_, var path, _) when item.StartLine > 0 => "code:"
+                + path
+                + ":"
+                + item.StartLine.ToString(CultureInfo.InvariantCulture),
             (_, var path, _) => "code:" + path + "#" + name,
         };
     }
 }
 
 public sealed record RetrievalCommit(string Id, string Subject, MemoryTimestamp When, IReadOnlyList<string> Paths);
+
 public sealed record RetrievalTask(string Text, string Path = "", int Limit = 10, TimeSpan CodeTimeout = default);
-public sealed record RetrievalSources(IProviderRegistry? Registry = null,
+
+public sealed record RetrievalSources(
+    IProviderRegistry? Registry = null,
     Func<MemoryQuery, CancellationToken, Task<RetrievalMemories>>? Memory = null,
-    Func<IReadOnlyList<string>, int, CancellationToken, Task<IReadOnlyList<RetrievalCommit>>>? RecentChanges = null, string Branch = "");
+    Func<IReadOnlyList<string>, int, CancellationToken, Task<IReadOnlyList<RetrievalCommit>>>? RecentChanges = null,
+    string Branch = ""
+);
+
 public sealed record RetrievalMemories(IReadOnlyList<MemoryRecord> Memories)
 {
     public IReadOnlyList<string> Errors { get; init; } = [];
 }
-public sealed record RetrievalCall(string Provider, string Capability, string Query, int Items, long LatencyMs, int Bytes, string Error = "");
-public sealed record Gathered(IReadOnlyList<Candidate> Candidates, IReadOnlyList<string> Symbols, IReadOnlyList<string> Phrases,
-    IReadOnlyList<string> Errors, IReadOnlyList<string> Notes, IReadOnlyList<RetrievalCall> Calls);
+
+public sealed record RetrievalCall(
+    string Provider,
+    string Capability,
+    string Query,
+    int Items,
+    long LatencyMs,
+    int Bytes,
+    string Error = ""
+);
+
+public sealed record Gathered(
+    IReadOnlyList<Candidate> Candidates,
+    IReadOnlyList<string> Symbols,
+    IReadOnlyList<string> Phrases,
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<string> Notes,
+    IReadOnlyList<RetrievalCall> Calls
+);
+
 public sealed record Folded(Candidate Candidate, string Into, string Reason);
+
 public sealed record Merged(IReadOnlyList<Candidate> Candidates, IReadOnlyList<Folded> Folded);
+
 public sealed record Ranked(Candidate Candidate, int Tier, double Score, IReadOnlyList<string> Why)
 {
     public string Explain() => "tier " + Tier.ToString(CultureInfo.InvariantCulture) + ": " + string.Join(", ", Why);

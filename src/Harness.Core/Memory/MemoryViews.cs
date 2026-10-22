@@ -67,7 +67,11 @@ public static class MemoryViews
     public static Dictionary<string, object?> Detail(MemoryDetail detail)
     {
         ArgumentNullException.ThrowIfNull(detail);
-        Dictionary<string, object?> result = new(StringComparer.Ordinal) { ["memory"] = Memory(detail.Memory), ["current"] = detail.Current };
+        Dictionary<string, object?> result = new(StringComparer.Ordinal)
+        {
+            ["memory"] = Memory(detail.Memory),
+            ["current"] = detail.Current,
+        };
         if (detail.History.Count > 0)
         {
             result["history"] = detail.History.Select(Memory).ToArray();
@@ -95,7 +99,12 @@ public static class MemoryViews
 
     private static Dictionary<string, object?> Event(MemoryEvent item)
     {
-        Dictionary<string, object?> result = new(StringComparer.Ordinal) { ["event"] = item.Event, ["actor"] = item.Actor, ["at"] = item.At.ToRfc3339() };
+        Dictionary<string, object?> result = new(StringComparer.Ordinal)
+        {
+            ["event"] = item.Event,
+            ["actor"] = item.Actor,
+            ["at"] = item.At.ToRfc3339(),
+        };
         Add(result, "related_id", item.RelatedId);
         Add(result, "detail", item.Detail);
         return result;

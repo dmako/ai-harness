@@ -22,12 +22,17 @@ public static class Capabilities
     public const string ArchDuplicates = "arch.duplicates";
     public const string ArchDeadCode = "arch.dead_code";
 
-    public static IReadOnlyList<string> Architecture { get; } = Array.AsReadOnly(new[] { ArchDependencies, ArchCycles, ArchChangeCoupling, ArchDuplicates, ArchDeadCode });
+    public static IReadOnlyList<string> Architecture { get; } =
+        Array.AsReadOnly(new[] { ArchDependencies, ArchCycles, ArchChangeCoupling, ArchDuplicates, ArchDeadCode });
+
     public static bool IsPackage(string capability) => capability.StartsWith("package.", StringComparison.Ordinal);
+
     public static bool IsArchitecture(string capability) => capability.StartsWith("arch.", StringComparison.Ordinal);
-    public static string DefaultEvidence(string capability) => capability switch
-    {
-        TextSearch or FileSearch or ArchChangeCoupling => "exact",
-        _ => "inferred",
-    };
+
+    public static string DefaultEvidence(string capability) =>
+        capability switch
+        {
+            TextSearch or FileSearch or ArchChangeCoupling => "exact",
+            _ => "inferred",
+        };
 }

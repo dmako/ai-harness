@@ -15,7 +15,12 @@ public sealed class MemoryMcpProcessTests
         Directory.CreateDirectory(root);
         try
         {
-            using (var database = HarnessDatabase.Open(Path.Combine(root, ".harness", "harness.db"), cancellationToken: Token))
+            using (
+                var database = HarnessDatabase.Open(
+                    Path.Combine(root, ".harness", "harness.db"),
+                    cancellationToken: Token
+                )
+            )
             {
                 database.SchemaVersion().Should().Be(19);
             }
@@ -24,32 +29,75 @@ public sealed class MemoryMcpProcessTests
             await using var codex = await StartAsync(root, "codex");
             var tools = await claude.ListToolsAsync(cancellationToken: Token);
             tools.Count.Should().Be(30);
-            var created = await Call(claude, "memory_put", new { type = "decision", content = "Use JSON for task import", scope = "path:src/tasks", source_ref = "TASK-0009 review", confidence = (double?)null });
+            var created = await Call(
+                claude,
+                "memory_put",
+                new
+                {
+                    type = "decision",
+                    content = "Use JSON for task import",
+                    scope = "path:src/tasks",
+                    source_ref = "TASK-0009 review",
+                    confidence = (double?)null,
+                }
+            );
             var old = created.GetProperty("memory").GetProperty("id").GetString()!;
             created.GetProperty("memory").GetProperty("recorded_by").GetString().Should().Be("claude-code fixture");
             var rules = await Call(codex, "decisions_for", new { scope = "path:src/tasks/import.cs" });
             rules.GetProperty("memories")[0].GetProperty("id").GetString().Should().Be(old);
-            var replaced = await Call(codex, "memory_supersede", new { id = old, content = "Use YAML for task import", reason = "hand-edited backlog" });
+            var replaced = await Call(
+                codex,
+                "memory_supersede",
+                new
+                {
+                    id = old,
+                    content = "Use YAML for task import",
+                    reason = "hand-edited backlog",
+                }
+            );
             var current = replaced.GetProperty("memory").GetProperty("id").GetString()!;
             replaced.GetProperty("memory").GetProperty("recorded_by").GetString().Should().Be("codex fixture");
             var history = await Call(claude, "memory_get", new { id = current, history = true });
             history.GetProperty("history").GetArrayLength().Should().Be(2);
             history.GetProperty("events")[0].GetProperty("actor").GetString().Should().Be("codex fixture");
-            var proposal = await Call(codex, "memory_propose", new { type = "warning", content = "Do not deploy on Fridays", rationale = "unconfirmed suggestion" });
+            var proposal = await Call(
+                codex,
+                "memory_propose",
+                new
+                {
+                    type = "warning",
+                    content = "Do not deploy on Fridays",
+                    rationale = "unconfirmed suggestion",
+                }
+            );
             var proposalId = proposal.GetProperty("proposal").GetProperty("id").GetString()!;
             var before = await Call(claude, "memory_search", new { types = new[] { "warning" } });
             before.GetProperty("memories").EnumerateArray().Should().BeEmpty();
-            var rejected = await Call(claude, "memory_review", new { id = proposalId, action = "reject", note = "not a project rule" });
+            var rejected = await Call(
+                claude,
+                "memory_review",
+                new
+                {
+                    id = proposalId,
+                    action = "reject",
+                    note = "not a project rule",
+                }
+            );
             rejected.GetProperty("proposal").GetProperty("decided_by").GetString().Should().Be("claude-code fixture");
             var pending = await Call(codex, "memory_proposals", new { });
             pending.GetProperty("proposals").EnumerateArray().Should().BeEmpty();
         }
-        finally { Directory.Delete(root, recursive: true); }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     private static async Task<System.Text.Json.JsonElement> Call(McpClient client, string name, object args)
     {
-        var values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(System.Text.Json.JsonSerializer.Serialize(args));
+        var values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(
+            System.Text.Json.JsonSerializer.Serialize(args)
+        );
         var result = await client.CallToolAsync(name, values, cancellationToken: Token);
         result.IsError.Should().NotBe(true);
         result.StructuredContent.Should().NotBeNull();
@@ -70,17 +118,35 @@ public sealed class MemoryMcpProcessTests
 #else
         const string Configuration = "Release";
 #endif
-        var binary = Path.Combine(directory.FullName, "src", "Harness.Cli", "bin", Configuration, "net10.0", "harness.dll");
+        var binary = Path.Combine(
+            directory.FullName,
+            "src",
+            "Harness.Cli",
+            "bin",
+            Configuration,
+            "net10.0",
+            "harness.dll"
+        );
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
         environment["HARNESS_CONFIG_DIR"] = Path.Combine(root, "config");
-        return McpClient.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
-        {
-            Command = "dotnet",
-            Arguments = [binary, "mcp", "--project", root],
-            WorkingDirectory = root,
-            EnvironmentVariables = environment,
-            InheritEnvironmentVariables = false,
-        }), new McpClientOptions { ClientInfo = new Implementation { Name = name, Version = "fixture" }, ProtocolVersion = "2025-06-18" }, cancellationToken: Token);
+        return McpClient.CreateAsync(
+            new StdioClientTransport(
+                new StdioClientTransportOptions
+                {
+                    Command = "dotnet",
+                    Arguments = [binary, "mcp", "--project", root],
+                    WorkingDirectory = root,
+                    EnvironmentVariables = environment,
+                    InheritEnvironmentVariables = false,
+                }
+            ),
+            new McpClientOptions
+            {
+                ClientInfo = new Implementation { Name = name, Version = "fixture" },
+                ProtocolVersion = "2025-06-18",
+            },
+            cancellationToken: Token
+        );
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;

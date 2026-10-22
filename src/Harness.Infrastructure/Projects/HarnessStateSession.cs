@@ -6,7 +6,18 @@ using Microsoft.Data.Sqlite;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed partial class HarnessStateSession(ProjectLocation location, MachineRegistry registry, HarnessRuntime runtime, string? globalConfigurationPath = null) : IHarnessStateSession, Harness.Core.Memory.IMemorySession, Harness.Core.Tasks.ITaskSession, Harness.Core.Providers.IProviderProjectSession, Harness.Core.Retrieval.IContextProjectSession, Harness.Core.Workspaces.IWorkspaceProjectSession
+public sealed partial class HarnessStateSession(
+    ProjectLocation location,
+    MachineRegistry registry,
+    HarnessRuntime runtime,
+    string? globalConfigurationPath = null
+)
+    : IHarnessStateSession,
+        Harness.Core.Memory.IMemorySession,
+        Harness.Core.Tasks.ITaskSession,
+        Harness.Core.Providers.IProviderProjectSession,
+        Harness.Core.Retrieval.IContextProjectSession,
+        Harness.Core.Workspaces.IWorkspaceProjectSession
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private HarnessDatabase? _database;
@@ -18,8 +29,13 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         var database = await StateDatabaseAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         try
-        { database.PutDiagnostic(key, value); }
-        catch (SqliteException exception) { throw new IOException("store value: " + exception.Message, exception); }
+        {
+            database.PutDiagnostic(key, value);
+        }
+        catch (SqliteException exception)
+        {
+            throw new IOException("store value: " + exception.Message, exception);
+        }
         cancellationToken.ThrowIfCancellationRequested();
     }
 
@@ -35,7 +51,10 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         {
             return null;
         }
-        catch (SqliteException exception) { throw new IOException("read value: " + exception.Message, exception); }
+        catch (SqliteException exception)
+        {
+            throw new IOException("read value: " + exception.Message, exception);
+        }
     }
 
     public async Task<IReadOnlyDictionary<string, object?>> DiagnosticsAsync(CancellationToken cancellationToken)
@@ -90,7 +109,9 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         {
             if (!File.Exists(location.DatabasePath))
             {
-                throw new FileNotFoundException("project not initialized (run 'harness init'): " + location.DatabasePath);
+                throw new FileNotFoundException(
+                    "project not initialized (run 'harness init'): " + location.DatabasePath
+                );
             }
 
             var database = await DatabaseAsync(cancellationToken);
@@ -102,7 +123,14 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
                 result["sync"] = ReadSync(database, registration.Worktree.Id, head, out _);
             }
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or SqliteException or ArgumentException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or UnauthorizedAccessException
+                        or SqliteException
+                        or ArgumentException
+            )
         {
             result["db_error"] = exception.Message;
         }
@@ -128,8 +156,14 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
                 return _database;
             }
 
-            HarnessDatabase? opened = HarnessDatabase.Open(location.DatabasePath,
-                new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs) }, cancellationToken);
+            HarnessDatabase? opened = HarnessDatabase.Open(
+                location.DatabasePath,
+                new StorageOptions
+                {
+                    BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs),
+                },
+                cancellationToken
+            );
             try
             {
                 if (location.Repository is { } repository)
@@ -159,8 +193,17 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
     private async Task<HarnessDatabase> StateDatabaseAsync(CancellationToken cancellationToken)
     {
         try
-        { return await DatabaseAsync(cancellationToken); }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or SqliteException or ArgumentException)
+        {
+            return await DatabaseAsync(cancellationToken);
+        }
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or UnauthorizedAccessException
+                        or SqliteException
+                        or ArgumentException
+            )
         {
             throw new IOException("storage unavailable: " + exception.Message, exception);
         }
@@ -173,7 +216,14 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         {
             await registry.NoteMcpAsync(project, worktrees, runtime.Version);
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or UnauthorizedAccessException
+                        or System.Text.Json.JsonException
+                        or InvalidOperationException
+            )
         {
             // The machine registry is optional and must not fail tool calls or disconnect cleanup.
         }
@@ -187,7 +237,13 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
         }
     }
 
-    private static Dictionary<string, object?> ReadSync(HarnessDatabase database, string worktree, GitHead? head, out bool crossBranch, bool includeRecentRuns = true)
+    private static Dictionary<string, object?> ReadSync(
+        HarnessDatabase database,
+        string worktree,
+        GitHead? head,
+        out bool crossBranch,
+        bool includeRecentRuns = true
+    )
     {
         // Keep facade reads cheap and use the same freshness rules as the synchronization engine.
         crossBranch = false;
@@ -199,12 +255,14 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
 
         using var connection = database.OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT branch, head_commit, detached, synced_at FROM sync_state WHERE worktree_id=$worktree";
+        command.CommandText =
+            "SELECT branch, head_commit, detached, synced_at FROM sync_state WHERE worktree_id=$worktree";
         command.Parameters.AddWithValue("$worktree", worktree);
         using var reader = command.ExecuteReader();
         if (!reader.Read())
         {
-            result["stale"] = "this worktree has never been synced; provider indexes may not reflect it (run 'harness sync')";
+            result["stale"] =
+                "this worktree has never been synced; provider indexes may not reflect it (run 'harness sync')";
             return result;
         }
 
@@ -240,7 +298,8 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
     {
         using var connection = database.OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id, started_at, finished_at, mode, reason, base_commit, head_commit, added, changed, removed, providers, status, error FROM sync_runs WHERE worktree_id=$worktree ORDER BY id DESC LIMIT 5";
+        command.CommandText =
+            "SELECT id, started_at, finished_at, mode, reason, base_commit, head_commit, added, changed, removed, providers, status, error FROM sync_runs WHERE worktree_id=$worktree ORDER BY id DESC LIMIT 5";
         command.Parameters.AddWithValue("$worktree", worktree);
         using var reader = command.ExecuteReader();
         List<Dictionary<string, object?>> runs = [];
@@ -256,7 +315,16 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
                 ["removed"] = reader.GetInt64(9),
                 ["status"] = reader.GetString(11),
             };
-            foreach (var (column, key) in new[] { (2, "finished_at"), (4, "reason"), (5, "base_commit"), (6, "head_commit"), (12, "error") })
+            foreach (
+                var (column, key) in new[]
+                {
+                    (2, "finished_at"),
+                    (4, "reason"),
+                    (5, "base_commit"),
+                    (6, "head_commit"),
+                    (12, "error"),
+                }
+            )
             {
                 if (!reader.IsDBNull(column))
                 {
@@ -265,7 +333,10 @@ public sealed partial class HarnessStateSession(ProjectLocation location, Machin
             }
 
             using var providers = System.Text.Json.JsonDocument.Parse(reader.GetString(10));
-            run["providers"] = providers.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array ? providers.RootElement.Clone() : (object)Array.Empty<object>();
+            run["providers"] =
+                providers.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array
+                    ? providers.RootElement.Clone()
+                    : (object)Array.Empty<object>();
             runs.Add(run);
         }
 

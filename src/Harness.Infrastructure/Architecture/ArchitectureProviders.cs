@@ -8,26 +8,57 @@ namespace Harness.Infrastructure.Architecture;
 public sealed record ArchitectureCoverage(
     [property: JsonPropertyName("capability")] string Capability,
     [property: JsonPropertyName("providers")] IReadOnlyList<string> Providers,
-    [property: JsonPropertyName("without"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Without);
-public sealed record ProviderArchitectureRead(IReadOnlyList<ArchitectureFinding> Findings, bool Answered, IReadOnlyList<string> Notes);
+    [property: JsonPropertyName("without"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Without
+);
+
+public sealed record ProviderArchitectureRead(
+    IReadOnlyList<ArchitectureFinding> Findings,
+    bool Answered,
+    IReadOnlyList<string> Notes
+);
 
 public static class ArchitectureProviders
 {
-    public static IReadOnlyList<ArchitectureCoverage> Coverage(IProviderRegistry? registry) => CoverageOf(registry?.Capabilities() ?? []);
-    public static IReadOnlyList<ArchitectureCoverage> Coverage(HarnessConfiguration configuration) => CoverageOf(configuration.Providers.Where(pair => pair.Value.IsEnabled()).SelectMany(pair => pair.Value.Capabilities.Keys.Where(capability => pair.Value.Only.Length is 0 || pair.Value.Only.Contains(capability, StringComparer.Ordinal)).Select(capability => new CapabilityInfo(capability, pair.Key))).ToArray());
-    private static ArchitectureCoverage[] CoverageOf(IReadOnlyList<CapabilityInfo> capabilities) => Capabilities.Architecture.Select(capability =>
-    {
-        var providers = capabilities.Where(item => item.Capability == capability).Select(item => item.Provider).Order(StringComparer.Ordinal).ToArray();
-        var without = capability switch
-        {
-            Capabilities.ArchDependencies => "harness reads dependencies itself from build files and imports; nothing is missing",
-            Capabilities.ArchCycles => "harness finds circles in what it reads itself; nothing is missing",
-            Capabilities.ArchChangeCoupling => "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)",
-            Capabilities.ArchDuplicates => "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)",
-            _ => "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet",
-        };
-        return new ArchitectureCoverage(capability, providers, providers.Length is 0 ? without : null);
-    }).ToArray();
+    public static IReadOnlyList<ArchitectureCoverage> Coverage(IProviderRegistry? registry) =>
+        CoverageOf(registry?.Capabilities() ?? []);
+
+    public static IReadOnlyList<ArchitectureCoverage> Coverage(HarnessConfiguration configuration) =>
+        CoverageOf(
+            configuration
+                .Providers.Where(pair => pair.Value.IsEnabled())
+                .SelectMany(pair =>
+                    pair.Value.Capabilities.Keys.Where(capability =>
+                            pair.Value.Only.Length is 0 || pair.Value.Only.Contains(capability, StringComparer.Ordinal)
+                        )
+                        .Select(capability => new CapabilityInfo(capability, pair.Key))
+                )
+                .ToArray()
+        );
+
+    private static ArchitectureCoverage[] CoverageOf(IReadOnlyList<CapabilityInfo> capabilities) =>
+        Capabilities
+            .Architecture.Select(capability =>
+            {
+                var providers = capabilities
+                    .Where(item => item.Capability == capability)
+                    .Select(item => item.Provider)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+                var without = capability switch
+                {
+                    Capabilities.ArchDependencies =>
+                        "harness reads dependencies itself from build files and imports; nothing is missing",
+                    Capabilities.ArchCycles => "harness finds circles in what it reads itself; nothing is missing",
+                    Capabilities.ArchChangeCoupling =>
+                        "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)",
+                    Capabilities.ArchDuplicates =>
+                        "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)",
+                    _ =>
+                        "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet",
+                };
+                return new ArchitectureCoverage(capability, providers, providers.Length is 0 ? without : null);
+            })
+            .ToArray();
 
     public static async Task<ProviderArchitectureRead> CyclesAsync(IProviderRegistry? registry, CancellationToken token)
     {
@@ -36,31 +67,51 @@ public static class ArchitectureProviders
             return new([], false, ["no provider offers arch.cycles; file reference cycles remain available"]);
         }
 
-        var results = await registry.CallAsync(new(Capabilities.ArchCycles, Limit: 100), cancellationToken: token).ConfigureAwait(false);
+        var results = await registry
+            .CallAsync(new(Capabilities.ArchCycles, Limit: 100), cancellationToken: token)
+            .ConfigureAwait(false);
         List<ArchitectureFinding> findings = [];
         List<string> notes = [];
         var answered = false;
         foreach (var result in results)
         {
             if (result.Error is not null)
-            { notes.Add(result.Provider + ": " + result.Error.Message.Split('\n')[0]); continue; }
+            {
+                notes.Add(result.Provider + ": " + result.Error.Message.Split('\n')[0]);
+                continue;
+            }
             answered = true;
             foreach (var item in result.Items.Where(item => item.Members?.Count >= 2))
             {
-                findings.Add(ArchitectureAnalyzer.Complete(new()
-                {
-                    Kind = "cycle",
-                    Level = "problem",
-                    Key = ArchitectureAnalyzer.Key("cycle", [.. item.Members!.Order(StringComparer.Ordinal)]),
-                    Measure = item.Members!.Count,
-                    Title = $"{item.Members.Count} units depend on each other in a circle: " + string.Join(", ", item.Members),
-                    Why = "Each reaches the others through its dependencies, so none of them can be changed, tested or understood alone.",
-                    Fix = "Move what they share into a lower unit, or turn one dependency around (the lower one owns an interface the higher one implements).",
-                    Evidence = item.Path is null ? null : new[] { item.Path + ":" + item.StartLine.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-                    Basis = "fact",
-                    Confidence = item.Confidence,
-                    Source = new(item.Provider, item.Tool.Length is 0 ? null : item.Tool)
-                }));
+                findings.Add(
+                    ArchitectureAnalyzer.Complete(
+                        new()
+                        {
+                            Kind = "cycle",
+                            Level = "problem",
+                            Key = ArchitectureAnalyzer.Key("cycle", [.. item.Members!.Order(StringComparer.Ordinal)]),
+                            Measure = item.Members!.Count,
+                            Title =
+                                $"{item.Members.Count} units depend on each other in a circle: "
+                                + string.Join(", ", item.Members),
+                            Why =
+                                "Each reaches the others through its dependencies, so none of them can be changed, tested or understood alone.",
+                            Fix =
+                                "Move what they share into a lower unit, or turn one dependency around (the lower one owns an interface the higher one implements).",
+                            Evidence = item.Path is null
+                                ? null
+                                : new[]
+                                {
+                                    item.Path
+                                        + ":"
+                                        + item.StartLine.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                },
+                            Basis = "fact",
+                            Confidence = item.Confidence,
+                            Source = new(item.Provider, item.Tool.Length is 0 ? null : item.Tool),
+                        }
+                    )
+                );
             }
         }
         if (results.Count is 0)

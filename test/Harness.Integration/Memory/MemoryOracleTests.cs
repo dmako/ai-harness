@@ -32,8 +32,14 @@ public sealed class MemoryOracleTests
     public async Task UnicodeWordRangeBoundariesMatchGoSimilarityTokenization()
     {
         var unicode = await Run(Oracle(), "unicode", "unused");
-        var ranges = unicode["word_ranges"]!.AsArray().Select(node => (First: node![0]!.GetValue<int>(), Last: node[1]!.GetValue<int>())).ToArray();
-        var scalars = ranges.SelectMany(range => new[] { range.First, range.Last, range.First - 1, range.Last + 1 }).Where(Rune.IsValid).Distinct();
+        var ranges = unicode["word_ranges"]!
+            .AsArray()
+            .Select(node => (First: node![0]!.GetValue<int>(), Last: node[1]!.GetValue<int>()))
+            .ToArray();
+        var scalars = ranges
+            .SelectMany(range => new[] { range.First, range.Last, range.First - 1, range.Last + 1 })
+            .Where(Rune.IsValid)
+            .Distinct();
         foreach (var scalar in scalars)
         {
             var isWord = ranges.Any(range => scalar >= range.First && scalar <= range.Last);
@@ -51,7 +57,10 @@ public sealed class MemoryOracleTests
             CredentialRedactor.Redact(fixture.Key).Should().Be(expected);
             if (expected != fixture.Key)
             {
-                FluentActions.Invoking(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = fixture.Key })).Should().ThrowExactly<ArgumentException>();
+                FluentActions
+                    .Invoking(() => MemoryText.Validate(new MemoryInput { Type = "fact", Content = fixture.Key }))
+                    .Should()
+                    .ThrowExactly<ArgumentException>();
             }
         }
     }
@@ -68,10 +77,30 @@ public sealed class MemoryOracleTests
         {
             var store = new MemoryStore(database);
             Equal(expected, Report(store));
-            store.Put(new MemoryInput { Type = "fact", Content = "İSTANBUL 𐐀 Á Ž Σ K Unicode compatibility" }, Token).Status.Should().Be("duplicate");
+            store
+                .Put(new MemoryInput { Type = "fact", Content = "İSTANBUL 𐐀 Á Ž Σ K Unicode compatibility" }, Token)
+                .Status.Should()
+                .Be("duplicate");
             var old = store.Search(new MemoryQuery { Text = "TOML" }, Token)[0];
-            store.Supersede(old.Id, new MemoryInput { Content = "Use TOML with explicit source metadata for config.", Source = new MemorySource("agent", "C# review", "codex"), SupersedeReason = "C# roundtrip" }, Token);
-            store.Put(new MemoryInput { Type = "fact", Content = "žluťoučký memory 🧪 survives C# → Go", Source = new MemorySource("import", "roundtrip", "csharp") }, Token);
+            store.Supersede(
+                old.Id,
+                new MemoryInput
+                {
+                    Content = "Use TOML with explicit source metadata for config.",
+                    Source = new MemorySource("agent", "C# review", "codex"),
+                    SupersedeReason = "C# roundtrip",
+                },
+                Token
+            );
+            store.Put(
+                new MemoryInput
+                {
+                    Type = "fact",
+                    Content = "žluťoučký memory 🧪 survives C# → Go",
+                    Source = new MemorySource("import", "roundtrip", "csharp"),
+                },
+                Token
+            );
             var retired = store.Search(new MemoryQuery { Text = "Subsystem" }, Token)[0];
             store.Retire(retired.Id, "human:csharp", "roundtrip retirement", Token);
             after = Report(store);
@@ -92,16 +121,21 @@ public sealed class MemoryOracleTests
         using var project = HarnessDatabase.OpenReadOnly(Path.Combine(directory.Path, "project.db"));
         using var workspace = HarnessDatabase.OpenReadOnly(Path.Combine(directory.Path, "workspace.db"));
         using var user = HarnessDatabase.OpenReadOnly(Path.Combine(directory.Path, "user.db"));
-        var layers = new MemoryLayers(new MemoryStore(project),
-        [
-            new MemoryLevel(MemoryScope.Parse("workspace:home"), new MemoryStore(workspace)),
-            new MemoryLevel(MemoryScope.User, new MemoryStore(user)),
-        ]);
+        var layers = new MemoryLayers(
+            new MemoryStore(project),
+            [
+                new MemoryLevel(MemoryScope.Parse("workspace:home"), new MemoryStore(workspace)),
+                new MemoryLevel(MemoryScope.User, new MemoryStore(user)),
+            ]
+        );
         var target = MemoryScope.Parse("path:src/api/handler.cs");
         var queries = new MemoryQuery[]
         {
-            new(), new() { Scope = target, Branch = "main" }, new() { IncludeInactive = true },
-            new() { Text = "SQLite" }, new() { Scope = target, Limit = 1 },
+            new(),
+            new() { Scope = target, Branch = "main" },
+            new() { IncludeInactive = true },
+            new() { Text = "SQLite" },
+            new() { Scope = target, Limit = 1 },
         };
         var results = queries.Select(query => layers.Search(query, Token)).ToArray();
         results.Should().AllSatisfy(result => result.Errors.Should().BeEmpty());
@@ -114,56 +148,94 @@ public sealed class MemoryOracleTests
         var path = MemoryScope.Parse("path:src/api/handler.cs");
         var queries = new MemoryQuery[]
         {
-            new(), new() { Scope = path, Branch = "feature", Limit = 3 }, new() { Scope = path, Branch = "main" },
-            new() { Text = "migration storage" }, new() { Text = "migration", Scope = path }, new() { Text = "!!!" },
-            new() { Types = ["decision", "warning"], IncludeInactive = true, Limit = 100 }, new() { Text = "\"; DROP TABLE memories; --" },
+            new(),
+            new()
+            {
+                Scope = path,
+                Branch = "feature",
+                Limit = 3,
+            },
+            new() { Scope = path, Branch = "main" },
+            new() { Text = "migration storage" },
+            new() { Text = "migration", Scope = path },
+            new() { Text = "!!!" },
+            new()
+            {
+                Types = ["decision", "warning"],
+                IncludeInactive = true,
+                Limit = 100,
+            },
+            new() { Text = "\"; DROP TABLE memories; --" },
         };
         var all = store.Search(new MemoryQuery { IncludeInactive = true, Limit = 100 }, Token);
-        return JsonSerializer.SerializeToNode(new
-        {
-            all = all.Select(Snapshot),
-            searches = queries.Select(query => store.Search(query, Token).Select(Snapshot)),
-            histories = all.ToDictionary(memory => memory.Id, memory => store.History(memory.Id, Token).Select(Snapshot), StringComparer.Ordinal),
-            events = all.ToDictionary(memory => memory.Id, memory => store.Events(memory.Id, Token).Select(item => new
+        return JsonSerializer.SerializeToNode(
+            new
             {
-                @event = item.Event,
-                related_id = item.RelatedId,
-                actor = item.Actor,
-                detail = item.Detail,
-                at = item.At.ToString(),
-            }), StringComparer.Ordinal),
-            similar = store.Similar("decision", "Store project memory in the SQLite project database", Token).Select(item => new { memory = Snapshot(item.Memory), similarity = item.Similarity }),
-        })!;
+                all = all.Select(Snapshot),
+                searches = queries.Select(query => store.Search(query, Token).Select(Snapshot)),
+                histories = all.ToDictionary(
+                    memory => memory.Id,
+                    memory => store.History(memory.Id, Token).Select(Snapshot),
+                    StringComparer.Ordinal
+                ),
+                events = all.ToDictionary(
+                    memory => memory.Id,
+                    memory =>
+                        store
+                            .Events(memory.Id, Token)
+                            .Select(item => new
+                            {
+                                @event = item.Event,
+                                related_id = item.RelatedId,
+                                actor = item.Actor,
+                                detail = item.Detail,
+                                at = item.At.ToString(),
+                            }),
+                    StringComparer.Ordinal
+                ),
+                similar = store
+                    .Similar("decision", "Store project memory in the SQLite project database", Token)
+                    .Select(item => new { memory = Snapshot(item.Memory), similarity = item.Similarity }),
+            }
+        )!;
     }
 
-    private static object Snapshot(MemoryRecord memory) => new
-    {
-        id = memory.Id,
-        type = memory.Type,
-        content = memory.Content,
-        scope = memory.Scope.ToString(),
-        source_type = memory.Source.Type,
-        source_ref = memory.Source.Ref,
-        recorded_by = memory.Source.By,
-        confidence = memory.Confidence,
-        superseded_by = memory.SupersededBy,
-        supersede_reason = memory.SupersedeReason,
-        valid_from = memory.ValidFrom?.ToString(),
-        valid_until = memory.ValidUntil?.ToString(),
-        created_at = memory.CreatedAt.ToString(),
-        updated_at = memory.UpdatedAt.ToString(),
-        overrides = memory.Overrides.Count is 0 ? null : memory.Overrides,
-    };
+    private static object Snapshot(MemoryRecord memory) =>
+        new
+        {
+            id = memory.Id,
+            type = memory.Type,
+            content = memory.Content,
+            scope = memory.Scope.ToString(),
+            source_type = memory.Source.Type,
+            source_ref = memory.Source.Ref,
+            recorded_by = memory.Source.By,
+            confidence = memory.Confidence,
+            superseded_by = memory.SupersededBy,
+            supersede_reason = memory.SupersedeReason,
+            valid_from = memory.ValidFrom?.ToString(),
+            valid_until = memory.ValidUntil?.ToString(),
+            created_at = memory.CreatedAt.ToString(),
+            updated_at = memory.UpdatedAt.ToString(),
+            overrides = memory.Overrides.Count is 0 ? null : memory.Overrides,
+        };
 
     private static void Equal(JsonNode expected, JsonNode actual) =>
-        JsonNode.DeepEquals(expected, actual).Should().BeTrue("Memory oracle mismatch. Expected: " + expected.ToJsonString() + " Actual: " + actual.ToJsonString());
+        JsonNode
+            .DeepEquals(expected, actual)
+            .Should()
+            .BeTrue(
+                "Memory oracle mismatch. Expected: " + expected.ToJsonString() + " Actual: " + actual.ToJsonString()
+            );
 
     private static string Oracle()
     {
         var executable = Environment.GetEnvironmentVariable("HARNESS_GO_MEMORY_ORACLE");
         if (string.IsNullOrWhiteSpace(executable))
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_MEMORY_ORACLE to the bridge built by Memory/Go/build-oracle.ps1.");
+            throw Xunit.Sdk.SkipException.ForSkip(
+                "Set HARNESS_GO_MEMORY_ORACLE to the bridge built by Memory/Go/build-oracle.ps1."
+            );
         }
 
         File.Exists(executable).Should().BeTrue();
@@ -208,10 +280,15 @@ public sealed class MemoryOracleTests
     {
         public TemporaryDirectory()
         {
-            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "harness-memory-oracle-" + Guid.NewGuid().ToString("N"));
+            Path = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "harness-memory-oracle-" + Guid.NewGuid().ToString("N")
+            );
             Directory.CreateDirectory(Path);
         }
+
         public string Path { get; }
+
         public void Dispose() => Directory.Delete(Path, recursive: true);
     }
 }

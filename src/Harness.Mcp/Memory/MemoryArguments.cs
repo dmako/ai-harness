@@ -8,11 +8,18 @@ internal static class MemoryArguments
 {
     public static string? Validate(Tool tool, IDictionary<string, JsonElement>? arguments)
     {
-        var required = tool.InputSchema.TryGetProperty("required", out var requiredSchema) ? requiredSchema.EnumerateArray().Select(item => item.GetString()!).Order(StringComparer.Ordinal).ToArray() : [];
-        var properties = tool.InputSchema.TryGetProperty("properties", out var propertiesSchema) ? propertiesSchema.EnumerateObject().Select(property => property.Name).ToArray() : [];
+        var required = tool.InputSchema.TryGetProperty("required", out var requiredSchema)
+            ? requiredSchema.EnumerateArray().Select(item => item.GetString()!).Order(StringComparer.Ordinal).ToArray()
+            : [];
+        var properties = tool.InputSchema.TryGetProperty("properties", out var propertiesSchema)
+            ? propertiesSchema.EnumerateObject().Select(property => property.Name).ToArray()
+            : [];
         var optional = properties.Except(required, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var given = arguments ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        var hint = "\nexpected arguments: required " + (required.Length is 0 ? "nothing" : string.Join(", ", required)) + (optional.Length is 0 ? "" : "; optional " + string.Join(", ", optional));
+        var hint =
+            "\nexpected arguments: required "
+            + (required.Length is 0 ? "nothing" : string.Join(", ", required))
+            + (optional.Length is 0 ? "" : "; optional " + string.Join(", ", optional));
         if (given.ContainsKey("path") && tool.Name is "memory_put" or "memory_propose" or "memory_search")
         {
             hint = "\npath: use scope \"path:<dir or file>\" (not path)" + hint;
@@ -20,7 +27,8 @@ internal static class MemoryArguments
 
         if (tool.Name is "task_complete")
         {
-            hint += "\nacceptance: [{\"index\": 1, \"result\": \"pass\", \"evidence\": \"...\"}] (one per criterion; [] when the task has none); validation: [\"go test ./...\"] or [{\"command\": \"...\", \"result\": \"pass\"}]";
+            hint +=
+                "\nacceptance: [{\"index\": 1, \"result\": \"pass\", \"evidence\": \"...\"}] (one per criterion; [] when the task has none); validation: [\"go test ./...\"] or [{\"command\": \"...\", \"result\": \"pass\"}]";
         }
 
         const string Prefix = "validating \"arguments\": validating root: ";
@@ -55,7 +63,11 @@ internal static class MemoryArguments
             var index = 0;
             foreach (var variant in variants.EnumerateArray())
             {
-                var error = Check(variant, value, path + "/anyOf/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                var error = Check(
+                    variant,
+                    value,
+                    path + "/anyOf/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                );
                 if (error is null)
                 {
                     return null;
@@ -64,23 +76,38 @@ internal static class MemoryArguments
                 errors.Add(error);
                 index++;
             }
-            return "validating " + path + ": anyOf: did not validate against any of [" + string.Join(" ", Enumerable.Repeat("<anonymous schema>", errors.Count)) + "]:\n" + string.Join("\n", errors);
+            return "validating "
+                + path
+                + ": anyOf: did not validate against any of ["
+                + string.Join(" ", Enumerable.Repeat("<anonymous schema>", errors.Count))
+                + "]:\n"
+                + string.Join("\n", errors);
         }
         var type = schema.GetProperty("type");
-        var allowed = type.ValueKind is JsonValueKind.Array ? type.EnumerateArray().Select(item => item.GetString()).ToArray() : [type.GetString()];
+        var allowed =
+            type.ValueKind is JsonValueKind.Array
+                ? type.EnumerateArray().Select(item => item.GetString()).ToArray()
+                : [type.GetString()];
         var actual = value.ValueKind switch
         {
             JsonValueKind.String => "string",
             JsonValueKind.True or JsonValueKind.False => "boolean",
-            JsonValueKind.Number => value.TryGetDouble(out var number) && double.IsInteger(number) ? "integer" : "number",
+            JsonValueKind.Number => value.TryGetDouble(out var number) && double.IsInteger(number)
+                ? "integer"
+                : "number",
             JsonValueKind.Null => "null",
             JsonValueKind.Array => "array",
             _ => "object",
         };
-        if (!allowed.Contains(actual, StringComparer.Ordinal) && !(actual is "integer" && allowed.Contains("number", StringComparer.Ordinal)))
+        if (
+            !allowed.Contains(actual, StringComparer.Ordinal)
+            && !(actual is "integer" && allowed.Contains("number", StringComparer.Ordinal))
+        )
         {
             var display = value.ValueKind is JsonValueKind.Null ? "<invalid reflect.Value>" : Display(value);
-            var want = allowed.Length is 1 ? JsonSerializer.Serialize(allowed[0]) : "one of " + JsonSerializer.Serialize(string.Join(", ", allowed));
+            var want = allowed.Length is 1
+                ? JsonSerializer.Serialize(allowed[0])
+                : "one of " + JsonSerializer.Serialize(string.Join(", ", allowed));
             return $"validating {path}: type: {display} has type \"{actual}\", want {want}";
         }
         if (value.ValueKind is JsonValueKind.Array)
@@ -96,7 +123,9 @@ internal static class MemoryArguments
         }
         if (value.ValueKind is JsonValueKind.Object)
         {
-            var required = schema.TryGetProperty("required", out var requiredSchema) ? requiredSchema.EnumerateArray().Select(x => x.GetString()).Order(StringComparer.Ordinal).ToArray() : [];
+            var required = schema.TryGetProperty("required", out var requiredSchema)
+                ? requiredSchema.EnumerateArray().Select(x => x.GetString()).Order(StringComparer.Ordinal).ToArray()
+                : [];
             var fields = value.EnumerateObject().Select(x => x.Name).ToArray();
             var missing = required.Except(fields, StringComparer.Ordinal).ToArray();
             if (missing.Length is not 0)
@@ -123,12 +152,22 @@ internal static class MemoryArguments
         }
         return null;
     }
-    private static string Display(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Object => "map[" + string.Join(" ", value.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal).Select(p => p.Name + ":" + Display(p.Value))) + "]",
-        JsonValueKind.Array => "[" + string.Join(" ", value.EnumerateArray().Select(Display)) + "]",
-        JsonValueKind.String => value.GetString() ?? "",
-        JsonValueKind.Null => "<nil>",
-        _ => value.GetRawText(),
-    };
+
+    private static string Display(JsonElement value) =>
+        value.ValueKind switch
+        {
+            JsonValueKind.Object => "map["
+                + string.Join(
+                    " ",
+                    value
+                        .EnumerateObject()
+                        .OrderBy(p => p.Name, StringComparer.Ordinal)
+                        .Select(p => p.Name + ":" + Display(p.Value))
+                )
+                + "]",
+            JsonValueKind.Array => "[" + string.Join(" ", value.EnumerateArray().Select(Display)) + "]",
+            JsonValueKind.String => value.GetString() ?? "",
+            JsonValueKind.Null => "<nil>",
+            _ => value.GetRawText(),
+        };
 }

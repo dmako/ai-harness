@@ -54,7 +54,11 @@ internal static class ProjectOutput
     internal static async Task WriteStatusAsync(TextWriter output, ProjectInspection inspection)
     {
         var node = JsonSerializer.SerializeToNode(inspection.Status(), JsonOptions)!.AsObject();
-        foreach (var required in new[] { "project", "git", "worktrees", "clients" }.Where(required => !node.ContainsKey(required)))
+        foreach (
+            var required in new[] { "project", "git", "worktrees", "clients" }.Where(required =>
+                !node.ContainsKey(required)
+            )
+        )
         {
             node[required] = null;
         }
@@ -62,20 +66,31 @@ internal static class ProjectOutput
         await output.WriteLineAsync(node.ToJsonString(JsonOptions));
     }
 
-    internal static object DoctorResult(IReadOnlyList<HealthCheck> checks, string? id = null, string? root = null) => new
-    {
-        id, root, healthy = checks.All(check => check.Level != "fail"),
-        failures = checks.Count(check => check.Level == "fail"), warnings = checks.Count(check => check.Level == "warn"), checks,
-    };
+    internal static object DoctorResult(IReadOnlyList<HealthCheck> checks, string? id = null, string? root = null) =>
+        new
+        {
+            id,
+            root,
+            healthy = checks.All(check => check.Level != "fail"),
+            failures = checks.Count(check => check.Level == "fail"),
+            warnings = checks.Count(check => check.Level == "warn"),
+            checks,
+        };
 }
 
 internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output) : AsyncCommand<InitSettings>
 {
-    public override async Task<int> ExecuteAsync(CommandContext context, InitSettings settings, CancellationToken cancellationToken)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        InitSettings settings,
+        CancellationToken cancellationToken
+    )
     {
         var result = await lifecycle.InitAsync(settings.Project, settings.DryRun, cancellationToken);
         var location = result.Location;
-        await output.WriteLineAsync($"{(result.DryRun ? "Would initialize" : "Initializing")} {location.Root} ({result.Head}):");
+        await output.WriteLineAsync(
+            $"{(result.DryRun ? "Would initialize" : "Initializing")} {location.Root} ({result.Head}):"
+        );
         if (location.StateRoot != location.Root)
         {
             await output.WriteLineAsync($"  (linked worktree: shared state lives in {location.StateRoot})");
@@ -84,8 +99,11 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
         foreach (var action in result.Actions)
         {
             var relative = action.Path.Length == 0 ? "" : Path.GetRelativePath(location.Root, action.Path);
-            var display = relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) ? action.Path : relative;
-            await output.WriteLineAsync($"  {action.Verb,-9} {display,-28} {action.Note}");
+            var display =
+                relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                    ? action.Path
+                    : relative;
+            await output.WriteLineAsync($"  {action.Verb, -9} {display, -28} {action.Note}");
         }
 
         await output.WriteLineAsync();
@@ -95,13 +113,19 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
         }
         else
         {
-            await output.WriteLineAsync(registration switch
-            {
-                { Created: true } => $"Initialized project {registration.Project.Id} (worktree {registration.Worktree.Id}).",
-                { Copied: true } => $"This is a copy of the project at {registration.PreviousRoot}: assigned new project {registration.Project.Id} (copied from {registration.Project.CopiedFrom}).",
-                { Moved: true } => $"Project {registration.Project.Id} moved from {registration.PreviousRoot}; location updated.",
-                _ => $"Already initialized: project {registration.Project.Id} (worktree {registration.Worktree.Id}).",
-            });
+            await output.WriteLineAsync(
+                registration switch
+                {
+                    { Created: true } =>
+                        $"Initialized project {registration.Project.Id} (worktree {registration.Worktree.Id}).",
+                    { Copied: true } =>
+                        $"This is a copy of the project at {registration.PreviousRoot}: assigned new project {registration.Project.Id} (copied from {registration.Project.CopiedFrom}).",
+                    { Moved: true } =>
+                        $"Project {registration.Project.Id} moved from {registration.PreviousRoot}; location updated.",
+                    _ =>
+                        $"Already initialized: project {registration.Project.Id} (worktree {registration.Worktree.Id}).",
+                }
+            );
         }
 
         return 0;
@@ -110,7 +134,11 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
 
 internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter output) : AsyncCommand<StatusSettings>
 {
-    public override async Task<int> ExecuteAsync(CommandContext context, StatusSettings settings, CancellationToken cancellationToken)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        StatusSettings settings,
+        CancellationToken cancellationToken
+    )
     {
         var inspection = await lifecycle.InspectAsync(settings.Project, cancellationToken);
         if (settings.Json)
@@ -119,15 +147,21 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
         }
         else
         {
-            await output.WriteLineAsync($"Project     {inspection.Project?.Id ?? "not initialized — run 'harness init'"}");
+            await output.WriteLineAsync(
+                $"Project     {inspection.Project?.Id ?? "not initialized — run 'harness init'"}"
+            );
             await output.WriteLineAsync($"Root        {inspection.Location.Root}");
             if (inspection.Location.StateRoot != inspection.Location.Root)
             {
-                await output.WriteLineAsync($"State root  {inspection.Location.StateRoot} (shared with linked worktrees)");
+                await output.WriteLineAsync(
+                    $"State root  {inspection.Location.StateRoot} (shared with linked worktrees)"
+                );
             }
 
             await output.WriteLineAsync($"Git         {inspection.GitError ?? inspection.Head?.ToString()}");
-            await output.WriteLineAsync($"Database    {inspection.Location.DatabasePath} ({(inspection.Location.Initialized ? $"schema {inspection.SchemaVersion}/19" : "not created")})");
+            await output.WriteLineAsync(
+                $"Database    {inspection.Location.DatabasePath} ({(inspection.Location.Initialized ? $"schema {inspection.SchemaVersion}/19" : "not created")})"
+            );
             if (inspection.ConfigurationError is not null || inspection.DatabaseError is not null)
             {
                 await output.WriteLineAsync($"Error       {inspection.ConfigurationError ?? inspection.DatabaseError}");
@@ -138,9 +172,14 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
     }
 }
 
-internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation information, TextWriter output) : AsyncCommand<DoctorSettings>
+internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation information, TextWriter output)
+    : AsyncCommand<DoctorSettings>
 {
-    public override async Task<int> ExecuteAsync(CommandContext context, DoctorSettings settings, CancellationToken cancellationToken)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        DoctorSettings settings,
+        CancellationToken cancellationToken
+    )
     {
         List<object> results = [];
         var failed = false;
@@ -153,7 +192,15 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
                 var id = entry["id"]?.GetValue<string>() ?? "";
                 var checks = Directory.Exists(root)
                     ? (await lifecycle.InspectAsync(root, cancellationToken)).Checks(information.Version)
-                    : [new HealthCheck("project", "fail", "repository not found: " + root, "restore it, or remove it from the registry")];
+                    :
+                    [
+                        new HealthCheck(
+                            "project",
+                            "fail",
+                            "repository not found: " + root,
+                            "restore it, or remove it from the registry"
+                        ),
+                    ];
                 failed |= checks.Any(check => check.Level == "fail");
                 results.Add(ProjectOutput.DoctorResult(checks, id, root));
                 if (!settings.Json)
@@ -165,16 +212,22 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
 
             if (settings.Json)
             {
-                await output.WriteLineAsync(JsonSerializer.Serialize(new { projects = results }, ProjectOutput.JsonOptions));
+                await output.WriteLineAsync(
+                    JsonSerializer.Serialize(new { projects = results }, ProjectOutput.JsonOptions)
+                );
             }
         }
         else
         {
-            var checks = (await lifecycle.InspectAsync(settings.Project, cancellationToken)).Checks(information.Version);
+            var checks = (await lifecycle.InspectAsync(settings.Project, cancellationToken)).Checks(
+                information.Version
+            );
             failed = checks.Any(check => check.Level == "fail");
             if (settings.Json)
             {
-                await output.WriteLineAsync(JsonSerializer.Serialize(ProjectOutput.DoctorResult(checks), ProjectOutput.JsonOptions));
+                await output.WriteLineAsync(
+                    JsonSerializer.Serialize(ProjectOutput.DoctorResult(checks), ProjectOutput.JsonOptions)
+                );
             }
             else
             {
@@ -189,7 +242,7 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
     {
         foreach (var check in checks)
         {
-            await output.WriteLineAsync($"[{check.Level,-4}] {check.Name,-12} {check.Detail}");
+            await output.WriteLineAsync($"[{check.Level, -4}] {check.Name, -12} {check.Detail}");
             if (check.Fix is not null)
             {
                 await output.WriteLineAsync($"                    fix: {check.Fix}");
@@ -198,6 +251,10 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
 
         var failures = checks.Count(check => check.Level == "fail");
         var warnings = checks.Count(check => check.Level == "warn");
-        await output.WriteLineAsync(failures == 0 ? $"\nHealthy: 0 failures, {warnings} warning(s)." : $"\nUnhealthy: {failures} failure(s), {warnings} warning(s).");
+        await output.WriteLineAsync(
+            failures == 0
+                ? $"\nHealthy: 0 failures, {warnings} warning(s)."
+                : $"\nUnhealthy: {failures} failure(s), {warnings} warning(s)."
+        );
     }
 }

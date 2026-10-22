@@ -9,13 +9,30 @@ namespace Harness.Mcp;
 internal sealed class CompatibleStdioTransport : ITransport
 {
     internal const int MaximumFrameBytes = 16 * 1024 * 1024;
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Input is caller-owned; the CLI owns the standard stream lifetime.")]
+
+    [SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "Input is caller-owned; the CLI owns the standard stream lifetime."
+    )]
     private readonly Stream _input;
-    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Output is caller-owned; the CLI owns the standard stream lifetime.")]
+
+    [SuppressMessage(
+        "Usage",
+        "CA2213:Disposable fields should be disposed",
+        Justification = "Output is caller-owned; the CLI owns the standard stream lifetime."
+    )]
     private readonly Stream _output;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly SemaphoreSlim _writer = new(1, 1);
-    private readonly Channel<JsonRpcMessage> _messages = Channel.CreateBounded<JsonRpcMessage>(new BoundedChannelOptions(64) { SingleWriter = true, SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
+    private readonly Channel<JsonRpcMessage> _messages = Channel.CreateBounded<JsonRpcMessage>(
+        new BoundedChannelOptions(64)
+        {
+            SingleWriter = true,
+            SingleReader = true,
+            FullMode = BoundedChannelFullMode.Wait,
+        }
+    );
     private readonly Dictionary<string, int> _inflight = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Batch> _batches = new(StringComparer.Ordinal);
     private string? _protocolVersion;
@@ -50,10 +67,17 @@ internal sealed class CompatibleStdioTransport : ITransport
 
     public async Task SendMessageAsync(JsonRpcMessage message, CancellationToken cancellationToken = default)
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(message, McpJsonUtilities.DefaultOptions.GetTypeInfo(typeof(JsonRpcMessage)));
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(
+            message,
+            McpJsonUtilities.DefaultOptions.GetTypeInfo(typeof(JsonRpcMessage))
+        );
         using var document = JsonDocument.Parse(bytes);
         var root = document.RootElement;
-        if (root.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Object && result.TryGetProperty("protocolVersion", out var version))
+        if (
+            root.TryGetProperty("result", out var result)
+            && result.ValueKind == JsonValueKind.Object
+            && result.TryGetProperty("protocolVersion", out var version)
+        )
         {
             _protocolVersion = version.GetString();
         }
@@ -73,7 +97,9 @@ internal sealed class CompatibleStdioTransport : ITransport
                     }
 
                     completed = batch.Keys;
-                    bytes = JsonSerializer.SerializeToUtf8Bytes(batch.Keys.Select(name => batch.Responses[name]).ToArray());
+                    bytes = JsonSerializer.SerializeToUtf8Bytes(
+                        batch.Keys.Select(name => batch.Responses[name]).ToArray()
+                    );
                     foreach (var name in completed)
                     {
                         _batches.Remove(name);
@@ -150,8 +176,13 @@ internal sealed class CompatibleStdioTransport : ITransport
                         empty = _empty.Task;
                     }
 
-                    try { await empty.WaitAsync(TimeSpan.FromSeconds(30), _shutdown.Token); }
-                    catch (TimeoutException) { /* The SDK then cancels outstanding requests on disconnect. */ }
+                    try
+                    {
+                        await empty.WaitAsync(TimeSpan.FromSeconds(30), _shutdown.Token);
+                    }
+                    catch (TimeoutException)
+                    { /* The SDK then cancels outstanding requests on disconnect. */
+                    }
                     break;
                 }
 
@@ -177,7 +208,10 @@ internal sealed class CompatibleStdioTransport : ITransport
         {
             // Disposal cancels an idle reader and EOF drain without faulting the session.
         }
-        catch (IOException exception) { failure = exception; }
+        catch (IOException exception)
+        {
+            failure = exception;
+        }
         finally
         {
             _messages.Writer.TryComplete(failure);
@@ -212,7 +246,10 @@ internal sealed class CompatibleStdioTransport : ITransport
         }
 
         JsonDocument document;
-        try { document = JsonDocument.Parse(frame, new JsonDocumentOptions { MaxDepth = 256 }); }
+        try
+        {
+            document = JsonDocument.Parse(frame, new JsonDocumentOptions { MaxDepth = 256 });
+        }
         catch (JsonException)
         {
             await ReplyAsync(null, -32700, "parse error: invalid JSON");
@@ -227,20 +264,34 @@ internal sealed class CompatibleStdioTransport : ITransport
                 var messages = root.EnumerateArray().ToArray();
                 if (messages.Length == 0 || messages.Any(message => !Valid(message)))
                 {
-                    await ReplyAsync(null, -32600, messages.Length == 0 ? "invalid request: empty or malformed batch" : "invalid request: batch contains a non-JSON-RPC 2.0 message");
+                    await ReplyAsync(
+                        null,
+                        -32600,
+                        messages.Length == 0
+                            ? "invalid request: empty or malformed batch"
+                            : "invalid request: batch contains a non-JSON-RPC 2.0 message"
+                    );
                     return;
                 }
 
                 if (string.CompareOrdinal(_protocolVersion, "2025-06-18") >= 0)
                 {
-                    throw new IOException($"JSON-RPC batching is not supported in 2025-06-18 and later (request version: {_protocolVersion})");
+                    throw new IOException(
+                        $"JSON-RPC batching is not supported in 2025-06-18 and later (request version: {_protocolVersion})"
+                    );
                 }
 
-                var keys = messages.Where(message => message.TryGetProperty("method", out _) && message.TryGetProperty("id", out _)).Select(message => Id(message.GetProperty("id"))).ToArray();
+                var keys = messages
+                    .Where(message => message.TryGetProperty("method", out _) && message.TryGetProperty("id", out _))
+                    .Select(message => Id(message.GetProperty("id")))
+                    .ToArray();
                 var batch = new Batch(keys);
                 lock (_inflight)
                 {
-                    if (keys.Distinct(StringComparer.Ordinal).Count() != keys.Length || keys.Any(key => _batches.ContainsKey(key)))
+                    if (
+                        keys.Distinct(StringComparer.Ordinal).Count() != keys.Length
+                        || keys.Any(key => _batches.ContainsKey(key))
+                    )
                     {
                         throw new IOException("batch contains previously seen request IDs");
                     }
@@ -258,8 +309,17 @@ internal sealed class CompatibleStdioTransport : ITransport
             }
             else if (!Valid(root))
             {
-                var id = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("id", out var value) && ValidId(value) ? value : (JsonElement?)null;
-                await ReplyAsync(id, -32600, root.ValueKind == JsonValueKind.Object ? "invalid request: not a JSON-RPC 2.0 message" : "invalid request: expected a JSON object");
+                var id =
+                    root.ValueKind == JsonValueKind.Object && root.TryGetProperty("id", out var value) && ValidId(value)
+                        ? value
+                        : (JsonElement?)null;
+                await ReplyAsync(
+                    id,
+                    -32600,
+                    root.ValueKind == JsonValueKind.Object
+                        ? "invalid request: not a JSON-RPC 2.0 message"
+                        : "invalid request: expected a JSON object"
+                );
             }
             else
             {
@@ -271,10 +331,17 @@ internal sealed class CompatibleStdioTransport : ITransport
     private async Task ForwardAsync(JsonElement message)
     {
         JsonRpcMessage? decoded;
-        try { decoded = message.Deserialize<JsonRpcMessage>(McpJsonUtilities.DefaultOptions); }
+        try
+        {
+            decoded = message.Deserialize<JsonRpcMessage>(McpJsonUtilities.DefaultOptions);
+        }
         catch (JsonException)
         {
-            await ReplyAsync(message.TryGetProperty("id", out var value) && ValidId(value) ? value : null, -32600, "invalid request: not a JSON-RPC 2.0 message");
+            await ReplyAsync(
+                message.TryGetProperty("id", out var value) && ValidId(value) ? value : null,
+                -32600,
+                "invalid request: not a JSON-RPC 2.0 message"
+            );
             return;
         }
 
@@ -302,7 +369,12 @@ internal sealed class CompatibleStdioTransport : ITransport
 
     private static bool Valid(JsonElement message)
     {
-        if (message.ValueKind != JsonValueKind.Object || !message.TryGetProperty("jsonrpc", out var version) || version.ValueKind != JsonValueKind.String || version.GetString() != "2.0")
+        if (
+            message.ValueKind != JsonValueKind.Object
+            || !message.TryGetProperty("jsonrpc", out var version)
+            || version.ValueKind != JsonValueKind.String
+            || version.GetString() != "2.0"
+        )
         {
             return false;
         }
@@ -310,16 +382,37 @@ internal sealed class CompatibleStdioTransport : ITransport
         var hasId = message.TryGetProperty("id", out var id);
         if (message.TryGetProperty("method", out var method))
         {
-            return method.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(method.GetString()) && (!hasId || ValidId(id));
+            return method.ValueKind == JsonValueKind.String
+                && !string.IsNullOrEmpty(method.GetString())
+                && (!hasId || ValidId(id));
         }
 
-        return hasId && ValidId(id) && message.TryGetProperty("result", out _) != message.TryGetProperty("error", out _);
+        return hasId
+            && ValidId(id)
+            && message.TryGetProperty("result", out _) != message.TryGetProperty("error", out _);
     }
 
-    private static bool ValidId(JsonElement id) => id.ValueKind == JsonValueKind.String || id.ValueKind == JsonValueKind.Number && id.TryGetDouble(out var number) && double.IsFinite(number);
-    private static string Id(JsonElement id) => id.ValueKind == JsonValueKind.String ? "s:" + id.GetString() : "n:" + id.GetDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+    private static bool ValidId(JsonElement id) =>
+        id.ValueKind == JsonValueKind.String
+        || id.ValueKind == JsonValueKind.Number && id.TryGetDouble(out var number) && double.IsFinite(number);
 
-    private Task ReplyAsync(JsonElement? id, int code, string message) => WriteFrameAsync(JsonSerializer.SerializeToUtf8Bytes(new { jsonrpc = "2.0", id, error = new { code, message } }), _shutdown.Token);
+    private static string Id(JsonElement id) =>
+        id.ValueKind == JsonValueKind.String
+            ? "s:" + id.GetString()
+            : "n:" + id.GetDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+
+    private Task ReplyAsync(JsonElement? id, int code, string message) =>
+        WriteFrameAsync(
+            JsonSerializer.SerializeToUtf8Bytes(
+                new
+                {
+                    jsonrpc = "2.0",
+                    id,
+                    error = new { code, message },
+                }
+            ),
+            _shutdown.Token
+        );
 
     private async Task WriteFrameAsync(byte[] bytes, CancellationToken cancellationToken)
     {
@@ -336,7 +429,10 @@ internal sealed class CompatibleStdioTransport : ITransport
             await _shutdown.CancelAsync();
             throw;
         }
-        finally { _writer.Release(); }
+        finally
+        {
+            _writer.Release();
+        }
     }
 
     private static TaskCompletionSource Completed()

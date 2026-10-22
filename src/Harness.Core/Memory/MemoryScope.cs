@@ -7,14 +7,15 @@ public sealed record MemoryScope(string Kind, string Value = "")
 
     public bool Wider => Kind is "workspace" or "user";
 
-    public int Specificity => Kind switch
-    {
-        "path" => 100 + Value.Count(character => character is '/'),
-        "subsystem" or "branch" => 50,
-        "workspace" => -10,
-        "user" => -20,
-        _ => 0,
-    };
+    public int Specificity =>
+        Kind switch
+        {
+            "path" => 100 + Value.Count(character => character is '/'),
+            "subsystem" or "branch" => 50,
+            "workspace" => -10,
+            "user" => -20,
+            _ => 0,
+        };
 
     public static MemoryScope Parse(string text)
     {
@@ -33,7 +34,11 @@ public sealed record MemoryScope(string Kind, string Value = "")
         var separator = text.IndexOf(':', StringComparison.Ordinal);
         if (separator < 0)
         {
-            throw new ArgumentException("invalid scope " + MemoryText.Quote(text) + " (want project, path:<dir or file>, subsystem:<name>, branch:<name>, workspace:<name> or user)");
+            throw new ArgumentException(
+                "invalid scope "
+                    + MemoryText.Quote(text)
+                    + " (want project, path:<dir or file>, subsystem:<name>, branch:<name>, workspace:<name> or user)"
+            );
         }
 
         return new MemoryScope(text[..separator].Trim(), text[(separator + 1)..].Trim()).Normalize();
@@ -54,7 +59,9 @@ public sealed record MemoryScope(string Kind, string Value = "")
                 var path = Value.Replace('\\', '/');
                 if (path.Length is 0 || path.StartsWith('/'))
                 {
-                    throw new ArgumentException("path scope must be a path relative to the project root, got " + MemoryText.Quote(Value));
+                    throw new ArgumentException(
+                        "path scope must be a path relative to the project root, got " + MemoryText.Quote(Value)
+                    );
                 }
 
                 List<string> parts = [];
@@ -69,7 +76,9 @@ public sealed record MemoryScope(string Kind, string Value = "")
                     {
                         if (parts.Count is 0)
                         {
-                            throw new ArgumentException("path scope must stay inside the project, got " + MemoryText.Quote(Value));
+                            throw new ArgumentException(
+                                "path scope must stay inside the project, got " + MemoryText.Quote(Value)
+                            );
                         }
 
                         parts.RemoveAt(parts.Count - 1);
@@ -85,7 +94,10 @@ public sealed record MemoryScope(string Kind, string Value = "")
                     throw new ArgumentException("path scope '.' is the whole project; use project scope");
                 }
 
-                return this with { Value = string.Join('/', parts) };
+                return this with
+                {
+                    Value = string.Join('/', parts),
+                };
             case "subsystem" or "branch" or "workspace":
                 if (Value.Length is 0)
                 {
@@ -94,7 +106,11 @@ public sealed record MemoryScope(string Kind, string Value = "")
 
                 return this;
             default:
-                throw new ArgumentException("invalid scope kind " + MemoryText.Quote(Kind) + " (want project, path, subsystem, branch, workspace or user)");
+                throw new ArgumentException(
+                    "invalid scope kind "
+                        + MemoryText.Quote(Kind)
+                        + " (want project, path, subsystem, branch, workspace or user)"
+                );
         }
     }
 
@@ -104,7 +120,8 @@ public sealed record MemoryScope(string Kind, string Value = "")
         return Kind switch
         {
             "project" or "workspace" or "user" => true,
-            "path" => target.Kind is "path" && (target.Value == Value || target.Value.StartsWith(Value + "/", StringComparison.Ordinal)),
+            "path" => target.Kind is "path"
+                && (target.Value == Value || target.Value.StartsWith(Value + "/", StringComparison.Ordinal)),
             _ => this == target,
         };
     }

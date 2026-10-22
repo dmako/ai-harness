@@ -48,9 +48,26 @@ public sealed class CliTests
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        var info = new BuildInformation("test", "0123456789abcdef", "2026-10-20T00:00:00Z", true, ".NET test", "windows/amd64");
-        (await CliApplication.RunConfiguredAsync([argument, "--json"], output, error,
-            builder => builder.Services.AddSingleton(info), null, TestContext.Current.CancellationToken)).Should().Be(0);
+        var info = new BuildInformation(
+            "test",
+            "0123456789abcdef",
+            "2026-10-20T00:00:00Z",
+            true,
+            ".NET test",
+            "windows/amd64"
+        );
+        (
+            await CliApplication.RunConfiguredAsync(
+                [argument, "--json"],
+                output,
+                error,
+                builder => builder.Services.AddSingleton(info),
+                null,
+                TestContext.Current.CancellationToken
+            )
+        )
+            .Should()
+            .Be(0);
         using var json = JsonDocument.Parse(output.ToString());
         json.RootElement.EnumerateObject().Count().Should().Be(6);
         json.RootElement.GetProperty("version").GetString().Should().Be("test");
@@ -76,8 +93,14 @@ public sealed class CliTests
     [Fact]
     public void HumanVersionHasStableFormattingAndExplicitUnknownValues()
     {
-        new BuildInformation("dev", "", "", false, ".NET test", "linux/arm64").ToString().Should().Be("harness dev (commit unknown, built unknown, .NET test, linux/arm64)");
-        new BuildInformation("v1", "0123456789abcdef", "date", true, ".NET test", "linux/arm64").ToString().Should().Contain("0123456789ab-dirty");
+        new BuildInformation("dev", "", "", false, ".NET test", "linux/arm64")
+            .ToString()
+            .Should()
+            .Be("harness dev (commit unknown, built unknown, .NET test, linux/arm64)");
+        new BuildInformation("v1", "0123456789abcdef", "date", true, ".NET test", "linux/arm64")
+            .ToString()
+            .Should()
+            .Contain("0123456789ab-dirty");
     }
 
     [Fact]
@@ -85,9 +108,22 @@ public sealed class CliTests
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        (await CliApplication.RunConfiguredAsync(["fail"], output, error, null,
-            configuration => configuration.AddDelegate<ProbeSettings>("fail", (_, _, _) => throw new IOException("probe failure")),
-            TestContext.Current.CancellationToken)).Should().Be(1);
+        (
+            await CliApplication.RunConfiguredAsync(
+                ["fail"],
+                output,
+                error,
+                null,
+                configuration =>
+                    configuration.AddDelegate<ProbeSettings>(
+                        "fail",
+                        (_, _, _) => throw new IOException("probe failure")
+                    ),
+                TestContext.Current.CancellationToken
+            )
+        )
+            .Should()
+            .Be(1);
         output.ToString().Should().BeEmpty();
         error.ToString().Should().NotBeEmpty();
     }
@@ -98,13 +134,20 @@ public sealed class CliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         var state = new ProbeState();
-        (await CliApplication.RunConfiguredAsync(["probe"], output, error,
-            builder =>
-            {
-                builder.Services.AddSingleton(state);
-                builder.Services.AddSingleton<ProbeResource>();
-            },
-            configuration => configuration.AddCommand<ProbeCommand>("probe"), TestContext.Current.CancellationToken)).Should().Be(0);
+        (
+            await CliApplication.RunConfiguredAsync(
+                ["probe"],
+                output,
+                error,
+                builder =>
+                {
+                    builder.Services.AddSingleton(state);
+                    builder.Services.AddSingleton<ProbeResource>();
+                },
+                configuration => configuration.AddCommand<ProbeCommand>("probe"),
+                TestContext.Current.CancellationToken
+            )
+        ).Should().Be(0);
         state.Disposals.Should().Be(1);
         state.Shared.Should().BeTrue();
         output.ToString().Should().BeEmpty();
@@ -113,19 +156,29 @@ public sealed class CliTests
     }
 
     [Fact]
-    [SuppressMessage("Reliability", "CA2025:Do not pass disposables into unawaited tasks", Justification = "The running task is awaited in finally after cancellation, before either writer is disposed.")]
+    [SuppressMessage(
+        "Reliability",
+        "CA2025:Do not pass disposables into unawaited tasks",
+        Justification = "The running task is awaited in finally after cancellation, before either writer is disposed."
+    )]
     public async Task CancellationReachesCommandsAndDisposesTheHost()
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var state = new ProbeState();
-        var running = CliApplication.RunConfiguredAsync(["wait"], output, error,
+        var running = CliApplication.RunConfiguredAsync(
+            ["wait"],
+            output,
+            error,
             builder =>
             {
                 builder.Services.AddSingleton(state);
                 builder.Services.AddSingleton<ProbeResource>();
-            }, configuration => configuration.AddCommand<WaitCommand>("wait"), cancellation.Token);
+            },
+            configuration => configuration.AddCommand<WaitCommand>("wait"),
+            cancellation.Token
+        );
         try
         {
             await state.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -154,6 +207,7 @@ public sealed class CliTests
     internal sealed class ProbeResource(ProbeState state) : IAsyncDisposable
     {
         public ProbeState State { get; } = state;
+
         public ValueTask DisposeAsync()
         {
             State.Disposals++;
@@ -163,7 +217,8 @@ public sealed class CliTests
 
     internal sealed class ProbeSettings : CommandSettings;
 
-    internal sealed class ProbeCommand(ProbeState state, ProbeResource resource, ILogger<ProbeCommand> logger) : Command<ProbeSettings>
+    internal sealed class ProbeCommand(ProbeState state, ProbeResource resource, ILogger<ProbeCommand> logger)
+        : Command<ProbeSettings>
     {
         public override int Execute(CommandContext context, ProbeSettings settings, CancellationToken cancellationToken)
         {
@@ -175,7 +230,11 @@ public sealed class CliTests
 
     internal sealed class WaitCommand(ProbeState state, ProbeResource resource) : AsyncCommand<ProbeSettings>
     {
-        public override async Task<int> ExecuteAsync(CommandContext context, ProbeSettings settings, CancellationToken cancellationToken)
+        public override async Task<int> ExecuteAsync(
+            CommandContext context,
+            ProbeSettings settings,
+            CancellationToken cancellationToken
+        )
         {
             state.Shared = ReferenceEquals(state, resource.State);
             state.Started.SetResult();

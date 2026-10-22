@@ -19,7 +19,9 @@ public sealed record ProviderConfiguration
     public RefreshMapping? Refresh { get; init; }
     public ResolveMapping? Resolve { get; init; }
     public bool IndexWorktrees { get; init; }
+
     public bool IsEnabled() => Enabled is not false;
+
     public bool InContext() => Context is not false;
 }
 

@@ -22,15 +22,28 @@ public sealed partial class StaticMsBuild
             return (true, false);
         }
 
-        var parser = new ConditionParser(tokens, path => repository.Exists(repository.Relative(Path.GetFullPath(path.Length is 0 ? "." : path.Replace('\\', Path.DirectorySeparatorChar), directory))));
+        var parser = new ConditionParser(
+            tokens,
+            path =>
+                repository.Exists(
+                    repository.Relative(
+                        Path.GetFullPath(
+                            path.Length is 0 ? "." : path.Replace('\\', Path.DirectorySeparatorChar),
+                            directory
+                        )
+                    )
+                )
+        );
         var answer = parser.Or();
         return parser.Complete && answer.Known ? answer : (true, false);
     }
+
     private sealed class ConditionParser(IReadOnlyList<string> tokens, Func<string, bool> exists)
     {
         private int _index;
         internal bool Complete => _index == tokens.Count;
         private string Peek => _index < tokens.Count ? tokens[_index] : "";
+
         internal (bool Value, bool Known) Or()
         {
             var value = And();
@@ -47,6 +60,7 @@ public sealed partial class StaticMsBuild
             }
             return value;
         }
+
         private (bool Value, bool Known) And()
         {
             var value = Not();
@@ -63,6 +77,7 @@ public sealed partial class StaticMsBuild
             }
             return value;
         }
+
         private (bool Value, bool Known) Not()
         {
             if (Peek is not "!")
@@ -74,6 +89,7 @@ public sealed partial class StaticMsBuild
             var value = Not();
             return (!value.Value, value.Known);
         }
+
         private (bool Value, bool Known) Compare()
         {
             if (Peek is "(")
@@ -88,7 +104,11 @@ public sealed partial class StaticMsBuild
                 _index++;
                 return value;
             }
-            if (Peek.Equals("exists", StringComparison.OrdinalIgnoreCase) && _index + 1 < tokens.Count && tokens[_index + 1] is "(")
+            if (
+                Peek.Equals("exists", StringComparison.OrdinalIgnoreCase)
+                && _index + 1 < tokens.Count
+                && tokens[_index + 1] is "("
+            )
             {
                 _index += 2;
                 var argument = Operand();
@@ -118,13 +138,31 @@ public sealed partial class StaticMsBuild
                 return (left.Equals(right, StringComparison.OrdinalIgnoreCase) == (op is "=="), true);
             }
 
-            if (!double.TryParse(left.TrimStart('v', 'V'), NumberStyles.Float, CultureInfo.InvariantCulture, out var a) || !double.TryParse(right.TrimStart('v', 'V'), NumberStyles.Float, CultureInfo.InvariantCulture, out var b))
+            if (
+                !double.TryParse(left.TrimStart('v', 'V'), NumberStyles.Float, CultureInfo.InvariantCulture, out var a)
+                || !double.TryParse(
+                    right.TrimStart('v', 'V'),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var b
+                )
+            )
             {
                 return (false, false);
             }
 
-            return (op switch { "<" => a < b, ">" => a > b, "<=" => a <= b, _ => a >= b }, true);
+            return (
+                op switch
+                {
+                    "<" => a < b,
+                    ">" => a > b,
+                    "<=" => a <= b,
+                    _ => a >= b,
+                },
+                true
+            );
         }
+
         private string Operand()
         {
             var text = Peek;
@@ -132,6 +170,7 @@ public sealed partial class StaticMsBuild
             return text.Length >= 2 && text[0] is '\'' && text[^1] is '\'' ? text[1..^1] : text;
         }
     }
+
     private static List<string> Tokens(string text)
     {
         List<string> tokens = [];
@@ -139,7 +178,10 @@ public sealed partial class StaticMsBuild
         while (i < text.Length)
         {
             if (char.IsWhiteSpace(text[i]))
-            { i++; continue; }
+            {
+                i++;
+                continue;
+            }
             var start = i;
             switch (text[i])
             {

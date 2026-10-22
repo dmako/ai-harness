@@ -7,16 +7,28 @@ public sealed record ContextRequest(string Task, int Budget = 0, int Tokens = 0,
 
 public static class ContextRenderer
 {
-    public static int BudgetBytes(ContextRequest request) => (request.Tokens > 0 ? ContextBudget.FromTokens(request.Tokens).Bytes : request.Budget) switch
-    {
-        <= 0 => ContextBudget.DefaultBytes,
-        < 1000 => 1000,
-        var bytes => bytes,
-    };
+    public static int BudgetBytes(ContextRequest request) =>
+        (request.Tokens > 0 ? ContextBudget.FromTokens(request.Tokens).Bytes : request.Budget) switch
+        {
+            <= 0 => ContextBudget.DefaultBytes,
+            < 1000 => 1000,
+            var bytes => bytes,
+        };
 
-    public static Task<ContextAnswer> RenderAsync(ContextRequest request, Gathered gathered, ContextProject? project = null, CancellationToken cancellationToken = default) => RenderAsync(request, gathered, project, null, cancellationToken);
+    public static Task<ContextAnswer> RenderAsync(
+        ContextRequest request,
+        Gathered gathered,
+        ContextProject? project = null,
+        CancellationToken cancellationToken = default
+    ) => RenderAsync(request, gathered, project, null, cancellationToken);
 
-    public static async Task<ContextAnswer> RenderAsync(ContextRequest request, Gathered gathered, ContextProject? project, ContextWorkspace? workspace, CancellationToken cancellationToken = default)
+    public static async Task<ContextAnswer> RenderAsync(
+        ContextRequest request,
+        Gathered gathered,
+        ContextProject? project,
+        ContextWorkspace? workspace,
+        CancellationToken cancellationToken = default
+    )
     {
         var full = BudgetBytes(request);
         var notes = (project?.Notes ?? []).Concat(gathered.Notes).Concat(workspace?.Notes ?? []).ToList();
@@ -30,7 +42,9 @@ public static class ContextRenderer
         var candidates = gathered.Candidates;
         if (project?.CrossBranch is true)
         {
-            var kept = candidates.Where(candidate => candidate.Source is not "code" || candidate.Freshness is not "indexed").ToArray();
+            var kept = candidates
+                .Where(candidate => candidate.Source is not "code" || candidate.Freshness is not "indexed")
+                .ToArray();
             if (kept.Length < candidates.Count)
             {
                 stale += "; indexed code results were withheld until then";
@@ -40,7 +54,11 @@ public static class ContextRenderer
         }
         if (project?.IsDirectory is { } directory)
         {
-            candidates = candidates.Where(candidate => candidate.Source is not "code" || candidate.Role is not "file" || !directory(candidate.Path)).ToArray();
+            candidates = candidates
+                .Where(candidate =>
+                    candidate.Source is not "code" || candidate.Role is not "file" || !directory(candidate.Path)
+                )
+                .ToArray();
         }
 
         var merged = RetrievalMerger.Merge(candidates);
@@ -55,7 +73,9 @@ public static class ContextRenderer
         }
         if (ContextJson.Size(empty) + 100 > full)
         {
-            throw new ArgumentException("task metadata exceeds the context budget; raise the budget or shorten the task");
+            throw new ArgumentException(
+                "task metadata exceeds the context budget; raise the budget or shorten the task"
+            );
         }
 
         var envelope = EnvelopeSize(empty, notes);
@@ -74,8 +94,13 @@ public static class ContextRenderer
             empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
             envelope = EnvelopeSize(empty, notes);
         }
-        var budget = new ContextBudget(Math.Max(full - envelope, 1)) { Cost = (unit, packed) => ContextWire.UnitCost(unit, packed, request.Debug) };
-        var packed = await ContextPacker.PackAsync(RetrievalRanker.Rank(merged.Candidates), budget, project?.ReadBody, cancellationToken).ConfigureAwait(false);
+        var budget = new ContextBudget(Math.Max(full - envelope, 1))
+        {
+            Cost = (unit, packed) => ContextWire.UnitCost(unit, packed, request.Debug),
+        };
+        var packed = await ContextPacker
+            .PackAsync(RetrievalRanker.Rank(merged.Candidates), budget, project?.ReadBody, cancellationToken)
+            .ConfigureAwait(false);
         var calls = request.Debug ? gathered.Calls.Count : 0;
         var debugEntries = packed.Units.Count + packed.Rejected.Count + merged.Folded.Count;
         var debugTruncated = false;
@@ -120,11 +145,18 @@ public static class ContextRenderer
             }
             if (packed.Units.Count is 0)
             {
-                throw new ArgumentException("task metadata exceeds the context budget; raise the budget or shorten the task");
+                throw new ArgumentException(
+                    "task metadata exceeds the context budget; raise the budget or shorten the task"
+                );
             }
 
             var rejected = packed.Rejected.Prepend(packed.Units[^1].Ranked).ToArray();
-            packed = packed with { Units = packed.Units.Take(packed.Units.Count - 1).ToArray(), Omitted = packed.Omitted + 1, Rejected = rejected };
+            packed = packed with
+            {
+                Units = packed.Units.Take(packed.Units.Count - 1).ToArray(),
+                Omitted = packed.Omitted + 1,
+                Rejected = rejected,
+            };
         }
 
         Dictionary<string, object?> Build()
@@ -141,13 +173,21 @@ public static class ContextRenderer
                 {
                     var key = unit.Ranked.Candidate.Source is "memory" ? "memory" : "changes";
                     if (!output.TryGetValue(key, out var entries))
-                    { entries = new List<object>(); output[key] = entries; }
-                    ((List<object>)entries!).Add(key is "memory" ? ContextWire.Memory(unit, request.Debug) : ContextWire.Change(unit));
+                    {
+                        entries = new List<object>();
+                        output[key] = entries;
+                    }
+                    ((List<object>)entries!).Add(
+                        key is "memory" ? ContextWire.Memory(unit, request.Debug) : ContextWire.Change(unit)
+                    );
                 }
             }
             var messages = notes.ToList();
             if (packed.Omitted > 0)
-            { output["omitted"] = packed.Omitted; messages.Add(ContextPacker.OmissionNote(packed.Omitted, full)); }
+            {
+                output["omitted"] = packed.Omitted;
+                messages.Add(ContextPacker.OmissionNote(packed.Omitted, full));
+            }
             if (debugTruncated)
             {
                 messages.Add("debug details truncated to fit the budget");
@@ -169,7 +209,11 @@ public static class ContextRenderer
         }
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Optional telemetry must never fail a served answer.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Optional telemetry must never fail a served answer."
+    )]
     private static void RecordContext(ContextProject? project, string task, PackedContext packed)
     {
         if (project?.RecordContext is not { } observe)
@@ -177,15 +221,47 @@ public static class ContextRenderer
             return;
         }
 
-        var units = packed.Units.Where(u => u.Ranked.Candidate.Source is "code" && u.Ranked.Candidate.Path.Length > 0).SelectMany((unit, position) => unit.Ranked.Candidate.Provenance.Select(p => new Harness.Core.Telemetry.ContextUnitObservation(unit.Ranked.Candidate.Path, unit.Ranked.Candidate.Name, unit.Ranked.Candidate.Role, p.Provider, p.Capability, p.Rank, position, unit.Ranked.Tier, unit.Body.Length > 0))).ToArray();
+        var units = packed
+            .Units.Where(u => u.Ranked.Candidate.Source is "code" && u.Ranked.Candidate.Path.Length > 0)
+            .SelectMany(
+                (unit, position) =>
+                    unit.Ranked.Candidate.Provenance.Select(p => new Harness.Core.Telemetry.ContextUnitObservation(
+                        unit.Ranked.Candidate.Path,
+                        unit.Ranked.Candidate.Name,
+                        unit.Ranked.Candidate.Role,
+                        p.Provider,
+                        p.Capability,
+                        p.Rank,
+                        position,
+                        unit.Ranked.Tier,
+                        unit.Body.Length > 0
+                    ))
+            )
+            .ToArray();
         try
-        { observe(new("", "", task, packed.Budget.Bytes, packed.Used, units)); }
-        catch (Exception) { /* Measurements cannot change the result. */ }
+        {
+            observe(new("", "", task, packed.Budget.Bytes, packed.Used, units));
+        }
+        catch (Exception)
+        { /* Measurements cannot change the result. */
+        }
     }
 
-    private static Dictionary<string, object?> Base(string task, IReadOnlyList<string> symbols, List<string> errors, string stale, IReadOnlyList<object>? workspace)
+    private static Dictionary<string, object?> Base(
+        string task,
+        IReadOnlyList<string> symbols,
+        List<string> errors,
+        string stale,
+        IReadOnlyList<object>? workspace
+    )
     {
-        var output = new Dictionary<string, object?> { ["task"] = task, ["code"] = new List<Dictionary<string, object?>>(), ["used_bytes"] = 0, ["budget_bytes"] = 0 };
+        var output = new Dictionary<string, object?>
+        {
+            ["task"] = task,
+            ["code"] = new List<Dictionary<string, object?>>(),
+            ["used_bytes"] = 0,
+            ["budget_bytes"] = 0,
+        };
         if (workspace is { Count: > 0 })
         {
             output["workspace"] = workspace;
@@ -204,6 +280,7 @@ public static class ContextRenderer
         ContextWire.Add(output, "stale", stale);
         return output;
     }
+
     private static int EnvelopeSize(Dictionary<string, object?> original, IReadOnlyList<string> notes)
     {
         var output = new Dictionary<string, object?>(original)
@@ -212,12 +289,33 @@ public static class ContextRenderer
             ["budget_bytes"] = 999999,
             ["omitted"] = 9999,
             ["memory"] = new[] { new { id = "", type = "" } },
-            ["changes"] = new[] { new { commit = "", subject = "", path = "", when = "" } },
+            ["changes"] = new[]
+            {
+                new
+                {
+                    commit = "",
+                    subject = "",
+                    path = "",
+                    when = "",
+                },
+            },
             ["areas"] = new Dictionary<string, int> { [""] = 0 },
-            ["note"] = string.Join("; ", notes.Append(new string('x', 140)))
+            ["note"] = string.Join("; ", notes.Append(new string('x', 140))),
         };
-        return ContextJson.Size(output) - ContextJson.Size(new { id = "", type = "" }) - ContextJson.Size(new { commit = "", subject = "", path = "", when = "" }) - ContextJson.Size("");
+        return ContextJson.Size(output)
+            - ContextJson.Size(new { id = "", type = "" })
+            - ContextJson.Size(
+                new
+                {
+                    commit = "",
+                    subject = "",
+                    path = "",
+                    when = "",
+                }
+            )
+            - ContextJson.Size("");
     }
+
     private static string Measured(Dictionary<string, object?> output)
     {
         for (var i = 0; i < 4; i++)

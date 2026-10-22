@@ -18,13 +18,19 @@ namespace Harness.Integration.Companions;
 public sealed class CompanionTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task CliPreviewDoesNotPersistOrSendAndDisabledAutomaticSendNeverExports()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        await using var app = CollectApplication.Create(Path.Combine(fixture.DirectoryRoot, "reports"), "127.0.0.1:0", token: "tok");
+        await using var app = CollectApplication.Create(
+            Path.Combine(fixture.DirectoryRoot, "reports"),
+            "127.0.0.1:0",
+            token: "tok"
+        );
         await app.StartAsync(Token);
-        Task<(int Code, string Output, string Error)> Cli(params string[] args) => fixture.ProcessAsync("dotnet", [UiFixture.CliPath, "telemetry", .. args]);
+        Task<(int Code, string Output, string Error)> Cli(params string[] args) =>
+            fixture.ProcessAsync("dotnet", [UiFixture.CliPath, "telemetry", .. args]);
         (await Cli()).Output.Should().Contain("export: off");
         var preview = await Cli("preview");
         preview.Code.Should().Be(0, preview.Error);
@@ -51,6 +57,7 @@ public sealed class CompanionTests
         (await Cli("send", "--auto")).Code.Should().Be(0);
         await app.StopAsync(Token);
     }
+
     [Fact]
     public async Task AggregateExportRoundTripsThroughCollectorWithAuthenticationAndDailySuccessInterval()
     {
@@ -59,16 +66,66 @@ public sealed class CompanionTests
         var state = exporter.Load();
         state.Enabled.Should().BeFalse();
         state.Due(DateTimeOffset.UtcNow).Should().BeFalse();
-        await using var app = CollectApplication.Create(Path.Combine(temp.Path, "reports"), "127.0.0.1:0", token: "test-token");
+        await using var app = CollectApplication.Create(
+            Path.Combine(temp.Path, "reports"),
+            "127.0.0.1:0",
+            token: "test-token"
+        );
         await app.StartAsync(Token);
         DeveloperExport.Enable(state, UiHost.Address(app) + "v1/report", "test-token");
         var now = DateTimeOffset.UtcNow;
-        var report = new LocalReport { Id = "prj_0123456789abcdef", Root = "/Users/someone/secret-project", Context = new() { Calls = 4, Hits = 3, Changed = 10, Misses = [new() { Path = "source-secret.cs" }] }, Findings = [new("warn", "context", "provider failed: https://bot:pw@host/x and C:\\repo\\a.cs", "harness context stats --project secret-project")], Metrics = new() { Tools = [new() { Tool = "get_context", Calls = 4 }] }, Knowledge = new() { Current = 7 } };
-        var payload = DeveloperExport.Build(state, [report], new() { ["version"] = "test", ["platform"] = "test" }, new Dictionary<string, string> { ["ripwire"] = "ripwire 1.2" }, now);
+        var report = new LocalReport
+        {
+            Id = "prj_0123456789abcdef",
+            Root = "/Users/someone/secret-project",
+            Context = new()
+            {
+                Calls = 4,
+                Hits = 3,
+                Changed = 10,
+                Misses = [new() { Path = "source-secret.cs" }],
+            },
+            Findings =
+            [
+                new(
+                    "warn",
+                    "context",
+                    "provider failed: https://bot:pw@host/x and C:\\repo\\a.cs",
+                    "harness context stats --project secret-project"
+                ),
+            ],
+            Metrics = new() { Tools = [new() { Tool = "get_context", Calls = 4 }] },
+            Knowledge = new() { Current = 7 },
+        };
+        var payload = DeveloperExport.Build(
+            state,
+            [report],
+            new() { ["version"] = "test", ["platform"] = "test" },
+            new Dictionary<string, string> { ["ripwire"] = "ripwire 1.2" },
+            now
+        );
         var bytes = Encoding.UTF8.GetBytes(payload.ToJsonString());
         var body = Encoding.UTF8.GetString(bytes);
-        foreach (var forbidden in new[] { report.Id, "secret-project", "/Users", "source-secret.cs", "bot:pw", "C:\\repo", "harness context stats", "top_misses", "query", "root", "action", "task" })
-        { body.Should().NotContain(forbidden); }
+        foreach (
+            var forbidden in new[]
+            {
+                report.Id,
+                "secret-project",
+                "/Users",
+                "source-secret.cs",
+                "bot:pw",
+                "C:\\repo",
+                "harness context stats",
+                "top_misses",
+                "query",
+                "root",
+                "action",
+                "task",
+            }
+        )
+        {
+            body.Should().NotContain(forbidden);
+        }
         var again = DeveloperExport.Build(state, [report], new(), new Dictionary<string, string>(), now);
         again["projects"]![0]!["id"]!.ToString().Should().Be(payload["projects"]![0]!["id"]!.ToString());
         await exporter.SendAsync(state, bytes, now, Token);
@@ -78,7 +135,9 @@ public sealed class CompanionTests
         await exporter.SaveAsync(state, Token);
         exporter.Load().Token.Should().Be("test-token");
         if (!OperatingSystem.IsWindows())
-        { File.GetUnixFileMode(exporter.StatePath).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite); }
+        {
+            File.GetUnixFileMode(exporter.StatePath).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
         using var client = new HttpClient { BaseAddress = new Uri(UiHost.Address(app)) };
         (await client.GetStringAsync("/machines/" + state.Machine + ".json", Token)).Should().Be(body);
         (await client.GetStringAsync("/", Token)).Should().Contain(state.Machine).And.Contain("--brand-teal");
@@ -94,6 +153,7 @@ public sealed class CompanionTests
         (await File.ReadAllLinesAsync(exporter.LogPath, Token)).Should().HaveCount(2);
         await app.StopAsync(Token);
     }
+
     [Theory]
     [InlineData("hello", 400)]
     [InlineData("""{"schema":9,"machine":"m_0123456789abcdef"}""", 400)]
@@ -117,20 +177,35 @@ public sealed class CompanionTests
         Directory.GetFiles(temp.Path, "*", SearchOption.AllDirectories).Should().BeEmpty();
         await app.StopAsync(Token);
     }
+
     [Theory]
     [InlineData("project prj_edda8bc866761dd9b196edcc6d73d1a7 is not readable", "project [id] is not readable")]
     [InlineData("context hits 26% (31/130 over 25 answers)", "context hits 26% (31/130 over 25 answers)")]
     [InlineData("provider failed: https://bot:pw@host/x and C:\\repo\\a.cs", "provider failed: [path] and [path]")]
     [InlineData("token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0123 in internal/cli/x.go", "token [redacted] in [path]")]
-    public void GoRedactionScenarios(string input, string expected) => DeveloperExport.Clean(input).Should().Be(expected);
+    public void GoRedactionScenarios(string input, string expected) =>
+        DeveloperExport.Clean(input).Should().Be(expected);
+
     [Fact]
     public async Task SharingServesOnlyStartupAllowlistReadOnlyWithChecksumsRangesAndPlatformHints()
     {
         using var temp = new TemporaryDirectory();
         var releaseDir = Path.Combine(temp.Path, "v0.1.0");
         Directory.CreateDirectory(releaseDir);
-        foreach (var (name, body) in new Dictionary<string, string> { ["harness-v0.1.0-linux-amd64.tar.gz"] = "linux bytes", ["harness-v0.1.0-darwin-arm64.tar.gz"] = "mac bytes", ["harness-v0.1.0-windows-amd64.zip"] = "win bytes", ["SHA256SUMS"] = "abc123  harness-v0.1.0-windows-amd64.zip\n", ["RELEASE_NOTES.md"] = "# notes", ["secret.txt"] = "private" })
-        { await File.WriteAllTextAsync(Path.Combine(releaseDir, name), body, Token); }
+        foreach (
+            var (name, body) in new Dictionary<string, string>
+            {
+                ["harness-v0.1.0-linux-amd64.tar.gz"] = "linux bytes",
+                ["harness-v0.1.0-darwin-arm64.tar.gz"] = "mac bytes",
+                ["harness-v0.1.0-windows-amd64.zip"] = "win bytes",
+                ["SHA256SUMS"] = "abc123  harness-v0.1.0-windows-amd64.zip\n",
+                ["RELEASE_NOTES.md"] = "# notes",
+                ["secret.txt"] = "private",
+            }
+        )
+        {
+            await File.WriteAllTextAsync(Path.Combine(releaseDir, name), body, Token);
+        }
         var release = ShareApplication.Load(releaseDir);
         release.Builds.Should().HaveCount(3);
         release.Extra.Should().HaveCount(2);
@@ -141,7 +216,13 @@ public sealed class CompanionTests
         await app.StartAsync(Token);
         using var client = new HttpClient { BaseAddress = new Uri(UiHost.Address(app)) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)");
-        (await client.GetStringAsync("/", Token)).Should().Contain("Download for macOS · Apple silicon").And.Contain("Intel Mac").And.Contain("sha256 abc123").And.Contain("chmod +x").And.Contain("Release notes");
+        (await client.GetStringAsync("/", Token))
+            .Should()
+            .Contain("Download for macOS · Apple silicon")
+            .And.Contain("Intel Mac")
+            .And.Contain("sha256 abc123")
+            .And.Contain("chmod +x")
+            .And.Contain("Release notes");
         var download = "/download/harness-v0.1.0-darwin-arm64.tar.gz";
         using var response = await client.GetAsync(download, Token);
         (await response.Content.ReadAsStringAsync(Token)).Should().Be("mac bytes");
@@ -151,25 +232,47 @@ public sealed class CompanionTests
         using var partial = await client.SendAsync(range, Token);
         partial.StatusCode.Should().Be(HttpStatusCode.PartialContent);
         (await partial.Content.ReadAsStringAsync(Token)).Should().Be("mac");
-        foreach (var path in new[] { "/secret.txt", "/download/secret.txt", "/download/..%2fsecret.txt", "/download/", "/harness-v0.1.0-linux-amd64.tar.gz", "/download/HARNESS-v0.1.0-linux-amd64.tar.gz" })
-        { using var rejected = await client.GetAsync(path, Token); rejected.StatusCode.Should().Be(HttpStatusCode.NotFound); }
+        foreach (
+            var path in new[]
+            {
+                "/secret.txt",
+                "/download/secret.txt",
+                "/download/..%2fsecret.txt",
+                "/download/",
+                "/harness-v0.1.0-linux-amd64.tar.gz",
+                "/download/HARNESS-v0.1.0-linux-amd64.tar.gz",
+            }
+        )
+        {
+            using var rejected = await client.GetAsync(path, Token);
+            rejected.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
         foreach (var method in new[] { HttpMethod.Post, HttpMethod.Put, HttpMethod.Delete, HttpMethod.Patch })
-        { using var request = new HttpRequestMessage(method, download); using var rejected = await client.SendAsync(request, Token); rejected.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed); }
+        {
+            using var request = new HttpRequestMessage(method, download);
+            using var rejected = await client.SendAsync(request, Token);
+            rejected.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        }
         await File.WriteAllTextAsync(Path.Combine(releaseDir, "harness-v0.1.0-linux-arm64.tar.gz"), "late", Token);
         using var late = await client.GetAsync("/download/harness-v0.1.0-linux-arm64.tar.gz", Token);
         late.StatusCode.Should().Be(HttpStatusCode.NotFound);
         await app.StopAsync(Token);
     }
+
     [Fact]
     public void WiderExposureRequiresExplicitLanOption()
     {
         var create = () => CompanionHost.Create("0.0.0.0:0", false, 8765);
         create.Should().Throw<ArgumentException>().WithMessage("*--lan*");
     }
+
     private sealed class TemporaryDirectory : IDisposable
     {
-        internal string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "harness-companion-" + Guid.NewGuid().ToString("N"));
+        internal string Path { get; } =
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "harness-companion-" + Guid.NewGuid().ToString("N"));
+
         public TemporaryDirectory() => Directory.CreateDirectory(Path);
+
         public void Dispose() => Directory.Delete(Path, true);
     }
 }

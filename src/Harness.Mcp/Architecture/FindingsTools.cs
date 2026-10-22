@@ -7,20 +7,40 @@ namespace Harness.Mcp.Architecture;
 
 public static class FindingsTools
 {
-    public const string Rule = "Explain and suggest; never act on a finding until it is a task. Architectural tasks and by-design marks are the author's: propose them to the user, never create them. A finding marked by design is intended (its reason says why): do not raise it again; one back for review grew since it was marked.";
-    public static async Task<object> CallAsync(string name, IDictionary<string, JsonElement>? arguments, IFindingSession session, string caller, CancellationToken token)
+    public const string Rule =
+        "Explain and suggest; never act on a finding until it is a task. Architectural tasks and by-design marks are the author's: propose them to the user, never create them. A finding marked by design is intended (its reason says why): do not raise it again; one back for review grew since it was marked.";
+
+    public static async Task<object> CallAsync(
+        string name,
+        IDictionary<string, JsonElement>? arguments,
+        IFindingSession session,
+        string caller,
+        CancellationToken token
+    )
     {
         string Text(string key) => arguments?.TryGetValue(key, out var value) is true ? value.GetString() ?? "" : "";
-        bool Flag(string key) => arguments?.TryGetValue(key, out var value) is true && value.ValueKind is JsonValueKind.True;
+        bool Flag(string key) =>
+            arguments?.TryGetValue(key, out var value) is true && value.ValueKind is JsonValueKind.True;
         if (name is "architecture_propose")
         {
-            var request = new FindingProposalRequest(Text("kind"), Text("finding"), Text("scope"), Text("title"), Text("reason"), arguments?.TryGetValue("evidence", out var evidence) is true ? evidence.Deserialize<string[]>() : null);
+            var request = new FindingProposalRequest(
+                Text("kind"),
+                Text("finding"),
+                Text("scope"),
+                Text("title"),
+                Text("reason"),
+                arguments?.TryGetValue("evidence", out var evidence) is true ? evidence.Deserialize<string[]>() : null
+            );
             var result = await session.ProposeFindingAsync(request, caller, token).ConfigureAwait(false);
             return new Dictionary<string, object?>
             {
                 ["proposal"] = Clean(result.Proposal),
                 ["status"] = result.Existing ? "exists" : "pending",
-                ["note"] = result.Existing ? "The same proposal already waits for the user (" + result.Proposal.Id + "); tell them it is in harness ui, Work › Inbox." : "Waiting for the user: tell them it is in harness ui, Work › Inbox. Do not act on it until they approve it.",
+                ["note"] = result.Existing
+                    ? "The same proposal already waits for the user ("
+                        + result.Proposal.Id
+                        + "); tell them it is in harness ui, Work › Inbox."
+                    : "Waiting for the user: tell them it is in harness ui, Work › Inbox. Do not act on it until they approve it.",
             };
         }
         var read = await session.ReadFindingsAsync(Text("scope"), token).ConfigureAwait(false);
@@ -30,14 +50,30 @@ public static class FindingsTools
             var key = Text("key");
             var kind = Text("kind");
             var area = Text("area");
-            var selected = group.Findings.Where(f => (key.Length is 0 || f.Key == key) && (kind.Length is 0 || f.Kind == kind) && (area.Length is 0 || InArea(f, area)) && (Flag("gone") || f.Status is not "gone")).ToArray();
+            var selected = group
+                .Findings.Where(f =>
+                    (key.Length is 0 || f.Key == key)
+                    && (kind.Length is 0 || f.Kind == kind)
+                    && (area.Length is 0 || InArea(f, area))
+                    && (Flag("gone") || f.Status is not "gone")
+                )
+                .ToArray();
             var hidden = Flag("hide_marked") ? selected.Count(f => f.Mark?.State is "by_design") : 0;
             if (Flag("hide_marked"))
             {
                 selected = selected.Where(f => f.Mark?.State is not "by_design").ToArray();
             }
 
-            var summary = selected.GroupBy(f => f.Kind, StringComparer.Ordinal).Select(g => new { kind = g.Key, count = g.Count(), worst = g.OrderBy(f => Rank(f.Level)).First().Level }).OrderBy(g => Rank(g.worst)).ToArray();
+            var summary = selected
+                .GroupBy(f => f.Kind, StringComparer.Ordinal)
+                .Select(g => new
+                {
+                    kind = g.Key,
+                    count = g.Count(),
+                    worst = g.OrderBy(f => Rank(f.Level)).First().Level,
+                })
+                .OrderBy(g => Rank(g.worst))
+                .ToArray();
             Dictionary<string, object?> output = new() { ["where"] = group.Where, ["summary"] = summary };
             if (group.Snapshot is not null)
             {
@@ -70,8 +106,17 @@ public static class FindingsTools
                 {
                     foreach (var at in f.Evidence ?? [])
                     {
-                        var span = f.Kind is "repeated-sequence" ? f.Why.Split('\n').Skip(1).Count(line => line.Length > 0 && !line.StartsWith("They differ", StringComparison.Ordinal)) : 0;
-                        var snippet = await session.ReadFindingSnippetAsync(group, at, span, token).ConfigureAwait(false);
+                        var span = f.Kind is "repeated-sequence"
+                            ? f
+                                .Why.Split('\n')
+                                .Skip(1)
+                                .Count(line =>
+                                    line.Length > 0 && !line.StartsWith("They differ", StringComparison.Ordinal)
+                                )
+                            : 0;
+                        var snippet = await session
+                            .ReadFindingSnippetAsync(group, at, span, token)
+                            .ConfigureAwait(false);
                         if (snippet is null)
                         {
                             continue;
@@ -80,9 +125,21 @@ public static class FindingsTools
                         var body = string.Join('\n', snippet.Lines ?? []);
                         var size = Encoding.UTF8.GetByteCount(body) + Encoding.UTF8.GetByteCount(at) + 40;
                         if (size > room)
-                        { left++; continue; }
+                        {
+                            left++;
+                            continue;
+                        }
                         room -= size;
-                        code.Add(new { key = f.Key, at, start = snippet.Start, code = body, focus = snippet.Focus });
+                        code.Add(
+                            new
+                            {
+                                key = f.Key,
+                                at,
+                                start = snippet.Start,
+                                code = body,
+                                focus = snippet.Focus,
+                            }
+                        );
                     }
                 }
 
@@ -106,10 +163,25 @@ public static class FindingsTools
 
         return answer;
     }
-    private static int Rank(string level) => level switch { "problem" => 0, "warn" => 1, "info" => 2, _ => 0 };
+
+    private static int Rank(string level) =>
+        level switch
+        {
+            "problem" => 0,
+            "warn" => 1,
+            "info" => 2,
+            _ => 0,
+        };
+
     private static object Brief(Finding f)
     {
-        Dictionary<string, object?> result = new() { ["key"] = f.Key, ["level"] = f.Level, ["basis"] = f.Basis, ["title"] = f.Title };
+        Dictionary<string, object?> result = new()
+        {
+            ["key"] = f.Key,
+            ["level"] = f.Level,
+            ["basis"] = f.Basis,
+            ["title"] = f.Title,
+        };
         if (f.Confidence is not 0)
         {
             result["confidence"] = f.Confidence;
@@ -135,12 +207,17 @@ public static class FindingsTools
 
         return result;
     }
+
     public static bool InArea(Finding f, string area)
     {
         area = area.TrimEnd('/');
         bool Under(string p) => p == area || p.StartsWith(area + "/", StringComparison.Ordinal);
         var project = (f.Project ?? "").TrimEnd('/');
-        var folder = Path.GetExtension(project).EndsWith("proj", StringComparison.Ordinal) || Path.GetExtension(project) is ".json" ? project[..Math.Max(0, project.LastIndexOf('/'))] : project;
+        var folder =
+            Path.GetExtension(project).EndsWith("proj", StringComparison.Ordinal)
+            || Path.GetExtension(project) is ".json"
+                ? project[..Math.Max(0, project.LastIndexOf('/'))]
+                : project;
         if (Under(project) || Under(folder))
         {
             return true;
@@ -159,10 +236,12 @@ public static class FindingsTools
                 e = e[(colon + 2)..];
             }
 
-            var file = e.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Split(':')[0] ?? "";
+            var file =
+                e.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Split(':')[0] ?? "";
             return Under(file);
         });
     }
+
     // Go's omitempty omits empty optional strings as well as null pointers.
     private static JsonNode Clean<T>(T value)
     {
@@ -173,7 +252,27 @@ public static class FindingsTools
             {
                 foreach (var (key, child) in obj.ToArray())
                 {
-                    if (child is JsonValue v && v.TryGetValue<string>(out var text) && text.Length is 0 && key is "reason" or "review_reason" or "memory_id" or "task_id" or "task_project" or "proposed_by" or "commit" or "finding_key" or "body" or "decided_by" or "decided_at" or "note" or "result" or "fix" or "project")
+                    if (
+                        child is JsonValue v
+                        && v.TryGetValue<string>(out var text)
+                        && text.Length is 0
+                        && key
+                            is "reason"
+                                or "review_reason"
+                                or "memory_id"
+                                or "task_id"
+                                or "task_project"
+                                or "proposed_by"
+                                or "commit"
+                                or "finding_key"
+                                or "body"
+                                or "decided_by"
+                                or "decided_at"
+                                or "note"
+                                or "result"
+                                or "fix"
+                                or "project"
+                    )
                     {
                         obj.Remove(key);
                     }

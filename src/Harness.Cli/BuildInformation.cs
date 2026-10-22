@@ -10,13 +10,18 @@ internal sealed record BuildInformation(
     [property: JsonPropertyName("date")] string Date,
     [property: JsonPropertyName("modified")] bool Modified,
     [property: JsonPropertyName("go_version")] string Runtime,
-    [property: JsonPropertyName("platform")] string Platform)
+    [property: JsonPropertyName("platform")] string Platform
+)
 {
     internal static BuildInformation Current()
     {
         var assembly = typeof(BuildInformation).Assembly;
-        var metadata = assembly.GetCustomAttributes<AssemblyMetadataAttribute>().ToDictionary(attribute => attribute.Key, attribute => attribute.Value, StringComparer.Ordinal);
-        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "dev";
+        var metadata = assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .ToDictionary(attribute => attribute.Key, attribute => attribute.Value, StringComparer.Ordinal);
+        var version =
+            assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+            ?? "dev";
         var os = (OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()) switch
         {
             (true, _) => "windows",
@@ -31,15 +36,24 @@ internal sealed record BuildInformation(
             Architecture.Arm => "arm",
             _ => throw new PlatformNotSupportedException("Unsupported process architecture."),
         };
-        return new BuildInformation(version, metadata.GetValueOrDefault("CommitHash") ?? string.Empty,
+        return new BuildInformation(
+            version,
+            metadata.GetValueOrDefault("CommitHash") ?? string.Empty,
             metadata.GetValueOrDefault("BuildTimestamp") ?? string.Empty,
             bool.TryParse(metadata.GetValueOrDefault("Modified"), out var modified) && modified,
-            RuntimeInformation.FrameworkDescription, $"{os}/{architecture}");
+            RuntimeInformation.FrameworkDescription,
+            $"{os}/{architecture}"
+        );
     }
 
     public override string ToString()
     {
-        var commit = Commit.Length switch { 0 => "unknown", > 12 => Commit[..12], _ => Commit };
+        var commit = Commit.Length switch
+        {
+            0 => "unknown",
+            > 12 => Commit[..12],
+            _ => Commit,
+        };
         return $"harness {Version} (commit {commit}{(Modified ? "-dirty" : string.Empty)}, built {(Date.Length == 0 ? "unknown" : Date)}, {Runtime}, {Platform})";
     }
 }

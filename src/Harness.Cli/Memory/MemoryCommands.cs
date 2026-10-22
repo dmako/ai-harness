@@ -22,6 +22,7 @@ internal sealed class MemoryPromoteSettings : MemoryIdSettings
 {
     [CommandOption("--to")]
     public string To { get; init; } = "";
+
     [CommandOption("--force")]
     public bool Force { get; init; }
 }
@@ -42,37 +43,73 @@ internal sealed class ProposalApproveSettings : ProposalNoteSettings
 {
     [CommandOption("--content")]
     public string Content { get; init; } = "";
+
     [CommandOption("--supersede")]
     public string[] Supersede { get; init; } = [];
+
     [CommandOption("--keep-both")]
     public bool KeepBoth { get; init; }
 }
 
 internal sealed class MemoryShowCommand(MemoryCommandRunner runner) : AsyncCommand<MemoryIdSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, MemoryIdSettings settings, CancellationToken cancellationToken) => runner.MemoryAsync("show", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        MemoryIdSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.MemoryAsync("show", settings, cancellationToken);
 }
+
 internal sealed class MemoryRetireCommand(MemoryCommandRunner runner) : AsyncCommand<MemoryRetireSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, MemoryRetireSettings settings, CancellationToken cancellationToken) => runner.MemoryAsync("retire", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        MemoryRetireSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.MemoryAsync("retire", settings, cancellationToken);
 }
+
 internal sealed class MemoryPromoteCommand(MemoryCommandRunner runner) : AsyncCommand<MemoryPromoteSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, MemoryPromoteSettings settings, CancellationToken cancellationToken) => runner.MemoryAsync("promote", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        MemoryPromoteSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.MemoryAsync("promote", settings, cancellationToken);
 }
+
 internal sealed class ProposalsListCommand(MemoryCommandRunner runner) : AsyncCommand<ProposalListSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, ProposalListSettings settings, CancellationToken cancellationToken) => runner.ProposalAsync("list", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        ProposalListSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.ProposalAsync("list", settings, cancellationToken);
 }
+
 internal sealed class ProposalsShowCommand(MemoryCommandRunner runner) : AsyncCommand<MemoryIdSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, MemoryIdSettings settings, CancellationToken cancellationToken) => runner.ProposalAsync("show", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        MemoryIdSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.ProposalAsync("show", settings, cancellationToken);
 }
+
 internal sealed class ProposalsApproveCommand(MemoryCommandRunner runner) : AsyncCommand<ProposalApproveSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, ProposalApproveSettings settings, CancellationToken cancellationToken) => runner.ProposalAsync("approve", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        ProposalApproveSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.ProposalAsync("approve", settings, cancellationToken);
 }
+
 internal sealed class ProposalsRejectCommand(MemoryCommandRunner runner) : AsyncCommand<ProposalNoteSettings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, ProposalNoteSettings settings, CancellationToken cancellationToken) => runner.ProposalAsync("reject", settings, cancellationToken);
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        ProposalNoteSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.ProposalAsync("reject", settings, cancellationToken);
 }

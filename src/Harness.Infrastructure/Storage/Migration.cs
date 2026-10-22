@@ -17,12 +17,20 @@ internal static class MigrationCatalog
         var migrations = new List<Migration>();
         foreach (var (fileName, sql) in files)
         {
-            if (!Regex.IsMatch(fileName, @"\A[0-9]{4}_[a-z0-9_]+\.sql\z", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking))
+            if (
+                !Regex.IsMatch(
+                    fileName,
+                    @"\A[0-9]{4}_[a-z0-9_]+\.sql\z",
+                    RegexOptions.CultureInvariant | RegexOptions.NonBacktracking
+                )
+            )
             {
                 throw new InvalidDataException($"Unexpected migration file '{fileName}' (want NNNN_name.sql).");
             }
 
-            migrations.Add(new Migration(int.Parse(fileName.AsSpan(0, 4), CultureInfo.InvariantCulture), fileName[..^4], sql));
+            migrations.Add(
+                new Migration(int.Parse(fileName.AsSpan(0, 4), CultureInfo.InvariantCulture), fileName[..^4], sql)
+            );
         }
 
         migrations.Sort((left, right) => left.Version.CompareTo(right.Version));
@@ -30,7 +38,9 @@ internal static class MigrationCatalog
         {
             if (migrations[index].Version != index + 1)
             {
-                throw new InvalidDataException($"Migration {migrations[index].Name}: expected version {index + 1:0000} (versions must be contiguous from 0001).");
+                throw new InvalidDataException(
+                    $"Migration {migrations[index].Name}: expected version {index + 1:0000} (versions must be contiguous from 0001)."
+                );
             }
         }
 
@@ -41,14 +51,18 @@ internal static class MigrationCatalog
     {
         const string Prefix = "Harness.Migrations.";
         var assembly = typeof(MigrationCatalog).Assembly;
-        return Load(assembly.GetManifestResourceNames()
-            .Where(name => name.StartsWith(Prefix, StringComparison.Ordinal))
-            .Select(name =>
-            {
-                using var stream = assembly.GetManifestResourceStream(name)
-                    ?? throw new InvalidDataException($"Missing migration resource '{name}'.");
-                using var reader = new StreamReader(stream, new UTF8Encoding(false, true));
-                return (name[Prefix.Length..], reader.ReadToEnd());
-            }));
+        return Load(
+            assembly
+                .GetManifestResourceNames()
+                .Where(name => name.StartsWith(Prefix, StringComparison.Ordinal))
+                .Select(name =>
+                {
+                    using var stream =
+                        assembly.GetManifestResourceStream(name)
+                        ?? throw new InvalidDataException($"Missing migration resource '{name}'.");
+                    using var reader = new StreamReader(stream, new UTF8Encoding(false, true));
+                    return (name[Prefix.Length..], reader.ReadToEnd());
+                })
+        );
     }
 }

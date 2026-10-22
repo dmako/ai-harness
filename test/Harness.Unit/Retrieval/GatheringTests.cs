@@ -9,7 +9,11 @@ using Xunit;
 
 namespace Harness.Unit.Retrieval;
 
-[SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Each fixture provider transfers ownership to the asynchronously disposed registry.")]
+[SuppressMessage(
+    "Reliability",
+    "CA2000:Dispose objects before losing scope",
+    Justification = "Each fixture provider transfers ownership to the asynchronously disposed registry."
+)]
 public sealed class GatheringTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -18,18 +22,64 @@ public sealed class GatheringTests
     public async Task ExpandsDefinedSymbolsQualifiersVariantsAndRelations()
     {
         await using var registry = new ProviderRegistry();
-        var provider = new Fake("code", request => request.Capability is Capabilities.SymbolSearch ? request.Query switch
-        {
-            "OrderService.Copy" => [new() { Name = "Copy", QualifiedName = "OrderService.Copy", Path = "src/OrderService.cs", StartLine = 1 }, new() { Name = "Copy", QualifiedName = "Other.Copy", Path = "src/Other.cs", StartLine = 1 }],
-            "order_template" => [],
-            "orderTemplate" => [new() { Name = "orderTemplate", Path = "src/template.cs", StartLine = 1 }],
-            _ => [],
-        } : []);
+        var provider = new Fake(
+            "code",
+            request =>
+                request.Capability is Capabilities.SymbolSearch
+                    ? request.Query switch
+                    {
+                        "OrderService.Copy" =>
+                        [
+                            new()
+                            {
+                                Name = "Copy",
+                                QualifiedName = "OrderService.Copy",
+                                Path = "src/OrderService.cs",
+                                StartLine = 1,
+                            },
+                            new()
+                            {
+                                Name = "Copy",
+                                QualifiedName = "Other.Copy",
+                                Path = "src/Other.cs",
+                                StartLine = 1,
+                            },
+                        ],
+                        "order_template" => [],
+                        "orderTemplate" =>
+                        [
+                            new()
+                            {
+                                Name = "orderTemplate",
+                                Path = "src/template.cs",
+                                StartLine = 1,
+                            },
+                        ],
+                        _ => [],
+                    }
+                    : []
+        );
         registry.Register(provider);
-        var gathered = await RetrievalGatherer.GatherAsync(new(registry), new("fix OrderService.Copy and order_template", "src", 0), Token);
-        gathered.Candidates.Single(candidate => candidate.QualifiedName is "OrderService.Copy").Scores["name"].Should().Be(1);
-        gathered.Candidates.Single(candidate => candidate.QualifiedName is "Other.Copy").Scores["name"].Should().Be(0.3);
-        provider.Requests.Where(request => request.Capability is Capabilities.Callers).Select(request => request.Query).Should().Equal("OrderService.Copy", "orderTemplate");
+        var gathered = await RetrievalGatherer.GatherAsync(
+            new(registry),
+            new("fix OrderService.Copy and order_template", "src", 0),
+            Token
+        );
+        gathered
+            .Candidates.Single(candidate => candidate.QualifiedName is "OrderService.Copy")
+            .Scores["name"]
+            .Should()
+            .Be(1);
+        gathered
+            .Candidates.Single(candidate => candidate.QualifiedName is "Other.Copy")
+            .Scores["name"]
+            .Should()
+            .Be(0.3);
+        provider
+            .Requests.Where(request => request.Capability is Capabilities.Callers)
+            .Select(request => request.Query)
+            .Should()
+            .Equal("OrderService.Copy", "orderTemplate");
         provider.Requests.Should().OnlyContain(request => request.Path == "src" && request.Limit == 10);
     }
 
@@ -37,7 +87,10 @@ public sealed class GatheringTests
     public async Task ExcludedProvidersAreNeverDiscoveredInspectedOrExecuted()
     {
         await using var registry = new ProviderRegistry();
-        var excluded = new Fake("heavy", _ => throw new InvalidOperationException("excluded execution")) { RejectMetadata = true };
+        var excluded = new Fake("heavy", _ => throw new InvalidOperationException("excluded execution"))
+        {
+            RejectMetadata = true,
+        };
         registry.Register(excluded);
         registry.Register(new Fake("light", _ => []));
         registry.ExcludeFromContext("heavy");
@@ -56,7 +109,15 @@ public sealed class GatheringTests
         var unindexed = new Fake("unindexed", _ => throw new ProviderNotIndexedException("no index"));
         registry.Register(broken);
         registry.Register(unindexed);
-        registry.Register(new Fake("healthy", request => request.Capability is Capabilities.SymbolSearch ? [new() { Name = "OrderService", Path = "src/OrderService.cs" }] : []));
+        registry.Register(
+            new Fake(
+                "healthy",
+                request =>
+                    request.Capability is Capabilities.SymbolSearch
+                        ? [new() { Name = "OrderService", Path = "src/OrderService.cs" }]
+                        : []
+            )
+        );
         var gathered = await RetrievalGatherer.GatherAsync(new(registry), new("fix OrderService"), Token);
         gathered.Candidates.Should().NotBeEmpty();
         broken.Requests.Should().ContainSingle();
@@ -78,9 +139,23 @@ public sealed class GatheringTests
         var watch = Stopwatch.StartNew();
         try
         {
-            var gathered = await RetrievalGatherer.GatherAsync(new(registry,
-                (_, _) => { memoryCalls++; return Task.FromResult(new RetrievalMemories([])); },
-                (_, _, _) => { gitCalls++; return Task.FromResult<IReadOnlyList<RetrievalCommit>>([]); }), new("fix OrderService", CodeTimeout: TimeSpan.FromMilliseconds(150)), Token);
+            var gathered = await RetrievalGatherer.GatherAsync(
+                new(
+                    registry,
+                    (_, _) =>
+                    {
+                        memoryCalls++;
+                        return Task.FromResult(new RetrievalMemories([]));
+                    },
+                    (_, _, _) =>
+                    {
+                        gitCalls++;
+                        return Task.FromResult<IReadOnlyList<RetrievalCommit>>([]);
+                    }
+                ),
+                new("fix OrderService", CodeTimeout: TimeSpan.FromMilliseconds(150)),
+                Token
+            );
             watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
             gathered.Candidates.Should().ContainSingle().Which.Name.Should().Be("OrderService");
             gathered.Notes.Should().ContainSingle().Which.Should().Contain("stopped after 150ms");
@@ -88,30 +163,59 @@ public sealed class GatheringTests
             memoryCalls.Should().Be(3);
             gitCalls.Should().Be(1);
         }
-        finally { release.TrySetException(new IOException("late fault must be observed")); }
+        finally
+        {
+            release.TrySetException(new IOException("late fault must be observed"));
+        }
     }
 
     [Fact]
     public async Task MemoryAndRecentChangesUseBestProviderPositionsAndPreservePartialResults()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("code", request => request.Query is "fix OrderService" && request.Capability is Capabilities.SymbolSearch
-            ? Enumerable.Range(0, 12).Select(i => new ProviderItem { Name = "Other", Path = $"src/{i}.cs" }).ToArray() : []));
+        registry.Register(
+            new Fake(
+                "code",
+                request =>
+                    request.Query is "fix OrderService" && request.Capability is Capabilities.SymbolSearch
+                        ? Enumerable
+                            .Range(0, 12)
+                            .Select(i => new ProviderItem { Name = "Other", Path = $"src/{i}.cs" })
+                            .ToArray()
+                        : []
+            )
+        );
         var queries = new List<MemoryQuery>();
         var common = Memory("m1", "decision", new("project", ""));
-        var gathered = await RetrievalGatherer.GatherAsync(new(registry, (query, _) =>
-        {
-            queries.Add(query);
-            var memory = query.Types.Contains("goal", StringComparer.Ordinal) ? Memory("goal", "goal", new("project", "")) : common;
-            return Task.FromResult(new RetrievalMemories([memory]) { Errors = ["one layer offline"] });
-        }, (paths, limit, _) =>
-        {
-            paths.Should().Equal("src/0.cs", "src/1.cs", "src/2.cs");
-            limit.Should().Be(5);
-            return Task.FromResult<IReadOnlyList<RetrievalCommit>>([new("0123456789abcdef", "recent", MemoryTimestamp.Parse("2026-01-02T03:04:05Z"), [paths[0]])]);
-        }, "main"), new("fix OrderService"), Token);
+        var gathered = await RetrievalGatherer.GatherAsync(
+            new(
+                registry,
+                (query, _) =>
+                {
+                    queries.Add(query);
+                    var memory = query.Types.Contains("goal", StringComparer.Ordinal)
+                        ? Memory("goal", "goal", new("project", ""))
+                        : common;
+                    return Task.FromResult(new RetrievalMemories([memory]) { Errors = ["one layer offline"] });
+                },
+                (paths, limit, _) =>
+                {
+                    paths.Should().Equal("src/0.cs", "src/1.cs", "src/2.cs");
+                    limit.Should().Be(5);
+                    return Task.FromResult<IReadOnlyList<RetrievalCommit>>([
+                        new("0123456789abcdef", "recent", MemoryTimestamp.Parse("2026-01-02T03:04:05Z"), [paths[0]]),
+                    ]);
+                },
+                "main"
+            ),
+            new("fix OrderService"),
+            Token
+        );
         queries.Should().HaveCount(12);
-        queries.Take(10).Should().OnlyContain(query => query.Branch == "main" && query.Limit == 20 && query.Scope!.Kind == "path");
+        queries
+            .Take(10)
+            .Should()
+            .OnlyContain(query => query.Branch == "main" && query.Limit == 20 && query.Scope!.Kind == "path");
         queries[^2].Text.Should().Be("orderservice");
         queries[^2].Branch.Should().BeEmpty();
         queries[^1].Types.Should().Equal("goal");
@@ -126,12 +230,21 @@ public sealed class GatheringTests
     public async Task BroadPhraseHitsLoseBoostAndHeadNounFallbackFindsFiles()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("code", request => (request.Capability, request.Query) switch
-        {
-            (Capabilities.SymbolSearch, "OrderTemplate") => Enumerable.Range(0, 4).Select(i => new ProviderItem { Name = "OrderTemplate", Path = $"test/{i}.cs" }).ToArray(),
-            (Capabilities.FileSearch, "template") => [new() { Path = "src/template.json" }],
-            _ => [],
-        }));
+        registry.Register(
+            new Fake(
+                "code",
+                request =>
+                    (request.Capability, request.Query) switch
+                    {
+                        (Capabilities.SymbolSearch, "OrderTemplate") => Enumerable
+                            .Range(0, 4)
+                            .Select(i => new ProviderItem { Name = "OrderTemplate", Path = $"test/{i}.cs" })
+                            .ToArray(),
+                        (Capabilities.FileSearch, "template") => [new() { Path = "src/template.json" }],
+                        _ => [],
+                    }
+            )
+        );
         var gathered = await RetrievalGatherer.GatherAsync(new(registry), new("order templates"), Token);
         gathered.Candidates.Take(4).Should().OnlyContain(candidate => !candidate.Scores.ContainsKey("phrase"));
         foreach (var candidate in gathered.Candidates.Take(4))
@@ -151,11 +264,27 @@ public sealed class GatheringTests
         empty.Errors.Should().BeEmpty();
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        await FluentActions.Awaiting(() => RetrievalGatherer.GatherAsync(new(), new("anything"), cancellation.Token)).Should().ThrowAsync<OperationCanceledException>();
+        await FluentActions
+            .Awaiting(() => RetrievalGatherer.GatherAsync(new(), new("anything"), cancellation.Token))
+            .Should()
+            .ThrowAsync<OperationCanceledException>();
     }
 
-    private static MemoryRecord Memory(string id, string type, MemoryScope scope) => new(id, type, "a durable statement", scope, new(), null, "", "", null, null,
-        MemoryTimestamp.Parse("2026-01-01T00:00:00Z"), MemoryTimestamp.Parse("2026-01-01T00:00:00Z"));
+    private static MemoryRecord Memory(string id, string type, MemoryScope scope) =>
+        new(
+            id,
+            type,
+            "a durable statement",
+            scope,
+            new(),
+            null,
+            "",
+            "",
+            null,
+            null,
+            MemoryTimestamp.Parse("2026-01-01T00:00:00Z"),
+            MemoryTimestamp.Parse("2026-01-01T00:00:00Z")
+        );
 
     [Fact]
     public async Task StalledMetadataIsBoundedAndDoesNotPreventMemoryGathering()
@@ -166,38 +295,78 @@ public sealed class GatheringTests
         var memoryCalls = 0;
         try
         {
-            var gathered = await RetrievalGatherer.GatherAsync(new(registry, (_, _) =>
-            {
-                memoryCalls++;
-                return Task.FromResult(new RetrievalMemories([]));
-            }), new("fix OrderService", CodeTimeout: TimeSpan.FromMilliseconds(100)), Token).WaitAsync(TimeSpan.FromSeconds(3), Token);
+            var gathered = await RetrievalGatherer
+                .GatherAsync(
+                    new(
+                        registry,
+                        (_, _) =>
+                        {
+                            memoryCalls++;
+                            return Task.FromResult(new RetrievalMemories([]));
+                        }
+                    ),
+                    new("fix OrderService", CodeTimeout: TimeSpan.FromMilliseconds(100)),
+                    Token
+                )
+                .WaitAsync(TimeSpan.FromSeconds(3), Token);
             gathered.Notes.Should().ContainSingle().Which.Should().Contain("stopped after 100ms");
             memoryCalls.Should().Be(2);
         }
-        finally { release.TrySetException(new IOException("late discovery failure")); }
+        finally
+        {
+            release.TrySetException(new IOException("late discovery failure"));
+        }
     }
 
     [Fact]
     public async Task SourceLocalCancellationIsPartialButCallerCancellationPropagates()
     {
-        var gathered = await RetrievalGatherer.GatherAsync(new(Memory: (_, _) => throw new OperationCanceledException("memory deadline")), new("inspect operations"), Token);
+        var gathered = await RetrievalGatherer.GatherAsync(
+            new(Memory: (_, _) => throw new OperationCanceledException("memory deadline")),
+            new("inspect operations"),
+            Token
+        );
         gathered.Errors.Should().Equal("memory: memory deadline");
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        await FluentActions.Awaiting(() => RetrievalGatherer.GatherAsync(new(Memory: async (_, token) =>
-        {
-            await cancellation.CancelAsync();
-            token.ThrowIfCancellationRequested();
-            return new RetrievalMemories([]);
-        }), new("inspect operations"), cancellation.Token)).Should().ThrowAsync<OperationCanceledException>();
+        await FluentActions
+            .Awaiting(() =>
+                RetrievalGatherer.GatherAsync(
+                    new(
+                        Memory: async (_, token) =>
+                        {
+                            await cancellation.CancelAsync();
+                            token.ThrowIfCancellationRequested();
+                            return new RetrievalMemories([]);
+                        }
+                    ),
+                    new("inspect operations"),
+                    cancellation.Token
+                )
+            )
+            .Should()
+            .ThrowAsync<OperationCanceledException>();
         using var ignored = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        await FluentActions.Awaiting(() => RetrievalGatherer.GatherAsync(new(RecentChanges: async (_, _, _) =>
-        {
-            await ignored.CancelAsync();
-            return Array.Empty<RetrievalCommit>();
-        }), new(""), ignored.Token)).Should().ThrowAsync<OperationCanceledException>();
+        await FluentActions
+            .Awaiting(() =>
+                RetrievalGatherer.GatherAsync(
+                    new(
+                        RecentChanges: async (_, _, _) =>
+                        {
+                            await ignored.CancelAsync();
+                            return Array.Empty<RetrievalCommit>();
+                        }
+                    ),
+                    new(""),
+                    ignored.Token
+                )
+            )
+            .Should()
+            .ThrowAsync<OperationCanceledException>();
     }
 
-    internal sealed class Fake(string name, Func<ProviderRequest, IReadOnlyList<ProviderItem>> answer) : IProvider, IProviderDiscovery
+    internal sealed class Fake(string name, Func<ProviderRequest, IReadOnlyList<ProviderItem>> answer)
+        : IProvider,
+            IProviderDiscovery
     {
         public string Name => name;
         public bool RejectMetadata { get; init; }
@@ -206,6 +375,7 @@ public sealed class GatheringTests
         public List<ProviderRequest> Requests { get; } = [];
         public Func<ProviderRequest, CancellationToken, Task<ProviderResult>>? Execute { get; init; }
         public Func<CancellationToken, Task>? Discover { get; init; }
+
         public Task DiscoverAsync(CancellationToken cancellationToken = default)
         {
             Discoveries++;
@@ -216,6 +386,7 @@ public sealed class GatheringTests
 
             return Discover?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
+
         public IReadOnlyList<CapabilityInfo> Capabilities()
         {
             CapabilityReads++;
@@ -224,14 +395,35 @@ public sealed class GatheringTests
                 throw new InvalidOperationException("excluded capabilities");
             }
 
-            return new[] { Core.Providers.Capabilities.SymbolSearch, Core.Providers.Capabilities.Context, Core.Providers.Capabilities.Callers, Core.Providers.Capabilities.Impact, Core.Providers.Capabilities.FileSearch }.Select(capability => new CapabilityInfo(capability, name)).ToArray();
+            return new[]
+            {
+                Core.Providers.Capabilities.SymbolSearch,
+                Core.Providers.Capabilities.Context,
+                Core.Providers.Capabilities.Callers,
+                Core.Providers.Capabilities.Impact,
+                Core.Providers.Capabilities.FileSearch,
+            }
+                .Select(capability => new CapabilityInfo(capability, name))
+                .ToArray();
         }
+
         public Task<ProviderResult> ExecuteAsync(ProviderRequest request, CancellationToken cancellationToken = default)
         {
             Requests.Add(request);
-            return Execute?.Invoke(request, cancellationToken) ?? Task.FromResult(new ProviderResult { Items = answer(request).Select(item => item with { Provider = name, Tool = "fixture" }).ToArray() });
+            return Execute?.Invoke(request, cancellationToken)
+                ?? Task.FromResult(
+                    new ProviderResult
+                    {
+                        Items = answer(request)
+                            .Select(item => item with { Provider = name, Tool = "fixture" })
+                            .ToArray(),
+                    }
+                );
         }
-        public ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default) => ValueTask.FromResult(new ProviderHealth("ready"));
+
+        public ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ProviderHealth("ready"));
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

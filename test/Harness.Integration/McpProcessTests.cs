@@ -30,16 +30,32 @@ public sealed class McpProcessTests
                 ShutdownTimeout = TimeSpan.FromSeconds(10),
             };
             var path = Path.Combine(root, ".harness", "harness.db");
-            await using (var client = await McpClient.CreateAsync(new StdioClientTransport(options), cancellationToken: TestContext.Current.CancellationToken))
+            await using (
+                var client = await McpClient.CreateAsync(
+                    new StdioClientTransport(options),
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            )
             {
                 client.ServerInfo.Name.Should().Be("harness");
                 var ping = await client.CallToolAsync("ping", cancellationToken: TestContext.Current.CancellationToken);
                 ping.StructuredContent!.Value.GetProperty("message").GetString().Should().Be("pong");
                 File.Exists(path).Should().BeFalse();
-                var diagnostics = await client.CallToolAsync("diagnostics", cancellationToken: TestContext.Current.CancellationToken);
+                var diagnostics = await client.CallToolAsync(
+                    "diagnostics",
+                    cancellationToken: TestContext.Current.CancellationToken
+                );
                 diagnostics.StructuredContent!.Value.TryGetProperty("db_error", out _).Should().BeTrue();
                 Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
-                var put = await client.CallToolAsync("state_put_test", new Dictionary<string, object?>(StringComparer.Ordinal) { ["key"] = "Unicode 🧪", ["value"] = "žluťoučký" }, cancellationToken: TestContext.Current.CancellationToken);
+                var put = await client.CallToolAsync(
+                    "state_put_test",
+                    new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["key"] = "Unicode 🧪",
+                        ["value"] = "žluťoučký",
+                    },
+                    cancellationToken: TestContext.Current.CancellationToken
+                );
                 put.IsError.Should().BeNull();
             }
 
@@ -48,9 +64,18 @@ public sealed class McpProcessTests
                 (exclusive.Length > 0).Should().BeTrue();
             }
 
-            await using (var client = await McpClient.CreateAsync(new StdioClientTransport(options), cancellationToken: TestContext.Current.CancellationToken))
+            await using (
+                var client = await McpClient.CreateAsync(
+                    new StdioClientTransport(options),
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            )
             {
-                var read = await client.CallToolAsync("state_get_test", new Dictionary<string, object?>(StringComparer.Ordinal) { ["key"] = "Unicode 🧪" }, cancellationToken: TestContext.Current.CancellationToken);
+                var read = await client.CallToolAsync(
+                    "state_get_test",
+                    new Dictionary<string, object?>(StringComparer.Ordinal) { ["key"] = "Unicode 🧪" },
+                    cancellationToken: TestContext.Current.CancellationToken
+                );
                 read.StructuredContent!.Value.GetProperty("found").GetBoolean().Should().BeTrue();
                 read.StructuredContent.Value.GetProperty("value").GetString().Should().Be("žluťoučký");
             }

@@ -14,23 +14,45 @@ internal sealed class UiSettings : CommandSettings
     [CommandOption("--addr <ADDRESS>")]
     [Description("Loopback listen address (default 127.0.0.1:17477)")]
     public string Address { get; init; } = UiHost.DefaultAddress;
+
     [CommandOption("--no-open")]
     [Description("Do not open the browser")]
     public bool NoOpen { get; init; }
+
     public override ValidationResult Validate()
     {
         try
-        { UiHost.ParseAddress(Address); return ValidationResult.Success(); }
-        catch (ArgumentException exception) { return ValidationResult.Error(exception.Message); }
+        {
+            UiHost.ParseAddress(Address);
+            return ValidationResult.Success();
+        }
+        catch (ArgumentException exception)
+        {
+            return ValidationResult.Error(exception.Message);
+        }
     }
 }
 
-internal sealed class UiCommand(ProjectLifecycle lifecycle, UiProjectCatalog catalog, UiSessions sessions, TextWriter output, CliErrorOutput error) : AsyncCommand<UiSettings>
+internal sealed class UiCommand(
+    ProjectLifecycle lifecycle,
+    UiProjectCatalog catalog,
+    UiSessions sessions,
+    TextWriter output,
+    CliErrorOutput error
+) : AsyncCommand<UiSettings>
 {
-    public override async Task<int> ExecuteAsync(CommandContext context, UiSettings settings, CancellationToken cancellationToken)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        UiSettings settings,
+        CancellationToken cancellationToken
+    )
     {
-        await using var app = UiHost.Create(settings.Address, _ => new UiReadService(lifecycle, catalog, sessions),
-            _ => new UiReadService(lifecycle, catalog, sessions), () => new UiChangeSource(lifecycle, catalog));
+        await using var app = UiHost.Create(
+            settings.Address,
+            _ => new UiReadService(lifecycle, catalog, sessions),
+            _ => new UiReadService(lifecycle, catalog, sessions),
+            () => new UiChangeSource(lifecycle, catalog)
+        );
         await app.StartAsync(cancellationToken);
         var address = UiHost.Address(app);
         await output.WriteLineAsync("harness ui on " + address + " (Ctrl-C to stop)");
@@ -38,14 +60,18 @@ internal sealed class UiCommand(ProjectLifecycle lifecycle, UiProjectCatalog cat
         if (!settings.NoOpen)
         {
             try
-            { OpenBrowser(address); }
+            {
+                OpenBrowser(address);
+            }
             catch (Exception exception) when (exception is IOException or Win32Exception or InvalidOperationException)
             {
                 await error.Writer.WriteLineAsync("harness ui: cannot open browser: " + exception.Message);
             }
         }
         try
-        { await app.WaitForShutdownAsync(cancellationToken); }
+        {
+            await app.WaitForShutdownAsync(cancellationToken);
+        }
         finally
         {
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -53,9 +79,15 @@ internal sealed class UiCommand(ProjectLifecycle lifecycle, UiProjectCatalog cat
         }
         return 0;
     }
+
     private static void OpenBrowser(string address)
     {
-        var command = (OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()) switch { (true, _) => "rundll32", (_, true) => "open", _ => "xdg-open" };
+        var command = (OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()) switch
+        {
+            (true, _) => "rundll32",
+            (_, true) => "open",
+            _ => "xdg-open",
+        };
         var start = new ProcessStartInfo(command) { UseShellExecute = false, CreateNoWindow = true };
         if (OperatingSystem.IsWindows())
         {

@@ -4,18 +4,28 @@ using Harness.Mcp.Workspaces;
 
 namespace Harness.Mcp.Providers;
 
-public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderProjectSession? project = null, WorkspaceTools? workspace = null)
+public sealed class ProviderTools(
+    IProviderRegistry? registry = null,
+    IProviderProjectSession? project = null,
+    WorkspaceTools? workspace = null
+)
 {
-    public static bool Handles(string name) => name is "search_project" or "provider_status" or "package_api" or "project_overview";
+    public static bool Handles(string name) =>
+        name is "search_project" or "provider_status" or "package_api" or "project_overview";
 
-    public Task<object> CallAsync(string name, IDictionary<string, JsonElement>? arguments, CancellationToken cancellationToken) => name switch
-    {
-        "search_project" => SearchAsync(arguments, cancellationToken),
-        "provider_status" => StatusAsync(cancellationToken),
-        "package_api" => PackageAsync(arguments, cancellationToken),
-        "project_overview" => OverviewAsync(cancellationToken),
-        _ => throw new ArgumentException("unknown provider tool " + name, nameof(name)),
-    };
+    public Task<object> CallAsync(
+        string name,
+        IDictionary<string, JsonElement>? arguments,
+        CancellationToken cancellationToken
+    ) =>
+        name switch
+        {
+            "search_project" => SearchAsync(arguments, cancellationToken),
+            "provider_status" => StatusAsync(cancellationToken),
+            "package_api" => PackageAsync(arguments, cancellationToken),
+            "project_overview" => OverviewAsync(cancellationToken),
+            _ => throw new ArgumentException("unknown provider tool " + name, nameof(name)),
+        };
 
     private async Task<object> SearchAsync(IDictionary<string, JsonElement>? arguments, CancellationToken token)
     {
@@ -40,7 +50,9 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
             "callers" => [Capabilities.Callers],
             "references" => [Capabilities.References],
             "impact" => [Capabilities.Impact],
-            _ => throw new ArgumentException("kind must be one of: symbol, text, file, callers, references, impact, all"),
+            _ => throw new ArgumentException(
+                "kind must be one of: symbol, text, file, callers, references, impact, all"
+            ),
         };
         var path = String(arguments, "path");
         if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal))
@@ -64,26 +76,56 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
 
             if (workspace is null)
             {
-                throw new InvalidOperationException("this project is not in a workspace; use 'harness workspace create' to add it");
+                throw new InvalidOperationException(
+                    "this project is not in a workspace; use 'harness workspace create' to add it"
+                );
             }
 
-            return await workspace.SearchAsync(query, kind, capabilities, path, Limit(arguments), depth is "deep", arguments?.TryGetValue("debug", out var wsDebug) is true && wsDebug.GetBoolean(), token).ConfigureAwait(false);
+            return await workspace
+                .SearchAsync(
+                    query,
+                    kind,
+                    capabilities,
+                    path,
+                    Limit(arguments),
+                    depth is "deep",
+                    arguments?.TryGetValue("debug", out var wsDebug) is true && wsDebug.GetBoolean(),
+                    token
+                )
+                .ConfigureAwait(false);
         }
         await DiscoverAsync(token).ConfigureAwait(false);
         var debug = arguments?.TryGetValue("debug", out var value) is true && value.GetBoolean();
-        var snapshot = registry?.IndexedProviders().Count > 0 ? await SnapshotAsync(token).ConfigureAwait(false) : new ProviderProjectSnapshot();
-        var indexed = snapshot.CrossBranch ? registry?.IndexedProviders() ?? new HashSet<string>(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
+        var snapshot =
+            registry?.IndexedProviders().Count > 0
+                ? await SnapshotAsync(token).ConfigureAwait(false)
+                : new ProviderProjectSnapshot();
+        var indexed = snapshot.CrossBranch
+            ? registry?.IndexedProviders() ?? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
         var output = new Dictionary<string, object?> { ["query"] = query };
-        List<object> items = [], calls = [];
-        List<string> errors = [], notIndexed = [];
+        List<object> items = [],
+            calls = [];
+        List<string> errors = [],
+            notIndexed = [];
         var asked = 0;
         var truncated = false;
         foreach (var capability in capabilities)
         {
-            foreach (var result in await CallAsync(new(capability, query, path, Limit(arguments)), token).ConfigureAwait(false))
+            foreach (
+                var result in await CallAsync(new(capability, query, path, Limit(arguments)), token)
+                    .ConfigureAwait(false)
+            )
             {
                 asked++;
-                var call = new Dictionary<string, object?> { ["provider"] = result.Provider, ["capability"] = result.Capability, ["items"] = result.Items.Count, ["latency_ms"] = (long)result.Latency.TotalMilliseconds, ["bytes"] = result.Bytes };
+                var call = new Dictionary<string, object?>
+                {
+                    ["provider"] = result.Provider,
+                    ["capability"] = result.Capability,
+                    ["items"] = result.Items.Count,
+                    ["latency_ms"] = (long)result.Latency.TotalMilliseconds,
+                    ["bytes"] = result.Bytes,
+                };
                 if (result.Truncated)
                 {
                     call["truncated"] = true;
@@ -129,7 +171,9 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
             output["calls"] = calls;
         }
 
-        var note = asked is 0 ? "no provider offers this kind of search; configure providers (see provider_status)" : "";
+        var note = asked is 0
+            ? "no provider offers this kind of search; configure providers (see provider_status)"
+            : "";
         if (notIndexed.Count > 0)
         {
             note = string.Join("; ", notIndexed.Append(note)).TrimEnd(';', ' ');
@@ -144,7 +188,10 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
         var stale = snapshot.Stale;
         if (snapshot.CrossBranch && indexed.Count > 0)
         {
-            stale += "; results from " + string.Join(", ", indexed.Order(StringComparer.Ordinal)) + " were withheld until then";
+            stale +=
+                "; results from "
+                + string.Join(", ", indexed.Order(StringComparer.Ordinal))
+                + " were withheld until then";
         }
 
         if (registry?.IndexedProviders().Count > 0)
@@ -184,19 +231,37 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
             throw new ArgumentException("definition needs type");
         }
 
-        var results = await CallAsync(new(capability, query, Limit: Limit(arguments), Package: package, Version: String(arguments, "version").Trim(), Type: type), token).ConfigureAwait(false);
+        var results = await CallAsync(
+                new(
+                    capability,
+                    query,
+                    Limit: Limit(arguments),
+                    Package: package,
+                    Version: String(arguments, "version").Trim(),
+                    Type: type
+                ),
+                token
+            )
+            .ConfigureAwait(false);
         var output = new Dictionary<string, object?> { ["action"] = action };
         if (results.Count is 0)
         {
-            output["note"] = "no provider offers " + capability + "; configure a package provider such as NugetMcpServer (see: harness docs providers)";
+            output["note"] =
+                "no provider offers "
+                + capability
+                + "; configure a package provider such as NugetMcpServer (see: harness docs providers)";
             return output;
         }
-        List<object> items = [], answers = [];
+        List<object> items = [],
+            answers = [];
         List<string> errors = [];
         foreach (var result in results)
         {
             if (result.Error is { } error)
-            { errors.Add(FirstLine(error.Message)); continue; }
+            {
+                errors.Add(FirstLine(error.Message));
+                continue;
+            }
             if (result.Truncated)
             {
                 output["truncated"] = true;
@@ -233,7 +298,8 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
 
         if (items.Count is 0 && answers.Count is 0 && errors.Count > 0)
         {
-            output["note"] = "no package provider could answer (errors above): a package from a private feed may not be reachable by the provider. Read its restored copy instead (NuGet: ~/.nuget/packages/<id>/<version>/, with its XML docs), or search_project kind symbol for how this repository uses it";
+            output["note"] =
+                "no package provider could answer (errors above): a package from a private feed may not be reachable by the provider. Read its restored copy instead (NuGet: ~/.nuget/packages/<id>/<version>/, with its XML docs), or search_project kind symbol for how this repository uses it";
         }
 
         return output;
@@ -243,7 +309,18 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
     {
         await DiscoverAsync(token).ConfigureAwait(false);
         var snapshot = await SnapshotAsync(token).ConfigureAwait(false);
-        var output = new Dictionary<string, object?> { ["project_root"] = snapshot.Root, ["capabilities"] = CapabilitiesOf().GroupBy(cap => cap.Capability, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Select(cap => cap.Provider).ToArray(), StringComparer.Ordinal), ["hint"] = "Use search_project to find code; provider_status if something is missing." };
+        var output = new Dictionary<string, object?>
+        {
+            ["project_root"] = snapshot.Root,
+            ["capabilities"] = CapabilitiesOf()
+                .GroupBy(cap => cap.Capability, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(cap => cap.Provider).ToArray(),
+                    StringComparer.Ordinal
+                ),
+            ["hint"] = "Use search_project to find code; provider_status if something is missing.",
+        };
         Add(output, "project_id", snapshot.ProjectId);
         Add(output, "git_branch", snapshot.Branch);
         Add(output, "git_commit", snapshot.Commit);
@@ -260,7 +337,9 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
         if (registry is not null)
         {
             var indexed = registry.IndexedProviders();
-            var (structure, errors) = await registry.OverviewAsync(name => snapshot.CrossBranch && indexed.Contains(name), token).ConfigureAwait(false);
+            var (structure, errors) = await registry
+                .OverviewAsync(name => snapshot.CrossBranch && indexed.Contains(name), token)
+                .ConfigureAwait(false);
             if (structure.Count > 0)
             {
                 output["structure"] = structure;
@@ -279,28 +358,45 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
         await DiscoverAsync(token).ConfigureAwait(false);
         var providers = registry?.Providers() ?? [];
         // Probe independent providers concurrently; preserve registration order in the response.
-        var entries = await Task.WhenAll(providers.Select(async provider =>
-        {
-            var health = await provider.HealthAsync(true, token).ConfigureAwait(false);
-            var caps = provider.Capabilities();
-            var entry = new Dictionary<string, object?> { ["name"] = provider.Name, ["state"] = health.State, ["capabilities"] = caps.Count is 0 ? null : caps.Select(cap => cap.Capability).ToArray() };
-            Add(entry, "detail", health.Detail);
-            Add(entry, "fix", health.Fix);
-            Add(entry, "freshness", caps.Count is 0 ? null : caps[^1].Freshness);
-            if (project is not null)
-            {
-                foreach (var (key, value) in await project.ReadProviderStatisticsAsync(provider.Name, token).ConfigureAwait(false))
+        var entries = await Task.WhenAll(
+                providers.Select(async provider =>
                 {
-                    entry[key] = value;
-                }
-            }
+                    var health = await provider.HealthAsync(true, token).ConfigureAwait(false);
+                    var caps = provider.Capabilities();
+                    var entry = new Dictionary<string, object?>
+                    {
+                        ["name"] = provider.Name,
+                        ["state"] = health.State,
+                        ["capabilities"] = caps.Count is 0 ? null : caps.Select(cap => cap.Capability).ToArray(),
+                    };
+                    Add(entry, "detail", health.Detail);
+                    Add(entry, "fix", health.Fix);
+                    Add(entry, "freshness", caps.Count is 0 ? null : caps[^1].Freshness);
+                    if (project is not null)
+                    {
+                        foreach (
+                            var (key, value) in await project
+                                .ReadProviderStatisticsAsync(provider.Name, token)
+                                .ConfigureAwait(false)
+                        )
+                        {
+                            entry[key] = value;
+                        }
+                    }
 
-            return entry;
-        })).ConfigureAwait(false);
-        var output = new Dictionary<string, object?> { ["providers"] = entries, ["architecture"] = ArchitectureCoverage() };
+                    return entry;
+                })
+            )
+            .ConfigureAwait(false);
+        var output = new Dictionary<string, object?>
+        {
+            ["providers"] = entries,
+            ["architecture"] = ArchitectureCoverage(),
+        };
         if (providers.Count is 0)
         {
-            output["note"] = "no providers configured; add [providers.codebase-memory] / [providers.rg-fd] to the harness config (see: harness docs providers)";
+            output["note"] =
+                "no providers configured; add [providers.codebase-memory] / [providers.rg-fd] to the harness config (see: harness docs providers)";
         }
 
         return output;
@@ -309,24 +405,34 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
     private object[] ArchitectureCoverage()
     {
         var offered = CapabilitiesOf();
-        return Capabilities.Architecture.Select(capability =>
-        {
-            var providers = offered.Where(cap => cap.Capability == capability).Select(cap => cap.Provider).Order(StringComparer.Ordinal).ToArray();
-            var entry = new Dictionary<string, object?> { ["capability"] = capability, ["providers"] = providers };
-            if (providers.Length is 0)
+        return Capabilities
+            .Architecture.Select(capability =>
             {
-                entry["without"] = capability switch
+                var providers = offered
+                    .Where(cap => cap.Capability == capability)
+                    .Select(cap => cap.Provider)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+                var entry = new Dictionary<string, object?> { ["capability"] = capability, ["providers"] = providers };
+                if (providers.Length is 0)
                 {
-                    Capabilities.ArchDependencies => "harness reads dependencies itself from build files and imports; nothing is missing",
-                    Capabilities.ArchCycles => "harness finds circles in what it reads itself; nothing is missing",
-                    Capabilities.ArchChangeCoupling => "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)",
-                    Capabilities.ArchDuplicates => "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)",
-                    _ => "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet",
-                };
-            }
+                    entry["without"] = capability switch
+                    {
+                        Capabilities.ArchDependencies =>
+                            "harness reads dependencies itself from build files and imports; nothing is missing",
+                        Capabilities.ArchCycles => "harness finds circles in what it reads itself; nothing is missing",
+                        Capabilities.ArchChangeCoupling =>
+                            "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)",
+                        Capabilities.ArchDuplicates =>
+                            "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)",
+                        _ =>
+                            "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet",
+                    };
+                }
 
-            return (object)entry;
-        }).ToArray();
+                return (object)entry;
+            })
+            .ToArray();
     }
 
     private static Dictionary<string, object?> SearchItem(ProviderItem item, bool debug)
@@ -364,22 +470,43 @@ public sealed class ProviderTools(IProviderRegistry? registry = null, IProviderP
     }
 
     private Task DiscoverAsync(CancellationToken token) => registry?.DiscoverAsync(token) ?? Task.CompletedTask;
-    private Task<ProviderProjectSnapshot> SnapshotAsync(CancellationToken token) => project?.ReadProviderProjectAsync(token) ?? Task.FromResult(new ProviderProjectSnapshot());
+
+    private Task<ProviderProjectSnapshot> SnapshotAsync(CancellationToken token) =>
+        project?.ReadProviderProjectAsync(token) ?? Task.FromResult(new ProviderProjectSnapshot());
+
     private IReadOnlyList<CapabilityInfo> CapabilitiesOf() => registry?.Capabilities() ?? [];
-    private Task<IReadOnlyList<ProviderResult>> CallAsync(ProviderRequest request, CancellationToken token) => registry?.CallAsync(request, cancellationToken: token) ?? Task.FromResult<IReadOnlyList<ProviderResult>>([]);
-    private static string String(IDictionary<string, JsonElement>? arguments, string key) => arguments?.TryGetValue(key, out var value) is true ? value.GetString() ?? "" : "";
-    private static int Limit(IDictionary<string, JsonElement>? arguments) => Math.Clamp(arguments?.TryGetValue("limit", out var value) is true && value.GetInt32() > 0 ? value.GetInt32() : 10, 1, 50);
+
+    private Task<IReadOnlyList<ProviderResult>> CallAsync(ProviderRequest request, CancellationToken token) =>
+        registry?.CallAsync(request, cancellationToken: token) ?? Task.FromResult<IReadOnlyList<ProviderResult>>([]);
+
+    private static string String(IDictionary<string, JsonElement>? arguments, string key) =>
+        arguments?.TryGetValue(key, out var value) is true ? value.GetString() ?? "" : "";
+
+    private static int Limit(IDictionary<string, JsonElement>? arguments) =>
+        Math.Clamp(
+            arguments?.TryGetValue("limit", out var value) is true && value.GetInt32() > 0 ? value.GetInt32() : 10,
+            1,
+            50
+        );
+
     private static string FirstLine(string value) => value.Split('\n')[0];
-    private static void Add(Dictionary<string, object?> output, string key, string? value) { if (!string.IsNullOrEmpty(value))
+
+    private static void Add(Dictionary<string, object?> output, string key, string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
         {
             output[key] = value;
         }
     }
-    private static string EmptyHint(string kind, bool failed) => (failed, kind) switch
-    {
-        (true, _) => "nothing answered: the providers above failed; try kind text, or the provider's own tool, and keep using harness for the next question",
-        (_, "callers" or "references" or "impact") => "none found: provider graphs can miss uses through interfaces, generics, dependency injection or reflection, or lag new code; try kind text for the name before concluding there are none",
-        (_, "symbol") => "no symbol found: try kind text (names in strings or config) or part of the name",
-        _ => "nothing found: try another wording, part of a name, or kind text",
-    };
+
+    private static string EmptyHint(string kind, bool failed) =>
+        (failed, kind) switch
+        {
+            (true, _) =>
+                "nothing answered: the providers above failed; try kind text, or the provider's own tool, and keep using harness for the next question",
+            (_, "callers" or "references" or "impact") =>
+                "none found: provider graphs can miss uses through interfaces, generics, dependency injection or reflection, or lag new code; try kind text for the name before concluding there are none",
+            (_, "symbol") => "no symbol found: try kind text (names in strings or config) or part of the name",
+            _ => "nothing found: try another wording, part of a name, or kind text",
+        };
 }

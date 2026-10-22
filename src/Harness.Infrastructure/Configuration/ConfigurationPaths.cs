@@ -2,12 +2,16 @@ namespace Harness.Infrastructure.Configuration;
 
 public static class ConfigurationPaths
 {
-    public static string GlobalPath() => GlobalPath((OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()) switch
-    {
-        (true, _) => "windows",
-        (_, true) => "darwin",
-        _ => "linux",
-    }, Environment.GetEnvironmentVariable);
+    public static string GlobalPath() =>
+        GlobalPath(
+            (OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()) switch
+            {
+                (true, _) => "windows",
+                (_, true) => "darwin",
+                _ => "linux",
+            },
+            Environment.GetEnvironmentVariable
+        );
 
     public static string GlobalPath(string platform, Func<string, string?> environment)
     {

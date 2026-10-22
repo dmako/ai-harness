@@ -12,22 +12,60 @@ namespace Harness.Integration.Workspaces;
 public sealed class CouplingProcessTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task PublicChangeCouplingPreservesSchemaPrecedenceDirtyPathsAndUnknownProviderNotes()
     {
         using var fixture = await SyncFixture.CreateAsync();
         fixture.Write("a.cs", "uncommitted");
-        var binary = Path.Combine(ProviderFixture.RepositoryRoot, "src", "Harness.Cli", "bin", Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name, "net10.0", "harness.dll");
+        var binary = Path.Combine(
+            ProviderFixture.RepositoryRoot,
+            "src",
+            "Harness.Cli",
+            "bin",
+            Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name,
+            "net10.0",
+            "harness.dll"
+        );
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
         environment["HARNESS_CONFIG_DIR"] = fixture.Global;
-        await using var client = await McpClient.CreateAsync(new StdioClientTransport(new() { Command = "dotnet", Arguments = [binary, "mcp", "--project", fixture.Root], WorkingDirectory = fixture.Root, EnvironmentVariables = environment, InheritEnvironmentVariables = false }), cancellationToken: Token);
+        await using var client = await McpClient.CreateAsync(
+            new StdioClientTransport(
+                new()
+                {
+                    Command = "dotnet",
+                    Arguments = [binary, "mcp", "--project", fixture.Root],
+                    WorkingDirectory = fixture.Root,
+                    EnvironmentVariables = environment,
+                    InheritEnvironmentVariables = false,
+                }
+            ),
+            cancellationToken: Token
+        );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
         tools.Should().HaveCount(30);
         var tool = JsonSerializer.SerializeToElement(tools.Single(tool => tool.Name == "change_coupling").ProtocolTool);
-        using var baseline = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"), Token));
-        var original = baseline.RootElement.GetProperty("cases").GetProperty("mcp").EnumerateArray().Single(row => row.GetProperty("name").GetString() == "tools_list").GetProperty("response").GetProperty("result").GetProperty("tools").EnumerateArray().Single(tool => tool.GetProperty("name").GetString() == "change_coupling");
+        using var baseline = JsonDocument.Parse(
+            await File.ReadAllTextAsync(
+                Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"),
+                Token
+            )
+        );
+        var original = baseline
+            .RootElement.GetProperty("cases")
+            .GetProperty("mcp")
+            .EnumerateArray()
+            .Single(row => row.GetProperty("name").GetString() == "tools_list")
+            .GetProperty("response")
+            .GetProperty("result")
+            .GetProperty("tools")
+            .EnumerateArray()
+            .Single(tool => tool.GetProperty("name").GetString() == "change_coupling");
         JsonElement.DeepEquals(tool.GetProperty("inputSchema"), original.GetProperty("inputSchema")).Should().BeTrue();
-        JsonElement.DeepEquals(tool.GetProperty("outputSchema"), original.GetProperty("outputSchema")).Should().BeTrue();
+        JsonElement
+            .DeepEquals(tool.GetProperty("outputSchema"), original.GetProperty("outputSchema"))
+            .Should()
+            .BeTrue();
         var file = await CallAsync(new() { ["file"] = "./a.cs", ["check"] = true });
         file.TryGetProperty("changed", out _).Should().BeFalse();
         file.GetProperty("note").GetString().Should().Contain("partners are unknown");
@@ -39,7 +77,11 @@ public sealed class CouplingProcessTests
         var hotspots = await CallAsync(new() { ["limit"] = 0 });
         hotspots.GetProperty("commits").GetInt32().Should().Be(1);
         hotspots.TryGetProperty("hotspots", out _).Should().BeFalse();
-        var invalid = await client.CallToolAsync("change_coupling", new Dictionary<string, object?> { ["unknown"] = "value" }, cancellationToken: Token);
+        var invalid = await client.CallToolAsync(
+            "change_coupling",
+            new Dictionary<string, object?> { ["unknown"] = "value" },
+            cancellationToken: Token
+        );
         invalid.IsError.Should().BeTrue();
 
         async Task<JsonElement> CallAsync(Dictionary<string, object?> arguments)

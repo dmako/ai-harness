@@ -8,21 +8,50 @@ public sealed record ContextBudget(int Bytes = 0, double SoftShare = 0, int MaxB
     public const int BytesPerToken = 4;
     public const int DefaultBytes = 8000;
     public Func<ContextUnit, IReadOnlyList<ContextUnit>, int>? Cost { get; init; }
+
     public static ContextBudget FromTokens(int tokens) => new(checked(tokens * BytesPerToken));
+
     public ContextBudget WithDefaults()
     {
         var bytes = Bytes > 0 ? Bytes : DefaultBytes;
-        return this with { Bytes = bytes, SoftShare = SoftShare is > 0 and <= 1 ? SoftShare : 0.75, MaxBody = MaxBody > 0 ? MaxBody : bytes / 4 };
+        return this with
+        {
+            Bytes = bytes,
+            SoftShare = SoftShare is > 0 and <= 1 ? SoftShare : 0.75,
+            MaxBody = MaxBody > 0 ? MaxBody : bytes / 4,
+        };
     }
 }
 
-public sealed record ContextUnit(Ranked Ranked, string Body = "", bool Clipped = false, string Reference = "", int Cost = 0, string BodyNote = "");
-public sealed record PackedContext(IReadOnlyList<ContextUnit> Units, ContextBudget Budget, int Used, int Omitted, bool Overrun, string Note, IReadOnlyList<Ranked> Rejected);
+public sealed record ContextUnit(
+    Ranked Ranked,
+    string Body = "",
+    bool Clipped = false,
+    string Reference = "",
+    int Cost = 0,
+    string BodyNote = ""
+);
+
+public sealed record PackedContext(
+    IReadOnlyList<ContextUnit> Units,
+    ContextBudget Budget,
+    int Used,
+    int Omitted,
+    bool Overrun,
+    string Note,
+    IReadOnlyList<Ranked> Rejected
+);
+
 public delegate Task<string> ContextBodyReader(string path, int start, int end, CancellationToken cancellationToken);
 
 public static class ContextPacker
 {
-    public static async Task<PackedContext> PackAsync(IEnumerable<Ranked> ranked, ContextBudget budget, ContextBodyReader? read = null, CancellationToken cancellationToken = default)
+    public static async Task<PackedContext> PackAsync(
+        IEnumerable<Ranked> ranked,
+        ContextBudget budget,
+        ContextBodyReader? read = null,
+        CancellationToken cancellationToken = default
+    )
     {
         budget = budget.WithDefaults();
         List<ContextUnit> units = [];
@@ -38,14 +67,21 @@ public static class ContextPacker
             if (candidate.Source is "code")
             {
                 unit = unit with { Reference = Reference(candidate) };
-                var (body, clipped, reason) = await BodyAsync(item, budget, read, cancellationToken).ConfigureAwait(false);
+                var (body, clipped, reason) = await BodyAsync(item, budget, read, cancellationToken)
+                    .ConfigureAwait(false);
                 if (reason.Length > 0)
                 {
                     unit = unit with { BodyNote = reason };
                 }
                 else if ((long)bodies + Bytes(body) > softLimit)
                 {
-                    unit = unit with { BodyNote = string.Create(CultureInfo.InvariantCulture, $"reference only: bodies reached the soft limit ({bodies} of {softLimit} bytes)") };
+                    unit = unit with
+                    {
+                        BodyNote = string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"reference only: bodies reached the soft limit ({bodies} of {softLimit} bytes)"
+                        ),
+                    };
                 }
                 else
                 {
@@ -55,12 +91,17 @@ public static class ContextPacker
                         unit = unit with { BodyNote = "reference only: the body would exceed the budget" };
                     }
                     else
-                    { unit = withBody; bodies += Bytes(body); }
+                    {
+                        unit = withBody;
+                        bodies += Bytes(body);
+                    }
                 }
             }
             else if (Bytes(candidate.Text) > 40)
             {
-                var previous = units.Find(previous => previous.Body.Length > 0 && previous.Body.Contains(candidate.Text, StringComparison.Ordinal));
+                var previous = units.Find(previous =>
+                    previous.Body.Length > 0 && previous.Body.Contains(candidate.Text, StringComparison.Ordinal)
+                );
                 if (previous is not null)
                 {
                     unit = unit with { Reference = "see " + previous.Reference };
@@ -68,12 +109,23 @@ public static class ContextPacker
             }
             unit = unit with { Cost = Cost(unit) };
             if ((long)used + unit.Cost > budget.Bytes)
-            { rejected.Add(item); continue; }
+            {
+                rejected.Add(item);
+                continue;
+            }
             used += unit.Cost;
             units.Add(unit);
         }
         var omitted = rejected.Count;
-        return new(units, budget, used, omitted, omitted > 0, omitted > 0 ? OmissionNote(omitted, budget.Bytes) : "", rejected);
+        return new(
+            units,
+            budget,
+            used,
+            omitted,
+            omitted > 0,
+            omitted > 0 ? OmissionNote(omitted, budget.Bytes) : "",
+            rejected
+        );
 
         int Cost(ContextUnit unit)
         {
@@ -92,8 +144,11 @@ public static class ContextPacker
         }
     }
 
-    public static string OmissionNote(int omitted, int bytes) => string.Create(CultureInfo.InvariantCulture,
-        $"{omitted} lower-ranked candidate(s) did not fit in {bytes} bytes (~{bytes / ContextBudget.BytesPerToken} tokens); raise the budget or narrow the task");
+    public static string OmissionNote(int omitted, int bytes) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{omitted} lower-ranked candidate(s) did not fit in {bytes} bytes (~{bytes / ContextBudget.BytesPerToken} tokens); raise the budget or narrow the task"
+        );
 
     public static string Reference(Candidate candidate)
     {
@@ -109,15 +164,29 @@ public static class ContextPacker
         return (candidate.Name.Length > 0 ? candidate.Name : candidate.Role) + " " + location;
     }
 
-    private static async Task<(string Text, bool Clipped, string Reason)> BodyAsync(Ranked ranked, ContextBudget budget, ContextBodyReader? read, CancellationToken token)
+    private static async Task<(string Text, bool Clipped, string Reason)> BodyAsync(
+        Ranked ranked,
+        ContextBudget budget,
+        ContextBodyReader? read,
+        CancellationToken token
+    )
     {
         var candidate = ranked.Candidate;
         var text = candidate.Text;
-        if (candidate.StartLine > 0 && candidate.EndLine > candidate.StartLine && read is not null && candidate.Role is "definition")
+        if (
+            candidate.StartLine > 0
+            && candidate.EndLine > candidate.StartLine
+            && read is not null
+            && candidate.Role is "definition"
+        )
         {
             try
-            { text = await read(candidate.Path, candidate.StartLine, candidate.EndLine, token).ConfigureAwait(false); }
-            catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested) { /* Retain the known snippet if a body cannot be loaded. */ }
+            {
+                text = await read(candidate.Path, candidate.StartLine, candidate.EndLine, token).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
+            { /* Retain the known snippet if a body cannot be loaded. */
+            }
         }
         if (text.Length is 0)
         {
@@ -134,7 +203,14 @@ public static class ContextPacker
             return (Clip(text, budget.MaxBody), true, "");
         }
 
-        return ("", false, string.Create(CultureInfo.InvariantCulture, $"reference only: body {Bytes(text)} bytes over the {budget.MaxBody}-byte maximum"));
+        return (
+            "",
+            false,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"reference only: body {Bytes(text)} bytes over the {budget.MaxBody}-byte maximum"
+            )
+        );
     }
 
     private static string Clip(string text, int maximum)
@@ -157,5 +233,6 @@ public static class ContextPacker
         }
         return text[..end].TrimEnd('\n') + Marker;
     }
+
     private static int Bytes(string text) => Encoding.UTF8.GetByteCount(text);
 }

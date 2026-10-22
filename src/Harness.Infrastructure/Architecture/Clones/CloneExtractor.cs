@@ -10,11 +10,13 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
 {
     private IReadOnlyList<CloneFunction>? _functions;
     private readonly List<CloneBranch> _branches = [];
+
     public IReadOnlyList<CloneBranch> Branches()
     {
         Extract();
         return _branches;
     }
+
     public IReadOnlyList<CloneFunction> Extract()
     {
         if (_functions is not null)
@@ -45,25 +47,59 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
         }
         foreach (var file in go)
         {
-            var peers = go.Where(peer => Directory(peer.Path) == Directory(file.Path)).Select(peer => peer.Tokens).ToArray();
+            var peers = go.Where(peer => Directory(peer.Path) == Directory(file.Path))
+                .Select(peer => peer.Tokens)
+                .ToArray();
             functions.AddRange(GoFunctions(file.Path, file.Tokens, peers));
             _branches.AddRange(GoBranches(file.Path, file.Tokens));
         }
         return _functions = functions;
     }
+
     public EvidenceFunction? Locate(EvidenceSite site)
     {
-        var functions = Extract().Where(function => function.Path == site.Path && function.Line <= site.Line && site.Line <= function.End).ToArray();
+        var functions = Extract()
+            .Where(function => function.Path == site.Path && function.Line <= site.Line && site.Line <= function.End)
+            .ToArray();
         var name = site.Name ?? "?";
-        var named = functions.Where(function => function.Name == name || function.Name.Split('.')[^1] == name).MinBy(function => Math.Abs(function.Line - site.Line));
+        var named = functions
+            .Where(function => function.Name == name || function.Name.Split('.')[^1] == name)
+            .MinBy(function => Math.Abs(function.Line - site.Line));
         var found = named ?? functions.MinBy(function => function.End - function.Line);
         return found is null ? null : new(found.Name, found.Line, found.End);
     }
-    public static bool Reads(string file) => Language(file).Length > 0 && !TaskParsing.IsTestFile(file) && !ChangeCoupling.Generated(file) && !file.Split('/').Any(part => part is "node_modules" or "vendor" or "testdata" || part.StartsWith('.'));
-    private static string Language(string file) => Path.GetExtension(file).ToUpperInvariant() switch { ".GO" => "go", ".CS" => "cs", ".TS" or ".TSX" or ".JS" or ".JSX" or ".MJS" when !file.EndsWith(".d.ts", StringComparison.Ordinal) && !file.EndsWith(".min.js", StringComparison.Ordinal) => "ts", _ => "" };
-    private static string Directory(string file) => Path.GetDirectoryName(file)?.Replace('\\', '/') is { Length: > 0 } dir ? dir : ".";
+
+    public static bool Reads(string file) =>
+        Language(file).Length > 0
+        && !TaskParsing.IsTestFile(file)
+        && !ChangeCoupling.Generated(file)
+        && !file.Split('/').Any(part => part is "node_modules" or "vendor" or "testdata" || part.StartsWith('.'));
+
+    private static string Language(string file) =>
+        Path.GetExtension(file).ToUpperInvariant() switch
+        {
+            ".GO" => "go",
+            ".CS" => "cs",
+            ".TS"
+            or ".TSX"
+            or ".JS"
+            or ".JSX"
+            or ".MJS"
+                when !file.EndsWith(".d.ts", StringComparison.Ordinal)
+                    && !file.EndsWith(".min.js", StringComparison.Ordinal) => "ts",
+            _ => "",
+        };
+
+    private static string Directory(string file) =>
+        Path.GetDirectoryName(file)?.Replace('\\', '/') is { Length: > 0 } dir ? dir : ".";
+
     private sealed record Declaration(CloneFunction Function, int Parameters, int Body, int End);
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeSmell", "S127:For loop stop conditions should be invariant", Justification = "The token cursor deliberately skips matched parameter/body subtrees.")]
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "CodeSmell",
+        "S127:For loop stop conditions should be invariant",
+        Justification = "The token cursor deliberately skips matched parameter/body subtrees."
+    )]
     private static List<CloneFunction> CFunctions(string path, string language, List<CodeToken> tokens)
     {
         List<Declaration> declarations = [];
@@ -77,7 +113,11 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
 
             var overrides = false;
             List<string> result = [];
-            for (var index = name - 1; index >= 0 && index >= name - 12 && !";{}],()=".Contains(tokens[index].Text, StringComparison.Ordinal); index--)
+            for (
+                var index = name - 1;
+                index >= 0 && index >= name - 12 && !";{}],()=".Contains(tokens[index].Text, StringComparison.Ordinal);
+                index--
+            )
             {
                 overrides |= tokens[index].Text is "override";
                 if (!CloneLexer.Modifiers.Contains(tokens[index].Text))
@@ -88,19 +128,55 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             var close = tokens[parameters].Text is "(" ? CloneLexer.Match(tokens, parameters) : parameters;
             if (language is "ts" && close + 1 < body && tokens[close + 1].Text is ":")
             {
-                result = tokens.Skip(close + 2).Take(body - close - 2).TakeWhile(token => token.Text is not "=>").Select(token => token.Text).ToList();
+                result = tokens
+                    .Skip(close + 2)
+                    .Take(body - close - 2)
+                    .TakeWhile(token => token.Text is not "=>")
+                    .Select(token => token.Text)
+                    .ToList();
             }
 
             var signature = new List<string> { string.Concat(result), "|" };
-            signature.AddRange(tokens[parameters].Text is "(" ? ParameterTypes(tokens.GetRange(parameters + 1, close - parameters - 1), language) : ["?"]);
-            declarations.Add(new(new() { Path = path, Name = tokens[name].Text, Line = tokens[name].Line, End = tokens[end].Line, Language = language, Override = overrides, Signature = signature }, parameters, body, end));
+            signature.AddRange(
+                tokens[parameters].Text is "("
+                    ? ParameterTypes(tokens.GetRange(parameters + 1, close - parameters - 1), language)
+                    : ["?"]
+            );
+            declarations.Add(
+                new(
+                    new()
+                    {
+                        Path = path,
+                        Name = tokens[name].Text,
+                        Line = tokens[name].Line,
+                        End = tokens[end].Line,
+                        Language = language,
+                        Override = overrides,
+                        Signature = signature,
+                    },
+                    parameters,
+                    body,
+                    end
+                )
+            );
         }
         for (var index = 0; index + 1 < tokens.Count; index++)
         {
             var token = tokens[index];
-            if (token.Kind is 'i' && tokens[index + 1].Text is "(" && !CloneLexer.Control.Contains(token.Text) && !CloneLexer.Keywords.Contains(token.Text))
+            if (
+                token.Kind is 'i'
+                && tokens[index + 1].Text is "("
+                && !CloneLexer.Control.Contains(token.Text)
+                && !CloneLexer.Keywords.Contains(token.Text)
+            )
             {
-                if (index > 0 && (tokens[index - 1].Text is "." or "?." or "new" || CloneLexer.Declares.Contains(tokens[index - 1].Text)))
+                if (
+                    index > 0
+                    && (
+                        tokens[index - 1].Text is "." or "?." or "new"
+                        || CloneLexer.Declares.Contains(tokens[index - 1].Text)
+                    )
+                )
                 {
                     continue;
                 }
@@ -120,8 +196,16 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
                         break;
                     }
 
-                    if (current.Kind is 'p' && current.Text is "(" && CloneLexer.Match(tokens, cursor) is var end && end > 0)
-                    { cursor = end; continue; }
+                    if (
+                        current.Kind is 'p'
+                        && current.Text is "("
+                        && CloneLexer.Match(tokens, cursor) is var end
+                        && end > 0
+                    )
+                    {
+                        cursor = end;
+                        continue;
+                    }
                     if (current.Kind is 'p' && current.Text is "{")
                     {
                         if (language is "cs" || cursor == close + 1 || tokens[close + 1].Text is ":")
@@ -176,24 +260,63 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
                 Add(before - 1, parameters, index + 1);
             }
         }
-        var locals = declarations.Select(declaration => Forms(tokens, declaration.Parameters, declaration.Body, declaration.End, null, language is "ts").Locals).ToArray();
+        var locals = declarations
+            .Select(declaration =>
+                Forms(tokens, declaration.Parameters, declaration.Body, declaration.End, null, language is "ts").Locals
+            )
+            .ToArray();
         List<CloneFunction> output = [];
         foreach (var declaration in declarations)
         {
             Dictionary<string, string> captured = new(StringComparer.Ordinal);
-            foreach (var outer in declarations.Select((value, index) => (value, index)).Where(pair => pair.value != declaration && pair.value.Body < declaration.Body && declaration.End <= pair.value.End).OrderBy(pair => pair.value.Body))
+            foreach (
+                var outer in declarations
+                    .Select((value, index) => (value, index))
+                    .Where(pair =>
+                        pair.value != declaration
+                        && pair.value.Body < declaration.Body
+                        && declaration.End <= pair.value.End
+                    )
+                    .OrderBy(pair => pair.value.Body)
+            )
             {
                 foreach (var local in locals[outer.index])
                 {
-                    captured[local] = outer.value.Function.Name + "@" + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture) + ".";
+                    captured[local] =
+                        outer.value.Function.Name
+                        + "@"
+                        + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture)
+                        + ".";
                 }
             }
 
-            var forms = Forms(tokens, declaration.Parameters, declaration.Body, declaration.End, captured, language is "ts");
-            output.Add(declaration.Function with { Canonical = forms.Canonical, Shape = forms.Shape, Statements = forms.Statements, Data = tokens.Skip(declaration.Body).Take(declaration.End - declaration.Body).Any(token => token.Kind is 'n' && token.Text is not "0" and not "1" || token.Kind is 's' && token.Text.EnumerateRunes().Count() > 3) });
+            var forms = Forms(
+                tokens,
+                declaration.Parameters,
+                declaration.Body,
+                declaration.End,
+                captured,
+                language is "ts"
+            );
+            output.Add(
+                declaration.Function with
+                {
+                    Canonical = forms.Canonical,
+                    Shape = forms.Shape,
+                    Statements = forms.Statements,
+                    Data = tokens
+                        .Skip(declaration.Body)
+                        .Take(declaration.End - declaration.Body)
+                        .Any(token =>
+                            token.Kind is 'n' && token.Text is not "0" and not "1"
+                            || token.Kind is 's' && token.Text.EnumerateRunes().Count() > 3
+                        ),
+                }
+            );
         }
         return output;
     }
+
     private static string[] ParameterTypes(List<CodeToken> tokens, string language)
     {
         List<string> output = [];
@@ -212,7 +335,17 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             }
             else
             {
-                output.Add(string.Concat(current.Take(current[^1].Kind is 'i' ? current.Count - 1 : current.Count).Where(token => token.Kind is not 'i' || token.Text is not ("this" or "ref" or "out" or "in" or "params" or "scoped")).Select(token => token.Text)));
+                output.Add(
+                    string.Concat(
+                        current
+                            .Take(current[^1].Kind is 'i' ? current.Count - 1 : current.Count)
+                            .Where(token =>
+                                token.Kind is not 'i'
+                                || token.Text is not ("this" or "ref" or "out" or "in" or "params" or "scoped")
+                            )
+                            .Select(token => token.Text)
+                    )
+                );
             }
 
             current.Clear();
@@ -249,7 +382,10 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             }
 
             if (depth is 0 && token.Text is ",")
-            { Flush(); defaultValue = false; }
+            {
+                Flush();
+                defaultValue = false;
+            }
             else if (depth is 0 && token.Text is "=")
             {
                 defaultValue = true;

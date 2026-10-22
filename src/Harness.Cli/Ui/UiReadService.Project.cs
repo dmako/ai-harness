@@ -28,7 +28,13 @@ internal sealed partial class UiReadService
             _ => await ProjectDatabaseAsync(project, endpoint, request, token),
         };
     }
-    private async Task<JsonNode?> ProjectDatabaseAsync(JsonObject project, string endpoint, UiReadRequest request, CancellationToken token)
+
+    private async Task<JsonNode?> ProjectDatabaseAsync(
+        JsonObject project,
+        string endpoint,
+        UiReadRequest request,
+        CancellationToken token
+    )
     {
         using var database = Open(project, endpoint is "tasks" or "tasks-next-id");
         var telemetry = new TelemetryStore(database);
@@ -46,30 +52,67 @@ internal sealed partial class UiReadService
             "proposals" => Proposals(database, request, token),
             "tasks" => Tasks(tasks, request, token),
             "milestones" => UiJson.Node(new { milestones = tasks.Milestones(token).Select(TaskViews.Milestone) }),
-            "tasks/{tid}/events" => UiJson.Node(new { events = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }),
+            "tasks/{tid}/events" => UiJson.Node(
+                new { events = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }
+            ),
             "tasks-next-id" => UiJson.Node(new { id = tasks.NextId(request.Parameter("prefix"), token) }),
-            "task-proposals" => UiJson.Node(new { proposals = tasks.Proposals(request.Parameter("status"), token).Select(TaskViews.Proposal) }),
-            "arch-proposals" => UiJson.Node(new { proposals = new FindingStore(database).Proposals(request.Parameter("status") is { Length: > 0 } status ? status : "pending", token) }),
+            "task-proposals" => UiJson.Node(
+                new { proposals = tasks.Proposals(request.Parameter("status"), token).Select(TaskViews.Proposal) }
+            ),
+            "arch-proposals" => UiJson.Node(
+                new
+                {
+                    proposals = new FindingStore(database).Proposals(
+                        request.Parameter("status") is { Length: > 0 } status ? status : "pending",
+                        token
+                    ),
+                }
+            ),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
     }
-    private JsonNode? Memories(JsonObject project, HarnessDatabase database, UiReadRequest request, CancellationToken token)
+
+    private JsonNode? Memories(
+        JsonObject project,
+        HarnessDatabase database,
+        UiReadRequest request,
+        CancellationToken token
+    )
     {
         var limit = 100;
         var raw = request.Parameter("limit");
-        if (raw.Length > 0 && (!int.TryParse(raw, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out limit) || limit is < 1 or > 500))
+        if (
+            raw.Length > 0
+            && (
+                !int.TryParse(
+                    raw,
+                    System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out limit
+                ) || limit is < 1 or > 500
+            )
+        )
         {
             throw new UiRequestException(400, "limit must be a whole number from 1 to 500");
         }
-        var query = new MemoryQuery { Text = request.Parameter("q"), Types = Split(request.Parameter("type")).Select(MemoryText.ParseType).ToArray(), IncludeInactive = request.Parameter("inactive") is "1", Limit = limit };
+        var query = new MemoryQuery
+        {
+            Text = request.Parameter("q"),
+            Types = Split(request.Parameter("type")).Select(MemoryText.ParseType).ToArray(),
+            IncludeInactive = request.Parameter("inactive") is "1",
+            Limit = limit,
+        };
         var store = new MemoryStore(database);
         if (request.Parameter("levels") is "1")
         {
             using var layers = Levels.OpenLayers(store, UiProjectCatalog.Text(project, "id"), token);
-            return UiJson.Node(new { memories = layers.Layers.Search(query, token).Memories.Select(MemoryViews.Memory) });
+            return UiJson.Node(
+                new { memories = layers.Layers.Search(query, token).Memories.Select(MemoryViews.Memory) }
+            );
         }
         return UiJson.Node(new { memories = store.Search(query, token).Select(MemoryViews.Memory) });
     }
+
     private static JsonNode? MemoryDetail(HarnessDatabase database, string id, CancellationToken token)
     {
         try
@@ -81,45 +124,95 @@ internal sealed partial class UiReadService
             throw new UiRequestException(400, exception.Message);
         }
     }
-    private static JsonNode? Applying(JsonObject project, HarnessDatabase database, UiReadRequest request, CancellationToken token)
+
+    private static JsonNode? Applying(
+        JsonObject project,
+        HarnessDatabase database,
+        UiReadRequest request,
+        CancellationToken token
+    )
     {
         var scope = request.Parameter("scope").Trim();
-        var result = new MemoryStore(database).Applying(scope.Length is 0 ? "project" : scope, project["live"]?["branch"]?.GetValue<string>() ?? "", token);
-        return UiJson.Node(new { scope = result.Scope, branch = result.Branch, goals = result.Goals.Select(MemoryViews.Memory), constraints = result.Constraints.Select(MemoryViews.Memory), decisions = result.Decisions.Select(MemoryViews.Memory) });
+        var result = new MemoryStore(database).Applying(
+            scope.Length is 0 ? "project" : scope,
+            project["live"]?["branch"]?.GetValue<string>() ?? "",
+            token
+        );
+        return UiJson.Node(
+            new
+            {
+                scope = result.Scope,
+                branch = result.Branch,
+                goals = result.Goals.Select(MemoryViews.Memory),
+                constraints = result.Constraints.Select(MemoryViews.Memory),
+                decisions = result.Decisions.Select(MemoryViews.Memory),
+            }
+        );
     }
+
     private static JsonNode? Proposals(HarnessDatabase database, UiReadRequest request, CancellationToken token)
     {
         var store = new MemoryStore(database);
-        var proposals = store.Proposals(request.Parameter("status"), 200, token).Select(proposal =>
-        {
-            var view = MemoryViews.Proposal(proposal);
-            if (proposal.Status is "pending")
+        var proposals = store
+            .Proposals(request.Parameter("status"), 200, token)
+            .Select(proposal =>
             {
-                var similar = store.GetProposal(proposal.Id, token).Related;
-                if (similar.Count > 0)
+                var view = MemoryViews.Proposal(proposal);
+                if (proposal.Status is "pending")
                 {
-                    view["similar"] = similar.Select(MemoryViews.Similar).ToArray();
+                    var similar = store.GetProposal(proposal.Id, token).Related;
+                    if (similar.Count > 0)
+                    {
+                        view["similar"] = similar.Select(MemoryViews.Similar).ToArray();
+                    }
                 }
-            }
-            return view;
-        }).ToArray();
+                return view;
+            })
+            .ToArray();
         return UiJson.Node(new { proposals });
     }
+
     private static JsonNode? Tasks(TaskStore store, UiReadRequest request, CancellationToken token)
     {
         var statuses = Split(request.Parameter("status"));
-        if (statuses.FirstOrDefault(status => !TaskWorkflow.Statuses.Contains(status, StringComparer.Ordinal)) is { } status)
+        if (
+            statuses.FirstOrDefault(status => !TaskWorkflow.Statuses.Contains(status, StringComparer.Ordinal)) is
+            { } status
+        )
         {
             throw new UiRequestException(400, "invalid status " + status);
         }
-        return UiJson.Node(new { tasks = store.List(new() { Milestone = request.Parameter("milestone"), Statuses = statuses }, token).Select(TaskViews.Task) });
+        return UiJson.Node(
+            new
+            {
+                tasks = store
+                    .List(new() { Milestone = request.Parameter("milestone"), Statuses = statuses }, token)
+                    .Select(TaskViews.Task),
+            }
+        );
     }
-    private async Task<JsonNode?> ReportAsync(JsonObject project, HarnessDatabase database, UiReadRequest request, CancellationToken token)
+
+    private async Task<JsonNode?> ReportAsync(
+        JsonObject project,
+        HarnessDatabase database,
+        UiReadRequest request,
+        CancellationToken token
+    )
     {
         var root = UiProjectCatalog.Text(project, "root");
         var location = await lifecycle.LocateAsync(root, cancellationToken: token);
-        var tools = typeof(Harness.Mcp.HarnessMcpServer).Assembly.GetManifestResourceNames().Where(n => n.StartsWith("Harness.Mcp.Schemas.", StringComparison.Ordinal)).Select(n => n["Harness.Mcp.Schemas.".Length..^5]).Order(StringComparer.Ordinal).ToArray();
-        var report = new TelemetryStore(database).Report(Days(request), DateTimeOffset.UtcNow, tools, ProviderServerMap.Read(root, location.Configuration.Value.Providers));
+        var tools = typeof(Harness.Mcp.HarnessMcpServer)
+            .Assembly.GetManifestResourceNames()
+            .Where(n => n.StartsWith("Harness.Mcp.Schemas.", StringComparison.Ordinal))
+            .Select(n => n["Harness.Mcp.Schemas.".Length..^5])
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var report = new TelemetryStore(database).Report(
+            Days(request),
+            DateTimeOffset.UtcNow,
+            tools,
+            ProviderServerMap.Read(root, location.Configuration.Value.Providers)
+        );
         report.Id = UiProjectCatalog.Text(project, "id");
         report.Root = root;
         return UiJson.Node(report);

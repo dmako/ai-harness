@@ -7,6 +7,8 @@ namespace Harness.Infrastructure.Providers;
 public sealed class ProviderCallRecorder(string databasePath, int busyTimeoutMs = 5000) : IAsyncDisposable
 {
     private readonly TelemetryRecorder _recorder = new(databasePath, busyTimeoutMs);
+
     public void Observe(ProviderResult result, ProviderRequest request) => _recorder.Observe(result, request);
+
     public ValueTask DisposeAsync() => _recorder.DisposeAsync();
 }

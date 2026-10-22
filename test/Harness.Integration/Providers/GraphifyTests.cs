@@ -37,18 +37,40 @@ public sealed class GraphifyTests
         File.WriteAllText(Path.Combine(fixture.Root, "src", "App", "App.slnx"), "");
         GraphifyDiscovery.FindInput(fixture.Root).Path.Should().Be("src/App/App.slnx");
         var (arguments, description) = GraphifyDiscovery.WatchArguments(fixture.Root, ["--configuration", "Release"]);
-        arguments.Should().Equal("--configuration", "Release", "--input", Path.Combine(fixture.Root, "src", "App", "App.slnx"));
+        arguments
+            .Should()
+            .Equal("--configuration", "Release", "--input", Path.Combine(fixture.Root, "src", "App", "App.slnx"));
         description.Should().Be("solution src/App/App.slnx");
         File.WriteAllText(Path.Combine(fixture.Root, "src", "Other.sln"), "");
         GraphifyDiscovery.FindInput(fixture.Root).Candidates.Should().HaveCount(2);
-        FluentActions.Invoking(() => GraphifyDiscovery.WatchArguments(fixture.Root, [])).Should().Throw<InvalidDataException>().WithMessage("*none chosen*args*--input*");
-        GraphifyDiscovery.WatchArguments(fixture.Root, ["--input=chosen.sln"]).Arguments.Should().Equal("--input=chosen.sln");
-        var parsed = GraphifyApplication.Parse(["--root", fixture.Root, "--graphify=custom", "--idle", "5m", "--stop-on-exit", "--", "--input", "Chosen.sln"]);
+        FluentActions
+            .Invoking(() => GraphifyDiscovery.WatchArguments(fixture.Root, []))
+            .Should()
+            .Throw<InvalidDataException>()
+            .WithMessage("*none chosen*args*--input*");
+        GraphifyDiscovery
+            .WatchArguments(fixture.Root, ["--input=chosen.sln"])
+            .Arguments.Should()
+            .Equal("--input=chosen.sln");
+        var parsed = GraphifyApplication.Parse([
+            "--root",
+            fixture.Root,
+            "--graphify=custom",
+            "--idle",
+            "5m",
+            "--stop-on-exit",
+            "--",
+            "--input",
+            "Chosen.sln",
+        ]);
         parsed.Options.Command.Should().Be("custom");
         parsed.Options.Idle.Should().Be(TimeSpan.FromMinutes(5));
         parsed.Options.StopOnExit.Should().BeTrue();
         parsed.Options.WatchArguments.Should().Equal("--input", "Chosen.sln");
-        GraphifyApplication.Parse(["--idle=1h30m", "--clean=1", "--stop-on-exit=F"]).Options.Idle.Should().Be(TimeSpan.FromMinutes(90));
+        GraphifyApplication
+            .Parse(["--idle=1h30m", "--clean=1", "--stop-on-exit=F"])
+            .Options.Idle.Should()
+            .Be(TimeSpan.FromMinutes(90));
         GraphifyApplication.Parse(["--idle=-1.5s"]).Options.Idle.Should().Be(TimeSpan.FromMilliseconds(-1500));
         GraphifyApplication.Parse(["--idle=0"]).Options.Idle.Should().Be(TimeSpan.Zero);
     }
@@ -68,7 +90,22 @@ public sealed class GraphifyTests
             result.Error.Should().BeNull();
             result.Items.Should().HaveCount(2);
             result.Truncated.Should().BeTrue();
-            result.Items[0].Should().BeEquivalentTo(new ProviderItem { Kind = "symbol", Name = "Save", QualifiedName = "N.IService.Save(System.Guid)", Label = "method", Path = "src/IService.cs", StartLine = 4, Provider = "graphify-csharp", Tool = "query symbols" });
+            result
+                .Items[0]
+                .Should()
+                .BeEquivalentTo(
+                    new ProviderItem
+                    {
+                        Kind = "symbol",
+                        Name = "Save",
+                        QualifiedName = "N.IService.Save(System.Guid)",
+                        Label = "method",
+                        Path = "src/IService.cs",
+                        StartLine = 4,
+                        Provider = "graphify-csharp",
+                        Tool = "query symbols",
+                    }
+                );
             result.Bytes.Should().Be(System.Text.Encoding.UTF8.GetByteCount(Symbols));
             (await provider.HealthAsync(true, Token)).Detail.Should().Be("warm session borrowed");
         }
@@ -81,7 +118,11 @@ public sealed class GraphifyTests
     [Theory]
     [InlineData("code.callers", "symbol", "query callers")]
     [InlineData("code.references", "match", "query usages")]
-    public async Task RelationsResolveExactNamesForwardLimitsAndApplyPathFilters(string capability, string kind, string tool)
+    public async Task RelationsResolveExactNamesForwardLimitsAndApplyPathFilters(
+        string capability,
+        string kind,
+        string tool
+    )
     {
         using var fixture = new GraphifyFixture();
         fixture.Ready("external");
@@ -93,7 +134,14 @@ public sealed class GraphifyTests
         result.Items[0].Kind.Should().Be(kind);
         result.Items[0].Tool.Should().Be(tool);
         result.Items[0].Snippet.Should().Be("-> Save");
-        fixture.Calls().Where(call => call[0] is "query" && call[1] is not "symbols").Should().ContainSingle().Which.Should().Contain("iface").And.Contain("1");
+        fixture
+            .Calls()
+            .Where(call => call[0] is "query" && call[1] is not "symbols")
+            .Should()
+            .ContainSingle()
+            .Which.Should()
+            .Contain("iface")
+            .And.Contain("1");
         (await provider.ExecuteAsync(new(capability, "IService.Save", "elsewhere"), Token)).Items.Should().BeEmpty();
     }
 
@@ -102,8 +150,14 @@ public sealed class GraphifyTests
     {
         using var fixture = new GraphifyFixture();
         fixture.Ready("s1");
-        fixture.Write("callers-controller.json", """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Api.cs","line":9},"origin":{"id":"api","label":"N.Api.Go()","declaration_kind":"method","location":{"file":"src/Api.cs","line":5}}}]}""");
-        fixture.Write("callers-api.json", """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Controller.cs","line":22},"origin":{"id":"controller","label":"N.Controller.Run()"}}]}""");
+        fixture.Write(
+            "callers-controller.json",
+            """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Api.cs","line":9},"origin":{"id":"api","label":"N.Api.Go()","declaration_kind":"method","location":{"file":"src/Api.cs","line":5}}}]}"""
+        );
+        fixture.Write(
+            "callers-api.json",
+            """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Controller.cs","line":22},"origin":{"id":"controller","label":"N.Controller.Run()"}}]}"""
+        );
         await using var manager = fixture.Manager();
         await using var provider = new GraphifyProvider(fixture.Options(), manager);
         var result = await provider.ExecuteAsync(new(Capabilities.Impact, "IService.Save"), Token);
@@ -112,7 +166,9 @@ public sealed class GraphifyTests
         result.Items.Select(item => item.Depth).Should().Equal(1, 2);
         result.Items[1].StartLine.Should().Be(5);
         result.Truncated.Should().BeFalse();
-        (await provider.ExecuteAsync(new(Capabilities.Impact, "IService.Save", Limit: 1), Token)).Truncated.Should().BeTrue();
+        (await provider.ExecuteAsync(new(Capabilities.Impact, "IService.Save", Limit: 1), Token))
+            .Truncated.Should()
+            .BeTrue();
     }
 
     [Fact]
@@ -120,13 +176,19 @@ public sealed class GraphifyTests
     {
         using var fixture = new GraphifyFixture();
         fixture.Ready("s1");
-        fixture.Write("symbols.json", """{"success":true,"scope":{"input_discovery_complete":false},"diagnostics":[{"message":"provenance from '/a/Custom.targets' was not traced"}],"items":[{"id":"iface","label":"N.IService","declaration_kind":"interface"}]}""");
+        fixture.Write(
+            "symbols.json",
+            """{"success":true,"scope":{"input_discovery_complete":false},"diagnostics":[{"message":"provenance from '/a/Custom.targets' was not traced"}],"items":[{"id":"iface","label":"N.IService","declaration_kind":"interface"}]}"""
+        );
         await using var manager = fixture.Manager();
         await using var provider = new GraphifyProvider(fixture.Options(), manager);
         var result = await provider.ExecuteAsync(new(Capabilities.Impact, "IService"), Token);
         result.Error.Should().BeNull();
         result.Items.Should().ContainSingle().Which.Tool.Should().Be("query usages");
-        fixture.Records()["sessions"]!["s1"]!["discovery_incomplete"]!.GetValue<string>().Should().Be("Custom.targets adds items graphify cannot trace");
+        fixture.Records()["sessions"]!["s1"]!["discovery_incomplete"]!
+            .GetValue<string>()
+            .Should()
+            .Be("Custom.targets adds items graphify cannot trace");
     }
 
     [Fact]
@@ -153,7 +215,10 @@ public sealed class GraphifyTests
             await ProviderFixture.GoneAsync(owned.Pid);
             File.Exists(Path.Combine(fixture.Descriptors, owned.Id + ".json")).Should().BeFalse();
         }
-        finally { await provider.DisposeAsync(); }
+        finally
+        {
+            await provider.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -195,7 +260,10 @@ public sealed class GraphifyTests
             await ProviderFixture.GoneAsync(loading.Pid);
             File.Exists(Path.Combine(fixture.Descriptors, loading.Id + ".json")).Should().BeFalse();
         }
-        finally { await provider.DisposeAsync(); }
+        finally
+        {
+            await provider.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -205,7 +273,10 @@ public sealed class GraphifyTests
         fixture.Write("watch-fails", "");
         await using var manager = fixture.Manager();
         await using var provider = new GraphifyProvider(fixture.Options(), manager);
-        (await provider.ExecuteAsync(new(Capabilities.SymbolSearch, "Save"), Token)).Error!.Message.Should().Contain("watch exited").And.Contain("no solution or project");
+        (await provider.ExecuteAsync(new(Capabilities.SymbolSearch, "Save"), Token))
+            .Error!.Message.Should()
+            .Contain("watch exited")
+            .And.Contain("no solution or project");
         File.Delete(Path.Combine(fixture.Data, "watch-fails"));
         fixture.Ready("old");
         (await provider.ExecuteAsync(new(Capabilities.SymbolSearch, "Save"), Token)).Error.Should().BeNull();
@@ -222,6 +293,7 @@ internal sealed class GraphifyFixture : IDisposable
     public string Data => Path.Combine(DirectoryRoot, "fake");
     public string Descriptors => Path.Combine(Data, "descriptors");
     public string RecordsPath => Path.Combine(DirectoryRoot, "config", "graphify-sessions.json");
+
     public GraphifyFixture()
     {
         Directory.CreateDirectory(Root);
@@ -232,10 +304,46 @@ internal sealed class GraphifyFixture : IDisposable
         Write("callers-iface.json", GraphifyTests.Callers);
         Write("usages-iface.json", GraphifyTests.Callers);
     }
-    public GraphifyOptions Options() => new(Root, "dotnet") { CommandArguments = [ProviderFixture.Worker], Environment = new Dictionary<string, string?> { ["HARNESS_FAKE_GRAPHIFY"] = Data }, RecordsPath = RecordsPath, SessionDirectory = Descriptors, ReadyWait = TimeSpan.FromSeconds(5), StopOnExit = true, StartedBy = "fixture owner" };
+
+    public GraphifyOptions Options() =>
+        new(Root, "dotnet")
+        {
+            CommandArguments = [ProviderFixture.Worker],
+            Environment = new Dictionary<string, string?> { ["HARNESS_FAKE_GRAPHIFY"] = Data },
+            RecordsPath = RecordsPath,
+            SessionDirectory = Descriptors,
+            ReadyWait = TimeSpan.FromSeconds(5),
+            StopOnExit = true,
+            StartedBy = "fixture owner",
+        };
+
     public GraphifySessionManager Manager(TimeProvider? clock = null) => new(Options(), clock: clock);
+
     public void Write(string name, string content) => File.WriteAllText(Path.Combine(Data, name), content);
-    public void Ready(string id) => Write("sessions.json", JsonSerializer.Serialize(new { success = true, sessions = new[] { new { session_id = id, process_id = Environment.ProcessId, reachability = "reachable", lifecycle_state = "ready", ready = true, repository_root = Root } } }));
+
+    public void Ready(string id) =>
+        Write(
+            "sessions.json",
+            JsonSerializer.Serialize(
+                new
+                {
+                    success = true,
+                    sessions = new[]
+                    {
+                        new
+                        {
+                            session_id = id,
+                            process_id = Environment.ProcessId,
+                            reachability = "reachable",
+                            lifecycle_state = "ready",
+                            ready = true,
+                            repository_root = Root,
+                        },
+                    },
+                }
+            )
+        );
+
     public string[][] Calls()
     {
         var path = Path.Combine(Data, "calls.log");
@@ -247,9 +355,17 @@ internal sealed class GraphifyFixture : IDisposable
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         // The worker appends newline-delimited records; ignore a record still being written.
-        return reader.ReadToEnd().Split('\n').SkipLast(1).Where(line => line.Length > 0).Select(line => JsonSerializer.Deserialize<string[]>(line)!).ToArray();
+        return reader
+            .ReadToEnd()
+            .Split('\n')
+            .SkipLast(1)
+            .Where(line => line.Length > 0)
+            .Select(line => JsonSerializer.Deserialize<string[]>(line)!)
+            .ToArray();
     }
+
     public JsonObject Records() => JsonNode.Parse(File.ReadAllText(RecordsPath))!.AsObject();
+
     public void Dispose()
     {
         var file = Path.Combine(Data, "sessions.json");
@@ -257,11 +373,23 @@ internal sealed class GraphifyFixture : IDisposable
         {
             foreach (var session in JsonNode.Parse(File.ReadAllText(file))!["sessions"]!.AsArray())
             {
-                if (session?["session_id"]?.GetValue<string>().StartsWith("watch-", StringComparison.Ordinal) is true && session["process_id"]?.GetValue<int>() is { } pid)
+                if (
+                    session?["session_id"]?.GetValue<string>().StartsWith("watch-", StringComparison.Ordinal) is true
+                    && session["process_id"]?.GetValue<int>() is { } pid
+                )
                 {
                     try
-                    { using var process = Process.GetProcessById(pid); if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(5000); } }
-                    catch (ArgumentException) { /* Already reaped. */ }
+                    {
+                        using var process = Process.GetProcessById(pid);
+                        if (!process.HasExited)
+                        {
+                            process.Kill(entireProcessTree: true);
+                            process.WaitForExit(5000);
+                        }
+                    }
+                    catch (ArgumentException)
+                    { /* Already reaped. */
+                    }
                 }
             }
         }

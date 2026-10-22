@@ -18,7 +18,9 @@ public sealed partial class HarnessStateSession
                 head = await repository.ReadHeadAsync(cancellationToken).ConfigureAwait(false);
                 snapshot = snapshot with { Branch = head.Branch, Commit = head.Commit };
             }
-            catch (Exception error) when (error is IOException or InvalidDataException) { /* Overview retains available identity when Git cannot report HEAD. */ }
+            catch (Exception error) when (error is IOException or InvalidDataException)
+            { /* Overview retains available identity when Git cannot report HEAD. */
+            }
         }
         if (!File.Exists(location.DatabasePath))
         {
@@ -30,15 +32,32 @@ public sealed partial class HarnessStateSession
             var database = await DatabaseAsync(cancellationToken).ConfigureAwait(false);
             if (_registration is { } registration)
             {
-                var sync = ReadSync(database, registration.Worktree.Id, head, out var crossBranch, includeRecentRuns: false);
-                snapshot = snapshot with { ProjectId = registration.Project.Id, Stale = sync.GetValueOrDefault("stale") as string ?? "", CrossBranch = crossBranch };
+                var sync = ReadSync(
+                    database,
+                    registration.Worktree.Id,
+                    head,
+                    out var crossBranch,
+                    includeRecentRuns: false
+                );
+                snapshot = snapshot with
+                {
+                    ProjectId = registration.Project.Id,
+                    Stale = sync.GetValueOrDefault("stale") as string ?? "",
+                    CrossBranch = crossBranch,
+                };
             }
         }
-        catch (Exception error) when (error is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException) { /* Reading a facade must not initialize or require project state. */ }
+        catch (Exception error)
+            when (error is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException)
+        { /* Reading a facade must not initialize or require project state. */
+        }
         return snapshot;
     }
 
-    public async Task<IReadOnlyDictionary<string, JsonElement>> ReadProviderStatisticsAsync(string provider, CancellationToken cancellationToken)
+    public async Task<IReadOnlyDictionary<string, JsonElement>> ReadProviderStatisticsAsync(
+        string provider,
+        CancellationToken cancellationToken
+    )
     {
         var result = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         if (!File.Exists(location.DatabasePath))
@@ -51,13 +70,25 @@ public sealed partial class HarnessStateSession
             var database = await DatabaseAsync(cancellationToken).ConfigureAwait(false);
             using var connection = database.OpenConnection();
             using var command = connection.CreateCommand();
-            command.CommandText = "SELECT COUNT(*), COUNT(error), AVG(duration_ms), AVG(response_bytes), MAX(at) FROM provider_calls WHERE provider=$provider AND at >= $since";
+            command.CommandText =
+                "SELECT COUNT(*), COUNT(error), AVG(duration_ms), AVG(response_bytes), MAX(at) FROM provider_calls WHERE provider=$provider AND at >= $since";
             command.Parameters.AddWithValue("$provider", provider);
-            command.Parameters.AddWithValue("$since", DateTimeOffset.UtcNow.AddDays(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue(
+                "$since",
+                DateTimeOffset
+                    .UtcNow.AddDays(-1)
+                    .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)
+            );
             using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                var stats = new Dictionary<string, object?> { ["calls"] = reader.GetInt32(0), ["errors"] = reader.GetInt32(1), ["avg_ms"] = reader.IsDBNull(2) ? 0 : reader.GetDouble(2), ["avg_bytes"] = reader.IsDBNull(3) ? 0 : reader.GetDouble(3) };
+                var stats = new Dictionary<string, object?>
+                {
+                    ["calls"] = reader.GetInt32(0),
+                    ["errors"] = reader.GetInt32(1),
+                    ["avg_ms"] = reader.IsDBNull(2) ? 0 : reader.GetDouble(2),
+                    ["avg_bytes"] = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                };
                 if (!reader.IsDBNull(4))
                 {
                     stats["last_call_at"] = reader.GetString(4);
@@ -72,16 +103,31 @@ public sealed partial class HarnessStateSession
                 WHERE c.at >= $since AND EXISTS (SELECT 1 FROM context_units u WHERE u.call_id=c.id AND u.provider=$provider)
                 """;
             command.Parameters.AddWithValue("$provider", provider);
-            command.Parameters.AddWithValue("$since", DateTimeOffset.UtcNow.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue(
+                "$since",
+                DateTimeOffset
+                    .UtcNow.AddDays(-30)
+                    .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)
+            );
             using var hits = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             await hits.ReadAsync(cancellationToken).ConfigureAwait(false);
             var changed = hits.GetInt32(1);
             if (changed > 0)
             {
-                result["context_30d"] = JsonSerializer.SerializeToElement(new { hits = hits.GetInt32(0), changed, hit_rate = Math.Truncate((double)hits.GetInt32(0) / changed * 100) / 100 });
+                result["context_30d"] = JsonSerializer.SerializeToElement(
+                    new
+                    {
+                        hits = hits.GetInt32(0),
+                        changed,
+                        hit_rate = Math.Truncate((double)hits.GetInt32(0) / changed * 100) / 100,
+                    }
+                );
             }
         }
-        catch (Exception error) when (error is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException) { /* Optional observations must not prevent health diagnostics. */ }
+        catch (Exception error)
+            when (error is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException)
+        { /* Optional observations must not prevent health diagnostics. */
+        }
         return result;
     }
 }

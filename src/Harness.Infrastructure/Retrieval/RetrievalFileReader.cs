@@ -13,7 +13,9 @@ public sealed class RetrievalFileReader
         _root = Path.GetFullPath(root);
         _cache = new(LoadAsync);
     }
-    public Task<string> ReadBodyAsync(string path, int start, int end, CancellationToken cancellationToken = default) => _cache.ReadBodyAsync(path, start, end, cancellationToken);
+
+    public Task<string> ReadBodyAsync(string path, int start, int end, CancellationToken cancellationToken = default) =>
+        _cache.ReadBodyAsync(path, start, end, cancellationToken);
 
     private async Task<byte[]> LoadAsync(string relative, CancellationToken token)
     {
@@ -24,7 +26,12 @@ public sealed class RetrievalFileReader
         }
 
         var path = Path.GetFullPath(Path.Combine(_root, relative));
-        if (!path.StartsWith(root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        if (
+            !path.StartsWith(
+                root,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
+            )
+        )
         {
             throw new InvalidDataException("Body path leaves the repository.");
         }
@@ -36,15 +43,30 @@ public sealed class RetrievalFileReader
             FileSystemInfo entry = Directory.Exists(actual) ? new DirectoryInfo(actual) : new FileInfo(actual);
             if (entry.LinkTarget is not null)
             {
-                actual = entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? throw new IOException("Cannot resolve body path link.");
+                actual =
+                    entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName
+                    ?? throw new IOException("Cannot resolve body path link.");
             }
 
-            if (!Path.GetFullPath(actual).StartsWith(root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            if (
+                !Path.GetFullPath(actual)
+                    .StartsWith(
+                        root,
+                        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
+                    )
+            )
             {
                 throw new InvalidDataException("Body path link leaves the repository.");
             }
         }
-        await using var file = new FileStream(actual, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 8192, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using var file = new FileStream(
+            actual,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            8192,
+            FileOptions.Asynchronous | FileOptions.SequentialScan
+        );
         const int Maximum = 4 * 1024 * 1024;
         if (file.Length > Maximum)
         {

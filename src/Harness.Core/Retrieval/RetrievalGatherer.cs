@@ -5,25 +5,41 @@ namespace Harness.Core.Retrieval;
 
 public static class RetrievalGatherer
 {
-    public static Task<Gathered> GatherAsync(RetrievalSources sources, RetrievalTask task, CancellationToken cancellationToken = default) => new Gathering(sources, task).RunAsync(cancellationToken);
+    public static Task<Gathered> GatherAsync(
+        RetrievalSources sources,
+        RetrievalTask task,
+        CancellationToken cancellationToken = default
+    ) => new Gathering(sources, task).RunAsync(cancellationToken);
 
     private sealed class Gathering(RetrievalSources sources, RetrievalTask task)
     {
         private readonly List<Candidate> _candidates = [];
-        private readonly List<string> _errors = [], _notes = [];
+        private readonly List<string> _errors = [],
+            _notes = [];
         private readonly List<RetrievalCall> _calls = [];
         private readonly IReadOnlyList<string> _symbols = TaskParsing.Symbols(task.Text);
 
         public async Task<Gathered> RunAsync(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            var phrases = TaskParsing.Phrases(task.Text).Where(phrase => !_symbols.Any(symbol => string.Equals(TaskParsing.LastName(symbol), phrase, StringComparison.OrdinalIgnoreCase))).ToArray();
+            var phrases = TaskParsing
+                .Phrases(task.Text)
+                .Where(phrase =>
+                    !_symbols.Any(symbol =>
+                        string.Equals(TaskParsing.LastName(symbol), phrase, StringComparison.OrdinalIgnoreCase)
+                    )
+                )
+                .ToArray();
             if (sources.Registry is { } registry)
             {
                 await CodeAsync(registry, phrases, token).ConfigureAwait(false);
                 if (!TaskParsing.TaskAboutTests(task.Text))
                 {
-                    foreach (var candidate in _candidates.Where(candidate => candidate.Source is "code" && TaskParsing.IsTestFile(candidate.Path)))
+                    foreach (
+                        var candidate in _candidates.Where(candidate =>
+                            candidate.Source is "code" && TaskParsing.IsTestFile(candidate.Path)
+                        )
+                    )
                     {
                         candidate.Scores["test"] = 1;
                     }
@@ -55,8 +71,25 @@ public static class RetrievalGatherer
             HashSet<string> failed = new(StringComparer.Ordinal);
             try
             {
-                await BoundedAsync(Task.Run(() => context is null ? registry.DiscoverAsync(linked.Token) : context.DiscoverContextAsync(linked.Token), CancellationToken.None), linked.Token).ConfigureAwait(false);
-                var capabilities = await BoundedAsync(Task.Run(() => context is null ? registry.Capabilities() : context.ContextCapabilities(), linked.Token), linked.Token).ConfigureAwait(false);
+                await BoundedAsync(
+                        Task.Run(
+                            () =>
+                                context is null
+                                    ? registry.DiscoverAsync(linked.Token)
+                                    : context.DiscoverContextAsync(linked.Token),
+                            CancellationToken.None
+                        ),
+                        linked.Token
+                    )
+                    .ConfigureAwait(false);
+                var capabilities = await BoundedAsync(
+                        Task.Run(
+                            () => context is null ? registry.Capabilities() : context.ContextCapabilities(),
+                            linked.Token
+                        ),
+                        linked.Token
+                    )
+                    .ConfigureAwait(false);
                 foreach (var info in capabilities)
                 {
                     information[info.Provider + "\0" + info.Capability] = info;
@@ -95,17 +128,34 @@ public static class RetrievalGatherer
                     }
                 }
             }
-            catch (OperationCanceledException) when (linked.IsCancellationRequested) { token.ThrowIfCancellationRequested(); }
-            catch (Exception error) { Add(_errors, "code: " + CredentialRedactor.Redact(error.Message)); }
+            catch (OperationCanceledException) when (linked.IsCancellationRequested)
+            {
+                token.ThrowIfCancellationRequested();
+            }
+            catch (Exception error)
+            {
+                Add(_errors, "code: " + CredentialRedactor.Redact(error.Message));
+            }
             finally
             {
                 if (deadline.IsCancellationRequested)
                 {
-                    Add(_notes, "code search stopped after " + Duration(duration) + "; the answer may miss code (a provider was slow)");
+                    Add(
+                        _notes,
+                        "code search stopped after "
+                            + Duration(duration)
+                            + "; the answer may miss code (a provider was slow)"
+                    );
                 }
             }
 
-            async Task AskAsync(string capability, string query, string name = "", string phrase = "", bool loose = false)
+            async Task AskAsync(
+                string capability,
+                string query,
+                string name = "",
+                string phrase = "",
+                bool loose = false
+            )
             {
                 if (linked.IsCancellationRequested)
                 {
@@ -114,21 +164,42 @@ public static class RetrievalGatherer
 
                 var before = _candidates.Count;
                 // The registry bounds each adapter and returns completed peers when the shared deadline expires.
-                var results = await registry.CallAsync(new(capability, query, task.Path, task.Limit > 0 ? task.Limit : 10), provider => failed.Contains(provider) || context?.InContext(provider) is false, linked.Token).ConfigureAwait(false);
+                var results = await registry
+                    .CallAsync(
+                        new(capability, query, task.Path, task.Limit > 0 ? task.Limit : 10),
+                        provider => failed.Contains(provider) || context?.InContext(provider) is false,
+                        linked.Token
+                    )
+                    .ConfigureAwait(false);
                 foreach (var result in results)
                 {
-                    _calls.Add(new(result.Provider, result.Capability, query, result.Items.Count, (long)result.Latency.TotalMilliseconds, result.Bytes, result.Error?.Message ?? ""));
+                    _calls.Add(
+                        new(
+                            result.Provider,
+                            result.Capability,
+                            query,
+                            result.Items.Count,
+                            (long)result.Latency.TotalMilliseconds,
+                            result.Bytes,
+                            result.Error?.Message ?? ""
+                        )
+                    );
                     if (result.Error is { } error)
                     {
                         failed.Add(result.Provider);
                         if (!linked.IsCancellationRequested)
                         {
-                            Add(error is ProviderNotIndexedException ? _notes : _errors, CredentialRedactor.Redact(error.Message));
+                            Add(
+                                error is ProviderNotIndexedException ? _notes : _errors,
+                                CredentialRedactor.Redact(error.Message)
+                            );
                         }
 
                         continue;
                     }
-                    var info = information.GetValueOrDefault(result.Provider + "\0" + result.Capability) ?? new CapabilityInfo(result.Capability, "");
+                    var info =
+                        information.GetValueOrDefault(result.Provider + "\0" + result.Capability)
+                        ?? new CapabilityInfo(result.Capability, "");
                     for (var i = 0; i < result.Items.Count; i++)
                     {
                         var item = result.Items[i];
@@ -144,7 +215,10 @@ public static class RetrievalGatherer
                         }
 
                         var filename = candidate.Path[(candidate.Path.LastIndexOf('/') + 1)..];
-                        if (phrase.Length > 0 && (candidate.Name + " " + filename).Contains(phrase, StringComparison.OrdinalIgnoreCase))
+                        if (
+                            phrase.Length > 0
+                            && (candidate.Name + " " + filename).Contains(phrase, StringComparison.OrdinalIgnoreCase)
+                        )
                         {
                             candidate.Scores["phrase"] = 1;
                         }
@@ -165,12 +239,26 @@ public static class RetrievalGatherer
         private void Qualify(int from, string name)
         {
             var qualifier = TaskParsing.Qualifier(name);
-            if (qualifier.Length is 0 || !_candidates.Skip(from).Any(candidate => candidate.Scores.GetValueOrDefault("name") is 1 && TaskParsing.InQualifier(candidate, qualifier)))
+            if (
+                qualifier.Length is 0
+                || !_candidates
+                    .Skip(from)
+                    .Any(candidate =>
+                        candidate.Scores.GetValueOrDefault("name") is 1 && TaskParsing.InQualifier(candidate, qualifier)
+                    )
+            )
             {
                 return;
             }
 
-            foreach (var candidate in _candidates.Skip(from).Where(candidate => candidate.Scores.GetValueOrDefault("name") is 1 && !TaskParsing.InQualifier(candidate, qualifier)))
+            foreach (
+                var candidate in _candidates
+                    .Skip(from)
+                    .Where(candidate =>
+                        candidate.Scores.GetValueOrDefault("name") is 1
+                        && !TaskParsing.InQualifier(candidate, qualifier)
+                    )
+            )
             {
                 candidate.Scores["name"] = 0.3;
             }
@@ -182,7 +270,18 @@ public static class RetrievalGatherer
             string[] types = ["decision", "convention", "warning", "constraint"];
             foreach (var path in Paths(10))
             {
-                foreach (var memory in await SearchAsync(new() { Types = types, Scope = new("path", path), Branch = sources.Branch, Limit = 20 }).ConfigureAwait(false))
+                foreach (
+                    var memory in await SearchAsync(
+                            new()
+                            {
+                                Types = types,
+                                Scope = new("path", path),
+                                Branch = sources.Branch,
+                                Limit = 20,
+                            }
+                        )
+                        .ConfigureAwait(false)
+                )
                 {
                     AddMemory(memory, ScopeScore(memory.Scope, path), "memory (applies to " + path + ")");
                 }
@@ -191,7 +290,15 @@ public static class RetrievalGatherer
             var words = TaskParsing.ContentWords(task.Text);
             if (words.Length > 0)
             {
-                var matches = await SearchAsync(new() { Text = words, Types = types, Limit = 10 }).ConfigureAwait(false);
+                var matches = await SearchAsync(
+                        new()
+                        {
+                            Text = words,
+                            Types = types,
+                            Limit = 10,
+                        }
+                    )
+                    .ConfigureAwait(false);
                 for (var i = 0; i < matches.Count; i++)
                 {
                     AddMemory(matches[i], 0.6 / (1 + i), "memory (matches the task)");
@@ -223,8 +330,14 @@ public static class RetrievalGatherer
             void AddMemory(MemoryRecord memory, double score, string why)
             {
                 if (seen.TryGetValue(memory.Id, out var index))
-                { _candidates[index].Scores["scope"] = Math.Max(_candidates[index].Scores["scope"], score); return; }
-                var candidate = Candidate.FromMemory(memory, score) with { Provenance = [new("harness", why, "memory")] };
+                {
+                    _candidates[index].Scores["scope"] = Math.Max(_candidates[index].Scores["scope"], score);
+                    return;
+                }
+                var candidate = Candidate.FromMemory(memory, score) with
+                {
+                    Provenance = [new("harness", why, "memory")],
+                };
                 seen.Add(memory.Id, _candidates.Count);
                 _candidates.Add(candidate);
             }
@@ -252,27 +365,64 @@ public static class RetrievalGatherer
                 }
             }
         }
-        private string[] Paths(int count) => _candidates.Select((candidate, position) => (candidate, position)).Where(pair => pair.candidate.Source is "code" && pair.candidate.Path.Length > 0)
-            .GroupBy(pair => pair.candidate.Path, StringComparer.Ordinal).Select(group => group.OrderBy(pair => FirstRank(pair.candidate)).ThenBy(pair => pair.position).First())
-            .OrderBy(pair => FirstRank(pair.candidate)).ThenBy(pair => pair.position).Take(count).Select(pair => pair.candidate.Path).ToArray();
-        private static int FirstRank(Candidate candidate) => candidate.Provenance.Count > 0 ? candidate.Provenance[0].Rank : 0;
-        private static double ScopeScore(MemoryScope scope, string path) => scope.Kind switch { "path" => scope.Value == path ? 1 : 0.8, "subsystem" or "branch" => 0.6, "workspace" => 0.25, "user" => 0.2, _ => 0.3 };
-        private static void Add(List<string> values, string value) { if (!values.Contains(value, StringComparer.Ordinal))
+
+        private string[] Paths(int count) =>
+            _candidates
+                .Select((candidate, position) => (candidate, position))
+                .Where(pair => pair.candidate.Source is "code" && pair.candidate.Path.Length > 0)
+                .GroupBy(pair => pair.candidate.Path, StringComparer.Ordinal)
+                .Select(group => group.OrderBy(pair => FirstRank(pair.candidate)).ThenBy(pair => pair.position).First())
+                .OrderBy(pair => FirstRank(pair.candidate))
+                .ThenBy(pair => pair.position)
+                .Take(count)
+                .Select(pair => pair.candidate.Path)
+                .ToArray();
+
+        private static int FirstRank(Candidate candidate) =>
+            candidate.Provenance.Count > 0 ? candidate.Provenance[0].Rank : 0;
+
+        private static double ScopeScore(MemoryScope scope, string path) =>
+            scope.Kind switch
+            {
+                "path" => scope.Value == path ? 1 : 0.8,
+                "subsystem" or "branch" => 0.6,
+                "workspace" => 0.25,
+                "user" => 0.2,
+                _ => 0.3,
+            };
+
+        private static void Add(List<string> values, string value)
+        {
+            if (!values.Contains(value, StringComparer.Ordinal))
             {
                 values.Add(value);
             }
         }
-        private static string Duration(TimeSpan duration) => duration.TotalSeconds >= 1 ? duration.TotalSeconds.ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture) + "s" : duration.TotalMilliseconds.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) + "ms";
+
+        private static string Duration(TimeSpan duration) =>
+            duration.TotalSeconds >= 1
+                ? duration.TotalSeconds.ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture) + "s"
+                : duration.TotalMilliseconds.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)
+                    + "ms";
+
         private static async Task BoundedAsync(Task operation, CancellationToken token)
         {
             Observe(operation);
             await operation.WaitAsync(token).ConfigureAwait(false);
         }
+
         private static async Task<T> BoundedAsync<T>(Task<T> operation, CancellationToken token)
         {
             Observe(operation);
             return await operation.WaitAsync(token).ConfigureAwait(false);
         }
-        private static void Observe(Task operation) => _ = operation.ContinueWith(completed => _ = completed.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+        private static void Observe(Task operation) =>
+            _ = operation.ContinueWith(
+                completed => _ = completed.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default
+            );
     }
 }

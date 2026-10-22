@@ -23,67 +23,194 @@ namespace Harness.Integration.Findings;
 public sealed class FindingsProcessTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task PublicToolsMatchFrozenSchemasAndKeepProposalsPendingUntilAuthorApproval()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Write("src/Domain/Domain.csproj", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include=\"../Dal/Dal.csproj\" /></ItemGroup></Project>");
-        fixture.Write("src/Dal/Dal.csproj", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        fixture.Write(
+            "src/Domain/Domain.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include=\"../Dal/Dal.csproj\" /></ItemGroup></Project>"
+        );
+        fixture.Write(
+            "src/Dal/Dal.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
         using var db = fixture.Database();
-        var rule = new MemoryStore(db).Put(new() { Type = "constraint", Content = "forbid: Domain -> Dal", Force = true }, Token).Memory!;
+        var rule = new MemoryStore(db)
+            .Put(
+                new()
+                {
+                    Type = "constraint",
+                    Content = "forbid: Domain -> Dal",
+                    Force = true,
+                },
+                Token
+            )
+            .Memory!;
         var result = await fixture.RunAsync();
         result.Findings.Should().ContainSingle().Which.Error.Should().BeEmpty();
-        var binary = Path.Combine(ProviderFixture.RepositoryRoot, "src", "Harness.Cli", "bin", Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name, "net10.0", "harness.dll");
+        var binary = Path.Combine(
+            ProviderFixture.RepositoryRoot,
+            "src",
+            "Harness.Cli",
+            "bin",
+            Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name,
+            "net10.0",
+            "harness.dll"
+        );
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
         environment["HARNESS_CONFIG_DIR"] = fixture.Global;
-        await using var client = await McpClient.CreateAsync(new StdioClientTransport(new() { Command = "dotnet", Arguments = [binary, "mcp", "--project", fixture.Root], WorkingDirectory = fixture.Root, EnvironmentVariables = environment, InheritEnvironmentVariables = false }), cancellationToken: Token);
+        await using var client = await McpClient.CreateAsync(
+            new StdioClientTransport(
+                new()
+                {
+                    Command = "dotnet",
+                    Arguments = [binary, "mcp", "--project", fixture.Root],
+                    WorkingDirectory = fixture.Root,
+                    EnvironmentVariables = environment,
+                    InheritEnvironmentVariables = false,
+                }
+            ),
+            cancellationToken: Token
+        );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
         tools.Should().HaveCount(30);
-        using var baseline = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"), Token));
+        using var baseline = JsonDocument.Parse(
+            await File.ReadAllTextAsync(
+                Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"),
+                Token
+            )
+        );
         foreach (var name in new[] { "architecture_findings", "architecture_propose" })
         {
             var actual = JsonSerializer.SerializeToElement(tools.Single(t => t.Name == name).ProtocolTool);
-            var expected = baseline.RootElement.GetProperty("cases").GetProperty("mcp").EnumerateArray().Single(row => row.GetProperty("name").GetString() == "tools_list").GetProperty("response").GetProperty("result").GetProperty("tools").EnumerateArray().Single(t => t.GetProperty("name").GetString() == name);
-            JsonElement.DeepEquals(actual.GetProperty("inputSchema"), expected.GetProperty("inputSchema")).Should().BeTrue();
-            JsonElement.DeepEquals(actual.GetProperty("outputSchema"), expected.GetProperty("outputSchema")).Should().BeTrue();
+            var expected = baseline
+                .RootElement.GetProperty("cases")
+                .GetProperty("mcp")
+                .EnumerateArray()
+                .Single(row => row.GetProperty("name").GetString() == "tools_list")
+                .GetProperty("response")
+                .GetProperty("result")
+                .GetProperty("tools")
+                .EnumerateArray()
+                .Single(t => t.GetProperty("name").GetString() == name);
+            JsonElement
+                .DeepEquals(actual.GetProperty("inputSchema"), expected.GetProperty("inputSchema"))
+                .Should()
+                .BeTrue();
+            JsonElement
+                .DeepEquals(actual.GetProperty("outputSchema"), expected.GetProperty("outputSchema"))
+                .Should()
+                .BeTrue();
         }
         var full = await CallAsync("architecture_findings", new() { ["kind"] = "boundary", ["snippets"] = true });
         var boundary = full.GetProperty("groups")[0].GetProperty("findings").EnumerateArray().Single();
         var key = boundary.GetProperty("key").GetString()!;
         boundary.GetProperty("rule").GetProperty("memory").GetString().Should().Be(rule.Id);
         full.GetProperty("groups")[0].GetProperty("code").GetArrayLength().Should().BeGreaterThan(0);
-        var proposed = await CallAsync("architecture_propose", new() { ["kind"] = "by_design", ["finding"] = key, ["reason"] = "A deliberate compatibility boundary" });
+        var proposed = await CallAsync(
+            "architecture_propose",
+            new()
+            {
+                ["kind"] = "by_design",
+                ["finding"] = key,
+                ["reason"] = "A deliberate compatibility boundary",
+            }
+        );
         proposed.GetProperty("status").GetString().Should().Be("pending");
         proposed.GetProperty("proposal").TryGetProperty("decided_by", out _).Should().BeFalse();
         new TaskStore(db).List(cancellationToken: Token).Should().BeEmpty();
         new FindingStore(db).MarkOf(key, Token).Should().BeNull();
         var goServer = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER");
-        await using var original = !string.IsNullOrEmpty(goServer) ? await McpClient.CreateAsync(new StdioClientTransport(new() { Command = goServer, Arguments = ["mcp", "--project", fixture.Root], WorkingDirectory = fixture.Root, EnvironmentVariables = environment, InheritEnvironmentVariables = false }), cancellationToken: Token) : null;
-        foreach (var args in new Dictionary<string, object?>[] { [], new() { ["full"] = true }, new() { ["kind"] = "boundary", ["snippets"] = true }, new() { ["area"] = "src/Domain" }, new() { ["key"] = key } })
+        await using var original = !string.IsNullOrEmpty(goServer)
+            ? await McpClient.CreateAsync(
+                new StdioClientTransport(
+                    new()
+                    {
+                        Command = goServer,
+                        Arguments = ["mcp", "--project", fixture.Root],
+                        WorkingDirectory = fixture.Root,
+                        EnvironmentVariables = environment,
+                        InheritEnvironmentVariables = false,
+                    }
+                ),
+                cancellationToken: Token
+            )
+            : null;
+        foreach (
+            var args in new Dictionary<string, object?>[]
+            {
+                [],
+                new() { ["full"] = true },
+                new() { ["kind"] = "boundary", ["snippets"] = true },
+                new() { ["area"] = "src/Domain" },
+                new() { ["key"] = key },
+            }
+        )
         {
             await CompareGoAsync(args);
         }
 
-        var duplicate = await CallAsync("architecture_propose", new() { ["kind"] = "by_design", ["finding"] = key, ["reason"] = "Another reason" });
+        var duplicate = await CallAsync(
+            "architecture_propose",
+            new()
+            {
+                ["kind"] = "by_design",
+                ["finding"] = key,
+                ["reason"] = "Another reason",
+            }
+        );
         duplicate.GetProperty("status").GetString().Should().Be("exists");
         var id = proposed.GetProperty("proposal").GetProperty("id").GetString()!;
         var project = result.Registration.Project.Id;
-        await new FindingSets(fixture.Root, project, db, fixture.Lifecycle.GlobalConfigurationPath, fixture.Lifecycle.Registry).ApproveAsync(id, "human", token: Token);
+        await new FindingSets(
+            fixture.Root,
+            project,
+            db,
+            fixture.Lifecycle.GlobalConfigurationPath,
+            fixture.Lifecycle.Registry
+        ).ApproveAsync(id, "human", token: Token);
         var hidden = await CallAsync("architecture_findings", new() { ["kind"] = "boundary", ["hide_marked"] = true });
         hidden.GetProperty("groups")[0].GetProperty("marked_hidden").GetInt32().Should().Be(1);
         hidden.GetProperty("groups")[0].TryGetProperty("findings", out _).Should().BeFalse();
         await CompareGoAsync(new() { ["kind"] = "boundary", ["hide_marked"] = true });
         var brief = await CallAsync("architecture_findings", []);
-        brief.GetProperty("groups")[0].GetProperty("brief").EnumerateArray().Should().Contain(f => f.GetProperty("key").GetString() == key && f.GetProperty("mark").GetString() == "by_design");
-        var invalid = await client.CallToolAsync("architecture_findings", new Dictionary<string, object?> { ["scope"] = "invalid" }, cancellationToken: Token);
+        brief
+            .GetProperty("groups")[0]
+            .GetProperty("brief")
+            .EnumerateArray()
+            .Should()
+            .Contain(f => f.GetProperty("key").GetString() == key && f.GetProperty("mark").GetString() == "by_design");
+        var invalid = await client.CallToolAsync(
+            "architecture_findings",
+            new Dictionary<string, object?> { ["scope"] = "invalid" },
+            cancellationToken: Token
+        );
         invalid.IsError.Should().BeTrue();
-        var badArgument = await client.CallToolAsync("architecture_propose", new Dictionary<string, object?> { ["kind"] = "task", ["unknown"] = true }, cancellationToken: Token);
+        var badArgument = await client.CallToolAsync(
+            "architecture_propose",
+            new Dictionary<string, object?> { ["kind"] = "task", ["unknown"] = true },
+            cancellationToken: Token
+        );
         badArgument.IsError.Should().BeTrue();
         // The existing memory proposal path corrects drift without changing files or silently settling a decision.
-        var memoryProposal = await CallAsync("memory_propose", new() { ["type"] = "constraint", ["content"] = "forbid: Domain -> Other", ["supersedes"] = rule.Id, ["rationale"] = "Boundary changed" });
+        var memoryProposal = await CallAsync(
+            "memory_propose",
+            new()
+            {
+                ["type"] = "constraint",
+                ["content"] = "forbid: Domain -> Other",
+                ["supersedes"] = rule.Id,
+                ["rationale"] = "Boundary changed",
+            }
+        );
         memoryProposal.GetProperty("proposal").GetProperty("supersedes").GetString().Should().Be(rule.Id);
         new MemoryStore(db).Get(rule.Id, Token).SupersededBy.Should().BeEmpty();
-        fixture.Write("src/Domain/Domain.csproj", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        fixture.Write(
+            "src/Domain/Domain.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
         await fixture.RunAsync();
         var gone = await CallAsync("architecture_findings", new() { ["key"] = key, ["gone"] = true });
         gone.GetProperty("groups")[0].GetProperty("findings")[0].GetProperty("status").GetString().Should().Be("gone");
@@ -98,41 +225,85 @@ public sealed class FindingsProcessTests
             }
 
             var expected = await original.CallToolAsync("architecture_findings", args, cancellationToken: Token);
-            expected.IsError.Should().BeNull(string.Join("; ", expected.Content.OfType<TextContentBlock>().Select(c => c.Text)));
+            expected
+                .IsError.Should()
+                .BeNull(string.Join("; ", expected.Content.OfType<TextContentBlock>().Select(c => c.Text)));
             var actual = await CallAsync("architecture_findings", args);
-            JsonElement.DeepEquals(actual, expected.StructuredContent!.Value).Should().BeTrue($"C#: {actual}\nGo: {expected.StructuredContent}");
+            JsonElement
+                .DeepEquals(actual, expected.StructuredContent!.Value)
+                .Should()
+                .BeTrue($"C#: {actual}\nGo: {expected.StructuredContent}");
         }
         async Task<JsonElement> CallAsync(string tool, Dictionary<string, object?> args)
         {
             var response = await client.CallToolAsync(tool, args, cancellationToken: Token);
-            response.IsError.Should().BeNull(string.Join("; ", response.Content.OfType<TextContentBlock>().Select(c => c.Text)));
+            response
+                .IsError.Should()
+                .BeNull(string.Join("; ", response.Content.OfType<TextContentBlock>().Select(c => c.Text)));
             using var text = JsonDocument.Parse(response.Content.OfType<TextContentBlock>().Single().Text);
             JsonElement.DeepEquals(response.StructuredContent!.Value, text.RootElement).Should().BeTrue();
             return response.StructuredContent.Value;
         }
     }
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Register transfers provider ownership to the await-using registry.")]
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "Register transfers provider ownership to the await-using registry."
+    )]
     [Fact]
     public async Task FailedProviderKeepsLastEvidenceAndHealthyEmptyAnswerRemovesIt()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Write("App.csproj", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        fixture.Write(
+            "App.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
         await using var providers = new ProviderRegistry();
         var phase = 0;
-        providers.Register(new ProviderRegistryTests.Fake("fixture", [Capabilities.ArchCycles], execute: (_, _) => Task.FromResult(phase switch
-        {
-            0 => new ProviderResult { Items = [new() { Provider = "fixture", Tool = "cycles", Members = ["A", "B"] }] },
-            1 => new ProviderResult { Error = new IOException("fixture failure") },
-            _ => new ProviderResult(),
-        })));
+        providers.Register(
+            new ProviderRegistryTests.Fake(
+                "fixture",
+                [Capabilities.ArchCycles],
+                execute: (_, _) =>
+                    Task.FromResult(
+                        phase switch
+                        {
+                            0 => new ProviderResult
+                            {
+                                Items =
+                                [
+                                    new()
+                                    {
+                                        Provider = "fixture",
+                                        Tool = "cycles",
+                                        Members = ["A", "B"],
+                                    },
+                                ],
+                            },
+                            1 => new ProviderResult { Error = new IOException("fixture failure") },
+                            _ => new ProviderResult(),
+                        }
+                    )
+            )
+        );
         var sync = new ProjectSynchronizer(fixture.Lifecycle, providers: providers);
         await sync.RunAsync(fixture.Root, token: Token);
         using var db = fixture.Database();
         new FindingStore(db).Current(Token).Findings.Should().Contain(f => f.Source.Provider == "fixture");
         var project = (await sync.RunAsync(fixture.Root, token: Token)).Registration.Project.Id;
         var before = providers.Providers().OfType<ProviderRegistryTests.Fake>().Single().Calls;
-        var quick = new FindingSets(fixture.Root, project, db, fixture.Lifecycle.GlobalConfigurationPath, fixture.Lifecycle.Registry);
-        (await quick.ReadAsync("project", Token)).Groups.Single().Findings.Should().Contain(f => f.Source.Provider == "fixture");
+        var quick = new FindingSets(
+            fixture.Root,
+            project,
+            db,
+            fixture.Lifecycle.GlobalConfigurationPath,
+            fixture.Lifecycle.Registry
+        );
+        (await quick.ReadAsync("project", Token))
+            .Groups.Single()
+            .Findings.Should()
+            .Contain(f => f.Source.Provider == "fixture");
         providers.Providers().OfType<ProviderRegistryTests.Fake>().Single().Calls.Should().Be(before);
         phase = 1;
         await sync.RunAsync(fixture.Root, token: Token);
@@ -141,20 +312,47 @@ public sealed class FindingsProcessTests
         await sync.RunAsync(fixture.Root, token: Token);
         new FindingStore(db).Current(Token).Findings.Should().NotContain(f => f.Source.Provider == "fixture");
     }
+
     [Fact]
     public async Task QuickReadsRetainSyncOnlyDriftUntilNextSync()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Write("App.csproj", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        fixture.Write(
+            "App.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
         using var db = fixture.Database();
-        var memory = new MemoryStore(db).Put(new() { Type = "decision", Content = "Keep `MissingPolicy` as the authority", Force = true }, Token).Memory!;
+        var memory = new MemoryStore(db)
+            .Put(
+                new()
+                {
+                    Type = "decision",
+                    Content = "Keep `MissingPolicy` as the authority",
+                    Force = true,
+                },
+                Token
+            )
+            .Memory!;
         var synced = await fixture.RunAsync();
-        var sets = new FindingSets(fixture.Root, synced.Registration.Project.Id, db, fixture.Lifecycle.GlobalConfigurationPath, fixture.Lifecycle.Registry);
+        var sets = new FindingSets(
+            fixture.Root,
+            synced.Registration.Project.Id,
+            db,
+            fixture.Lifecycle.GlobalConfigurationPath,
+            fixture.Lifecycle.Registry
+        );
         fixture.Write("Policy.cs", "class MissingPolicy {}");
-        (await sets.ReadAsync("project", Token)).Groups.Single().Findings.Should().Contain(f => f.Kind == "stale-knowledge" && f.Rule!.Memory == memory.Id);
+        (await sets.ReadAsync("project", Token))
+            .Groups.Single()
+            .Findings.Should()
+            .Contain(f => f.Kind == "stale-knowledge" && f.Rule!.Memory == memory.Id);
         await fixture.RunAsync();
-        (await sets.ReadAsync("project", Token)).Groups.Single().Findings.Should().NotContain(f => f.Kind == "stale-knowledge" && f.Status != "gone");
+        (await sets.ReadAsync("project", Token))
+            .Groups.Single()
+            .Findings.Should()
+            .NotContain(f => f.Kind == "stale-knowledge" && f.Status != "gone");
     }
+
     [Fact]
     public async Task WorkspaceProposalsKeepMarksInWorkspaceAndTasksInCurrentProject()
     {
@@ -163,7 +361,10 @@ public sealed class FindingsProcessTests
         await fixture.Store.JoinAsync("suite", fixture.Members.Select(m => m.Id).ToArray(), Token);
         foreach (var repo in fixture.Repositories)
         {
-            repo.Write("App.csproj", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+            repo.Write(
+                "App.csproj",
+                "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+            );
             repo.Write("appsettings.json", """{"ConnectionStrings":{"Main":"Server=db;Database=shared"}}""");
             repo.Write("Program.cs", "[ServiceContract]\ninterface IShared {}\nclass SharedDbContext : DbContext {}");
         }
@@ -171,20 +372,36 @@ public sealed class FindingsProcessTests
         var sync = await new ProjectSynchronizer(fixture.Lifecycle).RunAsync(root.Root, token: Token);
         sync.Findings.Should().Contain(f => f.Where == "workspace suite" && f.Error.Length == 0);
         using var db = root.Database();
-        var sets = new FindingSets(root.Root, fixture.Members[0].Id, db, fixture.Lifecycle.GlobalConfigurationPath, fixture.Lifecycle.Registry);
+        var sets = new FindingSets(
+            root.Root,
+            fixture.Members[0].Id,
+            db,
+            fixture.Lifecycle.GlobalConfigurationPath,
+            fixture.Lifecycle.Registry
+        );
         var read = await sets.ReadAsync("workspace", Token);
         var finding = read.Groups.Single().Findings.First(f => f.Kind is "shared-database");
-        var proposal = await sets.ProposeAsync(new("by_design", finding.Key, "workspace", Reason: "These are one bounded context"), "agent", Token);
+        var proposal = await sets.ProposeAsync(
+            new("by_design", finding.Key, "workspace", Reason: "These are one bounded context"),
+            "agent",
+            Token
+        );
         await sets.ApproveAsync(proposal.Proposal.Id, "author", token: Token);
         new FindingStore(db).MarkOf(finding.Key, Token).Should().BeNull();
         var levels = new KnowledgeLevels(fixture.Lifecycle.GlobalConfigurationPath, fixture.Lifecycle.Registry);
-        using var workspaceDb = HarnessDatabase.OpenReadOnly(levels.KnowledgePath(levels.Load(), new("workspace", "suite")));
+        using var workspaceDb = HarnessDatabase.OpenReadOnly(
+            levels.KnowledgePath(levels.Load(), new("workspace", "suite"))
+        );
         new FindingStore(workspaceDb).MarkOf(finding.Key, Token)!.State.Should().Be("by_design");
         var task = await sets.ProposeAsync(new("task", finding.Key, "workspace"), "agent", Token);
         await sets.ApproveAsync(task.Proposal.Id, "author", token: Token);
         new TaskStore(db).List(cancellationToken: Token).Should().ContainSingle().Which.Id.Should().Be("ARCH-0001");
         new FindingStore(workspaceDb).MarkOf(finding.Key, Token)!.TaskProject.Should().Be(fixture.Members[0].Id);
-        var obsolete = await sets.ProposeAsync(new("by_design", finding.Key, "workspace", Reason: "obsolete"), "agent", Token);
+        var obsolete = await sets.ProposeAsync(
+            new("by_design", finding.Key, "workspace", Reason: "obsolete"),
+            "agent",
+            Token
+        );
         await fixture.Store.LeaveAsync("suite", fixture.Members[0].Id, Token);
         var action = () => sets.ApproveAsync(obsolete.Proposal.Id, "author", token: Token);
         await action.Should().ThrowAsync<InvalidOperationException>().WithMessage("*no longer in workspace*");

@@ -2,11 +2,16 @@ using System.Runtime.InteropServices;
 using Harness.Cli;
 
 using var cancellation = new CancellationTokenSource();
-using var terminate = OperatingSystem.IsWindows() ? null : PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
-{
-    context.Cancel = true;
-    cancellation.Cancel();
-});
+using var terminate = OperatingSystem.IsWindows()
+    ? null
+    : PosixSignalRegistration.Create(
+        PosixSignal.SIGTERM,
+        context =>
+        {
+            context.Cancel = true;
+            cancellation.Cancel();
+        }
+    );
 ConsoleCancelEventHandler onCancel = (_, eventArgs) =>
 {
     eventArgs.Cancel = true;

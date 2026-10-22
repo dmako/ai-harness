@@ -39,8 +39,21 @@ public sealed class ProviderModelTests
         Capabilities.IsPackage(Capabilities.SymbolSearch).Should().BeFalse();
         Capabilities.IsArchitecture(Capabilities.ArchCycles).Should().BeTrue();
         Capabilities.IsArchitecture(Capabilities.Overview).Should().BeFalse();
-        Capabilities.Architecture.Should().Equal(Capabilities.ArchDependencies, Capabilities.ArchCycles, Capabilities.ArchChangeCoupling, Capabilities.ArchDuplicates, Capabilities.ArchDeadCode);
-        var request = new ProviderRequest(Capabilities.PackageTypeDefinition, Package: "Example.Package", Version: "1.2.3", Type: "Example.Type");
+        Capabilities
+            .Architecture.Should()
+            .Equal(
+                Capabilities.ArchDependencies,
+                Capabilities.ArchCycles,
+                Capabilities.ArchChangeCoupling,
+                Capabilities.ArchDuplicates,
+                Capabilities.ArchDeadCode
+            );
+        var request = new ProviderRequest(
+            Capabilities.PackageTypeDefinition,
+            Package: "Example.Package",
+            Version: "1.2.3",
+            Type: "Example.Type"
+        );
         request.Package.Should().Be("Example.Package");
         request.Version.Should().Be("1.2.3");
         request.Type.Should().Be("Example.Type");
@@ -73,9 +86,28 @@ public sealed class ProviderModelTests
         JsonSerializer.Serialize(new ProviderHealth("idle")).Should().Be("""{"state":"idle"}""");
         JsonSerializer.Serialize(new ProviderHealth("idle", "", "")).Should().Be("""{"state":"idle"}""");
         JsonSerializer.Serialize(new ProviderReference("", "")).Should().Be("""{}""");
-        JsonSerializer.Serialize(new ProviderItem { Name = "", QualifiedName = "", Label = "", Path = "", Snippet = "", Members = [] }).Should().Be("""{"kind":"","provider":"","tool":""}""");
-        JsonSerializer.SerializeToElement(new CapabilityInfo("x", "y", Evidence: "")).TryGetProperty("evidence", out _).Should().BeFalse();
-        var info = JsonSerializer.SerializeToElement(new CapabilityInfo(Capabilities.Context, "compiler", "high", "medium", "indexed", "project", "exact"));
+        JsonSerializer
+            .Serialize(
+                new ProviderItem
+                {
+                    Name = "",
+                    QualifiedName = "",
+                    Label = "",
+                    Path = "",
+                    Snippet = "",
+                    Members = [],
+                }
+            )
+            .Should()
+            .Be("""{"kind":"","provider":"","tool":""}""");
+        JsonSerializer
+            .SerializeToElement(new CapabilityInfo("x", "y", Evidence: ""))
+            .TryGetProperty("evidence", out _)
+            .Should()
+            .BeFalse();
+        var info = JsonSerializer.SerializeToElement(
+            new CapabilityInfo(Capabilities.Context, "compiler", "high", "medium", "indexed", "project", "exact")
+        );
         info.GetProperty("freshness").GetString().Should().Be("indexed");
         info.GetProperty("evidence").GetString().Should().Be("exact");
     }

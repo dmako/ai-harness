@@ -26,11 +26,18 @@ public sealed class McpSupervisorTests
         factory.Ids.Should().ContainSingle();
         supervisor.Health().State.Should().Be("ready");
         supervisor.ServerVersion.Should().Be("provider-fixture 1.0");
-        await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => supervisor.CallToolAsync("echo", new Dictionary<string, object?>(), Token)));
+        await Task.WhenAll(
+            Enumerable
+                .Range(0, 6)
+                .Select(_ => supervisor.CallToolAsync("echo", new Dictionary<string, object?>(), Token))
+        );
         await Task.WhenAll(CloseAsync(), CloseAsync());
         supervisor.Health().Detail.Should().Be("closed");
         supervisor.ServerVersion.Should().BeEmpty();
-        await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<ObjectDisposedException>();
+        await FluentActions
+            .Awaiting(() => supervisor.ClientAsync(Token))
+            .Should()
+            .ThrowAsync<ObjectDisposedException>();
         await ProviderFixture.GoneAsync(factory.Ids.Single());
         async Task CloseAsync() => await supervisor.DisposeAsync();
     }
@@ -43,9 +50,16 @@ public sealed class McpSupervisorTests
         var clock = new Clock();
         await using var supervisor = new McpSupervisor(factory, fixture.Options(), timeProvider: clock);
         var first = await supervisor.ClientAsync(Token);
-        await FluentActions.Awaiting(() => supervisor.CallToolAsync("crash", new Dictionary<string, object?>(), Token)).Should().ThrowAsync<IOException>();
+        await FluentActions
+            .Awaiting(() => supervisor.CallToolAsync("crash", new Dictionary<string, object?>(), Token))
+            .Should()
+            .ThrowAsync<IOException>();
         await ProviderFixture.EventuallyAsync(() => supervisor.Health().State is "degraded");
-        await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<IOException>().WithMessage("*restarting*");
+        await FluentActions
+            .Awaiting(() => supervisor.ClientAsync(Token))
+            .Should()
+            .ThrowAsync<IOException>()
+            .WithMessage("*restarting*");
         factory.Ids.Should().ContainSingle();
         clock.Advance(TimeSpan.FromMilliseconds(500));
         var second = await supervisor.ClientAsync(Token);
@@ -64,23 +78,49 @@ public sealed class McpSupervisorTests
         using var fixture = new ProviderFixture();
         var clock = new Clock();
         var options = fixture.Options() with { Process = new(Path.Combine(fixture.Root, "missing-provider"), []) };
-        await using var supervisor = new McpSupervisor(new ProviderProcessFactory(), options, new() { BaseBackoff = TimeSpan.FromMilliseconds(50), MaxBackoff = TimeSpan.FromMilliseconds(200), Window = TimeSpan.FromMinutes(1) }, clock);
+        await using var supervisor = new McpSupervisor(
+            new ProviderProcessFactory(),
+            options,
+            new()
+            {
+                BaseBackoff = TimeSpan.FromMilliseconds(50),
+                MaxBackoff = TimeSpan.FromMilliseconds(200),
+                Window = TimeSpan.FromMinutes(1),
+            },
+            clock
+        );
         await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<Exception>();
         supervisor.Health().State.Should().Be("degraded");
-        await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<IOException>().WithMessage("*restarting*");
+        await FluentActions
+            .Awaiting(() => supervisor.ClientAsync(Token))
+            .Should()
+            .ThrowAsync<IOException>()
+            .WithMessage("*restarting*");
         clock.Advance(TimeSpan.FromMilliseconds(50));
         await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<Exception>();
         clock.Advance(TimeSpan.FromMilliseconds(99));
-        await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<IOException>().WithMessage("*restarting*");
+        await FluentActions
+            .Awaiting(() => supervisor.ClientAsync(Token))
+            .Should()
+            .ThrowAsync<IOException>()
+            .WithMessage("*restarting*");
         clock.Advance(TimeSpan.FromMilliseconds(1));
         await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<Exception>();
         supervisor.Health().State.Should().Be("unavailable");
-        await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<IOException>().WithMessage("*failed 3 times*");
+        await FluentActions
+            .Awaiting(() => supervisor.ClientAsync(Token))
+            .Should()
+            .ThrowAsync<IOException>()
+            .WithMessage("*failed 3 times*");
         clock.Advance(TimeSpan.FromMinutes(1));
         await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<Exception>();
         supervisor.Health().State.Should().Be("degraded");
         clock.Advance(TimeSpan.FromMilliseconds(199));
-        await FluentActions.Awaiting(() => supervisor.ClientAsync(Token)).Should().ThrowAsync<IOException>().WithMessage("*restarting*");
+        await FluentActions
+            .Awaiting(() => supervisor.ClientAsync(Token))
+            .Should()
+            .ThrowAsync<IOException>()
+            .WithMessage("*restarting*");
     }
 
     [Fact]
@@ -98,17 +138,34 @@ public sealed class McpSupervisorTests
     }
 
     [Fact]
-    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The registry takes ownership of the registered conformance provider.")]
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The registry takes ownership of the registered conformance provider."
+    )]
     public async Task RegistryPreservesShortRpcTimeoutObservationAndHealthySibling()
     {
         using var fixture = new ProviderFixture();
         await using var registry = new ProviderRegistry(TimeSpan.FromSeconds(20));
-        var configuration = new ProviderConfiguration { Type = "mcp", Command = "dotnet", Args = [ProviderFixture.Worker, "normal", fixture.Root], TimeoutMs = 150, Capabilities = new(StringComparer.Ordinal) { [Capabilities.TextSearch] = new() { Tool = "hang" } } };
-        registry.Register(GenericMcpProvider.Build("stalled", configuration, fixture.Root, new ProviderProcessFactory()));
+        var configuration = new ProviderConfiguration
+        {
+            Type = "mcp",
+            Command = "dotnet",
+            Args = [ProviderFixture.Worker, "normal", fixture.Root],
+            TimeoutMs = 150,
+            Capabilities = new(StringComparer.Ordinal) { [Capabilities.TextSearch] = new() { Tool = "hang" } },
+        };
+        registry.Register(
+            GenericMcpProvider.Build("stalled", configuration, fixture.Root, new ProviderProcessFactory())
+        );
         registry.Register(new ProviderRegistryTests.Fake("healthy", [Capabilities.TextSearch]));
         var results = await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token);
         results[0].TimedOut.Should().BeTrue();
-        results[0].Error.Should().BeOfType<ProviderException>().Which.InnerException.Should().BeOfType<TimeoutException>();
+        results[0]
+            .Error.Should()
+            .BeOfType<ProviderException>()
+            .Which.InnerException.Should()
+            .BeOfType<TimeoutException>();
         results[1].Error.Should().BeNull();
     }
 
@@ -116,12 +173,18 @@ public sealed class McpSupervisorTests
     {
         private readonly object _gate = new();
         private DateTimeOffset _now = DateTimeOffset.UtcNow;
-        public override DateTimeOffset GetUtcNow() { lock (_gate)
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            lock (_gate)
             {
                 return _now;
             }
         }
-        public void Advance(TimeSpan time) { lock (_gate)
+
+        public void Advance(TimeSpan time)
+        {
+            lock (_gate)
             {
                 _now += time;
             }

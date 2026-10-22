@@ -7,11 +7,20 @@ internal static class MigrationRunner
 {
     private const string ForeignKeysOffMarker = "-- harness: foreign keys off";
 
-    internal static bool HasLedger(SqliteConnection connection) => Convert.ToInt64(Scalar(connection,
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"), System.Globalization.CultureInfo.InvariantCulture) > 0;
+    internal static bool HasLedger(SqliteConnection connection) =>
+        Convert.ToInt64(
+            Scalar(
+                connection,
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
+            ),
+            System.Globalization.CultureInfo.InvariantCulture
+        ) > 0;
 
-    internal static int Version(SqliteConnection connection) => Convert.ToInt32(
-        Scalar(connection, "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"), System.Globalization.CultureInfo.InvariantCulture);
+    internal static int Version(SqliteConnection connection) =>
+        Convert.ToInt32(
+            Scalar(connection, "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
 
     internal static void CheckApplied(SqliteConnection connection, IReadOnlyList<Migration> migrations)
     {
@@ -28,12 +37,19 @@ internal static class MigrationRunner
 
             if (version < 1 || rows.GetString(1) != migrations[(int)version - 1].Name)
             {
-                throw new InvalidDataException($"schema_migrations version {version} does not match this binary; refusing to continue.");
+                throw new InvalidDataException(
+                    $"schema_migrations version {version} does not match this binary; refusing to continue."
+                );
             }
         }
     }
 
-    internal static void Run(SqliteConnection connection, string path, IReadOnlyList<Migration> migrations, CancellationToken cancellationToken)
+    internal static void Run(
+        SqliteConnection connection,
+        string path,
+        IReadOnlyList<Migration> migrations,
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (HasLedger(connection) && Version(connection) == migrations.Count)
@@ -42,16 +58,20 @@ internal static class MigrationRunner
             return; // Current databases need no write lock, even while another process is writing.
         }
 
-        Execute(connection, """
+        Execute(
+            connection,
+            """
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 applied_at TEXT NOT NULL
             ) STRICT
-            """);
+            """
+        );
         CheckApplied(connection, migrations);
         var applied = Version(connection);
-        var saved = applied > 0 && applied < migrations.Count ? DatabaseBackups.Create(connection, path, applied) : null;
+        var saved =
+            applied > 0 && applied < migrations.Count ? DatabaseBackups.Create(connection, path, applied) : null;
         foreach (var migration in migrations)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -62,7 +82,10 @@ internal static class MigrationRunner
             catch (Exception exception) when (exception is SqliteException or InvalidDataException)
             {
                 var recovery = saved is null ? string.Empty : $"; the database before the upgrade is saved as {saved}";
-                throw new IOException($"Migration {migration.Name} failed, schema left at previous version{recovery}.", exception);
+                throw new IOException(
+                    $"Migration {migration.Name} failed, schema left at previous version{recovery}.",
+                    exception
+                );
             }
         }
 
@@ -88,7 +111,9 @@ internal static class MigrationRunner
             {
                 if (name != migration.Name)
                 {
-                    throw new InvalidDataException($"schema_migrations version {migration.Version} changed concurrently; refusing to continue.");
+                    throw new InvalidDataException(
+                        $"schema_migrations version {migration.Version} changed concurrently; refusing to continue."
+                    );
                 }
 
                 transaction.Commit();
@@ -96,7 +121,11 @@ internal static class MigrationRunner
             }
 
             Execute(connection, migration.Sql, transaction);
-            if (disableForeignKeys && Scalar(connection, "SELECT \"table\" FROM pragma_foreign_key_check LIMIT 1", transaction) is string table)
+            if (
+                disableForeignKeys
+                && Scalar(connection, "SELECT \"table\" FROM pragma_foreign_key_check LIMIT 1", transaction)
+                    is string table
+            )
             {
                 throw new InvalidDataException($"Migration {migration.Name} failed: foreign key violation in {table}.");
             }
@@ -104,7 +133,8 @@ internal static class MigrationRunner
             cancellationToken.ThrowIfCancellationRequested();
             using var record = connection.CreateCommand();
             record.Transaction = transaction;
-            record.CommandText = "INSERT INTO schema_migrations (version, name, applied_at) VALUES ($version, $name, $time)";
+            record.CommandText =
+                "INSERT INTO schema_migrations (version, name, applied_at) VALUES ($version, $name, $time)";
             record.Parameters.AddWithValue("$version", migration.Version);
             record.Parameters.AddWithValue("$name", migration.Name);
             record.Parameters.AddWithValue("$time", HarnessDatabase.FormatTime(DateTimeOffset.UtcNow));
@@ -120,7 +150,11 @@ internal static class MigrationRunner
         }
     }
 
-    [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Internal callers supply constant SQL only; external values use command parameters.")]
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "Internal callers supply constant SQL only; external values use command parameters."
+    )]
     internal static object? Scalar(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();
@@ -129,7 +163,11 @@ internal static class MigrationRunner
         return command.ExecuteScalar();
     }
 
-    [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Internal callers supply embedded migrations, constant SQL, or an invariant-formatted integer pragma; no external SQL is accepted.")]
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "Internal callers supply embedded migrations, constant SQL, or an invariant-formatted integer pragma; no external SQL is accepted."
+    )]
     internal static void Execute(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();

@@ -45,7 +45,9 @@ public sealed class NestedWorktreeFilter(string root, TimeProvider? timeProvider
             try
             {
                 var line = File.ReadAllText(Path.Combine(_root, directory, ".git")).Trim();
-                nested = line.StartsWith("gitdir:", StringComparison.Ordinal) && line.Replace(Path.DirectorySeparatorChar, '/').Contains("/worktrees/", StringComparison.Ordinal);
+                nested =
+                    line.StartsWith("gitdir:", StringComparison.Ordinal)
+                    && line.Replace(Path.DirectorySeparatorChar, '/').Contains("/worktrees/", StringComparison.Ordinal);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
@@ -62,7 +64,10 @@ public sealed class NestedWorktreeFilter(string root, TimeProvider? timeProvider
         var current = Path.GetPathRoot(full)!;
         try
         {
-            foreach (var component in full[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+            foreach (
+                var component in full[current.Length..]
+                    .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+            )
             {
                 current = Path.Combine(current, component);
                 current = new DirectoryInfo(current).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? current;

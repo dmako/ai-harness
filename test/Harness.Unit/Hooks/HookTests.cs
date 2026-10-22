@@ -19,31 +19,33 @@ namespace Harness.Unit.Hooks;
 public sealed class HookTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
-    public static TheoryData<string> Payloads => new()
-    {
-        """{"session_id":"s1","cwd":"/repo","tool_name":"Read","tool_input":{"file_path":"a.cs"},"tool_response":{"content":"PRIVATE"}}""",
-        """{"tool_name":"NotebookRead","tool_input":{"notebook_path":"a.ipynb"}}""",
-        """{"tool_name":"Edit","tool_input":{"path":"a.cs","old_string":"PRIVATE"}}""",
-        """{"tool_name":"MultiEdit","tool_input":{"file_path":"b.cs"}}""",
-        """{"tool_name":"Write","tool_input":{"file_path":"b.cs","content":"PRIVATE"}}""",
-        """{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"a.ipynb"}}""",
-        """{"tool_name":"Grep","tool_input":{"path":"src","pattern":"PRIVATE"}}""",
-        """{"tool_name":"Glob","tool_input":{"path":"src"}}""",
-        """{"tool_name":"LS","tool_input":{"path":"src"}}""",
-        """{"tool_name":"Bash","tool_input":{"command":"cd src && time sudo rg token | cat"}}""",
-        """{"tool_name":"shell","tool_input":{"command":["bash","-lc","A=x xargs cat src/a.cs"]}}""",
-        """{"tool_name":"Bash","tool_input":{"command":"git ls-files | head"}}""",
-        """{"tool_name":"Bash","tool_input":{"command":"cat a.cs; grep word b.cs"}}""",
-        """{"tool_name":"shell","tool_input":{"command":["pwsh","-c","cat src/a.cs"]}}""",
-        """{"tool_name":"unknown","tool_input":{"path":"PRIVATE","command":42}}""",
-        """{"tool_name":"mcp__harness__get_context","tool_input":{"task":"review class","secret":"PRIVATE"}}""",
-        """{"tool_name":"mcp__provider__search","tool_input":{"task":"PRIVATE","path":"PRIVATE"}}""",
-        """{"tool_name":"mcp____broken","tool_input":null}""",
-        """{"tool_name":"apply_patch","tool_input":{"patch":"*** Add File: a.cs\n+PRIVATE\n*** Update File: b.cs\n*** Delete File: a.cs\n*** Move to: c.cs"}}""",
-        """{"tool_name":"apply_patch","tool_input":[{"patch":"*** Update File: a.cs"},"*** Delete File: b.cs"]}""",
-        """{"tool_name":"Read","tool_input":"PRIVATE"}""",
-        """{}""",
-    };
+    public static TheoryData<string> Payloads =>
+        new()
+        {
+            """{"session_id":"s1","cwd":"/repo","tool_name":"Read","tool_input":{"file_path":"a.cs"},"tool_response":{"content":"PRIVATE"}}""",
+            """{"tool_name":"NotebookRead","tool_input":{"notebook_path":"a.ipynb"}}""",
+            """{"tool_name":"Edit","tool_input":{"path":"a.cs","old_string":"PRIVATE"}}""",
+            """{"tool_name":"MultiEdit","tool_input":{"file_path":"b.cs"}}""",
+            """{"tool_name":"Write","tool_input":{"file_path":"b.cs","content":"PRIVATE"}}""",
+            """{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"a.ipynb"}}""",
+            """{"tool_name":"Grep","tool_input":{"path":"src","pattern":"PRIVATE"}}""",
+            """{"tool_name":"Glob","tool_input":{"path":"src"}}""",
+            """{"tool_name":"LS","tool_input":{"path":"src"}}""",
+            """{"tool_name":"Bash","tool_input":{"command":"cd src && time sudo rg token | cat"}}""",
+            """{"tool_name":"shell","tool_input":{"command":["bash","-lc","A=x xargs cat src/a.cs"]}}""",
+            """{"tool_name":"Bash","tool_input":{"command":"git ls-files | head"}}""",
+            """{"tool_name":"Bash","tool_input":{"command":"cat a.cs; grep word b.cs"}}""",
+            """{"tool_name":"shell","tool_input":{"command":["pwsh","-c","cat src/a.cs"]}}""",
+            """{"tool_name":"unknown","tool_input":{"path":"PRIVATE","command":42}}""",
+            """{"tool_name":"mcp__harness__get_context","tool_input":{"task":"review class","secret":"PRIVATE"}}""",
+            """{"tool_name":"mcp__provider__search","tool_input":{"task":"PRIVATE","path":"PRIVATE"}}""",
+            """{"tool_name":"mcp____broken","tool_input":null}""",
+            """{"tool_name":"apply_patch","tool_input":{"patch":"*** Add File: a.cs\n+PRIVATE\n*** Update File: b.cs\n*** Delete File: a.cs\n*** Move to: c.cs"}}""",
+            """{"tool_name":"apply_patch","tool_input":[{"patch":"*** Update File: a.cs"},"*** Delete File: b.cs"]}""",
+            """{"tool_name":"Read","tool_input":"PRIVATE"}""",
+            """{}""",
+        };
+
     [Theory]
     [MemberData(nameof(Payloads))]
     public async Task PayloadAllowlistAndClassificationMatchFrozenGo(string json)
@@ -60,6 +62,7 @@ public sealed class HookTests
         call.Paths.Should().Equal((expected["Paths"] as JsonArray ?? []).Select(n => n!.GetValue<string>()));
         JsonSerializer.Serialize(call).Should().NotContain("PRIVATE");
     }
+
     [Theory]
     [InlineData("{")]
     [InlineData("[]")]
@@ -71,21 +74,26 @@ public sealed class HookTests
         var act = () => HookPayload.Parse(Encoding.UTF8.GetBytes(payload));
         act.Should().Throw<Exception>();
     }
+
     [Fact]
     public void PayloadIsBoundedAndRequiresUtf8()
     {
         var oversized = () => HookPayload.Parse(new byte[HookPayload.MaximumBytes + 1]);
         oversized.Should().Throw<InvalidDataException>();
-        var malformed = () => HookPayload.Parse(new byte[] { (byte)'{', (byte)'"', 0xFF, (byte)'"', (byte)':', (byte)'1', (byte)'}' });
+        var malformed = () =>
+            HookPayload.Parse(new byte[] { (byte)'{', (byte)'"', 0xFF, (byte)'"', (byte)':', (byte)'1', (byte)'}' });
         malformed.Should().Throw<Exception>();
     }
+
     [Theory]
     [InlineData("/c/repos/project", true, "C:\\repos\\project")]
     [InlineData("/d", true, "D:\\")]
     [InlineData("/c", false, "/c")]
     [InlineData("/code/repo", true, "/code/repo")]
     [InlineData("C:/repo", true, "C:/repo")]
-    public void GitBashPathsBecomeNativeOnlyOnWindows(string path, bool windows, string expected) => HookPayload.NativePath(path, windows).Should().Be(expected);
+    public void GitBashPathsBecomeNativeOnlyOnWindows(string path, bool windows, string expected) =>
+        HookPayload.NativePath(path, windows).Should().Be(expected);
+
     [Theory]
     [InlineData(false, "/path with $dollar;and`tick/harness")]
     [InlineData(false, "/path with double\"quote/harness")]
@@ -96,6 +104,7 @@ public sealed class HookTests
         ClientHookCleanup.SplitExecutable(command).Executable.Should().Be(executable);
         command[0].Should().Be(windows ? '"' : '\'');
     }
+
     [Theory]
     [InlineData("claude-code", "user")]
     [InlineData("claude-code", "project")]
@@ -109,17 +118,32 @@ public sealed class HookTests
         // from the oracle and the same file for both editors.
         var userDirectory = client is "codex" ? tree.Codex : tree.Claude;
         var userFile = client is "codex" ? "hooks.json" : "settings.json";
-        var path = scope is "user" ? Path.Combine(userDirectory, userFile) : ClientHookCleanup.Targets(tree.Paths, client, scope, tree.Root)[0].Path;
+        var path = scope is "user"
+            ? Path.Combine(userDirectory, userFile)
+            : ClientHookCleanup.Targets(tree.Paths, client, scope, tree.Root)[0].Path;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var source = """
-            {
-              "foreign": [1, true, "λ"],
-              "hooks": {"PostToolUse":[{"matcher":"Read","extra":true,"hooks":[{"type":"command","command":"harness hook event --client old"},{"type":"command","command":"echo preserve"}]}],"Other":[{"hooks":[{"type":"prompt","prompt":"preserve"}]}]}
-            }
-            """.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
+        var source =
+            """
+                {
+                  "foreign": [1, true, "λ"],
+                  "hooks": {"PostToolUse":[{"matcher":"Read","extra":true,"hooks":[{"type":"command","command":"harness hook event --client old"},{"type":"command","command":"echo preserve"}]}],"Other":[{"hooks":[{"type":"prompt","prompt":"preserve"}]}]}
+                }
+                """.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
         await File.WriteAllTextAsync(path, source, Token);
-        var command = ClientHookCleanup.Command(Path.Combine(tree.Root, "bin", OperatingSystem.IsWindows() ? "harness.exe" : "harness"), client);
-        var request = new { mode = "install", client, scope, root = tree.Root, claudeDir = tree.Claude, codexDir = tree.Codex, command };
+        var command = ClientHookCleanup.Command(
+            Path.Combine(tree.Root, "bin", OperatingSystem.IsWindows() ? "harness.exe" : "harness"),
+            client
+        );
+        var request = new
+        {
+            mode = "install",
+            client,
+            scope,
+            root = tree.Root,
+            claudeDir = tree.Claude,
+            codexDir = tree.Codex,
+            command,
+        };
         var expected = await OracleAsync(request);
         var dry = ClientHookCleanup.Install(path, client, command, true);
         dry.After.Should().Be(expected!["After"]!.GetValue<string>());
@@ -139,11 +163,27 @@ public sealed class HookTests
         {
             ClientHookCleanup.Installed(path, "session").Should().Contain("hook session");
         }
-        var removed = await OracleAsync(new { mode = "remove", client, scope, root = tree.Root, claudeDir = tree.Claude, codexDir = tree.Codex });
+        var removed = await OracleAsync(
+            new
+            {
+                mode = "remove",
+                client,
+                scope,
+                root = tree.Root,
+                claudeDir = tree.Claude,
+                codexDir = tree.Codex,
+            }
+        );
         ClientHookCleanup.Remove(path, client).After.Should().Be(removed!["After"]!.GetValue<string>());
-        FileEditor.Read(path).Should().Contain("echo preserve").And.Contain("\"extra\":true").And.Contain("\"foreign\": [1, true, \"λ\"]");
+        FileEditor
+            .Read(path)
+            .Should()
+            .Contain("echo preserve")
+            .And.Contain("\"extra\":true")
+            .And.Contain("\"foreign\": [1, true, \"λ\"]");
         ClientHookCleanup.Remove(path, client).Action.Should().Be("absent");
     }
+
     [Theory]
     [InlineData("""{"hooks":null}""")]
     [InlineData("""{"hooks":{"PostToolUse":42}}""")]
@@ -158,6 +198,7 @@ public sealed class HookTests
         FileEditor.Read(path).Should().Be(source);
         Directory.GetFiles(tree.Root, "*.bak-harness-*").Should().BeEmpty();
     }
+
     [Fact]
     public void AbsentUserClientsAreSkippedWithoutCreatingTheirDirectories()
     {
@@ -168,17 +209,29 @@ public sealed class HookTests
         ClientHookCleanup.Remove(target).Action.Should().Be("skip");
         Directory.Exists(directory).Should().BeFalse();
     }
+
     [Theory]
     [InlineData("/path with space/harness")]
     [InlineData("/path'quote/harness")]
     [InlineData("C:\\bin\\harness.exe")]
     public async Task ClientCommandQuotingMatchesFrozenGo(string executable)
     {
-        var expected = await OracleAsync(new { mode = "command", command = executable, client = "claude-code" });
+        var expected = await OracleAsync(
+            new
+            {
+                mode = "command",
+                command = executable,
+                client = "claude-code",
+            }
+        );
         var actual = ClientHookCleanup.Command(executable, "claude-code");
         if (!OperatingSystem.IsWindows() && executable.Contains('\\', StringComparison.Ordinal))
         {
-            actual.Should().Be("'" + expected!.GetValue<string>().Replace(" hook event", "' hook event", StringComparison.Ordinal));
+            actual
+                .Should()
+                .Be(
+                    "'" + expected!.GetValue<string>().Replace(" hook event", "' hook event", StringComparison.Ordinal)
+                );
         }
         else
         {
@@ -186,6 +239,7 @@ public sealed class HookTests
         }
         ClientHookCleanup.SplitExecutable(actual).Executable.Should().Be(executable);
     }
+
     [Theory]
     [InlineData("zsh")]
     [InlineData("bash")]
@@ -193,7 +247,9 @@ public sealed class HookTests
     [InlineData("pwsh")]
     public async Task ShellScriptsMatchFrozenGoAndProfilesPreserveForeignContent(string shell)
     {
-        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER") is { Length: > 0 } path ? path : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_FINDINGS_SERVER.");
+        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER") is { Length: > 0 } path
+            ? path
+            : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_FINDINGS_SERVER.");
         var expected = await ProcessAsync(oracle, ["completion", shell], "");
         CompletionScripts.For(shell).Should().Be(expected.Output);
         using var tree = new ClientTree();
@@ -214,6 +270,7 @@ public sealed class HookTests
         (await File.ReadAllTextAsync(profile, Token)).Should().Be("# preserve\n");
         Directory.GetFiles(tree.Root, shell + ".bak-harness-*").Should().NotBeEmpty();
     }
+
     [Theory]
     [InlineData("bash", "li")]
     [InlineData("zsh", "li")]
@@ -223,19 +280,36 @@ public sealed class HookTests
     {
         using var output = new StringWriter();
         using var error = new StringWriter();
-        string[] args = shell is "pwsh" ? ["__complete", shell, current, "tasks"] : ["__complete", shell, "tasks", current];
+        string[] args = shell is "pwsh"
+            ? ["__complete", shell, current, "tasks"]
+            : ["__complete", shell, "tasks", current];
         (await CliApplication.RunAsync(args, output, error, Token)).Should().Be(0, error.ToString());
-        output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal).Should().StartWith(shell switch { "bash" => "list\n", "zsh" => "list:List tasks\n", _ => "list\tList tasks\n" });
+        output
+            .ToString()
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Should()
+            .StartWith(
+                shell switch
+                {
+                    "bash" => "list\n",
+                    "zsh" => "list:List tasks\n",
+                    _ => "list\tList tasks\n",
+                }
+            );
     }
+
     [Theory]
     [InlineData("tasks", "list", "--milestone", "")]
     [InlineData("nonexistent", "")]
     public async Task CompletionDoesNotOfferFlagValuesOrUnknownCommands(params string[] words)
     {
         using var output = new StringWriter();
-        (await CliApplication.RunAsync(["__complete", "bash", .. words], output, TextWriter.Null, Token)).Should().Be(0);
+        (await CliApplication.RunAsync(["__complete", "bash", .. words], output, TextWriter.Null, Token))
+            .Should()
+            .Be(0);
         output.ToString().Should().BeEmpty();
     }
+
     [Theory]
     [InlineData("hooks", "install")]
     [InlineData("hooks", "uninstall")]
@@ -249,19 +323,32 @@ public sealed class HookTests
     [InlineData("completion", "bash")]
     public async Task HookAndCompletionOptionsMatchTheFrozenCommandTree(string group, string command)
     {
-        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER") is { Length: > 0 } path ? path : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_FINDINGS_SERVER.");
+        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER") is { Length: > 0 } path
+            ? path
+            : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_FINDINGS_SERVER.");
         var expected = await ProcessAsync(oracle, ["__complete", "bash", group, command, "--"], "");
         using var output = new StringWriter();
-        (await CliApplication.RunAsync(["__complete", "bash", group, command, "--"], output, TextWriter.Null, Token)).Should().Be(0);
+        (await CliApplication.RunAsync(["__complete", "bash", group, command, "--"], output, TextWriter.Null, Token))
+            .Should()
+            .Be(0);
         output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal).Should().Be(expected.Output);
     }
+
     [Fact]
     public async Task CompletionUsesTheRegisteredCommandModel()
     {
         using var output = new StringWriter();
-        await CliApplication.RunConfiguredAsync(["__complete", "bash", ""], output, TextWriter.Null, null, configuration => configuration.AddDelegate("future-command", (_, _) => 0), Token);
+        await CliApplication.RunConfiguredAsync(
+            ["__complete", "bash", ""],
+            output,
+            TextWriter.Null,
+            null,
+            configuration => configuration.AddDelegate("future-command", (_, _) => 0),
+            Token
+        );
         output.ToString().Should().Contain("future-command").And.NotContain("__complete");
     }
+
     [Fact]
     public void GitHooksRefuseForeignInterpretersAndRoundTripShellHooks()
     {
@@ -286,6 +373,7 @@ public sealed class HookTests
         var act = () => hooks.Set("post-commit", true);
         act.Should().Throw<InvalidDataException>();
     }
+
     [Fact]
     public void PathsOutsideRepositoryAreExcluded()
     {
@@ -294,6 +382,7 @@ public sealed class HookTests
         HookIngestion.Relative(tree.Root, tree.Root, "../private").Should().BeNull();
         HookIngestion.Relative(tree.Root, tree.Root, ".").Should().BeNull();
     }
+
     [Theory]
     [InlineData("shell")]
     [InlineData("crlf")]
@@ -314,7 +403,16 @@ public sealed class HookTests
         };
         await File.WriteAllTextAsync(path, source, Token);
         var command = "/path with ' quote/harness";
-        var expected = (await OracleAsync(new { mode = "git-install", root = tree.Root, command }))!.AsArray();
+        var expected = (
+            await OracleAsync(
+                new
+                {
+                    mode = "git-install",
+                    root = tree.Root,
+                    command,
+                }
+            )
+        )!.AsArray();
         foreach (var name in GitHooks.Names)
         {
             var dry = hooks.Set(name, true, command, true);
@@ -333,17 +431,39 @@ public sealed class HookTests
             change.Deleted.Should().Be(want["Deleted"]!.GetValue<bool>());
         }
     }
+
     private static async Task<JsonNode?> OracleAsync(object request)
     {
-        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_HOOKS_ORACLE") is { Length: > 0 } path ? path : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_HOOKS_ORACLE.");
+        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_HOOKS_ORACLE") is { Length: > 0 } path
+            ? path
+            : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_HOOKS_ORACLE.");
         var result = await ProcessAsync(oracle, [], JsonSerializer.Serialize(request));
         result.Code.Should().Be(0, result.Error);
         return JsonNode.Parse(result.Output);
     }
-    [SuppressMessage("Security", "S4036:Searching OS commands in PATH is security-sensitive", Justification = "Explicit frozen Go fixture executable, no shell.")]
-    private static async Task<(int Code, string Output, string Error)> ProcessAsync(string executable, string[] args, string input)
+
+    [SuppressMessage(
+        "Security",
+        "S4036:Searching OS commands in PATH is security-sensitive",
+        Justification = "Explicit frozen Go fixture executable, no shell."
+    )]
+    private static async Task<(int Code, string Output, string Error)> ProcessAsync(
+        string executable,
+        string[] args,
+        string input
+    )
     {
-        using var process = new Process { StartInfo = new(executable) { UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true } };
+        using var process = new Process
+        {
+            StartInfo = new(executable)
+            {
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            },
+        };
         foreach (var argument in args)
         {
             process.StartInfo.ArgumentList.Add(argument);

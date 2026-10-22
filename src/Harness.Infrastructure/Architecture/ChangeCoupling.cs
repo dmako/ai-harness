@@ -11,8 +11,18 @@ public static class ChangeCoupling
     public const int MinTogether = 3;
     public const double MinShare = 0.5;
     public const int MinHistory = 5;
-    public static bool Usual(ChangePartner partner) => partner.Together >= MinTogether && partner.Share >= MinShare && partner.Together / partner.Share >= MinHistory - 0.5;
-    public static async Task<ChangePartners> PartnersAsync(IProviderRegistry? registry, string file, int limit, CancellationToken token)
+
+    public static bool Usual(ChangePartner partner) =>
+        partner.Together >= MinTogether
+        && partner.Share >= MinShare
+        && partner.Together / partner.Share >= MinHistory - 0.5;
+
+    public static async Task<ChangePartners> PartnersAsync(
+        IProviderRegistry? registry,
+        string file,
+        int limit,
+        CancellationToken token
+    )
     {
         if (registry is null)
         {
@@ -21,10 +31,17 @@ public static class ChangeCoupling
 
         Dictionary<string, ChangePartner> byPath = new(StringComparer.Ordinal);
         List<string> errors = [];
-        foreach (var result in await registry.CallAsync(new(Capabilities.ArchChangeCoupling, file, Limit: limit), cancellationToken: token).ConfigureAwait(false))
+        foreach (
+            var result in await registry
+                .CallAsync(new(Capabilities.ArchChangeCoupling, file, Limit: limit), cancellationToken: token)
+                .ConfigureAwait(false)
+        )
         {
             if (result.Error is not null)
-            { errors.Add(result.Error.Message.Split('\n')[0]); continue; }
+            {
+                errors.Add(result.Error.Message.Split('\n')[0]);
+                continue;
+            }
             foreach (var item in result.Items.Where(item => item.Path is { Length: > 0 } && item.Path != file))
             {
                 var partner = new ChangePartner(item.Path!, item.Count, item.Confidence, item.Provider, item.Tool);
@@ -34,14 +51,39 @@ public static class ChangeCoupling
                 }
             }
         }
-        var partners = byPath.Values.OrderByDescending(partner => partner.Together).ThenByDescending(partner => partner.Share).ThenBy(partner => partner.Path, StringComparer.Ordinal);
+        var partners = byPath
+            .Values.OrderByDescending(partner => partner.Together)
+            .ThenByDescending(partner => partner.Share)
+            .ThenBy(partner => partner.Path, StringComparer.Ordinal);
         return new((limit > 0 ? partners.Take(limit) : partners).ToArray(), errors);
     }
-    public static async Task<ChangeHotspots> HotspotsAsync(GitRepository repository, IProviderRegistry? registry, int limit, int partners, CancellationToken token, TimeProvider? clock = null)
+
+    public static async Task<ChangeHotspots> HotspotsAsync(
+        GitRepository repository,
+        IProviderRegistry? registry,
+        int limit,
+        int partners,
+        CancellationToken token,
+        TimeProvider? clock = null
+    )
     {
-        var churn = await repository.ChurnAsync((clock ?? TimeProvider.System).GetUtcNow() - Window, token).ConfigureAwait(false);
+        var churn = await repository
+            .ChurnAsync((clock ?? TimeProvider.System).GetUtcNow() - Window, token)
+            .ConfigureAwait(false);
         var files = new AnalysisRepository(repository.Root, [], token);
-        var output = churn.Counts.Where(pair => Code(pair.Key) && !TaskParsing.IsTestFile(pair.Key) && !Generated(pair.Key) && pair.Value > 1 && files.Exists(pair.Key)).Select(pair => new ChangeHotspot(pair.Key, pair.Value)).OrderByDescending(hotspot => hotspot.Commits).ThenBy(hotspot => hotspot.Path, StringComparer.Ordinal).Take(Math.Max(0, limit)).ToArray();
+        var output = churn
+            .Counts.Where(pair =>
+                Code(pair.Key)
+                && !TaskParsing.IsTestFile(pair.Key)
+                && !Generated(pair.Key)
+                && pair.Value > 1
+                && files.Exists(pair.Key)
+            )
+            .Select(pair => new ChangeHotspot(pair.Key, pair.Value))
+            .OrderByDescending(hotspot => hotspot.Commits)
+            .ThenBy(hotspot => hotspot.Path, StringComparer.Ordinal)
+            .Take(Math.Max(0, limit))
+            .ToArray();
         List<string> errors = [];
         if (registry is not null && partners > 0)
         {
@@ -55,7 +97,13 @@ public static class ChangeCoupling
 
         return new(output, churn.Commits, errors);
     }
-    public static async Task<ChangeCheck> CheckAsync(IProviderRegistry? registry, string root, IReadOnlyList<string> changed, CancellationToken token)
+
+    public static async Task<ChangeCheck> CheckAsync(
+        IProviderRegistry? registry,
+        string root,
+        IReadOnlyList<string> changed,
+        CancellationToken token
+    )
     {
         var included = changed.ToHashSet(StringComparer.Ordinal);
         var files = new AnalysisRepository(root, [], token);
@@ -65,14 +113,57 @@ public static class ChangeCoupling
         {
             var result = await PartnersAsync(registry, file, 20, token).ConfigureAwait(false);
             errors.AddRange(result.Errors.Where(error => !errors.Contains(error, StringComparer.Ordinal)));
-            missing.AddRange(result.Partners.Where(partner => Usual(partner) && !included.Contains(partner.Path) && files.Exists(partner.Path)).Select(partner => new MissingChangePartner(file, partner)));
+            missing.AddRange(
+                result
+                    .Partners.Where(partner =>
+                        Usual(partner) && !included.Contains(partner.Path) && files.Exists(partner.Path)
+                    )
+                    .Select(partner => new MissingChangePartner(file, partner))
+            );
         }
-        return new(missing.OrderByDescending(item => item.Partner.Share).ThenByDescending(item => item.Partner.Together).ThenBy(item => item.Partner.Path, StringComparer.Ordinal).ToArray(), errors);
+        return new(
+            missing
+                .OrderByDescending(item => item.Partner.Share)
+                .ThenByDescending(item => item.Partner.Together)
+                .ThenBy(item => item.Partner.Path, StringComparer.Ordinal)
+                .ToArray(),
+            errors
+        );
     }
-    private static bool Code(string file) => Path.GetExtension(file).ToUpperInvariant() is ".CS" or ".GO" or ".TS" or ".TSX" or ".JS" or ".JSX" or ".MJS" or ".PY" or ".JAVA" or ".KT" or ".RS" or ".DART" or ".VUE" or ".SWIFT" or ".SQL" or ".PROTO" && !file.Contains("node_modules/", StringComparison.Ordinal);
+
+    private static bool Code(string file) =>
+        Path.GetExtension(file).ToUpperInvariant()
+            is ".CS"
+                or ".GO"
+                or ".TS"
+                or ".TSX"
+                or ".JS"
+                or ".JSX"
+                or ".MJS"
+                or ".PY"
+                or ".JAVA"
+                or ".KT"
+                or ".RS"
+                or ".DART"
+                or ".VUE"
+                or ".SWIFT"
+                or ".SQL"
+                or ".PROTO"
+        && !file.Contains("node_modules/", StringComparison.Ordinal);
+
     internal static bool Generated(string file)
     {
         var name = Path.GetFileName(file);
-        return new[] { ".designer.cs", ".g.cs", ".g.i.cs", "modelsnapshot.cs", ".pb.go", "_pb2.py" }.Any(suffix => name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) || name.Contains(".generated.", StringComparison.OrdinalIgnoreCase) || file.Split('/').SkipLast(1).Any(part => part.Equals("migrations", StringComparison.OrdinalIgnoreCase) || part.Equals("bin", StringComparison.OrdinalIgnoreCase) || part.Equals("obj", StringComparison.OrdinalIgnoreCase));
+        return new[] { ".designer.cs", ".g.cs", ".g.i.cs", "modelsnapshot.cs", ".pb.go", "_pb2.py" }.Any(suffix =>
+                name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            )
+            || name.Contains(".generated.", StringComparison.OrdinalIgnoreCase)
+            || file.Split('/')
+                .SkipLast(1)
+                .Any(part =>
+                    part.Equals("migrations", StringComparison.OrdinalIgnoreCase)
+                    || part.Equals("bin", StringComparison.OrdinalIgnoreCase)
+                    || part.Equals("obj", StringComparison.OrdinalIgnoreCase)
+                );
     }
 }

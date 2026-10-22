@@ -11,6 +11,7 @@ namespace Harness.Infrastructure.Tasks;
 public static class BacklogCodec
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
+
     public static BacklogFile Read(string path) => Parse(Utf8.GetString(File.ReadAllBytes(path)), path);
 
     public static BacklogFile Parse(string text, string path = "backlog")
@@ -37,38 +38,67 @@ public static class BacklogCodec
                 throw new InvalidDataException($"unsupported backlog version {version} (want 1)");
             }
 
-            var tasks = Sequence(root.GetValueOrDefault("tasks")).Select(node =>
-            {
-                var d = Mapping(node, ["id", "milestone", "title", "type", "priority", "goal", "scope", "depends_on", "acceptance", "validation", "notes", "status"]);
-                return new TaskDefinition
+            var tasks = Sequence(root.GetValueOrDefault("tasks"))
+                .Select(node =>
                 {
-                    Id = Text(d, "id"),
-                    Milestone = Text(d, "milestone"),
-                    Title = Text(d, "title"),
-                    Type = Text(d, "type"),
-                    Priority = Text(d, "priority"),
-                    Goal = Text(d, "goal"),
-                    Scope = Strings(d, "scope"),
-                    DependsOn = Strings(d, "depends_on"),
-                    Acceptance = Strings(d, "acceptance"),
-                    Validation = Strings(d, "validation"),
-                    Notes = Text(d, "notes"),
-                    Status = Text(d, "status")
-                };
-            }).ToArray();
-            var milestones = Sequence(root.GetValueOrDefault("milestones")).Select(node =>
-            {
-                var d = Mapping(node, ["id", "title", "goal", "exit", "notes"]);
-                return new MilestoneDefinition(Text(d, "id"), Text(d, "title"), Text(d, "goal"), Strings(d, "exit"), Text(d, "notes"));
-            }).ToArray();
+                    var d = Mapping(
+                        node,
+                        [
+                            "id",
+                            "milestone",
+                            "title",
+                            "type",
+                            "priority",
+                            "goal",
+                            "scope",
+                            "depends_on",
+                            "acceptance",
+                            "validation",
+                            "notes",
+                            "status",
+                        ]
+                    );
+                    return new TaskDefinition
+                    {
+                        Id = Text(d, "id"),
+                        Milestone = Text(d, "milestone"),
+                        Title = Text(d, "title"),
+                        Type = Text(d, "type"),
+                        Priority = Text(d, "priority"),
+                        Goal = Text(d, "goal"),
+                        Scope = Strings(d, "scope"),
+                        DependsOn = Strings(d, "depends_on"),
+                        Acceptance = Strings(d, "acceptance"),
+                        Validation = Strings(d, "validation"),
+                        Notes = Text(d, "notes"),
+                        Status = Text(d, "status"),
+                    };
+                })
+                .ToArray();
+            var milestones = Sequence(root.GetValueOrDefault("milestones"))
+                .Select(node =>
+                {
+                    var d = Mapping(node, ["id", "title", "goal", "exit", "notes"]);
+                    return new MilestoneDefinition(
+                        Text(d, "id"),
+                        Text(d, "title"),
+                        Text(d, "goal"),
+                        Strings(d, "exit"),
+                        Text(d, "notes")
+                    );
+                })
+                .ToArray();
             return new(version, tasks, milestones);
         }
-        catch (Exception exception) when (exception is YamlException or InvalidDataException or FormatException or OverflowException)
-        { throw new InvalidDataException($"{path}: {exception.Message}", exception); }
+        catch (Exception exception)
+            when (exception is YamlException or InvalidDataException or FormatException or OverflowException)
+        {
+            throw new InvalidDataException($"{path}: {exception.Message}", exception);
+        }
     }
 
-    private static Dictionary<string, YamlNode> Mapping(YamlNode? node, string[] allowed)
-        => Mapping(node, allowed, new HashSet<YamlNode>(ReferenceEqualityComparer.Instance));
+    private static Dictionary<string, YamlNode> Mapping(YamlNode? node, string[] allowed) =>
+        Mapping(node, allowed, new HashSet<YamlNode>(ReferenceEqualityComparer.Instance));
 
     private static Dictionary<string, YamlNode> Mapping(YamlNode? node, string[] allowed, HashSet<YamlNode> ancestors)
     {
@@ -101,7 +131,12 @@ public static class BacklogCodec
                 throw new InvalidDataException($"field {TaskWorkflow.Quote(name)} is defined twice");
             }
         }
-        if (map.Children.FirstOrDefault(kv => kv.Key is YamlScalarNode { Value: "<<", Style: ScalarStyle.Plain }).Value is { } merge)
+        if (
+            map
+                .Children.FirstOrDefault(kv => kv.Key is YamlScalarNode { Value: "<<", Style: ScalarStyle.Plain })
+                .Value is
+            { } merge
+        )
         {
             IEnumerable<YamlNode> maps = merge is YamlSequenceNode sequence ? sequence.Children : [merge];
             foreach (var merged in maps)
@@ -115,23 +150,31 @@ public static class BacklogCodec
         ancestors.Remove(map);
         return result;
     }
-    private static string Scalar(YamlNode? node) => node switch
-    {
-        null => "",
-        YamlScalarNode { Value: null or "" } => "",
-        YamlScalarNode scalar when scalar.Style is ScalarStyle.Plain && scalar.Value is "~" or "null" or "Null" or "NULL" => "",
-        YamlScalarNode scalar => scalar.Value,
-        _ => throw new InvalidDataException("expected a scalar string"),
-    };
-    private static IEnumerable<YamlNode> Sequence(YamlNode? node) => node switch
-    {
-        null => [],
-        YamlScalarNode scalar when Scalar(scalar).Length is 0 => [],
-        YamlSequenceNode sequence => sequence.Children,
-        _ => throw new InvalidDataException("expected a sequence"),
-    };
+
+    private static string Scalar(YamlNode? node) =>
+        node switch
+        {
+            null => "",
+            YamlScalarNode { Value: null or "" } => "",
+            YamlScalarNode scalar
+                when scalar.Style is ScalarStyle.Plain && scalar.Value is "~" or "null" or "Null" or "NULL" => "",
+            YamlScalarNode scalar => scalar.Value,
+            _ => throw new InvalidDataException("expected a scalar string"),
+        };
+
+    private static IEnumerable<YamlNode> Sequence(YamlNode? node) =>
+        node switch
+        {
+            null => [],
+            YamlScalarNode scalar when Scalar(scalar).Length is 0 => [],
+            YamlSequenceNode sequence => sequence.Children,
+            _ => throw new InvalidDataException("expected a sequence"),
+        };
+
     private static string Text(Dictionary<string, YamlNode> d, string key) => Scalar(d.GetValueOrDefault(key));
-    private static string[] Strings(Dictionary<string, YamlNode> d, string key) => Sequence(d.GetValueOrDefault(key)).Select(Scalar).ToArray();
+
+    private static string[] Strings(Dictionary<string, YamlNode> d, string key) =>
+        Sequence(d.GetValueOrDefault(key)).Select(Scalar).ToArray();
 
     public static string Write(BacklogFile file)
     {
@@ -145,8 +188,18 @@ public static class BacklogCodec
         root["tasks"] = file.Tasks.Select(DefinitionMap).ToArray();
         return Serialize(root);
     }
-    internal static string WriteDefinitions(IReadOnlyList<TaskDefinition> definitions) => Serialize(definitions.Select(DefinitionMap).ToArray());
-    private static string Serialize(object value) => new SerializerBuilder().WithIndentedSequences().ConfigureDefaultValuesHandling(DefaultValuesHandling.Preserve).Build().Serialize(value).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    internal static string WriteDefinitions(IReadOnlyList<TaskDefinition> definitions) =>
+        Serialize(definitions.Select(DefinitionMap).ToArray());
+
+    private static string Serialize(object value) =>
+        new SerializerBuilder()
+            .WithIndentedSequences()
+            .ConfigureDefaultValuesHandling(DefaultValuesHandling.Preserve)
+            .Build()
+            .Serialize(value)
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
     private static Dictionary<string, object> DefinitionMap(TaskDefinition d)
     {
         Dictionary<string, object> map = new() { ["id"] = d.Id };
@@ -163,6 +216,7 @@ public static class BacklogCodec
         Add(map, "status", d.Status);
         return map;
     }
+
     private static Dictionary<string, object> MilestoneMap(MilestoneDefinition d)
     {
         Dictionary<string, object> map = new() { ["id"] = d.Id, ["title"] = d.Title };
@@ -171,12 +225,18 @@ public static class BacklogCodec
         Add(map, "notes", d.Notes);
         return map;
     }
-    private static void Add(Dictionary<string, object> map, string key, string value) { if (value.Length is not 0)
+
+    private static void Add(Dictionary<string, object> map, string key, string value)
+    {
+        if (value.Length is not 0)
         {
             map[key] = value;
         }
     }
-    private static void Add(Dictionary<string, object> map, string key, IReadOnlyList<string> value) { if (value.Count is not 0)
+
+    private static void Add(Dictionary<string, object> map, string key, IReadOnlyList<string> value)
+    {
+        if (value.Count is not 0)
         {
             map[key] = value;
         }
@@ -186,12 +246,20 @@ public static class BacklogCodec
     {
         private bool _ended;
         public YamlDotNet.Core.Events.ParsingEvent? Current { get; private set; }
+
         public bool MoveNext()
         {
             if (_ended)
-            { Current = null; return false; }
+            {
+                Current = null;
+                return false;
+            }
             if (Current is YamlDotNet.Core.Events.DocumentEnd)
-            { _ended = true; Current = new YamlDotNet.Core.Events.StreamEnd(); return true; }
+            {
+                _ended = true;
+                Current = new YamlDotNet.Core.Events.StreamEnd();
+                return true;
+            }
             var moved = inner.MoveNext();
             Current = inner.Current;
             return moved;

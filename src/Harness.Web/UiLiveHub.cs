@@ -13,41 +13,68 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
         internal readonly Channel<bool> _wake = Channel.CreateBounded<bool>(1);
         private readonly object _gate = new();
         private JsonObject _pending = [];
+
         internal void Add(JsonObject change)
         {
             lock (_gate)
             {
-                foreach (var key in new[] { "registry", "workspaces" }.Where(key => change[key]?.GetValue<bool>() is true))
-                { _pending[key] = true; }
+                foreach (
+                    var key in new[] { "registry", "workspaces" }.Where(key => change[key]?.GetValue<bool>() is true)
+                )
+                {
+                    _pending[key] = true;
+                }
                 foreach (var project in change["projects"]?.AsArray().Select(p => p!.GetValue<string>()) ?? [])
                 {
                     _pending["kinds"] ??= new JsonObject();
                     var previous = _pending["kinds"]![project]?.AsArray().Select(k => k!.GetValue<string>()) ?? [];
                     var added = change["kinds"]?[project]?.AsArray().Select(k => k!.GetValue<string>()) ?? [];
-                    _pending["kinds"]![project] = new JsonArray(previous.Concat(added).Distinct(StringComparer.Ordinal).Select(k => (JsonNode?)JsonValue.Create(k)).ToArray());
-                    _pending["projects"] = new JsonArray(_pending["kinds"]!.AsObject().Select(p => p.Key).Order(StringComparer.Ordinal).Select(p => (JsonNode?)JsonValue.Create(p)).ToArray());
+                    _pending["kinds"]![project] = new JsonArray(
+                        previous
+                            .Concat(added)
+                            .Distinct(StringComparer.Ordinal)
+                            .Select(k => (JsonNode?)JsonValue.Create(k))
+                            .ToArray()
+                    );
+                    _pending["projects"] = new JsonArray(
+                        _pending["kinds"]!
+                            .AsObject()
+                            .Select(p => p.Key)
+                            .Order(StringComparer.Ordinal)
+                            .Select(p => (JsonNode?)JsonValue.Create(p))
+                            .ToArray()
+                    );
                 }
             }
             _wake.Writer.TryWrite(true);
         }
+
         internal JsonObject Take()
         {
             lock (_gate)
-            { var pending = _pending; _pending = []; return pending; }
+            {
+                var pending = _pending;
+                _pending = [];
+                return pending;
+            }
         }
     }
+
     private readonly object _gate = new();
     private readonly HashSet<Subscriber> _subscribers = [];
     private readonly List<Task> _watchers = [];
     private CancellationTokenSource? _watcherCancellation;
     private bool _disposed;
+
     public async Task ServeAsync(HttpContext context)
     {
         Subscriber subscriber;
         lock (_gate)
         {
             if (_disposed || _subscribers.Count >= 16)
-            { throw new UiRequestException(503, "too many open event streams"); }
+            {
+                throw new UiRequestException(503, "too many open event streams");
+            }
             subscriber = new();
             _subscribers.Add(subscriber);
             if (_subscribers.Count is 1)
@@ -74,20 +101,29 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
                 }
                 var change = subscriber.Take();
                 if (change.Count > 0)
-                { await SendAsync(context, "event: change\ndata: " + change.ToJsonString() + "\n\n"); }
+                {
+                    await SendAsync(context, "event: change\ndata: " + change.ToJsonString() + "\n\n");
+                }
             }
         }
-        catch (Exception exception) when (exception is OperationCanceledException or IOException) { /* Disconnected or stalled reader. */ }
+        catch (Exception exception) when (exception is OperationCanceledException or IOException)
+        { /* Disconnected or stalled reader. */
+        }
         finally
         {
             lock (_gate)
             {
                 _subscribers.Remove(subscriber);
                 if (_subscribers.Count is 0)
-                { _watcherCancellation?.Cancel(); _watcherCancellation?.Dispose(); _watcherCancellation = null; }
+                {
+                    _watcherCancellation?.Cancel();
+                    _watcherCancellation?.Dispose();
+                    _watcherCancellation = null;
+                }
             }
         }
     }
+
     private static async Task<bool> WaitAsync(Subscriber subscriber, CancellationToken token)
     {
         using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -102,6 +138,7 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
             return false;
         }
     }
+
     private static async Task SendAsync(HttpContext context, string frame)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
@@ -109,6 +146,7 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
         await context.Response.WriteAsync(frame, deadline.Token);
         await context.Response.Body.FlushAsync(deadline.Token);
     }
+
     private async Task WatchAsync(CancellationToken token)
     {
         await using var watcher = source();
@@ -120,13 +158,23 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
             {
                 var change = await watcher.PollAsync(token);
                 if (change.Count is 0)
-                { continue; }
+                {
+                    continue;
+                }
                 lock (_gate)
-                { foreach (var subscriber in _subscribers) { subscriber.Add(change); } }
+                {
+                    foreach (var subscriber in _subscribers)
+                    {
+                        subscriber.Add(change);
+                    }
+                }
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { /* Last page disconnected or host stopped. */ }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        { /* Last page disconnected or host stopped. */
+        }
     }
+
     public async ValueTask DisposeAsync()
     {
         Task[] watchers;

@@ -11,17 +11,38 @@ public sealed partial class TaskStore
         var all = List(cancellationToken: cancellationToken);
         byte[]? original;
         try
-        { original = File.ReadAllBytes(path); }
-        catch (FileNotFoundException) { original = null; }
-        catch (DirectoryNotFoundException) { original = null; }
+        {
+            original = File.ReadAllBytes(path);
+        }
+        catch (FileNotFoundException)
+        {
+            original = null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            original = null;
+        }
         var text = original is null ? "" : new UTF8Encoding(false, true).GetString(original);
-        var present = original is null ? new HashSet<string>(StringComparer.Ordinal) : BacklogCodec.Parse(text, path).Tasks.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
-        var definitions = all.Where(task => !present.Contains(task.Id)).Select(task => task.ExportDefinition().Normalize()).ToArray();
+        var present = original is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : BacklogCodec.Parse(text, path).Tasks.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+        var definitions = all.Where(task => !present.Contains(task.Id))
+            .Select(task => task.ExportDefinition().Normalize())
+            .ToArray();
         var result = new TaskExportResult(path, definitions.Select(d => d.Id).ToArray(), original is null);
         string content;
         if (original is null)
         {
-            content = BacklogCodec.Write(new(1, definitions, Milestones(cancellationToken).Where(m => m.Definition.Title.Length is not 0).Select(m => m.Definition).ToArray()));
+            content = BacklogCodec.Write(
+                new(
+                    1,
+                    definitions,
+                    Milestones(cancellationToken)
+                        .Where(m => m.Definition.Title.Length is not 0)
+                        .Select(m => m.Definition)
+                        .ToArray()
+                )
+            );
         }
         else
         {
@@ -49,12 +70,24 @@ public sealed partial class TaskStore
                 content += "\n";
             }
 
-            content += string.Concat(BacklogCodec.WriteDefinitions(definitions).Split('\n').Select(line => line.Length is 0 ? "" : indent + line + "\n"));
+            content += string.Concat(
+                BacklogCodec
+                    .WriteDefinitions(definitions)
+                    .Split('\n')
+                    .Select(line => line.Length is 0 ? "" : indent + line + "\n")
+            );
             BacklogFile parsed;
             try
-            { parsed = BacklogCodec.Parse(content, path); }
+            {
+                parsed = BacklogCodec.Parse(content, path);
+            }
             catch (InvalidDataException exception)
-            { throw new InvalidDataException($"{path}: appending the tasks would break the file ({exception.Message}); is 'tasks:' its last section?", exception); }
+            {
+                throw new InvalidDataException(
+                    $"{path}: appending the tasks would break the file ({exception.Message}); is 'tasks:' its last section?",
+                    exception
+                );
+            }
             if (parsed.Tasks.Count != present.Count + definitions.Length)
             {
                 throw new InvalidDataException($"{path}: 'tasks:' must be the file's last section to append to it");
@@ -75,7 +108,10 @@ public sealed partial class TaskStore
         var absolute = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(absolute)!;
         Directory.CreateDirectory(directory);
-        var mode = !OperatingSystem.IsWindows() && expected is not null ? File.GetUnixFileMode(absolute) : UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+        var mode =
+            !OperatingSystem.IsWindows() && expected is not null
+                ? File.GetUnixFileMode(absolute)
+                : UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
         var temporary = Path.Combine(directory, ".harness-backlog-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
@@ -96,14 +132,18 @@ public sealed partial class TaskStore
 
             File.Move(temporary, absolute, overwrite: expected is not null);
         }
-        finally { if (File.Exists(temporary))
+        finally
+        {
+            if (File.Exists(temporary))
             {
                 File.Delete(temporary);
             }
         }
     }
+
     [GeneratedRegex(@"(?m)^tasks:[ \t]*(\[\])?[ \t]*\r?$", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex TasksKey();
+
     [GeneratedRegex(@"(?m)^([ \t]*)- ", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex ListItem();
 }

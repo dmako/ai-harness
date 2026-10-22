@@ -10,10 +10,20 @@ public sealed partial class CloneExtractor
         HashSet<int> done = [];
         void Add(int at, IEnumerable<IReadOnlyList<string>> input)
         {
-            var choices = input.Select(choice => (IReadOnlyList<string>)choice.SelectMany(CloneContracts.NameWords).ToArray()).Where(choice => choice.Count > 0).ToArray();
+            var choices = input
+                .Select(choice => (IReadOnlyList<string>)choice.SelectMany(CloneContracts.NameWords).ToArray())
+                .Where(choice => choice.Count > 0)
+                .ToArray();
             if (choices.Length > 0)
             {
-                output.Add(new(path, tokens[at].Line, choices.SelectMany(choice => choice).Distinct(StringComparer.Ordinal).ToArray(), choices));
+                output.Add(
+                    new(
+                        path,
+                        tokens[at].Line,
+                        choices.SelectMany(choice => choice).Distinct(StringComparer.Ordinal).ToArray(),
+                        choices
+                    )
+                );
             }
         }
         for (var index = 0; index < tokens.Count; index++)
@@ -66,7 +76,10 @@ public sealed partial class CloneExtractor
                     for (var item = start; item <= stop; item++)
                     {
                         if (item == stop || tokens[item].Text is ",")
-                        { choices.Add(ChoicesIn(tokens.GetRange(part, item - part))); part = item + 1; }
+                        {
+                            choices.Add(ChoicesIn(tokens.GetRange(part, item - part)));
+                            part = item + 1;
+                        }
                     }
                 }
                 Add(index, choices);
@@ -91,7 +104,12 @@ public sealed partial class CloneExtractor
 
                     choices.Add(Compared(tokens.GetRange(current + 1, body - current - 1)));
                     var end = CloneLexer.Match(tokens, body);
-                    if (end < 0 || end + 2 >= tokens.Count || tokens[end + 1].Text is not "else" || tokens[end + 2].Text is not "if")
+                    if (
+                        end < 0
+                        || end + 2 >= tokens.Count
+                        || tokens[end + 1].Text is not "else"
+                        || tokens[end + 2].Text is not "if"
+                    )
                     {
                         break;
                     }
@@ -103,6 +121,7 @@ public sealed partial class CloneExtractor
         }
         return output;
     }
+
     private static List<string> ChoicesIn(List<CodeToken> tokens)
     {
         if (tokens.Any(token => token.Text is "==" or "!=" or "&&" or "||"))
@@ -128,6 +147,7 @@ public sealed partial class CloneExtractor
 
         return choices;
     }
+
     private static List<string> Compared(List<CodeToken> tokens)
     {
         List<string> output = [];
@@ -161,6 +181,7 @@ public sealed partial class CloneExtractor
 
         return output;
     }
+
     private static string? Choice(List<CodeToken> tokens)
     {
         if (tokens.Count is 1 && tokens[0].Kind is 's')
@@ -168,7 +189,12 @@ public sealed partial class CloneExtractor
             var value = tokens[0].Text.Trim('"', '`');
             return value.Length is 0 ? null : value;
         }
-        var identifier = tokens.Count switch { 1 when tokens[0].Kind is 'i' => tokens[0].Text, 3 when tokens[0].Kind is 'i' && tokens[1].Text is "." && tokens[2].Kind is 'i' => tokens[2].Text, _ => "" };
+        var identifier = tokens.Count switch
+        {
+            1 when tokens[0].Kind is 'i' => tokens[0].Text,
+            3 when tokens[0].Kind is 'i' && tokens[1].Text is "." && tokens[2].Kind is 'i' => tokens[2].Text,
+            _ => "",
+        };
         return identifier.Length > 0 && char.IsUpper(identifier[0]) ? identifier : null;
     }
 }

@@ -6,11 +6,25 @@ internal sealed class SetupItem(string label, string where, bool installed, Func
     public string Where { get; } = where;
     public bool Installed { get; } = installed;
     public bool Want { get; set; } = installed;
-    public int Change => (Want, Installed) switch { (true, false) => 1, (false, true) => -1, _ => 0 };
+    public int Change =>
+        (Want, Installed) switch
+        {
+            (true, false) => 1,
+            (false, true) => -1,
+            _ => 0,
+        };
     public Func<bool, Task<int>> Apply { get; } = apply;
 }
+
 internal sealed record SetupStep(string Title, string Note, IReadOnlyList<SetupItem> Items);
-internal enum WizardResult { Continue, Apply, Cancel }
+
+internal enum WizardResult
+{
+    Continue,
+    Apply,
+    Cancel,
+}
+
 internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
 {
     public string Title { get; } = title;
@@ -19,6 +33,7 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
     public int Cursor { get; private set; }
     public bool Reviewing => Step == Steps.Count;
     public IEnumerable<SetupItem> Changes => Steps.SelectMany(s => s.Items).Where(i => i.Change is not 0);
+
     public WizardResult Handle(string key)
     {
         if (key is "q" or "escape" or "cancel")
@@ -60,11 +75,15 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
         }
         return WizardResult.Continue;
     }
+
     public async Task<int> ApplyAsync(TextWriter output)
     {
         var changes = Changes.ToArray();
         if (changes.Length is 0)
-        { await output.WriteLineAsync("Nothing to change."); return 0; }
+        {
+            await output.WriteLineAsync("Nothing to change.");
+            return 0;
+        }
         var code = 0;
         foreach (var item in changes.OrderBy(i => i.Change))
         {
@@ -77,9 +96,11 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
         }
         return code;
     }
+
     public async Task RenderAsync(TextWriter output, int width)
     {
-        async Task Line(string text) => await output.WriteLineAsync(text.Length > width ? text[..Math.Max(0, width - 1)] + "…" : text);
+        async Task Line(string text) =>
+            await output.WriteLineAsync(text.Length > width ? text[..Math.Max(0, width - 1)] + "…" : text);
         var name = Reviewing ? "Review" : Steps[Step].Title;
         await Line($"{Title} · step {Step + 1}/{Steps.Count + 1} · {name}");
         if (Reviewing)
@@ -92,7 +113,7 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
 
             foreach (var item in changes)
             {
-                await Line($"  {(item.Change > 0 ? "+ install" : "- remove ")}  {item.Label,-28} {item.Where}");
+                await Line($"  {(item.Change > 0 ? "+ install" : "- remove ")}  {item.Label, -28} {item.Where}");
             }
 
             await Line("enter apply · b back · q cancel");
@@ -114,10 +135,13 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
                 state += item.Change > 0 ? " → install" : " → remove";
             }
 
-            await Line($"{(i == Cursor ? "> " : "  ")}{(item.Want ? "[x]" : "[ ]")} {item.Label,-28} {state,-26} {item.Where}");
+            await Line(
+                $"{(i == Cursor ? "> " : "  ")}{(item.Want ? "[x]" : "[ ]")} {item.Label, -28} {state, -26} {item.Where}"
+            );
         }
         await Line("↑/↓ move · space toggle · enter next · b back · q cancel");
     }
+
     public async Task StatusAsync(TextWriter output)
     {
         foreach (var step in Steps)
@@ -125,31 +149,40 @@ internal sealed class SetupWizard(string title, IReadOnlyList<SetupStep> steps)
             await output.WriteLineAsync(step.Title + ":");
             foreach (var item in step.Items)
             {
-                await output.WriteLineAsync($"  {item.Label,-28} {(item.Installed ? "installed" : "not installed"),-16} {item.Where}");
+                await output.WriteLineAsync(
+                    $"  {item.Label, -28} {(item.Installed ? "installed" : "not installed"), -16} {item.Where}"
+                );
             }
         }
         await output.WriteLineAsync("\nRun it in a terminal to choose, or use the flags (" + Title + " --help).");
     }
 }
+
 internal class SetupTerminal
 {
     protected virtual bool Interactive => !Console.IsInputRedirected && !Console.IsOutputRedirected;
-    protected virtual string ReadKey() => Console.ReadKey(intercept: true) switch
-    {
-        { Key: ConsoleKey.Enter } => "enter",
-        { Key: ConsoleKey.Escape } => "escape",
-        { Key: ConsoleKey.UpArrow } => "up",
-        { Key: ConsoleKey.DownArrow } => "down",
-        { Key: ConsoleKey.LeftArrow } => "left",
-        { Key: ConsoleKey.RightArrow } => "right",
-        { Key: ConsoleKey.Backspace } => "backspace",
-        { Key: ConsoleKey.C, Modifiers: ConsoleModifiers.Control } => "cancel",
-        var key => key.KeyChar.ToString(),
-    };
+
+    protected virtual string ReadKey() =>
+        Console.ReadKey(intercept: true) switch
+        {
+            { Key: ConsoleKey.Enter } => "enter",
+            { Key: ConsoleKey.Escape } => "escape",
+            { Key: ConsoleKey.UpArrow } => "up",
+            { Key: ConsoleKey.DownArrow } => "down",
+            { Key: ConsoleKey.LeftArrow } => "left",
+            { Key: ConsoleKey.RightArrow } => "right",
+            { Key: ConsoleKey.Backspace } => "backspace",
+            { Key: ConsoleKey.C, Modifiers: ConsoleModifiers.Control } => "cancel",
+            var key => key.KeyChar.ToString(),
+        };
+
     public async Task<int> RunAsync(SetupWizard wizard, TextWriter output, CancellationToken token)
     {
         if (!Interactive)
-        { await wizard.StatusAsync(output); return 0; }
+        {
+            await wizard.StatusAsync(output);
+            return 0;
+        }
         var result = WizardResult.Continue;
         var controlC = Console.TreatControlCAsInput;
         Console.TreatControlCAsInput = true;
@@ -169,9 +202,16 @@ internal class SetupTerminal
                 result = wizard.Handle(ReadKey());
             }
         }
-        finally { Console.TreatControlCAsInput = controlC; await output.WriteAsync("\x1b[?25h\x1b[?1049l"); }
+        finally
+        {
+            Console.TreatControlCAsInput = controlC;
+            await output.WriteAsync("\x1b[?25h\x1b[?1049l");
+        }
         if (result is WizardResult.Cancel)
-        { await output.WriteLineAsync("Cancelled: nothing changed."); return 0; }
+        {
+            await output.WriteLineAsync("Cancelled: nothing changed.");
+            return 0;
+        }
         return await wizard.ApplyAsync(output);
     }
 }

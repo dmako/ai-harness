@@ -16,7 +16,12 @@ internal static class StorageFiles
 
     internal static void CreateDatabase(string path)
     {
-        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.ReadWrite | FileShare.Delete };
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.ReadWrite,
+            Share = FileShare.ReadWrite | FileShare.Delete,
+        };
         if (!OperatingSystem.IsWindows())
         {
             options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;

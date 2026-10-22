@@ -10,7 +10,12 @@ public static class WorktreeSyncLock
             throw new DirectoryNotFoundException("The worktree Git directory no longer exists.");
         }
 
-        var options = new FileStreamOptions { Mode = FileMode.OpenOrCreate, Access = FileAccess.ReadWrite, Share = FileShare.None };
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.OpenOrCreate,
+            Access = FileAccess.ReadWrite,
+            Share = FileShare.None,
+        };
         if (!OperatingSystem.IsWindows())
         {
             options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
@@ -20,8 +25,14 @@ public static class WorktreeSyncLock
         {
             token.ThrowIfCancellationRequested();
             try
-            { return new FileStream(Path.Combine(gitDirectory, "harness-sync.lock"), options); }
-            catch (IOException error) when ((error.HResult & 0xFFFF) is 11 or 32 or 33 or 35 && Directory.Exists(gitDirectory)) { await Task.Delay(25, token).ConfigureAwait(false); }
+            {
+                return new FileStream(Path.Combine(gitDirectory, "harness-sync.lock"), options);
+            }
+            catch (IOException error)
+                when ((error.HResult & 0xFFFF) is 11 or 32 or 33 or 35 && Directory.Exists(gitDirectory))
+            {
+                await Task.Delay(25, token).ConfigureAwait(false);
+            }
         }
     }
 }

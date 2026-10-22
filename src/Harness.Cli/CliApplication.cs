@@ -18,11 +18,21 @@ namespace Harness.Cli;
 
 public static class CliApplication
 {
-    public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken = default) =>
-        RunConfiguredAsync(args, stdout, stderr, null, null, cancellationToken);
+    public static Task<int> RunAsync(
+        string[] args,
+        TextWriter stdout,
+        TextWriter stderr,
+        CancellationToken cancellationToken = default
+    ) => RunConfiguredAsync(args, stdout, stderr, null, null, cancellationToken);
 
-    internal static async Task<int> RunConfiguredAsync(string[] args, TextWriter stdout, TextWriter stderr,
-        Action<HostApplicationBuilder>? configureHost, Action<IConfigurator>? configureCommands, CancellationToken cancellationToken)
+    internal static async Task<int> RunConfiguredAsync(
+        string[] args,
+        TextWriter stdout,
+        TextWriter stderr,
+        Action<HostApplicationBuilder>? configureHost,
+        Action<IConfigurator>? configureCommands,
+        CancellationToken cancellationToken
+    )
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(stdout);
@@ -32,7 +42,11 @@ public static class CliApplication
             using var input = Console.OpenStandardInput();
             return await HookExecution.RunAsync(args, input, stdout, stderr, cancellationToken);
         }
-        if (args.Length is 2 && args[0] is "completion" && CompletionManager.Shells.Contains(args[1], StringComparer.Ordinal))
+        if (
+            args.Length is 2
+            && args[0] is "completion"
+            && CompletionManager.Shells.Contains(args[1], StringComparer.Ordinal)
+        )
         {
             await stdout.WriteAsync(CompletionScripts.For(args[1]));
             return 0;
@@ -47,7 +61,9 @@ public static class CliApplication
         using var loggerProvider = new WriterLoggerProvider(TextWriter.Synchronized(stderr));
         builder.Logging.AddProvider(loggerProvider);
         builder.Services.AddSingleton(BuildInformation.Current());
-        builder.Services.AddSingleton(services => new ProjectLifecycle(version: services.GetRequiredService<BuildInformation>().Version));
+        builder.Services.AddSingleton(services => new ProjectLifecycle(
+            version: services.GetRequiredService<BuildInformation>().Version
+        ));
         builder.Services.AddSingleton(stdout);
         builder.Services.AddSingleton(new CliErrorOutput(stderr));
         builder.Services.AddSingleton<MemoryCommandRunner>();
@@ -70,115 +86,177 @@ public static class CliApplication
             configuration.SetApplicationName("harness");
             configuration.UseStrictParsing();
             configuration.PropagateExceptions();
-            configuration.Settings.Console = AnsiConsole.Create(new AnsiConsoleSettings
-            {
-                Out = new AnsiConsoleOutput(stdout),
-                Ansi = AnsiSupport.No,
-                ColorSystem = ColorSystemSupport.NoColors,
-                Interactive = InteractionSupport.No,
-            });
+            configuration.Settings.Console = AnsiConsole.Create(
+                new AnsiConsoleSettings
+                {
+                    Out = new AnsiConsoleOutput(stdout),
+                    Ansi = AnsiSupport.No,
+                    ColorSystem = ColorSystemSupport.NoColors,
+                    Interactive = InteractionSupport.No,
+                }
+            );
             configuration.AddCommand<VersionCommand>("version").WithDescription("Print version and build information");
             configuration.AddCommand<InitCommand>("init").WithDescription("Initialize project state");
             configuration.AddCommand<StatusCommand>("status").WithDescription("Show project state without changing it");
-            configuration.AddCommand<DoctorCommand>("doctor").WithDescription("Check project health without changing it");
+            configuration
+                .AddCommand<DoctorCommand>("doctor")
+                .WithDescription("Check project health without changing it");
             configuration.AddCommand<UiCommand>("ui").WithDescription("Open the local harness UI");
             configuration.AddCommand<McpCommand>("mcp").WithDescription("Serve MCP over standard input/output");
-            configuration.AddCommand<SyncCommand>("sync").WithDescription("Refresh recorded project state (worktree, branch, HEAD)");
+            configuration
+                .AddCommand<SyncCommand>("sync")
+                .WithDescription("Refresh recorded project state (worktree, branch, HEAD)");
             configuration.AddCommand<InstallCommand>("install");
             configuration.AddCommand<UninstallCommand>("uninstall");
             configuration.AddCommand<InstructionsCommand>("instructions");
-            configuration.AddBranch("hooks", hooks =>
-            {
-                hooks.AddCommand<HooksChooseCommand>("choose").WithDescription("Choose hooks to install");
-                hooks.AddCommand<HooksInstallCommand>("install").WithDescription("Install optional hooks");
-                hooks.AddCommand<HooksUninstallCommand>("uninstall").WithDescription("Remove harness hooks");
-                hooks.AddCommand<HooksStatusCommand>("status").WithDescription("Show installed hooks");
-                hooks.AddAsyncDelegate<HookEventSettings>("event", (_, _, _) => Task.FromResult(0)).WithDescription("Record one client tool event");
-                hooks.AddAsyncDelegate<HookEventSettings>("session", (_, _, _) => Task.FromResult(0)).WithDescription("Tell the agent this repository uses harness");
-            }).WithAlias("hook");
-            configuration.AddBranch("completion", completion =>
-            {
-                completion.AddCommand<CompletionStatusCommand>("status");
-                completion.AddCommand<CompletionInstallCommand>("install");
-                completion.AddCommand<CompletionUninstallCommand>("uninstall");
-                foreach (var shell in CompletionManager.Shells)
-                {
-                    var selected = shell;
-                    completion.AddAsyncDelegate<CommandSettings>(shell, async (_, _, _) =>
+            configuration
+                .AddBranch(
+                    "hooks",
+                    hooks =>
                     {
-                        await stdout.WriteAsync(CompletionScripts.For(selected));
-                        return 0;
-                    }).WithDescription("Print the " + shell + " completion script");
+                        hooks.AddCommand<HooksChooseCommand>("choose").WithDescription("Choose hooks to install");
+                        hooks.AddCommand<HooksInstallCommand>("install").WithDescription("Install optional hooks");
+                        hooks.AddCommand<HooksUninstallCommand>("uninstall").WithDescription("Remove harness hooks");
+                        hooks.AddCommand<HooksStatusCommand>("status").WithDescription("Show installed hooks");
+                        hooks
+                            .AddAsyncDelegate<HookEventSettings>("event", (_, _, _) => Task.FromResult(0))
+                            .WithDescription("Record one client tool event");
+                        hooks
+                            .AddAsyncDelegate<HookEventSettings>("session", (_, _, _) => Task.FromResult(0))
+                            .WithDescription("Tell the agent this repository uses harness");
+                    }
+                )
+                .WithAlias("hook");
+            configuration.AddBranch(
+                "completion",
+                completion =>
+                {
+                    completion.AddCommand<CompletionStatusCommand>("status");
+                    completion.AddCommand<CompletionInstallCommand>("install");
+                    completion.AddCommand<CompletionUninstallCommand>("uninstall");
+                    foreach (var shell in CompletionManager.Shells)
+                    {
+                        var selected = shell;
+                        completion
+                            .AddAsyncDelegate<CommandSettings>(
+                                shell,
+                                async (_, _, _) =>
+                                {
+                                    await stdout.WriteAsync(CompletionScripts.For(selected));
+                                    return 0;
+                                }
+                            )
+                            .WithDescription("Print the " + shell + " completion script");
+                    }
                 }
-            });
-            configuration.AddBranch("telemetry", telemetry =>
-            {
-                telemetry.AddCommand<ExportStatusCommand>("status");
-                telemetry.AddCommand<ExportEnableCommand>("enable");
-                telemetry.AddCommand<ExportDisableCommand>("disable");
-                telemetry.AddCommand<ExportPreviewCommand>("preview");
-                telemetry.AddCommand<ExportSendCommand>("send");
-            });
+            );
+            configuration.AddBranch(
+                "telemetry",
+                telemetry =>
+                {
+                    telemetry.AddCommand<ExportStatusCommand>("status");
+                    telemetry.AddCommand<ExportEnableCommand>("enable");
+                    telemetry.AddCommand<ExportDisableCommand>("disable");
+                    telemetry.AddCommand<ExportPreviewCommand>("preview");
+                    telemetry.AddCommand<ExportSendCommand>("send");
+                }
+            );
             configuration.AddCommand<DocsCommand>("docs").WithDescription("Read embedded documentation by section");
-            configuration.AddBranch("providers", providers => providers.AddBranch("sessions", sessions =>
-            {
-                sessions.AddCommand<SessionsListCommand>("list");
-                sessions.AddCommand<SessionStartCommand>("start");
-                sessions.AddCommand<SessionRestartCommand>("restart");
-                sessions.AddCommand<SessionStopCommand>("stop");
-            }));
+            configuration.AddBranch(
+                "providers",
+                providers =>
+                    providers.AddBranch(
+                        "sessions",
+                        sessions =>
+                        {
+                            sessions.AddCommand<SessionsListCommand>("list");
+                            sessions.AddCommand<SessionStartCommand>("start");
+                            sessions.AddCommand<SessionRestartCommand>("restart");
+                            sessions.AddCommand<SessionStopCommand>("stop");
+                        }
+                    )
+            );
             configuration.AddCommand<MetricsCommand>("metrics");
             configuration.AddCommand<ReportCommand>("report");
             configuration.AddBranch("context", context => context.AddCommand<ContextStatsCommand>("stats"));
-            configuration.AddBranch("tasks", tasks =>
-            {
-                tasks.AddCommand<TaskListCommand>("list").WithDescription("List tasks");
-                tasks.AddCommand<TaskMilestonesCommand>("milestones");
-                tasks.AddCommand<TaskShowCommand>("show");
-                tasks.AddCommand<TaskNextCommand>("next");
-                tasks.AddCommand<TaskImportCommand>("import");
-                tasks.AddCommand<TaskExportCommand>("export");
-                tasks.AddCommand<TaskAddCommand>("add");
-                tasks.AddCommand<TaskBlockCommand>("block");
-                tasks.AddCommand<TaskDeferCommand>("defer");
-                tasks.AddCommand<TaskReadyCommand>("ready");
-                tasks.AddCommand<TaskClaimCommand>("claim");
-                tasks.AddCommand<TaskReleaseCommand>("release");
-                tasks.AddCommand<TaskCompleteCommand>("complete");
-                tasks.AddCommand<TaskProposalsCommand>("proposals");
-                tasks.AddCommand<TaskApproveCommand>("approve");
-                tasks.AddCommand<TaskRejectCommand>("reject");
-            }).WithAlias("task");
-            configuration.AddBranch("memory", memory =>
-            {
-                memory.AddCommand<MemoryShowCommand>("show").WithDescription("Show a memory with history and audit trail");
-                memory.AddCommand<MemoryRetireCommand>("retire").WithDescription("End a memory's validity without deleting its history");
-                memory.AddCommand<MemoryPromoteCommand>("promote").WithDescription("Promote a project memory to workspace or user scope");
-            });
-            configuration.AddBranch("proposals", proposals =>
-            {
-                proposals.AddCommand<ProposalsListCommand>("list").WithDescription("List memory proposals");
-                proposals.AddCommand<ProposalsShowCommand>("show").WithDescription("Show a proposal and look-alike memories");
-                proposals.AddCommand<ProposalsApproveCommand>("approve").WithDescription("Approve a proposal, optionally edited");
-                proposals.AddCommand<ProposalsRejectCommand>("reject").WithDescription("Reject a proposal");
-            });
-            configuration.AddBranch("workspace", workspace =>
-            {
-                workspace.AddCommand<WorkspaceListCommand>("list");
-                workspace.AddCommand<WorkspaceCreateCommand>("create");
-                workspace.AddCommand<WorkspaceDiscoverCommand>("discover");
-                workspace.AddCommand<WorkspaceShowCommand>("show");
-                workspace.AddCommand<WorkspaceJoinCommand>("join");
-                workspace.AddCommand<WorkspaceLeaveCommand>("leave");
-                workspace.AddCommand<WorkspaceDeleteCommand>("delete");
-                workspace.AddCommand<WorkspaceRenameCommand>("rename");
-            }).WithAlias("workspaces");
-            configuration.AddBranch("projects", projects =>
-            {
-                projects.AddCommand<ProjectsListCommand>("list");
-                projects.AddCommand<ProjectsForgetCommand>("forget");
-                projects.AddCommand<ProjectsRenameCommand>("rename");
-            });
+            configuration
+                .AddBranch(
+                    "tasks",
+                    tasks =>
+                    {
+                        tasks.AddCommand<TaskListCommand>("list").WithDescription("List tasks");
+                        tasks.AddCommand<TaskMilestonesCommand>("milestones");
+                        tasks.AddCommand<TaskShowCommand>("show");
+                        tasks.AddCommand<TaskNextCommand>("next");
+                        tasks.AddCommand<TaskImportCommand>("import");
+                        tasks.AddCommand<TaskExportCommand>("export");
+                        tasks.AddCommand<TaskAddCommand>("add");
+                        tasks.AddCommand<TaskBlockCommand>("block");
+                        tasks.AddCommand<TaskDeferCommand>("defer");
+                        tasks.AddCommand<TaskReadyCommand>("ready");
+                        tasks.AddCommand<TaskClaimCommand>("claim");
+                        tasks.AddCommand<TaskReleaseCommand>("release");
+                        tasks.AddCommand<TaskCompleteCommand>("complete");
+                        tasks.AddCommand<TaskProposalsCommand>("proposals");
+                        tasks.AddCommand<TaskApproveCommand>("approve");
+                        tasks.AddCommand<TaskRejectCommand>("reject");
+                    }
+                )
+                .WithAlias("task");
+            configuration.AddBranch(
+                "memory",
+                memory =>
+                {
+                    memory
+                        .AddCommand<MemoryShowCommand>("show")
+                        .WithDescription("Show a memory with history and audit trail");
+                    memory
+                        .AddCommand<MemoryRetireCommand>("retire")
+                        .WithDescription("End a memory's validity without deleting its history");
+                    memory
+                        .AddCommand<MemoryPromoteCommand>("promote")
+                        .WithDescription("Promote a project memory to workspace or user scope");
+                }
+            );
+            configuration.AddBranch(
+                "proposals",
+                proposals =>
+                {
+                    proposals.AddCommand<ProposalsListCommand>("list").WithDescription("List memory proposals");
+                    proposals
+                        .AddCommand<ProposalsShowCommand>("show")
+                        .WithDescription("Show a proposal and look-alike memories");
+                    proposals
+                        .AddCommand<ProposalsApproveCommand>("approve")
+                        .WithDescription("Approve a proposal, optionally edited");
+                    proposals.AddCommand<ProposalsRejectCommand>("reject").WithDescription("Reject a proposal");
+                }
+            );
+            configuration
+                .AddBranch(
+                    "workspace",
+                    workspace =>
+                    {
+                        workspace.AddCommand<WorkspaceListCommand>("list");
+                        workspace.AddCommand<WorkspaceCreateCommand>("create");
+                        workspace.AddCommand<WorkspaceDiscoverCommand>("discover");
+                        workspace.AddCommand<WorkspaceShowCommand>("show");
+                        workspace.AddCommand<WorkspaceJoinCommand>("join");
+                        workspace.AddCommand<WorkspaceLeaveCommand>("leave");
+                        workspace.AddCommand<WorkspaceDeleteCommand>("delete");
+                        workspace.AddCommand<WorkspaceRenameCommand>("rename");
+                    }
+                )
+                .WithAlias("workspaces");
+            configuration.AddBranch(
+                "projects",
+                projects =>
+                {
+                    projects.AddCommand<ProjectsListCommand>("list");
+                    projects.AddCommand<ProjectsForgetCommand>("forget");
+                    projects.AddCommand<ProjectsRenameCommand>("rename");
+                }
+            );
             configureCommands?.Invoke(configuration);
             if (completing)
             {
@@ -201,7 +279,16 @@ public static class CliApplication
             await stderr.WriteLineAsync($"harness: {exception.Message}");
             return 2;
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or InvalidOperationException or CommandRuntimeException or UnauthorizedAccessException or SqliteException or System.Text.Json.JsonException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or InvalidOperationException
+                        or CommandRuntimeException
+                        or UnauthorizedAccessException
+                        or SqliteException
+                        or System.Text.Json.JsonException
+            )
         {
             await stderr.WriteLineAsync($"harness: {exception.Message}");
             return 1;
@@ -216,11 +303,17 @@ public static class CliApplication
         }
 
         var normalized = NormalizeLegacyFlags(args);
-        if (normalized[0] is "hooks" or "hook" or "completion" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
+        if (
+            normalized[0] is "hooks" or "hook" or "completion"
+            && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
+        )
         {
             normalized = [normalized[0], normalized[0] is "completion" ? "status" : "choose", .. normalized[1..]];
         }
-        if (normalized[0] is "workspace" or "workspaces" or "projects" or "telemetry" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
+        if (
+            normalized[0] is "workspace" or "workspaces" or "projects" or "telemetry"
+            && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
+        )
         {
             normalized = [normalized[0], normalized[0] is "telemetry" ? "status" : "list", .. normalized[1..]];
         }
@@ -228,9 +321,17 @@ public static class CliApplication
         if (normalized[0] is "providers")
         {
             if (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
-            { normalized = [normalized[0], "sessions", .. normalized[1..]]; }
-            if (normalized.Length >= 2 && normalized[1] is "sessions" && (normalized.Length is 2 || normalized[2].StartsWith('-') && normalized[2] is not ("--help" or "-h")))
-            { normalized = [normalized[0], normalized[1], "list", .. normalized[2..]]; }
+            {
+                normalized = [normalized[0], "sessions", .. normalized[1..]];
+            }
+            if (
+                normalized.Length >= 2
+                && normalized[1] is "sessions"
+                && (normalized.Length is 2 || normalized[2].StartsWith('-') && normalized[2] is not ("--help" or "-h"))
+            )
+            {
+                normalized = [normalized[0], normalized[1], "list", .. normalized[2..]];
+            }
         }
 
         return normalized[0] switch
@@ -308,7 +409,42 @@ public static class CliApplication
                 _ => name,
             };
             normalized[index] = replacement + (equals < 0 ? "" : argument[equals..]);
-            if (equals < 0 && replacement is "--endpoint" or "--token" or "--addr" or "--kind" or "--shell" or "--client" or "--command" or "--discover" or "--project" or "--syncs" or "--reason" or "--to" or "--status" or "--content" or "--note" or "--supersede" or "--milestone" or "--id" or "--prefix" or "--title" or "--goal" or "--type" or "--priority" or "--depends" or "--accept" or "--scope" or "--lease" or "--summary" or "--commit" or "--acc" or "--acc-all" or "--check")
+            if (
+                equals < 0
+                && replacement
+                    is "--endpoint"
+                        or "--token"
+                        or "--addr"
+                        or "--kind"
+                        or "--shell"
+                        or "--client"
+                        or "--command"
+                        or "--discover"
+                        or "--project"
+                        or "--syncs"
+                        or "--reason"
+                        or "--to"
+                        or "--status"
+                        or "--content"
+                        or "--note"
+                        or "--supersede"
+                        or "--milestone"
+                        or "--id"
+                        or "--prefix"
+                        or "--title"
+                        or "--goal"
+                        or "--type"
+                        or "--priority"
+                        or "--depends"
+                        or "--accept"
+                        or "--scope"
+                        or "--lease"
+                        or "--summary"
+                        or "--commit"
+                        or "--acc"
+                        or "--acc-all"
+                        or "--check"
+            )
             {
                 index++; // A value is data, even when it resembles another option.
             }

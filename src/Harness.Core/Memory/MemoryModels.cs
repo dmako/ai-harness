@@ -3,14 +3,24 @@ namespace Harness.Core.Memory;
 public sealed record MemorySource(string Type = "agent", string Ref = "", string By = "unknown");
 
 public sealed record MemoryRecord(
-    string Id, string Type, string Content, MemoryScope Scope, MemorySource Source,
-    double? Confidence, string SupersededBy, string SupersedeReason,
-    MemoryTimestamp? ValidFrom, MemoryTimestamp? ValidUntil, MemoryTimestamp CreatedAt, MemoryTimestamp UpdatedAt)
+    string Id,
+    string Type,
+    string Content,
+    MemoryScope Scope,
+    MemorySource Source,
+    double? Confidence,
+    string SupersededBy,
+    string SupersedeReason,
+    MemoryTimestamp? ValidFrom,
+    MemoryTimestamp? ValidUntil,
+    MemoryTimestamp CreatedAt,
+    MemoryTimestamp UpdatedAt
+)
 {
     public IReadOnlyList<string> Overrides { get; init; } = [];
 
-    public bool Current(MemoryTimestamp at) => SupersededBy.Length is 0 &&
-        (ValidFrom is null || ValidFrom <= at) && (ValidUntil is null || ValidUntil > at);
+    public bool Current(MemoryTimestamp at) =>
+        SupersededBy.Length is 0 && (ValidFrom is null || ValidFrom <= at) && (ValidUntil is null || ValidUntil > at);
 }
 
 public sealed record MemoryInput
@@ -38,6 +48,7 @@ public sealed record MemoryQuery
 }
 
 public sealed record SimilarMemory(MemoryRecord Memory, double Similarity);
+
 public sealed record MemoryPutResult(string Status, MemoryRecord? Memory = null)
 {
     public string Hint { get; init; } = "";
@@ -47,9 +58,20 @@ public sealed record MemoryPutResult(string Status, MemoryRecord? Memory = null)
 
 public sealed record MemoryEvent(string Event, string RelatedId, string Actor, string Detail, MemoryTimestamp At);
 
-public sealed record MemoryDetail(MemoryRecord Memory, bool Current, IReadOnlyList<MemoryRecord> History, IReadOnlyList<MemoryEvent> Events);
+public sealed record MemoryDetail(
+    MemoryRecord Memory,
+    bool Current,
+    IReadOnlyList<MemoryRecord> History,
+    IReadOnlyList<MemoryEvent> Events
+);
 
-public sealed record ApplyingMemories(string Scope, string Branch, IReadOnlyList<MemoryRecord> Goals, IReadOnlyList<MemoryRecord> Constraints, IReadOnlyList<MemoryRecord> Decisions);
+public sealed record ApplyingMemories(
+    string Scope,
+    string Branch,
+    IReadOnlyList<MemoryRecord> Goals,
+    IReadOnlyList<MemoryRecord> Constraints,
+    IReadOnlyList<MemoryRecord> Decisions
+);
 
 public interface IMemoryStore
 {

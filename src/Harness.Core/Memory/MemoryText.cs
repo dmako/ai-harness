@@ -10,14 +10,52 @@ public static class MemoryText
 
     private static readonly HashSet<string> Types = new(StringComparer.Ordinal)
     {
-        "goal", "constraint", "decision", "fact", "open_question", "warning", "convention",
+        "goal",
+        "constraint",
+        "decision",
+        "fact",
+        "open_question",
+        "warning",
+        "convention",
     };
 
     private static readonly HashSet<string> Stopwords = new(StringComparer.Ordinal)
     {
-        "the", "and", "for", "are", "but", "not", "use", "with", "this", "that", "from", "into", "all", "any",
-        "can", "has", "have", "was", "were", "will", "should", "must", "our", "its", "than", "then", "them", "they",
-        "when", "which", "while", "only", "also", "per", "via",
+        "the",
+        "and",
+        "for",
+        "are",
+        "but",
+        "not",
+        "use",
+        "with",
+        "this",
+        "that",
+        "from",
+        "into",
+        "all",
+        "any",
+        "can",
+        "has",
+        "have",
+        "was",
+        "were",
+        "will",
+        "should",
+        "must",
+        "our",
+        "its",
+        "than",
+        "then",
+        "them",
+        "they",
+        "when",
+        "which",
+        "while",
+        "only",
+        "also",
+        "per",
+        "via",
     };
 
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -26,7 +64,13 @@ public static class MemoryText
     {
         ArgumentNullException.ThrowIfNull(text);
         var type = Lower(text.Trim());
-        return Types.Contains(type) ? type : throw new ArgumentException("invalid memory type " + Quote(text) + " (want one of: goal, constraint, decision, fact, open_question, warning, convention)");
+        return Types.Contains(type)
+            ? type
+            : throw new ArgumentException(
+                "invalid memory type "
+                    + Quote(text)
+                    + " (want one of: goal, constraint, decision, fact, open_question, warning, convention)"
+            );
     }
 
     public static MemoryInput Validate(MemoryInput input)
@@ -41,12 +85,18 @@ public static class MemoryText
         var length = StrictUtf8.GetByteCount(content);
         if (length > MaxContentBytes)
         {
-            throw new ArgumentException($"content is {length} bytes (max {MaxContentBytes}): store one short statement, not a transcript or document");
+            throw new ArgumentException(
+                $"content is {length} bytes (max {MaxContentBytes}): store one short statement, not a transcript or document"
+            );
         }
         // Only the redacted form reaches diagnostics; never echo the rejected credential.
         if (CredentialRedactor.HasCredential(content))
         {
-            throw new ArgumentException("content looks like it holds a secret (" + CredentialRedactor.Redact(content).Trim() + "): harness never stores credentials; state the fact without it");
+            throw new ArgumentException(
+                "content looks like it holds a secret ("
+                    + CredentialRedactor.Redact(content).Trim()
+                    + "): harness never stores credentials; state the fact without it"
+            );
         }
 
         var scope = (input.Scope is null or { Kind: "" } ? MemoryScope.Project : input.Scope).Normalize();
@@ -59,14 +109,19 @@ public static class MemoryText
         var sourceType = source.Type.Length is 0 ? "agent" : source.Type;
         if (sourceType is not ("agent" or "user" or "import" or "system"))
         {
-            throw new ArgumentException("invalid source type " + Quote(sourceType) + " (want agent, user, import or system)");
+            throw new ArgumentException(
+                "invalid source type " + Quote(sourceType) + " (want agent, user, import or system)"
+            );
         }
 
         var by = string.IsNullOrWhiteSpace(source.By) ? "unknown" : source.By;
         var reference = string.IsNullOrWhiteSpace(source.Ref) ? by : source.Ref;
         if (input.Confidence is { } confidence && (!double.IsFinite(confidence) || confidence is < 0 or > 1))
         {
-            throw new ArgumentException("confidence must be between 0 and 1, got " + confidence.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            throw new ArgumentException(
+                "confidence must be between 0 and 1, got "
+                    + confidence.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            );
         }
 
         if (input.ValidFrom is { } from && input.ValidUntil is { } until && until <= from)
@@ -74,18 +129,30 @@ public static class MemoryText
             throw new ArgumentException("valid_until must be after valid_from");
         }
 
-        return input with { Content = content, Type = ParseType(input.Type), Scope = scope, Source = new MemorySource(sourceType, reference, by) };
+        return input with
+        {
+            Content = content,
+            Type = ParseType(input.Type),
+            Scope = scope,
+            Source = new MemorySource(sourceType, reference, by),
+        };
     }
 
     public static string Normalize(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return Lower(string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))).TrimEnd('.', '!', ';', ',', ' ');
+        return Lower(string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)))
+            .TrimEnd('.', '!', ';', ',', ' ');
     }
 
-    public static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(StrictUtf8.GetBytes(Normalize(text))));
+    public static string Hash(string text) =>
+        Convert.ToHexStringLower(SHA256.HashData(StrictUtf8.GetBytes(Normalize(text))));
 
-    private static readonly System.Text.Json.JsonSerializerOptions QuoteOptions = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly System.Text.Json.JsonSerializerOptions QuoteOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     public static string Quote(string text) => System.Text.Json.JsonSerializer.Serialize(text, QuoteOptions);
 
     public static string FullTextQuery(string text)
@@ -163,7 +230,10 @@ public static class MemoryText
 
             foreach (var suffix in new[] { "ing", "ed", "es", "s" })
             {
-                if (StrictUtf8.GetByteCount(token) > suffix.Length + 3 && token.EndsWith(suffix, StringComparison.Ordinal))
+                if (
+                    StrictUtf8.GetByteCount(token) > suffix.Length + 3
+                    && token.EndsWith(suffix, StringComparison.Ordinal)
+                )
                 {
                     token = token[..^suffix.Length];
                     break;

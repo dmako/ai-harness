@@ -16,7 +16,13 @@ internal static class HookExecution
 
     // This entry point precedes command parsing and host construction: malformed hook arguments,
     // closed input, cancellation and all best-effort failures must still produce exit zero.
-    public static async Task<int> RunAsync(string[] args, Stream input, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    public static async Task<int> RunAsync(
+        string[] args,
+        Stream input,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken
+    )
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(3));
@@ -29,7 +35,10 @@ internal static class HookExecution
             {
                 client = args[++i];
             }
-            else if (args[i].StartsWith("--client=", StringComparison.Ordinal) || args[i].StartsWith("-client=", StringComparison.Ordinal))
+            else if (
+                args[i].StartsWith("--client=", StringComparison.Ordinal)
+                || args[i].StartsWith("-client=", StringComparison.Ordinal)
+            )
             {
                 client = args[i][(args[i].IndexOf('=', StringComparison.Ordinal) + 1)..];
             }
@@ -61,11 +70,21 @@ internal static class HookExecution
         catch (Exception exception)
         {
             // Never print external payloads, filenames or exception text in hook diagnostics.
-            await DebugAsync(error, exception is OperationCanceledException ? "dropped: time budget exceeded" : "dropped: " + exception.GetType().Name);
+            await DebugAsync(
+                error,
+                exception is OperationCanceledException
+                    ? "dropped: time budget exceeded"
+                    : "dropped: " + exception.GetType().Name
+            );
         }
         return 0;
     }
-    private static Task DebugAsync(TextWriter error, string message) => string.IsNullOrEmpty(Environment.GetEnvironmentVariable("HARNESS_HOOK_DEBUG")) ? Task.CompletedTask : error.WriteLineAsync("harness hook event: " + message);
+
+    private static Task DebugAsync(TextWriter error, string message) =>
+        string.IsNullOrEmpty(Environment.GetEnvironmentVariable("HARNESS_HOOK_DEBUG"))
+            ? Task.CompletedTask
+            : error.WriteLineAsync("harness hook event: " + message);
+
     private static async Task<byte[]> ReadAsync(Stream stream, CancellationToken token)
     {
         using var output = new MemoryStream();

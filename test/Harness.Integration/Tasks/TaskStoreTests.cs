@@ -13,21 +13,50 @@ public sealed class TaskStoreTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
     private static readonly TaskActor Human = new("human:fixture", Privileged: true);
-    private static TaskDefinition Definition(string id, params string[] dependencies) => new() { Id = id, Title = id, DependsOn = dependencies, Acceptance = ["build", "check"], Milestone = "M1" };
+
+    private static TaskDefinition Definition(string id, params string[] dependencies) =>
+        new()
+        {
+            Id = id,
+            Title = id,
+            DependsOn = dependencies,
+            Acceptance = ["build", "check"],
+            Milestone = "M1",
+        };
 
     [Fact]
     public void ImportsNormalizeDefinitionsRankReadyTasksAndCountMilestones()
     {
         using var s = new State();
-        s.Store.ImportMilestones([new(" M1 ", " Foundation ", "ship", ["verified", "Žluťoučký 🧪 <&>\u2028"]), new("M0", "Empty")], "fixture", cancellationToken: Token);
+        s.Store.ImportMilestones(
+            [new(" M1 ", " Foundation ", "ship", ["verified", "Žluťoučký 🧪 <&>\u2028"]), new("M0", "Empty")],
+            "fixture",
+            cancellationToken: Token
+        );
         using (var connection = s.Database.OpenConnection())
         using (var command = connection.CreateCommand())
         {
             command.CommandText = "SELECT exit FROM milestones WHERE id='M1'";
             command.ExecuteScalar().Should().Be("""["verified","Žluťoučký 🧪 \u003c\u0026\u003e\u2028"]""");
         }
-        var result = s.Store.Import([Definition("T-1") with { Status = "done" }, Definition("T-2", "T-1", "T-1"), Definition("T-3", "T-2"),
-            Definition("T-4") with { Priority = "critical", Scope = ["src", "", "src", "test"], Milestone = "implicit" }], "fixture", cancellationToken: Token);
+        var result = s.Store.Import(
+            [
+                Definition("T-1") with
+                {
+                    Status = "done",
+                },
+                Definition("T-2", "T-1", "T-1"),
+                Definition("T-3", "T-2"),
+                Definition("T-4") with
+                {
+                    Priority = "critical",
+                    Scope = ["src", "", "src", "test"],
+                    Milestone = "implicit",
+                },
+            ],
+            "fixture",
+            cancellationToken: Token
+        );
         result.Unlocked.Should().Equal("T-2", "T-4");
         s.Store.Next(cancellationToken: Token)!.Id.Should().Be("T-4");
         s.Store.Next("M1", Token)!.Id.Should().Be("T-2");
@@ -50,14 +79,38 @@ public sealed class TaskStoreTests
         s.Store.Import([Definition("T-3")], "dry", true, Token).Added.Should().ContainSingle();
         s.Store.ImportMilestones([new("M9", "dry")], "dry", true, Token).Should().Be(1);
         Snapshot(s.Database).Should().Be(before);
-        FluentActions.Invoking(() => s.Store.Import([Definition("bad")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
-        FluentActions.Invoking(() => s.Store.Import([Definition("T-3"), Definition("T-3")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
-        FluentActions.Invoking(() => s.Store.Import([Definition("T-3", "T-3")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
-        FluentActions.Invoking(() => s.Store.Import([Definition("T-3", "T-99")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
-        var cycle = FluentActions.Invoking(() => s.Store.Import([Definition("T-1", "T-2")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>().Which;
+        FluentActions
+            .Invoking(() => s.Store.Import([Definition("bad")], "bad", cancellationToken: Token))
+            .Should()
+            .ThrowExactly<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.Import([Definition("T-3"), Definition("T-3")], "bad", cancellationToken: Token))
+            .Should()
+            .ThrowExactly<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.Import([Definition("T-3", "T-3")], "bad", cancellationToken: Token))
+            .Should()
+            .ThrowExactly<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.Import([Definition("T-3", "T-99")], "bad", cancellationToken: Token))
+            .Should()
+            .ThrowExactly<ArgumentException>();
+        var cycle = FluentActions
+            .Invoking(() => s.Store.Import([Definition("T-1", "T-2")], "bad", cancellationToken: Token))
+            .Should()
+            .ThrowExactly<ArgumentException>()
+            .Which;
         cycle.Message.Should().Be("dependency cycle: T-1 -> T-2 -> T-1");
-        FluentActions.Invoking(() => s.Store.ImportMilestones([new("", "invalid")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
-        FluentActions.Invoking(() => s.Store.ImportMilestones([new("M1", "first"), new("M1", "second")], "bad", cancellationToken: Token)).Should().ThrowExactly<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.ImportMilestones([new("", "invalid")], "bad", cancellationToken: Token))
+            .Should()
+            .ThrowExactly<ArgumentException>();
+        FluentActions
+            .Invoking(() =>
+                s.Store.ImportMilestones([new("M1", "first"), new("M1", "second")], "bad", cancellationToken: Token)
+            )
+            .Should()
+            .ThrowExactly<ArgumentException>();
         Snapshot(s.Database).Should().Be(before);
     }
 
@@ -65,13 +118,38 @@ public sealed class TaskStoreTests
     public void ReimportPreservesClaimsCompletionNotesAndTextMatchedEvidence()
     {
         using var s = new State();
-        var defs = new[] { Definition("T-1") with { Status = "done", Notes = "execution notes" }, Definition("T-2"), Definition("T-3") };
+        var defs = new[]
+        {
+            Definition("T-1") with
+            {
+                Status = "done",
+                Notes = "execution notes",
+            },
+            Definition("T-2"),
+            Definition("T-3"),
+        };
         s.Store.Import(defs, "original", cancellationToken: Token);
         SeedExecution(s.Database);
         var complete = s.Store.Get("T-1", Token);
         var claim = s.Store.Get("T-2", Token);
-        var result = s.Store.Import([defs[0] with { Title = "new title", Status = "blocked", Notes = "replace?", Acceptance = ["check", "new", "build"] },
-            defs[1] with { Title = "claimed new", Status = "done" }], "new", cancellationToken: Token);
+        var result = s.Store.Import(
+            [
+                defs[0] with
+                {
+                    Title = "new title",
+                    Status = "blocked",
+                    Notes = "replace?",
+                    Acceptance = ["check", "new", "build"],
+                },
+                defs[1] with
+                {
+                    Title = "claimed new",
+                    Status = "done",
+                },
+            ],
+            "new",
+            cancellationToken: Token
+        );
         result.Updated.Should().Equal("T-1", "T-2");
         result.Orphaned.Should().Equal("T-3");
         var done = s.Store.Get("T-1", Token);
@@ -88,7 +166,11 @@ public sealed class TaskStoreTests
         JsonSerializer.Serialize(TaskViews.Task(stillClaimed)).Should().NotContain("secret-claim");
         s.Store.Events("T-1", Token)[^1].Event.Should().Be("definition_updated");
         var before = s.Store.Get("T-2", Token);
-        var unchanged = s.Store.Import([defs[1] with { Title = "claimed new", Notes = "ignored" }], "another", cancellationToken: Token);
+        var unchanged = s.Store.Import(
+            [defs[1] with { Title = "claimed new", Notes = "ignored" }],
+            "another",
+            cancellationToken: Token
+        );
         unchanged.Unchanged.Should().Equal("T-2");
         s.Store.Get("T-2", Token).UpdatedAt.Should().Be(before.UpdatedAt);
     }
@@ -97,11 +179,18 @@ public sealed class TaskStoreTests
     public void BlockDeferredReviewAndLeaseRecoveryKeepAuditAndAuthorization()
     {
         using var s = new State();
-        s.Store.Import([Definition("T-1") with { Status = "done" }, Definition("T-2"), Definition("T-3", "T-2")], "fixture", cancellationToken: Token);
+        s.Store.Import(
+            [Definition("T-1") with { Status = "done" }, Definition("T-2"), Definition("T-3", "T-2")],
+            "fixture",
+            cancellationToken: Token
+        );
         SeedExecution(s.Database);
         s.Store.Get("T-2", Token).Status.Should().Be("review");
         var before = Snapshot(s.Database);
-        FluentActions.Invoking(() => s.Store.Block("T-2", new("agent", "wrong"), "stuck", Token)).Should().ThrowExactly<InvalidOperationException>();
+        FluentActions
+            .Invoking(() => s.Store.Block("T-2", new("agent", "wrong"), "stuck", Token))
+            .Should()
+            .ThrowExactly<InvalidOperationException>();
         Snapshot(s.Database).Should().Be(before);
         s.Store.Block("T-2", new("agent", "secret-claim"), "password='example'", Token).Status.Should().Be("blocked");
         s.Store.Get("T-2", Token).BlockedReason.Should().Be("password=[redacted]");
@@ -110,7 +199,10 @@ public sealed class TaskStoreTests
         s.Store.Unblock("T-2", Human, cancellationToken: Token).Status.Should().Be("ready");
         s.Store.Block("T-3", Human, "wait", Token);
         s.Store.Unblock("T-3", Human, cancellationToken: Token).Status.Should().Be("backlog");
-        FluentActions.Invoking(() => s.Store.Defer("T-1", Human, "terminal", Token)).Should().ThrowExactly<InvalidOperationException>();
+        FluentActions
+            .Invoking(() => s.Store.Defer("T-1", Human, "terminal", Token))
+            .Should()
+            .ThrowExactly<InvalidOperationException>();
         SeedExpired(s.Database);
         s.Store.Get("T-2", Token).Status.Should().Be("ready");
         s.Store.Events("T-2", Token).Where(e => e.Event is "lease_expired").Should().NotBeEmpty();
@@ -135,7 +227,12 @@ public sealed class TaskStoreTests
     {
         using var s = new State();
         s.Store.Import([Definition("T-1")], "fixture", cancellationToken: Token);
-        var created = s.Store.Create(new() { Title = "New task", Acceptance = ["checked"] }, "", new("human", "cli", "manual"), Token);
+        var created = s.Store.Create(
+            new() { Title = "New task", Acceptance = ["checked"] },
+            "",
+            new("human", "cli", "manual"),
+            Token
+        );
         created.Id.Should().Be("T-2");
         FluentActions.Invoking(() => s.Store.NextId("T---", Token)).Should().ThrowExactly<ArgumentException>();
         s.Store.Events(created.Id, Token)[0].Event.Should().Be("created");
@@ -152,7 +249,10 @@ public sealed class TaskStoreTests
         s.Store.Export(path, cancellationToken: Token).Added.Should().BeEmpty();
         File.ReadAllBytes(path).Should().Equal(appended);
         File.WriteAllText(path, "version: 1\ntasks: []\nmilestones: []\n");
-        FluentActions.Invoking(() => s.Store.Export(path, cancellationToken: Token)).Should().ThrowExactly<InvalidDataException>();
+        FluentActions
+            .Invoking(() => s.Store.Export(path, cancellationToken: Token))
+            .Should()
+            .ThrowExactly<InvalidDataException>();
         File.ReadAllText(path).Should().Be("version: 1\ntasks: []\nmilestones: []\n");
         File.WriteAllText(path, "version: 1\ntasks: []\n");
         s.Store.Export(path, cancellationToken: Token);
@@ -166,18 +266,23 @@ public sealed class TaskStoreTests
     [InlineData("version: 1\ntasks: [{id: T-1, title: a, scope: wrong}]")]
     [InlineData("version: 1\ntasks: [{id: T-1, id: T-2}]")]
     [InlineData("version: 1\nmilestones: [{id: M1, mystery: x}]")]
-    public void StrictFormatRejectsUnknownDuplicateAndInvalidShapes(string yaml) => FluentActions.Invoking(() => BacklogCodec.Parse(yaml)).Should().ThrowExactly<InvalidDataException>();
+    public void StrictFormatRejectsUnknownDuplicateAndInvalidShapes(string yaml) =>
+        FluentActions.Invoking(() => BacklogCodec.Parse(yaml)).Should().ThrowExactly<InvalidDataException>();
 
     [Fact]
     public void JsonYamlAliasesAndMultilinePlanningRoundTrip()
     {
-        var parsed = BacklogCodec.Parse("version: 1\nmilestones: [{id: M1, title: phase, exit: [tested]}]\ntasks:\n  - id: T-1\n    title: 'null'\n    scope: &paths [src, test]\n    goal: |\n      Line one\n      Line two\n  - id: T-2\n    title: second\n    scope: *paths\n---\nignored: true\n");
+        var parsed = BacklogCodec.Parse(
+            "version: 1\nmilestones: [{id: M1, title: phase, exit: [tested]}]\ntasks:\n  - id: T-1\n    title: 'null'\n    scope: &paths [src, test]\n    goal: |\n      Line one\n      Line two\n  - id: T-2\n    title: second\n    scope: *paths\n---\nignored: true\n"
+        );
         parsed.Tasks[0].Title.Should().Be("null");
         parsed.Tasks[1].Scope.Should().Equal("src", "test");
         var json = """{"version":1,"tasks":[{"id":"T-3","title":"json"}]}""";
         BacklogCodec.Parse(json).Tasks.Should().ContainSingle().Which.Id.Should().Be("T-3");
         BacklogCodec.Parse(BacklogCodec.Write(parsed)).Tasks[0].Goal.Should().Be(parsed.Tasks[0].Goal);
-        var merged = BacklogCodec.Parse("version: 1\ntasks: [{id: T-1, title: first, scope: &p [src]}, {<<: {id: T-2, title: base, scope: *p}, title: explicit}]\n");
+        var merged = BacklogCodec.Parse(
+            "version: 1\ntasks: [{id: T-1, title: first, scope: &p [src]}, {<<: {id: T-2, title: base, scope: *p}, title: explicit}]\n"
+        );
         merged.Tasks[1].Title.Should().Be("explicit");
         merged.Tasks[1].Scope.Should().Equal("src");
     }
@@ -194,7 +299,11 @@ public sealed class TaskStoreTests
         File.Copy(Path.Combine(root, "test", "fixtures", "compatibility", "sqlite", fixture), path);
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
         var store = new TaskStore(database);
-        store.Import([Definition("T-41") with { Status = "done" }, Definition("T-42", "T-41")], "fixture", cancellationToken: Token);
+        store.Import(
+            [Definition("T-41") with { Status = "done" }, Definition("T-42", "T-41")],
+            "fixture",
+            cancellationToken: Token
+        );
         store.ImportMilestones([new("M1", "Migrated", "ship", ["verified"])], "fixture", cancellationToken: Token);
         var yaml = Path.Combine(s.Directory, "export.yaml");
         store.Export(yaml, cancellationToken: Token).Created.Should().BeTrue();
@@ -218,6 +327,7 @@ public sealed class TaskStoreTests
 
         return directory?.FullName ?? throw new DirectoryNotFoundException();
     }
+
     private static void SeedExecution(HarnessDatabase database)
     {
         using var c = database.OpenConnection();
@@ -228,36 +338,70 @@ public sealed class TaskStoreTests
             """;
         command.ExecuteNonQuery();
     }
+
     private static void SeedExpired(HarnessDatabase database)
     {
         using var c = database.OpenConnection();
         using var command = c.CreateCommand();
-        command.CommandText = "UPDATE tasks SET status='review',claimant='old',claim_token='expired',lease_until='2000-01-01T00:00:00.000000001Z' WHERE id='T-2'";
+        command.CommandText =
+            "UPDATE tasks SET status='review',claimant='old',claim_token='expired',lease_until='2000-01-01T00:00:00.000000001Z' WHERE id='T-2'";
         command.ExecuteNonQuery();
     }
-    [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Only constant test table queries are used.")]
+
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "Only constant test table queries are used."
+    )]
     private static string Snapshot(HarnessDatabase database)
     {
         using var c = database.OpenConnection();
         List<object?[]> rows = [];
-        foreach (var sql in new[] { "SELECT * FROM tasks ORDER BY id", "SELECT * FROM task_dependencies ORDER BY task_id,depends_on", "SELECT * FROM task_acceptance ORDER BY task_id,idx", "SELECT * FROM task_events ORDER BY id", "SELECT * FROM milestones ORDER BY id" })
+        foreach (
+            var sql in new[]
+            {
+                "SELECT * FROM tasks ORDER BY id",
+                "SELECT * FROM task_dependencies ORDER BY task_id,depends_on",
+                "SELECT * FROM task_acceptance ORDER BY task_id,idx",
+                "SELECT * FROM task_events ORDER BY id",
+                "SELECT * FROM milestones ORDER BY id",
+            }
+        )
         {
             using var command = c.CreateCommand();
             command.CommandText = sql;
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                rows.Add(Enumerable.Range(0, reader.FieldCount).Select(i => reader.IsDBNull(i) ? null : reader.GetValue(i)).ToArray());
+                rows.Add(
+                    Enumerable
+                        .Range(0, reader.FieldCount)
+                        .Select(i => reader.IsDBNull(i) ? null : reader.GetValue(i))
+                        .ToArray()
+                );
             }
         }
         return JsonSerializer.Serialize(rows);
     }
+
     private sealed class State : IDisposable
     {
-        public State() { Directory = Path.Combine(Path.GetTempPath(), "harness-tasks-" + Guid.NewGuid().ToString("N")); System.IO.Directory.CreateDirectory(Directory); Database = HarnessDatabase.Open(Path.Combine(Directory, "h.db"), cancellationToken: Token); Store = new(Database); }
+        public State()
+        {
+            Directory = Path.Combine(Path.GetTempPath(), "harness-tasks-" + Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(Directory);
+            Database = HarnessDatabase.Open(Path.Combine(Directory, "h.db"), cancellationToken: Token);
+            Store = new(Database);
+        }
+
         public string Directory { get; }
         public HarnessDatabase Database { get; }
         public TaskStore Store { get; }
-        public void Dispose() { Database.Dispose(); System.IO.Directory.Delete(Directory, recursive: true); }
+
+        public void Dispose()
+        {
+            Database.Dispose();
+            System.IO.Directory.Delete(Directory, recursive: true);
+        }
     }
 }

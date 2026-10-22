@@ -7,9 +7,20 @@ namespace Harness.Mcp;
 
 internal static class ToolMeasurements
 {
-    internal static ToolObservation Measure(string tool, IDictionary<string, JsonElement>? arguments, string client, DateTimeOffset at, long durationMs, CallToolResult? result, Exception? exception)
+    internal static ToolObservation Measure(
+        string tool,
+        IDictionary<string, JsonElement>? arguments,
+        string client,
+        DateTimeOffset at,
+        long durationMs,
+        CallToolResult? result,
+        Exception? exception
+    )
     {
-        string Arg(string key) => arguments?.TryGetValue(key, out var v) is true && v.ValueKind is JsonValueKind.String ? v.GetString() ?? "" : "";
+        string Arg(string key) =>
+            arguments?.TryGetValue(key, out var v) is true && v.ValueKind is JsonValueKind.String
+                ? v.GetString() ?? ""
+                : "";
         var kind = Arg("kind");
         if (Arg("scope") is "workspace" || tool is "library_adoption" or "similar_concerns")
         {
@@ -30,17 +41,37 @@ internal static class ToolMeasurements
             {
                 var lists = content.EnumerateObject().Where(p => p.Value.ValueKind is JsonValueKind.Array).ToArray();
                 empty = lists.Length > 0 && lists.All(p => p.Value.GetArrayLength() is 0);
-                if (result.IsError is not true && lists.All(p => p.Name is "errors" || p.Value.GetArrayLength() is 0) && content.TryGetProperty("errors", out var errors) && errors.ValueKind is JsonValueKind.Array && errors.GetArrayLength() > 0 && errors.EnumerateArray().All(e => e.ValueKind is JsonValueKind.String))
-                { error = "providers failed: " + string.Join("; ", errors.EnumerateArray().Select(e => e.GetString())); empty = false; }
+                if (
+                    result.IsError is not true
+                    && lists.All(p => p.Name is "errors" || p.Value.GetArrayLength() is 0)
+                    && content.TryGetProperty("errors", out var errors)
+                    && errors.ValueKind is JsonValueKind.Array
+                    && errors.GetArrayLength() > 0
+                    && errors.EnumerateArray().All(e => e.ValueKind is JsonValueKind.String)
+                )
+                {
+                    error =
+                        "providers failed: " + string.Join("; ", errors.EnumerateArray().Select(e => e.GetString()));
+                    empty = false;
+                }
             }
         }
         return new(at, tool, kind, client, durationMs, bytes, empty, error);
     }
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "An optional metrics adapter cannot fail the MCP response.")]
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "An optional metrics adapter cannot fail the MCP response."
+    )]
     internal static void Observe(IToolObserver? observer, ToolObservation measurement)
     {
         try
-        { observer?.Observe(measurement); }
-        catch (Exception) { /* Best effort. */ }
+        {
+            observer?.Observe(measurement);
+        }
+        catch (Exception)
+        { /* Best effort. */
+        }
     }
 }

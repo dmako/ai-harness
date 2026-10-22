@@ -25,16 +25,27 @@ public sealed class ConfigurationTests
     public void GlobalPathUsesGoOperatingSystemConventions(string platform, string variable, string suffix)
     {
         var folder = Path.Combine(Path.GetTempPath(), "config-home");
-        ConfigurationPaths.GlobalPath(platform, key => key == variable ? folder : null).Should().Be(Path.Combine(folder, suffix.Replace('/', Path.DirectorySeparatorChar), "config.toml"));
-        ConfigurationPaths.GlobalPath(platform, key => key == "HARNESS_CONFIG_DIR" ? folder : null).Should().Be(Path.Combine(folder, "config.toml"));
-        FluentActions.Invoking(() => ConfigurationPaths.GlobalPath(platform, _ => null)).Should().ThrowExactly<InvalidOperationException>();
+        ConfigurationPaths
+            .GlobalPath(platform, key => key == variable ? folder : null)
+            .Should()
+            .Be(Path.Combine(folder, suffix.Replace('/', Path.DirectorySeparatorChar), "config.toml"));
+        ConfigurationPaths
+            .GlobalPath(platform, key => key == "HARNESS_CONFIG_DIR" ? folder : null)
+            .Should()
+            .Be(Path.Combine(folder, "config.toml"));
+        FluentActions
+            .Invoking(() => ConfigurationPaths.GlobalPath(platform, _ => null))
+            .Should()
+            .ThrowExactly<InvalidOperationException>();
     }
 
     [Fact]
     public void ProjectReplacesProviderTableAndPacksOverlayPerCapability()
     {
         using var directory = new ConfigurationDirectory();
-        File.WriteAllText(directory.Global, """
+        File.WriteAllText(
+            directory.Global,
+            """
             [storage]
             busy_timeout_ms = 123
             [providers.rg-fd]
@@ -44,8 +55,11 @@ public sealed class ConfigurationTests
             [providers.other]
             type = "harness"
             command = "kept"
-            """);
-        File.WriteAllText(directory.Project, """
+            """
+        );
+        File.WriteAllText(
+            directory.Project,
+            """
             [storage]
             db_path = "data/state.db"
             [log]
@@ -56,7 +70,8 @@ public sealed class ConfigurationTests
             context = false
             [providers.rg-fd.capabilities."code.text_search"]
             tool = "custom"
-            """);
+            """
+        );
         var loaded = ConfigurationLoader.LoadFiles(directory.Global, directory.Project);
         loaded.Value.Storage.BusyTimeoutMs.Should().Be(123);
         loaded.Value.Storage.DbPath.Should().Be("data/state.db");
@@ -83,16 +98,26 @@ public sealed class ConfigurationTests
     [InlineData("[providers.x]\npack = '../unknown'")]
     [InlineData("[providers.x]\ntype = 'mcp'\ncommand = 'x'")]
     [InlineData("[providers.x]\ntype = 'harness'\ncommand = 'x'\nonly = ['bad']")]
-    [InlineData("[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nargs = {nested = {x=1}}")]
-    [InlineData("[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nmiss = '['")]
-    [InlineData("[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nunknown = true")]
+    [InlineData(
+        "[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nargs = {nested = {x=1}}"
+    )]
+    [InlineData(
+        "[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nmiss = '['"
+    )]
+    [InlineData(
+        "[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nunknown = true"
+    )]
     [InlineData("[storage")]
     public void InvalidLayerIdentifiesItsFileAndCannotBeMasked(string content)
     {
         using var directory = new ConfigurationDirectory();
         File.WriteAllText(directory.Global, content);
         File.WriteAllText(directory.Project, "[log]\nlevel = 'info'");
-        var error = FluentActions.Invoking(() => ConfigurationLoader.LoadFiles(directory.Global, directory.Project)).Should().ThrowExactly<InvalidDataException>().Which;
+        var error = FluentActions
+            .Invoking(() => ConfigurationLoader.LoadFiles(directory.Global, directory.Project))
+            .Should()
+            .ThrowExactly<InvalidDataException>()
+            .Which;
         error.Message.Should().Contain(directory.Global);
     }
 
@@ -110,15 +135,24 @@ public sealed class ConfigurationTests
         }
 
         File.WriteAllBytes(directory.Project, [0xff, 0xfe, 0x01]);
-        FluentActions.Invoking(() => ConfigurationLoader.LoadFiles("", directory.Project)).Should().ThrowExactly<InvalidDataException>();
+        FluentActions
+            .Invoking(() => ConfigurationLoader.LoadFiles("", directory.Project))
+            .Should()
+            .ThrowExactly<InvalidDataException>();
     }
 
     private sealed class ConfigurationDirectory : IDisposable
     {
-        private readonly string _root = Path.Combine(Path.GetTempPath(), "harness-config-" + Guid.NewGuid().ToString("N"));
+        private readonly string _root = Path.Combine(
+            Path.GetTempPath(),
+            "harness-config-" + Guid.NewGuid().ToString("N")
+        );
+
         internal ConfigurationDirectory() => Directory.CreateDirectory(_root);
+
         internal string Global => Path.Combine(_root, "global.toml");
         internal string Project => Path.Combine(_root, "project.toml");
+
         public void Dispose() => Directory.Delete(_root, recursive: true);
     }
 }

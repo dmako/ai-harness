@@ -20,22 +20,43 @@ internal sealed partial class UiReadService : IUiWriteApi
         {
             var endpoint = request.Route.Endpoint;
             if (endpoint.StartsWith("/api/projects/{id}/", StringComparison.Ordinal))
-            { return await WriteProjectAsync(request, token); }
+            {
+                return await WriteProjectAsync(request, token);
+            }
             if (endpoint.StartsWith("/api/knowledge/", StringComparison.Ordinal))
-            { return WriteKnowledge(request, token); }
+            {
+                return WriteKnowledge(request, token);
+            }
             if (endpoint is "/api/graphify/sessions/{action}")
-            { return await WriteGraphifyAsync(request, token); }
+            {
+                return await WriteGraphifyAsync(request, token);
+            }
             return await WriteWorkspaceAsync(request, token);
         }
-        catch (UiRequestException) { throw; }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException or FormatException)
-        { throw new UiRequestException(400, exception.Message); }
+        catch (UiRequestException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException or FormatException
+            )
+        {
+            throw new UiRequestException(400, exception.Message);
+        }
         catch (Exception exception) when (exception is SqliteException or TimeoutException or Win32Exception)
-        { throw new UiRequestException(500, exception.Message); }
+        {
+            throw new UiRequestException(500, exception.Message);
+        }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
-        { throw new UiRequestException(500, "operation timed out"); }
-        finally { catalog.Forget(); }
+        {
+            throw new UiRequestException(500, "operation timed out");
+        }
+        finally
+        {
+            catalog.Forget();
+        }
     }
+
     private async Task<JsonNode?> WriteProjectAsync(UiWriteRequest request, CancellationToken token)
     {
         var route = request.Route;
@@ -44,9 +65,23 @@ internal sealed partial class UiReadService : IUiWriteApi
         {
             var fields = new UiWriteBody(request.Body, "name", "title");
             if (fields.Optional("name") is null && fields.Optional("title") is null)
-            { throw new UiRequestException(400, "give a name or a title"); }
-            var renamed = await lifecycle.Registry.RenameAsync(route.Value("id"), fields.Optional("name"), fields.Optional("title"), token);
-            return UiJson.Node(new { project_id = route.Value("id"), name = WorkspaceStore.ShortName(renamed), title = UiProjectCatalog.Text(renamed, "title") });
+            {
+                throw new UiRequestException(400, "give a name or a title");
+            }
+            var renamed = await lifecycle.Registry.RenameAsync(
+                route.Value("id"),
+                fields.Optional("name"),
+                fields.Optional("title"),
+                token
+            );
+            return UiJson.Node(
+                new
+                {
+                    project_id = route.Value("id"),
+                    name = WorkspaceStore.ShortName(renamed),
+                    title = UiProjectCatalog.Text(renamed, "title"),
+                }
+            );
         }
         var project = await catalog.FindAsync(route.Value("id"), token);
         using var database = Open(project, tasks: true);
@@ -64,61 +99,209 @@ internal sealed partial class UiReadService : IUiWriteApi
             "task-proposals/{pid}/reject" => RejectTask(database, request, token),
             "findings/{action}" => await TriageProjectAsync(project, database, request, token),
             "arch-proposals/{pid}/approve" => await ApproveFindingAsync(project, database, request, token),
-            "arch-proposals/{pid}/reject" => UiJson.Node(new { proposal = new FindingStore(database).Decide(route.Value("pid"), "rejected", human, new UiWriteBody(request.Body, "note").Text("note"), token: token) }),
+            "arch-proposals/{pid}/reject" => UiJson.Node(
+                new
+                {
+                    proposal = new FindingStore(database).Decide(
+                        route.Value("pid"),
+                        "rejected",
+                        human,
+                        new UiWriteBody(request.Body, "note").Text("note"),
+                        token: token
+                    ),
+                }
+            ),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
     }
-    private static JsonNode? CorrectMemory(MemoryStore store, string id, JsonObject body, MemoryScope? scope, CancellationToken token)
+
+    private static JsonNode? CorrectMemory(
+        MemoryStore store,
+        string id,
+        JsonObject body,
+        MemoryScope? scope,
+        CancellationToken token
+    )
     {
-        var fields = scope is null ? new UiWriteBody(body, "content", "reason") : new UiWriteBody(body, "level", "content", "reason");
+        var fields = scope is null
+            ? new UiWriteBody(body, "content", "reason")
+            : new UiWriteBody(body, "level", "content", "reason");
         if (string.IsNullOrWhiteSpace(fields.Text("content")) || string.IsNullOrWhiteSpace(fields.Text("reason")))
-        { throw new UiRequestException(400, "a correction needs the new content and a reason"); }
-        var result = store.Supersede(id, new() { Content = fields.Text("content"), SupersedeReason = fields.Text("reason"), Source = new("user", "harness ui correction", HumanActor.Current()) }, token);
-        return UiJson.Node(new { status = result.Status, memory = MemoryViews.Memory(result.Memory! with { Scope = scope ?? result.Memory.Scope }) });
+        {
+            throw new UiRequestException(400, "a correction needs the new content and a reason");
+        }
+        var result = store.Supersede(
+            id,
+            new()
+            {
+                Content = fields.Text("content"),
+                SupersedeReason = fields.Text("reason"),
+                Source = new("user", "harness ui correction", HumanActor.Current()),
+            },
+            token
+        );
+        return UiJson.Node(
+            new
+            {
+                status = result.Status,
+                memory = MemoryViews.Memory(result.Memory! with { Scope = scope ?? result.Memory.Scope }),
+            }
+        );
     }
-    private static JsonNode? RetireMemory(MemoryStore store, string id, JsonObject body, MemoryScope? scope, CancellationToken token)
+
+    private static JsonNode? RetireMemory(
+        MemoryStore store,
+        string id,
+        JsonObject body,
+        MemoryScope? scope,
+        CancellationToken token
+    )
     {
-        var fields = scope is null ? new UiWriteBody(body, "reason") : new UiWriteBody(body, "level", "content", "reason");
+        var fields = scope is null
+            ? new UiWriteBody(body, "reason")
+            : new UiWriteBody(body, "level", "content", "reason");
         var memory = store.Retire(id, HumanActor.Current(), fields.Text("reason"), token);
         return UiJson.Node(new { memory = MemoryViews.Memory(memory with { Scope = scope ?? memory.Scope }) });
     }
+
     private static JsonObject? ApproveMemory(MemoryStore store, string id, JsonObject body, CancellationToken token)
     {
         var fields = new UiWriteBody(body, "content", "supersedes", "keep_both", "note");
-        var result = store.Approve(id, new() { Content = fields.Text("content"), Supersedes = fields.List("supersedes"), KeepBoth = fields.Flag("keep_both"), Note = fields.Text("note"), By = HumanActor.Current() }, token);
-        var view = UiJson.Node(new { status = result.Status, proposal = MemoryViews.Proposal(result.Proposal), similar = result.Similar.Count is 0 ? null : result.Similar.Select(MemoryViews.Similar).ToArray() })!.AsObject();
+        var result = store.Approve(
+            id,
+            new()
+            {
+                Content = fields.Text("content"),
+                Supersedes = fields.List("supersedes"),
+                KeepBoth = fields.Flag("keep_both"),
+                Note = fields.Text("note"),
+                By = HumanActor.Current(),
+            },
+            token
+        );
+        var view = UiJson
+            .Node(
+                new
+                {
+                    status = result.Status,
+                    proposal = MemoryViews.Proposal(result.Proposal),
+                    similar = result.Similar.Count is 0 ? null : result.Similar.Select(MemoryViews.Similar).ToArray(),
+                }
+            )!
+            .AsObject();
         if (result.Memory is not null)
-        { view["memory"] = UiJson.Node(MemoryViews.Memory(result.Memory)); }
+        {
+            view["memory"] = UiJson.Node(MemoryViews.Memory(result.Memory));
+        }
         return view;
     }
+
     private static JsonNode? RejectMemory(MemoryStore store, string id, JsonObject body, CancellationToken token) =>
-        UiJson.Node(new { proposal = MemoryViews.Proposal(store.Reject(id, HumanActor.Current(), new UiWriteBody(body, "note").Text("note"), token)) });
+        UiJson.Node(
+            new
+            {
+                proposal = MemoryViews.Proposal(
+                    store.Reject(id, HumanActor.Current(), new UiWriteBody(body, "note").Text("note"), token)
+                ),
+            }
+        );
+
     private static TaskDefinition TaskForm(JsonObject body)
     {
-        var fields = new UiWriteBody(body, "id", "prefix", "title", "goal", "type", "priority", "milestone", "depends_on", "acceptance", "scope");
-        return new() { Id = fields.Text("id"), Title = fields.Text("title"), Goal = fields.Text("goal").Trim(), Type = fields.Text("type").Trim(), Priority = fields.Text("priority").Trim(), Milestone = fields.Text("milestone").Trim(), DependsOn = fields.List("depends_on").Select(s => s.Trim().ToUpperInvariant()).Where(s => s.Length > 0).ToArray(), Acceptance = Clean(fields.List("acceptance")), Scope = Clean(fields.List("scope")) };
+        var fields = new UiWriteBody(
+            body,
+            "id",
+            "prefix",
+            "title",
+            "goal",
+            "type",
+            "priority",
+            "milestone",
+            "depends_on",
+            "acceptance",
+            "scope"
+        );
+        return new()
+        {
+            Id = fields.Text("id"),
+            Title = fields.Text("title"),
+            Goal = fields.Text("goal").Trim(),
+            Type = fields.Text("type").Trim(),
+            Priority = fields.Text("priority").Trim(),
+            Milestone = fields.Text("milestone").Trim(),
+            DependsOn = fields
+                .List("depends_on")
+                .Select(s => s.Trim().ToUpperInvariant())
+                .Where(s => s.Length > 0)
+                .ToArray(),
+            Acceptance = Clean(fields.List("acceptance")),
+            Scope = Clean(fields.List("scope")),
+        };
     }
-    private static string Prefix(JsonObject body) => body.FirstOrDefault(p => p.Key.Equals("prefix", StringComparison.OrdinalIgnoreCase)).Value?.GetValue<string>() ?? "";
-    private static string[] Clean(IEnumerable<string> strings) => strings.Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
+
+    private static string Prefix(JsonObject body) =>
+        body.FirstOrDefault(p => p.Key.Equals("prefix", StringComparison.OrdinalIgnoreCase)).Value?.GetValue<string>()
+        ?? "";
+
+    private static string[] Clean(IEnumerable<string> strings) =>
+        strings.Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
+
     private static JsonNode? CreateTask(HarnessDatabase database, JsonObject body, CancellationToken token) =>
-        UiJson.Node(new { task = TaskViews.Task(new TaskStore(database).Create(TaskForm(body), Prefix(body), new(HumanActor.Current(), "ui", "added in harness ui"), token)) });
+        UiJson.Node(
+            new
+            {
+                task = TaskViews.Task(
+                    new TaskStore(database).Create(
+                        TaskForm(body),
+                        Prefix(body),
+                        new(HumanActor.Current(), "ui", "added in harness ui"),
+                        token
+                    )
+                ),
+            }
+        );
+
     private static JsonNode? ApproveTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
     {
         var edit = new UiWriteBody(request.Body, "task").Object("task");
-        var result = new TaskStore(database).Approve(request.Route.Value("pid"), edit is null ? null : TaskForm(edit), edit is null ? "" : Prefix(edit), HumanActor.Current(), token);
+        var result = new TaskStore(database).Approve(
+            request.Route.Value("pid"),
+            edit is null ? null : TaskForm(edit),
+            edit is null ? "" : Prefix(edit),
+            HumanActor.Current(),
+            token
+        );
         return UiJson.Node(new { proposal = TaskViews.Proposal(result.Proposal), task = TaskViews.Task(result.Task) });
     }
+
     private static JsonNode? RejectTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token) =>
-        UiJson.Node(new { proposal = TaskViews.Proposal(new TaskStore(database).Reject(request.Route.Value("pid"), new UiWriteBody(request.Body, "note").Text("note"), HumanActor.Current(), token)) });
+        UiJson.Node(
+            new
+            {
+                proposal = TaskViews.Proposal(
+                    new TaskStore(database).Reject(
+                        request.Route.Value("pid"),
+                        new UiWriteBody(request.Body, "note").Text("note"),
+                        HumanActor.Current(),
+                        token
+                    )
+                ),
+            }
+        );
+
     private JsonNode? WriteKnowledge(UiWriteRequest request, CancellationToken token)
     {
         var adding = request.Route.Endpoint is "/api/knowledge/memories";
-        var fields = adding ? new UiWriteBody(request.Body, "level", "type", "content", "SourceRef") : new UiWriteBody(request.Body, "level", "content", "reason");
+        var fields = adding
+            ? new UiWriteBody(request.Body, "level", "type", "content", "SourceRef")
+            : new UiWriteBody(request.Body, "level", "content", "reason");
         var scope = Wider(fields.Text("level"));
         var type = adding ? MemoryText.ParseType(fields.Text("type")) : "";
         var path = Levels.KnowledgePath(Levels.Load(), scope);
         if (!adding && !File.Exists(path))
-        { throw new UiRequestException(400, "nothing is recorded at " + scope); }
+        {
+            throw new UiRequestException(400, "nothing is recorded at " + scope);
+        }
         using var database = Levels.OpenLevel(Levels.Load(), scope, "", token);
         var store = new MemoryStore(database);
         if (!adding)
@@ -128,18 +311,43 @@ internal sealed partial class UiReadService : IUiWriteApi
                 : CorrectMemory(store, request.Route.Value("mid"), request.Body, scope, token);
         }
         var reference = string.IsNullOrWhiteSpace(fields.Text("SourceRef")) ? "harness ui" : fields.Text("SourceRef");
-        var result = store.Put(new() { Type = type, Content = fields.Text("content"), Source = new("user", reference, HumanActor.Current()) }, token);
-        JsonObject view = new() { ["status"] = result.Status, ["similar"] = result.Similar.Count is 0 ? null : UiJson.Node(result.Similar.Select(s => MemoryViews.Memory(s.Memory with { Scope = scope })).ToArray()) };
+        var result = store.Put(
+            new()
+            {
+                Type = type,
+                Content = fields.Text("content"),
+                Source = new("user", reference, HumanActor.Current()),
+            },
+            token
+        );
+        JsonObject view = new()
+        {
+            ["status"] = result.Status,
+            ["similar"] = result.Similar.Count is 0
+                ? null
+                : UiJson.Node(
+                    result.Similar.Select(s => MemoryViews.Memory(s.Memory with { Scope = scope })).ToArray()
+                ),
+        };
         if (result.Memory is not null)
-        { view["memory"] = UiJson.Node(MemoryViews.Memory(result.Memory with { Scope = scope })); }
+        {
+            view["memory"] = UiJson.Node(MemoryViews.Memory(result.Memory with { Scope = scope }));
+        }
         return view;
     }
+
     private static MemoryScope Wider(string level)
     {
         var scope = MemoryScope.Parse(level);
         return scope.Wider ? scope : throw new UiRequestException(400, "level must be user or workspace:<name>");
     }
-    private async Task<JsonNode?> PromoteAsync(JsonObject project, HarnessDatabase database, UiWriteRequest request, CancellationToken token)
+
+    private async Task<JsonNode?> PromoteAsync(
+        JsonObject project,
+        HarnessDatabase database,
+        UiWriteRequest request,
+        CancellationToken token
+    )
     {
         var fields = new UiWriteBody(request.Body, "to", "dry_run", "force");
         var scope = Wider(fields.Text("to"));
@@ -148,23 +356,58 @@ internal sealed partial class UiReadService : IUiWriteApi
         {
             var memory = new MemoryStore(database).Get(request.Route.Value("mid"), token);
             if (!memory.Current(new(DateTimeOffset.UtcNow)))
-            { throw new UiRequestException(400, memory.Id + " is not current (superseded or retired)"); }
+            {
+                throw new UiRequestException(400, memory.Id + " is not current (superseded or retired)");
+            }
             if (memory.Scope != MemoryScope.Project)
-            { throw new UiRequestException(400, memory.Id + " applies to " + memory.Scope + " only; promote project-wide memories"); }
+            {
+                throw new UiRequestException(
+                    400,
+                    memory.Id + " applies to " + memory.Scope + " only; promote project-wide memories"
+                );
+            }
             _ = Levels.KnowledgePath(Levels.Load(), scope);
-            var holds = KnowledgeLevels.Across(Levels.OtherProjects(UiProjectCatalog.Text(project, "id"), scope.Kind is "workspace" ? scope.Value : null), s => s.Similar(memory.Type, memory.Content, token).Select(m => m.Memory).ToArray(), token);
+            var holds = KnowledgeLevels.Across(
+                Levels.OtherProjects(
+                    UiProjectCatalog.Text(project, "id"),
+                    scope.Kind is "workspace" ? scope.Value : null
+                ),
+                s => s.Similar(memory.Type, memory.Content, token).Select(m => m.Memory).ToArray(),
+                token
+            );
             result = new(memory, scope.ToString(), holds, "would_create");
         }
         else
         {
             var service = new MemoryService(_ => Task.FromResult(database), Levels, _ => Task.FromResult(""));
-            result = await service.PromoteAsync(request.Route.Value("mid"), scope, HumanActor.Current(), fields.Flag("force"), token);
+            result = await service.PromoteAsync(
+                request.Route.Value("mid"),
+                scope,
+                HumanActor.Current(),
+                fields.Flag("force"),
+                token
+            );
         }
-        var view = UiJson.Node(new { from = MemoryViews.Memory(result.From), level = result.Level, holds_in = result.HoldsIn.Select(MemoryViews.Found).ToArray(), status = result.Status, retired = result.Retired })!.AsObject();
+        var view = UiJson
+            .Node(
+                new
+                {
+                    from = MemoryViews.Memory(result.From),
+                    level = result.Level,
+                    holds_in = result.HoldsIn.Select(MemoryViews.Found).ToArray(),
+                    status = result.Status,
+                    retired = result.Retired,
+                }
+            )!
+            .AsObject();
         if (result.Memory is not null)
-        { view["memory"] = UiJson.Node(MemoryViews.Memory(result.Memory)); }
+        {
+            view["memory"] = UiJson.Node(MemoryViews.Memory(result.Memory));
+        }
         if (result.SimilarAtLevel.Count > 0)
-        { view["similar_at_level"] = UiJson.Node(result.SimilarAtLevel); }
+        {
+            view["similar_at_level"] = UiJson.Node(result.SimilarAtLevel);
+        }
         return view;
     }
 }

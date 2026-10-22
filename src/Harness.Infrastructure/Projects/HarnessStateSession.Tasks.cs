@@ -13,23 +13,77 @@ public sealed partial class HarnessStateSession
             cancellationToken.ThrowIfCancellationRequested();
             return operation(new TaskStore(database));
         }
-        catch (Microsoft.Data.Sqlite.SqliteException exception) { throw new IOException(exception.Message, exception); }
-    }
-    public Task<TaskRecord> ReadTaskAsync(string id, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Get(id, cancellationToken), cancellationToken);
-    public Task<IReadOnlyList<TaskEvent>> TaskEventsAsync(string id, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Events(id, cancellationToken), cancellationToken);
-    public Task<TaskRecord?> NextTaskAsync(string milestone, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Next(milestone, cancellationToken), cancellationToken);
-    public Task<TaskClaimResult?> ClaimNextTaskAsync(string milestone, TaskActor actor, TimeSpan lease, CancellationToken cancellationToken) => TaskOperationAsync(s => s.ClaimNext(milestone, actor, lease, cancellationToken), cancellationToken);
-    public Task<TaskClaimResult> ClaimTaskAsync(string id, TaskActor actor, TimeSpan lease, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Claim(id, actor, lease, cancellationToken), cancellationToken);
-    public Task<TaskRecord> UpdateTaskAsync(string id, TaskActor actor, TaskUpdate input, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Update(id, actor, input, cancellationToken), cancellationToken);
-    public async Task<TaskCompletionResult> CompleteTaskAsync(string id, TaskActor actor, TaskCompletion input, CancellationToken cancellationToken)
-    {
-        var result = await TaskOperationAsync(s => s.Complete(id, actor, input, cancellationToken), cancellationToken).ConfigureAwait(false);
-        if (input.Commit.Length > 0 && location.Repository is { } repository && _database is { } database && _registration is { } registration)
+        catch (Microsoft.Data.Sqlite.SqliteException exception)
         {
-            await Harness.Infrastructure.Telemetry.TelemetryStore.ResolveBestEffortAsync(database, repository, registration.Worktree.Id, input.Commit, "task", cancellationToken).ConfigureAwait(false);
+            throw new IOException(exception.Message, exception);
+        }
+    }
+
+    public Task<TaskRecord> ReadTaskAsync(string id, CancellationToken cancellationToken) =>
+        TaskOperationAsync(s => s.Get(id, cancellationToken), cancellationToken);
+
+    public Task<IReadOnlyList<TaskEvent>> TaskEventsAsync(string id, CancellationToken cancellationToken) =>
+        TaskOperationAsync(s => s.Events(id, cancellationToken), cancellationToken);
+
+    public Task<TaskRecord?> NextTaskAsync(string milestone, CancellationToken cancellationToken) =>
+        TaskOperationAsync(s => s.Next(milestone, cancellationToken), cancellationToken);
+
+    public Task<TaskClaimResult?> ClaimNextTaskAsync(
+        string milestone,
+        TaskActor actor,
+        TimeSpan lease,
+        CancellationToken cancellationToken
+    ) => TaskOperationAsync(s => s.ClaimNext(milestone, actor, lease, cancellationToken), cancellationToken);
+
+    public Task<TaskClaimResult> ClaimTaskAsync(
+        string id,
+        TaskActor actor,
+        TimeSpan lease,
+        CancellationToken cancellationToken
+    ) => TaskOperationAsync(s => s.Claim(id, actor, lease, cancellationToken), cancellationToken);
+
+    public Task<TaskRecord> UpdateTaskAsync(
+        string id,
+        TaskActor actor,
+        TaskUpdate input,
+        CancellationToken cancellationToken
+    ) => TaskOperationAsync(s => s.Update(id, actor, input, cancellationToken), cancellationToken);
+
+    public async Task<TaskCompletionResult> CompleteTaskAsync(
+        string id,
+        TaskActor actor,
+        TaskCompletion input,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await TaskOperationAsync(s => s.Complete(id, actor, input, cancellationToken), cancellationToken)
+            .ConfigureAwait(false);
+        if (
+            input.Commit.Length > 0
+            && location.Repository is { } repository
+            && _database is { } database
+            && _registration is { } registration
+        )
+        {
+            await Harness
+                .Infrastructure.Telemetry.TelemetryStore.ResolveBestEffortAsync(
+                    database,
+                    repository,
+                    registration.Worktree.Id,
+                    input.Commit,
+                    "task",
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
         }
 
         return result;
     }
-    public Task<TaskProposal> ProposeTaskAsync(TaskDefinition definition, string reason, string by, CancellationToken cancellationToken) => TaskOperationAsync(s => s.Propose(definition, reason, by, cancellationToken), cancellationToken);
+
+    public Task<TaskProposal> ProposeTaskAsync(
+        TaskDefinition definition,
+        string reason,
+        string by,
+        CancellationToken cancellationToken
+    ) => TaskOperationAsync(s => s.Propose(definition, reason, by, cancellationToken), cancellationToken);
 }

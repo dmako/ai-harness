@@ -6,18 +6,36 @@ namespace Harness.Infrastructure.Architecture;
 
 public static class DeclarationReader
 {
-    private static readonly Regex CSharp = EcosystemReader.Rx(@"^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly|ref)\s+)*(record\s+struct|record\s+class|class|interface|record|struct|enum)\s+([A-Za-z_]\w*)");
+    private static readonly Regex CSharp = EcosystemReader.Rx(
+        @"^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly|ref)\s+)*(record\s+struct|record\s+class|class|interface|record|struct|enum)\s+([A-Za-z_]\w*)"
+    );
     private static readonly Regex Go = EcosystemReader.Rx(@"^(?:type\s+([A-Z]\w*)|func\s+([A-Z]\w*)\s*[\[(])");
-    private static readonly Regex TypeScript = EcosystemReader.Rx(@"^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(class|interface|function|type|enum|const)\s+([A-Za-z_$][\w$]*)");
-    private static readonly Regex CSharpBases = EcosystemReader.Rx(@"^\s*(?:<[^>{]*>)?\s*(?:\([^){]*\))?\s*:\s*([^{]+?)\s*(?:\bwhere\b|\{|$)");
+    private static readonly Regex TypeScript = EcosystemReader.Rx(
+        @"^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(class|interface|function|type|enum|const)\s+([A-Za-z_$][\w$]*)"
+    );
+    private static readonly Regex CSharpBases = EcosystemReader.Rx(
+        @"^\s*(?:<[^>{]*>)?\s*(?:\([^){]*\))?\s*:\s*([^{]+?)\s*(?:\bwhere\b|\{|$)"
+    );
     private static readonly Regex TypeScriptBases = EcosystemReader.Rx(@"\b(?:extends|implements)\s+([^{]+)");
+
     public static IReadOnlyList<DeclaredType> Read(AnalysisRepository repository)
     {
         List<DeclaredType> result = [];
         foreach (var file in repository.Files)
         {
-            var regex = Path.GetExtension(file).ToUpperInvariant() switch { ".CS" => CSharp, ".GO" => Go, ".TS" or ".TSX" or ".JS" or ".MJS" => TypeScript, _ => null };
-            if (regex is null || TaskParsing.IsTestFile(file) || EcosystemReader.Vendored(file) || file.EndsWith(".d.ts", StringComparison.Ordinal))
+            var regex = Path.GetExtension(file).ToUpperInvariant() switch
+            {
+                ".CS" => CSharp,
+                ".GO" => Go,
+                ".TS" or ".TSX" or ".JS" or ".MJS" => TypeScript,
+                _ => null,
+            };
+            if (
+                regex is null
+                || TaskParsing.IsTestFile(file)
+                || EcosystemReader.Vendored(file)
+                || file.EndsWith(".d.ts", StringComparison.Ordinal)
+            )
             {
                 continue;
             }
@@ -31,7 +49,10 @@ public static class DeclarationReader
                     continue;
                 }
 
-                var kind = string.Join(' ', match.Groups[1].Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+                var kind = string.Join(
+                    ' ',
+                    match.Groups[1].Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                );
                 var name = match.Groups[2].Value;
                 List<string> bases = [];
                 if (regex == Go)
@@ -49,7 +70,17 @@ public static class DeclarationReader
 
                     if (regex == TypeScript)
                     {
-                        bases.AddRange(TypeScriptBases.Matches(rest).SelectMany(ts => BaseNames(ts.Groups[1].Value.Replace("implements", ",", StringComparison.Ordinal).Replace("extends", ",", StringComparison.Ordinal))));
+                        bases.AddRange(
+                            TypeScriptBases
+                                .Matches(rest)
+                                .SelectMany(ts =>
+                                    BaseNames(
+                                        ts.Groups[1]
+                                            .Value.Replace("implements", ",", StringComparison.Ordinal)
+                                            .Replace("extends", ",", StringComparison.Ordinal)
+                                    )
+                                )
+                        );
                     }
                 }
                 result.Add(new(name, kind, file, index + 1, bases.Count is 0 ? null : bases));
@@ -57,6 +88,7 @@ public static class DeclarationReader
         }
         return result;
     }
+
     private static List<string> BaseNames(string list)
     {
         List<string> result = [];

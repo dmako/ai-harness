@@ -6,10 +6,20 @@ using Harness.Core.Retrieval;
 
 namespace Harness.Infrastructure.Architecture;
 
-public sealed record SystemMember(string Id, string Name, string ShortName, AnalysisRepository Repository, bool Library = false);
+public sealed record SystemMember(
+    string Id,
+    string Name,
+    string ShortName,
+    AnalysisRepository Repository,
+    bool Library = false
+);
 
 /// <summary>A request-scoped file reader. Addresses are matched by declared names, never probed.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "Frozen system identities and matching use lowercase normalized tokens.")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Globalization",
+    "CA1308:Normalize strings to uppercase",
+    Justification = "Frozen system identities and matching use lowercase normalized tokens."
+)]
 public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 {
     private readonly Dictionary<string, SystemNode> _nodes = new(StringComparer.Ordinal);
@@ -21,11 +31,31 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
     private static readonly Regex ClassWord = Rx(@"\bclass\s+\w+");
     private static readonly Regex Proto = Rx(@"^\s*service\s+(\w+)\s*\{");
     private static readonly Regex ContextBase = Rx(@"(?:^|\.)\w*(?:DbContext|Context)\b");
-    private static readonly Regex DatabaseWords = Rx(@"^(?:Base|Migration|Migrated|Runtime|Design|Pooled)|(?:Base|Migration|Migrated|Runtime|Design|Pooled)$");
+    private static readonly Regex DatabaseWords = Rx(
+        @"^(?:Base|Migration|Migrated|Runtime|Design|Pooled)|(?:Base|Migration|Migrated|Runtime|Design|Pooled)$"
+    );
     private static readonly Regex ConnectionKey = Rx("GetConnectionString\\(\\s*\"(\\w+)\"");
-    private static readonly Regex Plumbing = Rx(@"keycloak|auth|issuer|authority|oidc|openid|kestrel|swagger|openapi|sentry|logging|serilog|otel|telemetry|redirect|callback|cors|origins|detailsurl|frontend|appurl|rooturl|publicurl|selfurl|baseurlpath");
+    private static readonly Regex Plumbing = Rx(
+        @"keycloak|auth|issuer|authority|oidc|openid|kestrel|swagger|openapi|sentry|logging|serilog|otel|telemetry|redirect|callback|cors|origins|detailsurl|frontend|appurl|rooturl|publicurl|selfurl|baseurlpath"
+    );
     private static readonly Regex UrlHost = Rx(@"^[a-z][a-z0-9+.-]*://([^/:?#]+)");
-    private static readonly string[] Suffixes = ["webapi", "grpc", "api", "service", "services", "client", "server", "ui", "web", "app", "url", "baseurl", "dev", "svc"];
+    private static readonly string[] Suffixes =
+    [
+        "webapi",
+        "grpc",
+        "api",
+        "service",
+        "services",
+        "client",
+        "server",
+        "ui",
+        "web",
+        "app",
+        "url",
+        "baseurl",
+        "dev",
+        "svc",
+    ];
 
     public WorkspaceSystem Read()
     {
@@ -36,8 +66,33 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         foreach (var member in members)
         {
             var ecosystem = new EcosystemReader(member.Repository);
-            var frontend = member.Repository.Files.Contains("package.json", StringComparer.Ordinal) && ecosystem.Dependencies("package.json").Any(dependency => dependency.Name is "react" or "vue" or "@angular/core" or "svelte" or "solid-js" or "next" or "nuxt");
-            Node(new(member.Id, member.Name, (frontend, member.Library) switch { (true, _) => "frontend", (_, true) => "library", _ => "service" }, member.Id));
+            var frontend =
+                member.Repository.Files.Contains("package.json", StringComparer.Ordinal)
+                && ecosystem
+                    .Dependencies("package.json")
+                    .Any(dependency =>
+                        dependency.Name
+                            is "react"
+                                or "vue"
+                                or "@angular/core"
+                                or "svelte"
+                                or "solid-js"
+                                or "next"
+                                or "nuxt"
+                    );
+            Node(
+                new(
+                    member.Id,
+                    member.Name,
+                    (frontend, member.Library) switch
+                    {
+                        (true, _) => "frontend",
+                        (_, true) => "library",
+                        _ => "service",
+                    },
+                    member.Id
+                )
+            );
         }
         ReadContracts();
         foreach (var member in members)
@@ -49,19 +104,51 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         }
 
         var findings = Findings();
-        var units = _nodes.Values.Where(node => node.Kind is "service" or "frontend").Select(node =>
-        {
-            var unit = new BuildUnit { Name = node.Name, Path = node.Id };
-            unit.References.AddRange(_links.Values.Where(link => link.From == node.Id && link.Style is "grpc" or "http" && members.Any(member => member.Id == link.To)).Select(link => link.To));
-            return unit;
-        }).ToArray();
+        var units = _nodes
+            .Values.Where(node => node.Kind is "service" or "frontend")
+            .Select(node =>
+            {
+                var unit = new BuildUnit { Name = node.Name, Path = node.Id };
+                unit.References.AddRange(
+                    _links
+                        .Values.Where(link =>
+                            link.From == node.Id
+                            && link.Style is "grpc" or "http"
+                            && members.Any(member => member.Id == link.To)
+                        )
+                        .Select(link => link.To)
+                );
+                return unit;
+            })
+            .ToArray();
         foreach (var unit in ArchitectureAnalyzer.Analyze(new("", "", [], units)).Projects)
         {
             _nodes[unit.Path].Layer = unit.Layer;
         }
 
-        var notes = members.SelectMany(member => member.Repository.Notes.Select(note => member.Name + ": " + note)).ToArray();
-        return new(_nodes.Values.OrderBy(node => node.Kind switch { "frontend" => 0, "service" => 1, "external" => 2, "broker" => 3, "database" => 4, _ => 0 }).ThenBy(node => node.Name, StringComparer.Ordinal).ToArray(), _links.Values.ToArray(), _contracts.ToArray(), findings, notes.Length is 0 ? null : notes);
+        var notes = members
+            .SelectMany(member => member.Repository.Notes.Select(note => member.Name + ": " + note))
+            .ToArray();
+        return new(
+            _nodes
+                .Values.OrderBy(node =>
+                    node.Kind switch
+                    {
+                        "frontend" => 0,
+                        "service" => 1,
+                        "external" => 2,
+                        "broker" => 3,
+                        "database" => 4,
+                        _ => 0,
+                    }
+                )
+                .ThenBy(node => node.Name, StringComparer.Ordinal)
+                .ToArray(),
+            _links.Values.ToArray(),
+            _contracts.ToArray(),
+            findings,
+            notes.Length is 0 ? null : notes
+        );
     }
 
     private void ReadContracts()
@@ -69,29 +156,40 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         Dictionary<string, (string Owner, string At)> declarations = new(StringComparer.Ordinal);
         foreach (var member in members)
         {
-            foreach (var file in member.Repository.Files.Where(file => !TestPath(file) && Path.GetExtension(file) is ".cs" or ".proto"))
+            foreach (
+                var file in member.Repository.Files.Where(file =>
+                    !TestPath(file) && Path.GetExtension(file) is ".cs" or ".proto"
+                )
+            )
             {
                 var pending = 0;
-                Each(member, file, (line, text) =>
-                {
-                    if (Path.GetExtension(file) is ".proto")
+                Each(
+                    member,
+                    file,
+                    (line, text) =>
                     {
-                        var proto = Proto.Match(text);
-                        if (proto.Success)
+                        if (Path.GetExtension(file) is ".proto")
                         {
-                            declarations[proto.Groups[1].Value] = (member.Id, At(file, line));
+                            var proto = Proto.Match(text);
+                            if (proto.Success)
+                            {
+                                declarations[proto.Groups[1].Value] = (member.Id, At(file, line));
+                            }
+
+                            return;
+                        }
+                        if (text.Contains("[ServiceContract", StringComparison.Ordinal))
+                        {
+                            pending = 6;
                         }
 
-                        return;
+                        if (pending-- > 0 && Interface.Match(text) is { Success: true } match)
+                        {
+                            declarations[match.Groups[1].Value] = (member.Id, At(file, line));
+                            pending = 0;
+                        }
                     }
-                    if (text.Contains("[ServiceContract", StringComparison.Ordinal))
-                    {
-                        pending = 6;
-                    }
-
-                    if (pending-- > 0 && Interface.Match(text) is { Success: true } match)
-                    { declarations[match.Groups[1].Value] = (member.Id, At(file, line)); pending = 0; }
-                });
+                );
             }
         }
 
@@ -102,76 +200,103 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
         Dictionary<string, List<(string Member, string At)>> implementations = new(StringComparer.Ordinal);
         Dictionary<string, Dictionary<string, List<string>>> uses = new(StringComparer.Ordinal);
-        var word = Rx(@"\b(" + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape)) + @")\b");
+        var word = Rx(
+            @"\b(" + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape)) + @")\b"
+        );
         foreach (var member in members)
         {
-            foreach (var file in member.Repository.Files.Where(file => !TestPath(file) && Path.GetExtension(file) is ".cs"))
+            foreach (
+                var file in member.Repository.Files.Where(file => !TestPath(file) && Path.GetExtension(file) is ".cs")
+            )
             {
                 var pending = "";
                 var pendingAt = 0;
-                Each(member, file, (line, original) =>
-                {
-                    var text = original.Trim();
-                    if (text.StartsWith("//", StringComparison.Ordinal) || text.StartsWith('*') || text.StartsWith("using ", StringComparison.Ordinal))
+                Each(
+                    member,
+                    file,
+                    (line, original) =>
                     {
-                        return;
-                    }
-
-                    if (pending.Length is 0 && ClassWord.IsMatch(original) && original.IndexOfAny(['{', ';']) < 0)
-                    { pending = original; pendingAt = line; return; }
-                    var declaration = original;
-                    if (pending.Length > 0)
-                    {
-                        pending += " " + text;
-                        if (text.IndexOfAny(['{', ';']) < 0 && pending.Length < 2000)
+                        var text = original.Trim();
+                        if (
+                            text.StartsWith("//", StringComparison.Ordinal)
+                            || text.StartsWith('*')
+                            || text.StartsWith("using ", StringComparison.Ordinal)
+                        )
                         {
                             return;
                         }
 
-                        declaration = pending;
-                        line = pendingAt;
-                        pending = "";
-                    }
-                    var match = Class.Match(Parentheses(declaration, false));
-                    var usedText = declaration;
-                    if (match.Success)
-                    {
-                        DbContext(member, file, line, match.Groups[1].Value, match.Groups[2].Value, declaration);
-                        foreach (var baseType in match.Groups[2].Value.Split(','))
+                        if (pending.Length is 0 && ClassWord.IsMatch(original) && original.IndexOfAny(['{', ';']) < 0)
                         {
-                            var name = baseType.Trim().Split(new char[] { '<', ' ' }, StringSplitOptions.None)[0];
-                            if (!declarations.ContainsKey(name))
+                            pending = original;
+                            pendingAt = line;
+                            return;
+                        }
+                        var declaration = original;
+                        if (pending.Length > 0)
+                        {
+                            pending += " " + text;
+                            if (text.IndexOfAny(['{', ';']) < 0 && pending.Length < 2000)
                             {
-                                continue;
+                                return;
                             }
 
-                            if (!implementations.TryGetValue(name, out var places))
-                            { places = []; implementations.Add(name, places); }
-                            places.Add((member.Id, At(file, line)));
+                            declaration = pending;
+                            line = pendingAt;
+                            pending = "";
                         }
-                        usedText = Parentheses(declaration, true);
-                    }
-                    if (Interface.IsMatch(usedText))
-                    {
-                        return;
-                    }
+                        var match = Class.Match(Parentheses(declaration, false));
+                        var usedText = declaration;
+                        if (match.Success)
+                        {
+                            DbContext(member, file, line, match.Groups[1].Value, match.Groups[2].Value, declaration);
+                            foreach (var baseType in match.Groups[2].Value.Split(','))
+                            {
+                                var name = baseType.Trim().Split(new char[] { '<', ' ' }, StringSplitOptions.None)[0];
+                                if (!declarations.ContainsKey(name))
+                                {
+                                    continue;
+                                }
 
-                    foreach (var use in word.Matches(usedText).Select(match => match.Value))
-                    {
-                        if (!uses.TryGetValue(use, out var byMember))
-                        { byMember = new(StringComparer.Ordinal); uses.Add(use, byMember); }
-                        if (!byMember.TryGetValue(member.Id, out var places))
-                        { places = []; byMember.Add(member.Id, places); }
-                        places.Add(At(file, line));
+                                if (!implementations.TryGetValue(name, out var places))
+                                {
+                                    places = [];
+                                    implementations.Add(name, places);
+                                }
+                                places.Add((member.Id, At(file, line)));
+                            }
+                            usedText = Parentheses(declaration, true);
+                        }
+                        if (Interface.IsMatch(usedText))
+                        {
+                            return;
+                        }
+
+                        foreach (var use in word.Matches(usedText).Select(match => match.Value))
+                        {
+                            if (!uses.TryGetValue(use, out var byMember))
+                            {
+                                byMember = new(StringComparer.Ordinal);
+                                uses.Add(use, byMember);
+                            }
+                            if (!byMember.TryGetValue(member.Id, out var places))
+                            {
+                                places = [];
+                                byMember.Add(member.Id, places);
+                            }
+                            places.Add(At(file, line));
+                        }
                     }
-                });
+                );
             }
         }
 
         foreach (var name in declarations.Keys.Order(StringComparer.Ordinal))
         {
             var declaration = declarations[name];
-            var servers = (implementations.GetValueOrDefault(name) ?? []).DistinctBy(place => place.Member, StringComparer.Ordinal).ToDictionary(place => place.Member, place => place.At, StringComparer.Ordinal);
+            var servers = (implementations.GetValueOrDefault(name) ?? [])
+                .DistinctBy(place => place.Member, StringComparer.Ordinal)
+                .ToDictionary(place => place.Member, place => place.At, StringComparer.Ordinal);
             List<string> clients = [];
             foreach (var (client, places) in uses.GetValueOrDefault(name) ?? [])
             {
@@ -183,10 +308,26 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
                 clients.Add(client);
                 foreach (var (server, at) in servers)
                 {
-                    Link(new(client, server, "grpc") { What = [name], Contracts = [name], Uses = places.Count, Evidence = [Place(client, places[0]) + " → " + Place(server, at) + " (" + name + ")"] });
+                    Link(
+                        new(client, server, "grpc")
+                        {
+                            What = [name],
+                            Contracts = [name],
+                            Uses = places.Count,
+                            Evidence = [Place(client, places[0]) + " → " + Place(server, at) + " (" + name + ")"],
+                        }
+                    );
                 }
             }
-            _contracts.Add(new(name, declaration.Owner, declaration.At, servers.Keys.Order(StringComparer.Ordinal).ToArray(), clients.Order(StringComparer.Ordinal).ToArray()));
+            _contracts.Add(
+                new(
+                    name,
+                    declaration.Owner,
+                    declaration.At,
+                    servers.Keys.Order(StringComparer.Ordinal).ToArray(),
+                    clients.Order(StringComparer.Ordinal).ToArray()
+                )
+            );
         }
     }
 
@@ -205,7 +346,10 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
         string previous;
         do
-        { previous = logical; logical = DatabaseWords.Replace(logical, ""); } while (previous != logical);
+        {
+            previous = logical;
+            logical = DatabaseWords.Replace(logical, "");
+        } while (previous != logical);
         if (logical.Length is 0)
         {
             logical = "Main";
@@ -214,7 +358,12 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         var text = member.Repository.Read(file);
         var key = First(ConnectionKey, text);
         var connection = key.Length > 0 ? "connection " + key : null;
-        var detail = Parentheses(declaration, true).Contains("Tenant", StringComparison.Ordinal) || text.Contains("TenantConnection", StringComparison.Ordinal) || text.Contains("ITenantConnectionStringProvider", StringComparison.Ordinal) ? "per tenant" : connection;
+        var detail =
+            Parentheses(declaration, true).Contains("Tenant", StringComparison.Ordinal)
+            || text.Contains("TenantConnection", StringComparison.Ordinal)
+            || text.Contains("ITenantConnectionStringProvider", StringComparison.Ordinal)
+                ? "per tenant"
+                : connection;
         var id = "db:" + member.Id + ":" + logical.ToLowerInvariant();
         if (_nodes.TryGetValue(id, out var node))
         {
@@ -230,7 +379,9 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
         Link(new(member.Id, id, "database") { What = [name], Evidence = [Place(member.Id, At(file, line))] });
     }
+
     private void Node(SystemNode node) => _nodes.TryAdd(node.Id, node);
+
     private void Link(SystemLink link)
     {
         if (link.From == link.To)
@@ -240,7 +391,10 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
         var key = (link.From, link.To, link.Style);
         if (!_links.TryGetValue(key, out var existing))
-        { _links.Add(key, link); return; }
+        {
+            _links.Add(key, link);
+            return;
+        }
         foreach (var what in link.What.Where(what => !existing.What.Contains(what, StringComparer.Ordinal)))
         {
             existing.What.Add(what);
@@ -269,7 +423,9 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
         existing.Basis ??= link.Basis;
     }
+
     private string Place(string member, string at) => members.First(item => item.Id == member).Name + ": " + at;
+
     private static void Each(SystemMember member, string file, Action<int, string> action)
     {
         var lines = AnalysisRepository.Lines(member.Repository.Read(file));
@@ -278,10 +434,17 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
             action(index + 1, lines[index]);
         }
     }
+
     private static string At(string file, int line) => file + ":" + line.ToString(CultureInfo.InvariantCulture);
+
     private static Regex Rx(string pattern) => EcosystemReader.Rx(pattern);
-    private static string First(Regex regex, string text) => regex.Match(text) is { Success: true } match ? match.Groups[1].Value.Trim() : "";
-    private static string Norm(string text) => new(text.ToLowerInvariant().Where(character => character is >= 'a' and <= 'z' or >= '0' and <= '9').ToArray());
+
+    private static string First(Regex regex, string text) =>
+        regex.Match(text) is { Success: true } match ? match.Groups[1].Value.Trim() : "";
+
+    private static string Norm(string text) =>
+        new(text.ToLowerInvariant().Where(character => character is >= 'a' and <= 'z' or >= '0' and <= '9').ToArray());
+
     private static string Token(string text)
     {
         var token = Norm(text);
@@ -299,6 +462,7 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         } while (token != previous);
         return token;
     }
+
     private string? MatchMember(params string[] names)
     {
         foreach (var name in names)
@@ -313,7 +477,14 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
             {
                 foreach (var candidate in new[] { Token(member.ShortName), Token(member.Name) })
                 {
-                    if (candidate.Length > 0 && (candidate == token || token.Length >= 6 && candidate.StartsWith(token, StringComparison.Ordinal) || candidate.Length >= 6 && token.StartsWith(candidate, StringComparison.Ordinal)))
+                    if (
+                        candidate.Length > 0
+                        && (
+                            candidate == token
+                            || token.Length >= 6 && candidate.StartsWith(token, StringComparison.Ordinal)
+                            || candidate.Length >= 6 && token.StartsWith(candidate, StringComparison.Ordinal)
+                        )
+                    )
                     {
                         return member.Id;
                     }
@@ -322,12 +493,31 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         }
         return null;
     }
+
     private static bool TestPath(string file)
     {
         var name = Path.GetFileName(file).ToLowerInvariant();
-        var generated = new[] { ".designer.cs", ".g.cs", ".g.i.cs", "modelsnapshot.cs", ".pb.go", "_pb2.py" }.Any(suffix => name.EndsWith(suffix, StringComparison.Ordinal)) || name.Contains(".generated.", StringComparison.Ordinal) || file.ToLowerInvariant().Split('/').SkipLast(1).Any(part => part is "migrations" or "bin" or "obj");
-        return TaskParsing.IsTestFile(file) || generated || file.Contains("node_modules/", StringComparison.Ordinal) || name.StartsWith("appsettings.", StringComparison.Ordinal) && name.Contains("test", StringComparison.Ordinal) || name.StartsWith(".env.", StringComparison.Ordinal) && name.Contains("test", StringComparison.Ordinal) || file.Split('/').SkipLast(1).Any(part => new[] { "mock", "example", "sample" }.Any(prefix => part.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
+        var generated =
+            new[] { ".designer.cs", ".g.cs", ".g.i.cs", "modelsnapshot.cs", ".pb.go", "_pb2.py" }.Any(suffix =>
+                name.EndsWith(suffix, StringComparison.Ordinal)
+            )
+            || name.Contains(".generated.", StringComparison.Ordinal)
+            || file.ToLowerInvariant().Split('/').SkipLast(1).Any(part => part is "migrations" or "bin" or "obj");
+        return TaskParsing.IsTestFile(file)
+            || generated
+            || file.Contains("node_modules/", StringComparison.Ordinal)
+            || name.StartsWith("appsettings.", StringComparison.Ordinal)
+                && name.Contains("test", StringComparison.Ordinal)
+            || name.StartsWith(".env.", StringComparison.Ordinal) && name.Contains("test", StringComparison.Ordinal)
+            || file.Split('/')
+                .SkipLast(1)
+                .Any(part =>
+                    new[] { "mock", "example", "sample" }.Any(prefix =>
+                        part.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                    )
+                );
     }
+
     private static string Parentheses(string text, bool inside)
     {
         StringBuilder output = new();

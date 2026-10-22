@@ -9,6 +9,7 @@ public sealed partial class HarnessStateSession
 {
     private readonly RecentChangesCache _recentChanges = new();
     public Harness.Core.Telemetry.IContextObserver? ContextObserver { get; init; }
+
     public async Task<ContextProject> ReadContextProjectAsync(CancellationToken cancellationToken)
     {
         var snapshot = await ReadProviderProjectAsync(cancellationToken).ConfigureAwait(false);
@@ -16,7 +17,10 @@ public sealed partial class HarnessStateSession
         var sources = new RetrievalSources(Branch: snapshot.Branch);
         if (location.Repository is { } repository)
         {
-            sources = sources with { RecentChanges = (paths, limit, token) => _recentChanges.ReadAsync(repository, paths, limit, token) };
+            sources = sources with
+            {
+                RecentChanges = (paths, limit, token) => _recentChanges.ReadAsync(repository, paths, limit, token),
+            };
         }
 
         if (File.Exists(location.DatabasePath))
@@ -27,14 +31,32 @@ public sealed partial class HarnessStateSession
                 var pending = new MemoryStore(database).Pending(cancellationToken);
                 if (pending.Count > 0 && pending.Oldest is { } oldest)
                 {
-                    var age = DateTimeOffset.UtcNow - DateTimeOffset.Parse(oldest.ToRfc3339Nano(), CultureInfo.InvariantCulture);
-                    var elapsed = age.TotalHours < 24 ? ((int)age.TotalHours).ToString(CultureInfo.InvariantCulture) + " hour(s)" : ((int)age.TotalDays).ToString(CultureInfo.InvariantCulture) + " day(s)";
-                    notes.Add(string.Create(CultureInfo.InvariantCulture, $"tell the user: {pending.Count} memory proposal(s) wait for review, the oldest for {elapsed} (harness proposals list, or the Proposals tab of harness ui)"));
+                    var age =
+                        DateTimeOffset.UtcNow
+                        - DateTimeOffset.Parse(oldest.ToRfc3339Nano(), CultureInfo.InvariantCulture);
+                    var elapsed =
+                        age.TotalHours < 24
+                            ? ((int)age.TotalHours).ToString(CultureInfo.InvariantCulture) + " hour(s)"
+                            : ((int)age.TotalDays).ToString(CultureInfo.InvariantCulture) + " day(s)";
+                    notes.Add(
+                        string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"tell the user: {pending.Count} memory proposal(s) wait for review, the oldest for {elapsed} (harness proposals list, or the Proposals tab of harness ui)"
+                        )
+                    );
                 }
                 sources = sources with { Memory = Knowledge.SearchContextAsync };
             }
-            catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
-            { notes.Add("no project memory (run harness init to record decisions)"); }
+            catch (Exception error)
+                when (error
+                        is IOException
+                            or InvalidDataException
+                            or UnauthorizedAccessException
+                            or Microsoft.Data.Sqlite.SqliteException
+                )
+            {
+                notes.Add("no project memory (run harness init to record decisions)");
+            }
         }
         else
         {
@@ -42,10 +64,25 @@ public sealed partial class HarnessStateSession
         }
 
         var reader = new RetrievalFileReader(location.Root);
-        return new(sources, reader.ReadBodyAsync, path => Directory.Exists(Path.Combine(location.Root, path)), snapshot.Stale, snapshot.CrossBranch, notes)
+        return new(
+            sources,
+            reader.ReadBodyAsync,
+            path => Directory.Exists(Path.Combine(location.Root, path)),
+            snapshot.Stale,
+            snapshot.CrossBranch,
+            notes
+        )
         {
-            RecordContext = call => ContextObserver?.Observe(call with { WorktreeId = _registration?.Worktree.Id ?? "", Head = snapshot.Commit }),
-            ReadFindings = token => MemoryOperationAsync(async () => (await FindingSetsAsync(token).ConfigureAwait(false)).Context(token)),
+            RecordContext = call =>
+                ContextObserver?.Observe(
+                    call with
+                    {
+                        WorktreeId = _registration?.Worktree.Id ?? "",
+                        Head = snapshot.Commit,
+                    }
+                ),
+            ReadFindings = token =>
+                MemoryOperationAsync(async () => (await FindingSetsAsync(token).ConfigureAwait(false)).Context(token)),
         };
     }
 }

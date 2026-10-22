@@ -21,24 +21,54 @@ public sealed class ProjectLifecycleTests
         var root = Path.Combine(fixture.Root, "metadata-only");
         Directory.CreateDirectory(Path.Combine(root, ".git/refs/heads"));
         Directory.CreateDirectory(Path.Combine(root, ".git/objects"));
-        await File.WriteAllTextAsync(Path.Combine(root, ".git/HEAD"), "ref: refs/heads/main\n", TestContext.Current.CancellationToken);
-        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(root, ".git/HEAD"),
+            "ref: refs/heads/main\n",
+            TestContext.Current.CancellationToken
+        );
+        var initialized = await fixture.Lifecycle.InitAsync(
+            root,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         initialized.Head.Unborn.Should().BeTrue();
-        await using var session = new HarnessStateSession(initialized.Location, fixture.Lifecycle.Registry, new("test", "", "test", "test"), fixture.GlobalConfig);
-        var saved = await session.PutMemoryAsync(new() { Type = "decision", Content = "Use metadata without external tools" }, TestContext.Current.CancellationToken);
+        await using var session = new HarnessStateSession(
+            initialized.Location,
+            fixture.Lifecycle.Registry,
+            new("test", "", "test", "test"),
+            fixture.GlobalConfig
+        );
+        var saved = await session.PutMemoryAsync(
+            new() { Type = "decision", Content = "Use metadata without external tools" },
+            TestContext.Current.CancellationToken
+        );
         saved.Status.Should().Be("created");
         var context = await session.ReadContextProjectAsync(TestContext.Current.CancellationToken);
         context.Sources.Branch.Should().Be("main");
     }
+
     [Fact]
     public async Task ProviderFacadeReadsStalenessAcrossSyncHeadMovementAndBranchSwitch()
     {
         using var fixture = new ProjectFixture();
         var token = TestContext.Current.CancellationToken;
         var root = await fixture.CreateRepositoryAsync("facade-staleness");
-        await fixture.GitAsync(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "initial");
+        await fixture.GitAsync(
+            root,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial"
+        );
         var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: token);
-        await using var session = new HarnessStateSession(initialized.Location, fixture.Lifecycle.Registry, new("test", "", "test", "test"));
+        await using var session = new HarnessStateSession(
+            initialized.Location,
+            fixture.Lifecycle.Registry,
+            new("test", "", "test", "test")
+        );
         var first = await session.ReadProviderProjectAsync(token);
         first.Stale.Should().Contain("never been synced");
         first.ProjectId.Should().NotBeEmpty();
@@ -46,14 +76,25 @@ public sealed class ProjectLifecycleTests
         using (var connection = database.OpenConnection())
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = "INSERT INTO sync_state(worktree_id,branch,head_commit,detached,dirty,dirty_paths,synced_at) SELECT id,$branch,$commit,0,0,0,'2026-10-21T00:00:00Z' FROM worktrees WHERE path=$path";
+            command.CommandText =
+                "INSERT INTO sync_state(worktree_id,branch,head_commit,detached,dirty,dirty_paths,synced_at) SELECT id,$branch,$commit,0,0,0,'2026-10-21T00:00:00Z' FROM worktrees WHERE path=$path";
             command.Parameters.AddWithValue("$branch", first.Branch);
             command.Parameters.AddWithValue("$commit", first.Commit);
             command.Parameters.AddWithValue("$path", initialized.Location.Root);
             await command.ExecuteNonQueryAsync(token);
         }
         (await session.ReadProviderProjectAsync(token)).Stale.Should().BeEmpty();
-        await fixture.GitAsync(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "moved");
+        await fixture.GitAsync(
+            root,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "moved"
+        );
         var moved = await session.ReadProviderProjectAsync(token);
         moved.Stale.Should().Contain("HEAD moved");
         moved.CrossBranch.Should().BeFalse();
@@ -70,14 +111,18 @@ public sealed class ProjectLifecycleTests
         var root = await fixture.CreateRepositoryAsync("spaces žluťoučký 🧪");
         var plan = await fixture.Lifecycle.InitAsync(root, dryRun: true, TestContext.Current.CancellationToken);
         plan.Registration.Should().BeNull();
-        plan.Actions.Should().Contain(action => action.Verb == "create" && action.Path.EndsWith("harness.db", StringComparison.Ordinal));
+        plan.Actions.Should()
+            .Contain(action => action.Verb == "create" && action.Path.EndsWith("harness.db", StringComparison.Ordinal));
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         inspection.Head!.Unborn.Should().BeTrue();
         inspection.Project.Should().BeNull();
         Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
         Directory.Exists(fixture.GlobalDirectory).Should().BeFalse();
 
-        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
+        var initialized = await fixture.Lifecycle.InitAsync(
+            root,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         initialized.Registration!.Project.Id.Should().MatchRegex("^prj_[a-f0-9]{32}$");
         var before = fixture.Snapshot();
         inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
@@ -101,12 +146,26 @@ public sealed class ProjectLifecycleTests
     {
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("main");
-        await fixture.GitAsync(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "initial");
+        await fixture.GitAsync(
+            root,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial"
+        );
         var main = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
         var linked = Path.Combine(fixture.Root, "linked Ω space");
         await fixture.GitAsync(root, "worktree", "add", "-b", "feature", linked);
         Directory.CreateDirectory(Path.Combine(linked, ".harness"));
-        await File.WriteAllTextAsync(ConfigurationPaths.ProjectPath(linked), "[log]\nlevel = 'debug'\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            ConfigurationPaths.ProjectPath(linked),
+            "[log]\nlevel = 'debug'\n",
+            TestContext.Current.CancellationToken
+        );
         var child = await fixture.Lifecycle.InitAsync(linked, cancellationToken: TestContext.Current.CancellationToken);
         child.Location.StateRoot.Should().Be(root);
         child.Location.Configuration.Value.Log.Level.Should().Be("debug");
@@ -118,7 +177,10 @@ public sealed class ProjectLifecycleTests
         var moved = Path.Combine(fixture.Root, "moved linked");
         await fixture.GitAsync(root, "worktree", "move", linked, moved);
         await fixture.GitAsync(moved, "checkout", "--detach");
-        var detached = await fixture.Lifecycle.InitAsync(moved, cancellationToken: TestContext.Current.CancellationToken);
+        var detached = await fixture.Lifecycle.InitAsync(
+            moved,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         detached.Head.Detached.Should().BeTrue();
         detached.Head.Branch.Should().BeEmpty();
         detached.Registration!.Worktree.Id.Should().Be(child.Registration.Worktree.Id);
@@ -138,8 +200,15 @@ public sealed class ProjectLifecycleTests
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("invalid");
         Directory.CreateDirectory(fixture.GlobalDirectory);
-        await File.WriteAllTextAsync(fixture.GlobalConfig, "[storage]\nmisspelled = 1", TestContext.Current.CancellationToken);
-        await FluentActions.Awaiting(() => fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactlyAsync<InvalidDataException>();
+        await File.WriteAllTextAsync(
+            fixture.GlobalConfig,
+            "[storage]\nmisspelled = 1",
+            TestContext.Current.CancellationToken
+        );
+        await FluentActions
+            .Awaiting(() => fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken))
+            .Should()
+            .ThrowExactlyAsync<InvalidDataException>();
         Directory.Exists(Path.Combine(root, ".harness")).Should().BeFalse();
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         inspection.ConfigurationError.Should().NotBeNull();
@@ -152,7 +221,14 @@ public sealed class ProjectLifecycleTests
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("old");
         var path = Path.Combine(root, ".harness", "harness.db");
-        using (var database = HarnessDatabase.Open(path, new StorageOptions(), MigrationCatalog.All.Take(1).ToArray(), TestContext.Current.CancellationToken))
+        using (
+            var database = HarnessDatabase.Open(
+                path,
+                new StorageOptions(),
+                MigrationCatalog.All.Take(1).ToArray(),
+                TestContext.Current.CancellationToken
+            )
+        )
         {
             database.SchemaVersion().Should().Be(1);
         }
@@ -170,8 +246,17 @@ public sealed class ProjectLifecycleTests
     public async Task NonGitLocationWorksForReadersButInitRefusesIt()
     {
         using var fixture = new ProjectFixture();
-        await FluentActions.Awaiting(() => fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: TestContext.Current.CancellationToken)).Should().ThrowExactlyAsync<NotRepositoryException>();
-        var location = await fixture.Lifecycle.LocateAsync(fixture.Root, allowNonGit: true, TestContext.Current.CancellationToken);
+        await FluentActions
+            .Awaiting(() =>
+                fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: TestContext.Current.CancellationToken)
+            )
+            .Should()
+            .ThrowExactlyAsync<NotRepositoryException>();
+        var location = await fixture.Lifecycle.LocateAsync(
+            fixture.Root,
+            allowNonGit: true,
+            TestContext.Current.CancellationToken
+        );
         location.Repository.Should().BeNull();
         var inspection = await fixture.Lifecycle.InspectAsync(fixture.Root, TestContext.Current.CancellationToken);
         inspection.GitError.Should().NotBeNull();
@@ -184,15 +269,26 @@ public sealed class ProjectLifecycleTests
     {
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("original");
-        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
-        using (var database = HarnessDatabase.Open(initialized.Location.DatabasePath, cancellationToken: TestContext.Current.CancellationToken))
+        var initialized = await fixture.Lifecycle.InitAsync(
+            root,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        using (
+            var database = HarnessDatabase.Open(
+                initialized.Location.DatabasePath,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        )
         {
             database.PutDiagnostic("keep", "knowledge");
         }
 
         var moved = Path.Combine(fixture.Root, "moved");
         Directory.Move(root, moved);
-        var relocated = await fixture.Lifecycle.InitAsync(moved, cancellationToken: TestContext.Current.CancellationToken);
+        var relocated = await fixture.Lifecycle.InitAsync(
+            moved,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         relocated.Registration!.Moved.Should().BeTrue();
         relocated.Registration.Project.Id.Should().Be(initialized.Registration!.Project.Id);
         var copy = Path.Combine(fixture.Root, "copy");
@@ -219,7 +315,10 @@ public sealed class ProjectLifecycleTests
         var runs = await Task.WhenAll(roots.Select(root => fixture.CliAsync("init", "--project", root)));
         runs.Should().AllSatisfy(run => run.Code.Should().Be(0));
         fixture.Lifecycle.Registry.Load()["projects"]!.AsArray().Count.Should().Be(5);
-        var data = await File.ReadAllTextAsync(Path.Combine(fixture.GlobalDirectory, "projects.json"), TestContext.Current.CancellationToken);
+        var data = await File.ReadAllTextAsync(
+            Path.Combine(fixture.GlobalDirectory, "projects.json"),
+            TestContext.Current.CancellationToken
+        );
         data.Should().Contain("last_init");
         Directory.Move(roots[0], roots[0] + "-gone");
         var before = fixture.Snapshot();
@@ -227,7 +326,11 @@ public sealed class ProjectLifecycleTests
         doctor.Code.Should().Be(1);
         using var json = JsonDocument.Parse(doctor.Output);
         json.RootElement.GetProperty("projects").GetArrayLength().Should().Be(5);
-        json.RootElement.GetProperty("projects").EnumerateArray().Count(item => !item.GetProperty("healthy").GetBoolean()).Should().Be(1);
+        json.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .Count(item => !item.GetProperty("healthy").GetBoolean())
+            .Should()
+            .Be(1);
         fixture.Snapshot().Should().Equal(before);
     }
 
@@ -260,8 +363,14 @@ public sealed class ProjectLifecycleTests
     {
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("live-wal");
-        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
-        using var writer = HarnessDatabase.Open(initialized.Location.DatabasePath, cancellationToken: TestContext.Current.CancellationToken);
+        var initialized = await fixture.Lifecycle.InitAsync(
+            root,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        using var writer = HarnessDatabase.Open(
+            initialized.Location.DatabasePath,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         using var heldConnection = writer.OpenConnection();
         writer.PutDiagnostic("live", "visible");
         var wal = new FileInfo(initialized.Location.DatabasePath + "-wal");
@@ -281,7 +390,10 @@ public sealed class ProjectLifecycleTests
     {
         using var fixture = new ProjectFixture();
         var root = await fixture.CreateRepositoryAsync("registry");
-        var initialized = await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
+        var initialized = await fixture.Lifecycle.InitAsync(
+            root,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         var path = Path.Combine(fixture.GlobalDirectory, "projects.json");
         var registry = fixture.Lifecycle.Registry.Load();
         registry["future"] = "keep";
@@ -296,14 +408,28 @@ public sealed class ProjectLifecycleTests
         await File.WriteAllTextAsync(path, "malformed", TestContext.Current.CancellationToken);
         await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken); // registry is best effort
         (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).Should().Be("malformed");
-        await File.WriteAllTextAsync(path, """{"version":1,"projects":["wrong shape"]}""", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            path,
+            """{"version":1,"projects":["wrong shape"]}""",
+            TestContext.Current.CancellationToken
+        );
         FluentActions.Invoking(() => fixture.Lifecycle.Registry.Load()).Should().ThrowExactly<InvalidDataException>();
         await fixture.Lifecycle.InitAsync(root, cancellationToken: TestContext.Current.CancellationToken);
         (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).Should().Contain("wrong shape");
         using var lease = new FileStream(path + ".lock", FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancellation.CancelAsync();
-        await FluentActions.Awaiting(() => fixture.Lifecycle.Registry.NoteInitAsync(initialized.Registration!.Project, [], "test", cancellation.Token)).Should().ThrowAsync<OperationCanceledException>();
+        await FluentActions
+            .Awaiting(() =>
+                fixture.Lifecycle.Registry.NoteInitAsync(
+                    initialized.Registration!.Project,
+                    [],
+                    "test",
+                    cancellation.Token
+                )
+            )
+            .Should()
+            .ThrowAsync<OperationCanceledException>();
     }
 
     private static void CopyDirectory(string source, string destination)
@@ -322,7 +448,8 @@ public sealed class ProjectLifecycleTests
 
     private sealed class ProjectFixture : IDisposable
     {
-        internal string Root { get; } = Path.Combine(Path.GetTempPath(), "harness-project-" + Guid.NewGuid().ToString("N"));
+        internal string Root { get; } =
+            Path.Combine(Path.GetTempPath(), "harness-project-" + Guid.NewGuid().ToString("N"));
         internal string GlobalDirectory => Path.Combine(Root, "global");
         internal string GlobalConfig => Path.Combine(GlobalDirectory, "config.toml");
         internal ProjectLifecycle Lifecycle => new(GlobalConfig, "test");
@@ -357,11 +484,23 @@ public sealed class ProjectLifecycleTests
 #else
             const string Configuration = "Release";
 #endif
-            var binary = Path.Combine(repository.FullName, "src", "Harness.Cli", "bin", Configuration, "net10.0", "harness.dll");
+            var binary = Path.Combine(
+                repository.FullName,
+                "src",
+                "Harness.Cli",
+                "bin",
+                Configuration,
+                "net10.0",
+                "harness.dll"
+            );
             return RunAsync("dotnet", [binary, .. args]);
         }
 
-        [SuppressMessage("Security", "S4036:Searching OS commands in PATH is security-sensitive", Justification = "Integration test deliberately exercises the installed Git and .NET CLI, matching the existing process test.")]
+        [SuppressMessage(
+            "Security",
+            "S4036:Searching OS commands in PATH is security-sensitive",
+            Justification = "Integration test deliberately exercises the installed Git and .NET CLI, matching the existing process test."
+        )]
         private async Task<(int Code, string Output, string Error)> RunAsync(string executable, string[] args)
         {
             var start = new ProcessStartInfo(executable)
@@ -390,7 +529,9 @@ public sealed class ProjectLifecycleTests
             {
                 var output = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
                 var error = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-                await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(45), TestContext.Current.CancellationToken);
+                await process
+                    .WaitForExitAsync(TestContext.Current.CancellationToken)
+                    .WaitAsync(TimeSpan.FromSeconds(45), TestContext.Current.CancellationToken);
                 return (process.ExitCode, await output, await error);
             }
             finally
@@ -403,10 +544,24 @@ public sealed class ProjectLifecycleTests
             }
         }
 
-        internal string[] Snapshot() => Directory.GetFiles(Root, "*", SearchOption.AllDirectories)
-            .Where(file => !file.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            .Where(file => !file.EndsWith(".db-wal", StringComparison.Ordinal) && !file.EndsWith(".db-shm", StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal).Select(file => $"{file}|{File.GetLastWriteTimeUtc(file).Ticks}|{Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)))}").ToArray();
+        internal string[] Snapshot() =>
+            Directory
+                .GetFiles(Root, "*", SearchOption.AllDirectories)
+                .Where(file =>
+                    !file.Contains(
+                        Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar,
+                        StringComparison.Ordinal
+                    )
+                )
+                .Where(file =>
+                    !file.EndsWith(".db-wal", StringComparison.Ordinal)
+                    && !file.EndsWith(".db-shm", StringComparison.Ordinal)
+                )
+                .Order(StringComparer.Ordinal)
+                .Select(file =>
+                    $"{file}|{File.GetLastWriteTimeUtc(file).Ticks}|{Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)))}"
+                )
+                .ToArray();
 
         public void Dispose()
         {

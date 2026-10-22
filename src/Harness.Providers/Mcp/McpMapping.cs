@@ -14,10 +14,12 @@ internal static class McpMapping
 {
     internal readonly record struct Entry(JsonElement Value, string? Key = null)
     {
-        internal JsonElement Field(string path) => path == "$key" ? JsonSerializer.SerializeToElement(Key) : Lookup(Value, path);
+        internal JsonElement Field(string path) =>
+            path == "$key" ? JsonSerializer.SerializeToElement(Key) : Lookup(Value, path);
     }
 
-    internal static string Text(CallToolResult result) => string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
+    internal static string Text(CallToolResult result) =>
+        string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
     internal static ProviderException ToolError(string provider, string tool, CallToolResult result)
     {
@@ -33,11 +35,24 @@ internal static class McpMapping
 
             if (message.Length > 0)
             {
-                return new(provider, CredentialRedactor.Redact(message), tool, CredentialRedactor.Redact(String(Lookup(body.RootElement, "hint"))));
+                return new(
+                    provider,
+                    CredentialRedactor.Redact(message),
+                    tool,
+                    CredentialRedactor.Redact(String(Lookup(body.RootElement, "hint")))
+                );
             }
         }
-        catch (JsonException) { /* Plain-text tool failures are also valid MCP. */ }
-        return new(provider, text.Length is 0 ? "tool reported an error without details" : CredentialRedactor.Redact(Utf8Prefix(text, 500, "…")), tool);
+        catch (JsonException)
+        { /* Plain-text tool failures are also valid MCP. */
+        }
+        return new(
+            provider,
+            text.Length is 0
+                ? "tool reported an error without details"
+                : CredentialRedactor.Redact(Utf8Prefix(text, 500, "…")),
+            tool
+        );
     }
 
     internal static JsonElement Body(CallToolResult result)
@@ -49,14 +64,25 @@ internal static class McpMapping
 
         var text = Text(result).Trim();
         try
-        { return JsonSerializer.Deserialize<JsonElement>(text); }
+        {
+            return JsonSerializer.Deserialize<JsonElement>(text);
+        }
         catch (JsonException error)
         {
-            throw new InvalidDataException(string.Create(CultureInfo.InvariantCulture, $"response is not JSON ({System.Text.Encoding.UTF8.GetByteCount(Text(result))} bytes); map JSON with items/fields, or text with pattern"), error);
+            throw new InvalidDataException(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"response is not JSON ({System.Text.Encoding.UTF8.GetByteCount(Text(result))} bytes); map JSON with items/fields, or text with pattern"
+                ),
+                error
+            );
         }
     }
 
-    internal static Dictionary<string, object?> Arguments(IReadOnlyDictionary<string, JsonElement> template, IReadOnlyDictionary<string, string> values)
+    internal static Dictionary<string, object?> Arguments(
+        IReadOnlyDictionary<string, JsonElement> template,
+        IReadOnlyDictionary<string, string> values
+    )
     {
         var result = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var (key, value) in template)
@@ -73,7 +99,9 @@ internal static class McpMapping
                 var replacement = values.GetValueOrDefault(name, "");
                 if (replacement.Length > 0)
                 {
-                    result[key] = name is "limit" or "limit_more" or "budget" ? long.Parse(replacement, CultureInfo.InvariantCulture) : replacement;
+                    result[key] = name is "limit" or "limit_more" or "budget"
+                        ? long.Parse(replacement, CultureInfo.InvariantCulture)
+                        : replacement;
                 }
 
                 continue;
@@ -111,7 +139,12 @@ internal static class McpMapping
             {
                 value = property;
             }
-            else if (value.ValueKind is JsonValueKind.Array && int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) && index >= 0 && index < value.GetArrayLength())
+            else if (
+                value.ValueKind is JsonValueKind.Array
+                && int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index)
+                && index >= 0
+                && index < value.GetArrayLength()
+            )
             {
                 value = value[index];
             }
@@ -127,7 +160,9 @@ internal static class McpMapping
     {
         if (path.Length is 0)
         {
-            return value.ValueKind is JsonValueKind.Array ? (value.EnumerateArray().Select(item => new Entry(item)).ToArray(), true) : ([], false);
+            return value.ValueKind is JsonValueKind.Array
+                ? (value.EnumerateArray().Select(item => new Entry(item)).ToArray(), true)
+                : ([], false);
         }
 
         var current = new List<Entry> { new(value) };
@@ -151,7 +186,12 @@ internal static class McpMapping
                 else if (entry.Value.ValueKind is JsonValueKind.Object)
                 {
                     expanded = true;
-                    next.AddRange(entry.Value.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal).Select(property => new Entry(property.Value, property.Name)));
+                    next.AddRange(
+                        entry
+                            .Value.EnumerateObject()
+                            .OrderBy(property => property.Name, StringComparer.Ordinal)
+                            .Select(property => new Entry(property.Value, property.Name))
+                    );
                 }
             }
             current = next;
@@ -167,27 +207,47 @@ internal static class McpMapping
                     return (current, true);
                 }
 
-                return (current.Where(entry => entry.Value.ValueKind is JsonValueKind.Array).SelectMany(entry => entry.Value.EnumerateArray().Select(item => new Entry(item, entry.Key))).ToArray(), current.Any(entry => entry.Value.ValueKind is JsonValueKind.Array));
+                return (
+                    current
+                        .Where(entry => entry.Value.ValueKind is JsonValueKind.Array)
+                        .SelectMany(entry => entry.Value.EnumerateArray().Select(item => new Entry(item, entry.Key)))
+                        .ToArray(),
+                    current.Any(entry => entry.Value.ValueKind is JsonValueKind.Array)
+                );
             }
         }
         return (current, true);
     }
 
-    [SuppressMessage("Major Bug", "S1244:Floating point numbers should not be tested for equality", Justification = "The pinned Go where-filter compares decoded JSON numeric values exactly; an epsilon would change routing predicates.")]
-    internal static bool Matches(Entry entry, IReadOnlyDictionary<string, JsonElement> where) => where.All(pair =>
-    {
-        var got = entry.Field(pair.Key);
-        if (pair.Value.ValueKind is JsonValueKind.Number)
+    [SuppressMessage(
+        "Major Bug",
+        "S1244:Floating point numbers should not be tested for equality",
+        Justification = "The pinned Go where-filter compares decoded JSON numeric values exactly; an epsilon would change routing predicates."
+    )]
+    internal static bool Matches(Entry entry, IReadOnlyDictionary<string, JsonElement> where) =>
+        where.All(pair =>
         {
-            if (got.ValueKind is JsonValueKind.Number)
+            var got = entry.Field(pair.Key);
+            if (pair.Value.ValueKind is JsonValueKind.Number)
             {
-                return got.GetDouble().Equals(pair.Value.GetDouble());
-            }
+                if (got.ValueKind is JsonValueKind.Number)
+                {
+                    return got.GetDouble().Equals(pair.Value.GetDouble());
+                }
 
-            return got.ValueKind is JsonValueKind.String && double.TryParse(got.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && number.Equals(pair.Value.GetDouble());
-        }
-        return got.ValueKind is JsonValueKind.Undefined ? pair.Value.ValueKind is JsonValueKind.Null : JsonElement.DeepEquals(got, pair.Value);
-    });
+                return got.ValueKind is JsonValueKind.String
+                    && double.TryParse(
+                        got.GetString(),
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out var number
+                    )
+                    && number.Equals(pair.Value.GetDouble());
+            }
+            return got.ValueKind is JsonValueKind.Undefined
+                ? pair.Value.ValueKind is JsonValueKind.Null
+                : JsonElement.DeepEquals(got, pair.Value);
+        });
 
     internal static ProviderItem Item(Entry entry, CapabilityMapping mapping, string capability, string root)
     {
@@ -226,11 +286,23 @@ internal static class McpMapping
             Depth = Integer(Get("depth")),
             Snippet = String(Get("snippet")).Trim(),
             Score = Number(Get("score")),
-            Related = relatedName.Length > 0 || relatedPath.Length > 0 ? new(relatedName, relatedPath, Integer(Get("related_line"))) : null,
+            Related =
+                relatedName.Length > 0 || relatedPath.Length > 0
+                    ? new(relatedName, relatedPath, Integer(Get("related_line")))
+                    : null,
             Members = members.ValueKind switch
             {
-                JsonValueKind.Array => members.EnumerateArray().Select(String).Where(member => member.Length > 0).ToArray(),
-                JsonValueKind.String => members.GetString()!.Split(',').Select(member => member.Trim()).Where(member => member.Length > 0).ToArray(),
+                JsonValueKind.Array => members
+                    .EnumerateArray()
+                    .Select(String)
+                    .Where(member => member.Length > 0)
+                    .ToArray(),
+                JsonValueKind.String => members
+                    .GetString()!
+                    .Split(',')
+                    .Select(member => member.Trim())
+                    .Where(member => member.Length > 0)
+                    .ToArray(),
                 _ => null,
             },
             Count = Integer(Get("count")),
@@ -240,10 +312,21 @@ internal static class McpMapping
 
     internal static IEnumerable<Entry> PatternEntries(Regex pattern, string text)
     {
-        var names = pattern.GetGroupNames().Where(name => !int.TryParse(name, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)).ToArray();
+        var names = pattern
+            .GetGroupNames()
+            .Where(name => !int.TryParse(name, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+            .ToArray();
         foreach (Match match in pattern.Matches(text))
         {
-            yield return new(JsonSerializer.SerializeToElement(names.ToDictionary(name => name, name => WebUtility.HtmlDecode(match.Groups[name].Value), StringComparer.Ordinal)));
+            yield return new(
+                JsonSerializer.SerializeToElement(
+                    names.ToDictionary(
+                        name => name,
+                        name => WebUtility.HtmlDecode(match.Groups[name].Value),
+                        StringComparer.Ordinal
+                    )
+                )
+            );
         }
     }
 
@@ -266,21 +349,35 @@ internal static class McpMapping
         return path.Replace(Path.DirectorySeparatorChar, '/');
     }
 
-    internal static string String(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Undefined or JsonValueKind.Null => "",
-        JsonValueKind.String => value.GetString()!,
-        JsonValueKind.Number => value.GetDouble().ToString("0.###############################", CultureInfo.InvariantCulture),
-        _ => value.GetRawText(),
-    };
-    internal static double Number(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Number when value.TryGetDouble(out var number) && double.IsFinite(number) => number,
-        JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && double.IsFinite(number) => number,
-        _ => 0,
-    };
+    internal static string String(JsonElement value) =>
+        value.ValueKind switch
+        {
+            JsonValueKind.Undefined or JsonValueKind.Null => "",
+            JsonValueKind.String => value.GetString()!,
+            JsonValueKind.Number => value
+                .GetDouble()
+                .ToString("0.###############################", CultureInfo.InvariantCulture),
+            _ => value.GetRawText(),
+        };
+
+    internal static double Number(JsonElement value) =>
+        value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetDouble(out var number) && double.IsFinite(number) => number,
+            JsonValueKind.String
+                when double.TryParse(
+                    value.GetString(),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var number
+                ) && double.IsFinite(number) => number,
+            _ => 0,
+        };
+
     private static int Integer(JsonElement value) => (int)Math.Clamp(Number(value), int.MinValue, int.MaxValue);
+
     internal static string FirstLine(string text) => text.Trim().Split('\n')[0];
+
     internal static string Utf8Prefix(string text, int limit, string suffix)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(text);
@@ -296,12 +393,18 @@ internal static class McpMapping
 
         return System.Text.Encoding.UTF8.GetString(bytes, 0, limit) + suffix;
     }
-    private static string Kind(string capability) => capability switch
-    {
-        Capabilities.SymbolSearch or Capabilities.PackageTypes or Capabilities.Callers or Capabilities.ArchDuplicates or Capabilities.ArchDeadCode => "symbol",
-        Capabilities.PackageSearch => "package",
-        Capabilities.FileSearch or Capabilities.ArchChangeCoupling => "file",
-        Capabilities.ArchDependencies or Capabilities.ArchCycles => "relation",
-        _ => "match",
-    };
+
+    private static string Kind(string capability) =>
+        capability switch
+        {
+            Capabilities.SymbolSearch
+            or Capabilities.PackageTypes
+            or Capabilities.Callers
+            or Capabilities.ArchDuplicates
+            or Capabilities.ArchDeadCode => "symbol",
+            Capabilities.PackageSearch => "package",
+            Capabilities.FileSearch or Capabilities.ArchChangeCoupling => "file",
+            Capabilities.ArchDependencies or Capabilities.ArchCycles => "relation",
+            _ => "match",
+        };
 }

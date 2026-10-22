@@ -26,24 +26,34 @@ public sealed class SyncTests
     {
         if (OperatingSystem.IsWindows())
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Unix symlink fixture; Windows creation may require developer mode or privileges.");
+            throw Xunit.Sdk.SkipException.ForSkip(
+                "Unix symlink fixture; Windows creation may require developer mode or privileges."
+            );
         }
 
         using var fixture = await SyncFixture.CreateAsync();
         File.CreateSymbolicLink(Path.Combine(fixture.Root, "link.cs"), "a.cs");
         await fixture.RunAsync();
-        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("symlink:a.cs")));
+        var hash = Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("symlink:a.cs"))
+        );
         fixture.Hashes()["link.cs"].Should().Be(hash);
         await fixture.CommitAsync("track link");
         File.Delete(Path.Combine(fixture.Root, "a.cs"));
         await fixture.RunAsync();
         fixture.Hashes()["link.cs"].Should().Be(hash);
         using var db = fixture.Database();
-        FluentActions.Invoking(() => SyncFiles.Apply(db, fixture.Worktree, fixture.Root, ["../outside"], [], Token)).Should().Throw<InvalidDataException>();
+        FluentActions
+            .Invoking(() => SyncFiles.Apply(db, fixture.Worktree, fixture.Root, ["../outside"], [], Token))
+            .Should()
+            .Throw<InvalidDataException>();
         var outside = Directory.CreateDirectory(Path.Combine(fixture.DirectoryRoot, "outside")).FullName;
         await File.WriteAllTextAsync(Path.Combine(outside, "private.cs"), "outside fixture", Token);
         Directory.CreateSymbolicLink(Path.Combine(fixture.Root, "escape"), outside);
-        FluentActions.Invoking(() => SyncFiles.Apply(db, fixture.Worktree, fixture.Root, ["escape/private.cs"], [], Token)).Should().Throw<InvalidDataException>();
+        FluentActions
+            .Invoking(() => SyncFiles.Apply(db, fixture.Worktree, fixture.Root, ["escape/private.cs"], [], Token))
+            .Should()
+            .Throw<InvalidDataException>();
     }
 
     [Fact]
@@ -96,10 +106,16 @@ public sealed class SyncTests
         fixture.Write("new.cs", "new");
         fixture.Write("ignored.log", "ignored");
         fixture.Write("gen/out.cs", "generated");
-        await File.AppendAllTextAsync(Path.Combine(fixture.Root, ".harness", "config.toml"), "\n[sync]\nignore = [\"gen/\"]\n", Token);
+        await File.AppendAllTextAsync(
+            Path.Combine(fixture.Root, ".harness", "config.toml"),
+            "\n[sync]\nignore = [\"gen/\"]\n",
+            Token
+        );
         var options = new SyncOptions();
         var changes = (await fixture.RunAsync(options)).Files!;
-        changes.Changes.Should().Contain(change => change.Kind == "renamed" && change.OldPath == "a.cs" && change.Path == "renamed ü.cs");
+        changes
+            .Changes.Should()
+            .Contain(change => change.Kind == "renamed" && change.OldPath == "a.cs" && change.Path == "renamed ü.cs");
         changes.Files.Added.Should().Equal("new.cs", "renamed ü.cs");
         changes.Files.Removed.Should().Equal("a.cs", "b.cs");
         fixture.Write("b.cs", "b");
@@ -137,8 +153,14 @@ public sealed class SyncTests
         var before = fixture.Hashes();
         fixture.Write("a.cs", "edited");
         fixture.Write("z.cs", "new later file");
-        fixture.Sql("CREATE TRIGGER fail_file BEFORE INSERT ON files WHEN NEW.path='z.cs' BEGIN SELECT RAISE(ABORT,'injected file failure'); END;");
-        await FluentActions.Awaiting(() => fixture.RunAsync()).Should().ThrowAsync<SqliteException>().WithMessage("*injected file failure*");
+        fixture.Sql(
+            "CREATE TRIGGER fail_file BEFORE INSERT ON files WHEN NEW.path='z.cs' BEGIN SELECT RAISE(ABORT,'injected file failure'); END;"
+        );
+        await FluentActions
+            .Awaiting(() => fixture.RunAsync())
+            .Should()
+            .ThrowAsync<SqliteException>()
+            .WithMessage("*injected file failure*");
         fixture.Hashes().Should().BeEquivalentTo(before);
         using (var db = fixture.Database())
         {
@@ -208,7 +230,13 @@ public sealed class SyncTests
         (await fixture.RunAsync()).Files!.Mode.Should().Be("incremental");
         fixture.Sql("UPDATE sync_state SET head_commit='cccccccccccccccccccccccccccccccccccccccc';");
         (await fixture.RunAsync()).Files!.Reason.Should().Contain("no longer in the repository");
-        await FluentActions.Awaiting(() => fixture.RunAsync(new() { Mode = "since", Since = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" })).Should().ThrowAsync<InvalidDataException>().WithMessage("*commit not found*");
+        await FluentActions
+            .Awaiting(() =>
+                fixture.RunAsync(new() { Mode = "since", Since = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" })
+            )
+            .Should()
+            .ThrowAsync<InvalidDataException>()
+            .WithMessage("*commit not found*");
     }
 
     [Fact]
@@ -228,7 +256,10 @@ public sealed class SyncTests
         SyncStore.LoadState(db, fixture.Worktree).Should().NotBeNull();
         SyncStore.LoadState(db, other.Registration.Worktree.Id).Should().BeNull();
         ProjectStore.Worktrees(db).Should().ContainSingle();
-        await FluentActions.Awaiting(() => WorktreeSyncLock.AcquireAsync(Path.Combine(fixture.DirectoryRoot, "deleted"), Token)).Should().ThrowAsync<DirectoryNotFoundException>();
+        await FluentActions
+            .Awaiting(() => WorktreeSyncLock.AcquireAsync(Path.Combine(fixture.DirectoryRoot, "deleted"), Token))
+            .Should()
+            .ThrowAsync<DirectoryNotFoundException>();
     }
 
     [Fact]
@@ -248,7 +279,10 @@ public sealed class SyncTests
             two.IsCompleted.Should().BeFalse();
             await fixture.GitAsync("switch", "-c", "while-queued");
         }
-        finally { await lease.DisposeAsync(); }
+        finally
+        {
+            await lease.DisposeAsync();
+        }
         var results = await Task.WhenAll(one, two);
         results.Should().OnlyContain(result => result.State.Branch == "while-queued");
         results.Count(result => result.CoveredBy > 0).Should().Be(1);
@@ -272,9 +306,15 @@ public sealed class SyncTests
             two.IsCompleted.Should().BeFalse();
             await fixture.GitAsync("switch", "-c", "queued-cli");
         }
-        finally { await lease.DisposeAsync(); }
+        finally
+        {
+            await lease.DisposeAsync();
+        }
         foreach (var result in await Task.WhenAll(one, two))
-        { result.Code.Should().Be(0, result.Error); result.Output.Should().Contain("queued-cli").And.Contain("Synced."); }
+        {
+            result.Code.Should().Be(0, result.Error);
+            result.Output.Should().Contain("queued-cli").And.Contain("Synced.");
+        }
         using var db = fixture.Database();
         SyncStore.RecentRuns(db, fixture.Worktree).Should().HaveCount(2).And.OnlyContain(run => run.Status == "ok");
         var invalid = await fixture.CliAsync("sync", "--full", "--since", "HEAD");
@@ -283,15 +323,36 @@ public sealed class SyncTests
     }
 
     [Fact]
-    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The awaited registry owns registered fake providers.")]
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The awaited registry owns registered fake providers."
+    )]
     public async Task IndexedBranchAnswersAreWithheldUntilSyncAndLiveProvidersRemainAvailable()
     {
         using var fixture = await SyncFixture.CreateAsync();
         var initial = await fixture.RunAsync();
-        await using var session = new HarnessStateSession(initial.Location, fixture.Lifecycle.Registry, new("test", "", "test", "test"));
+        await using var session = new HarnessStateSession(
+            initial.Location,
+            fixture.Lifecycle.Registry,
+            new("test", "", "test", "test")
+        );
         await using var registry = new ProviderRegistry();
-        registry.Register(new ProviderRegistryTests.Fake("indexed", [Capabilities.SymbolSearch], execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Name = "indexed" }] }), freshness: "indexed"));
-        registry.Register(new ProviderRegistryTests.Fake("live", [Capabilities.SymbolSearch], execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Name = "live" }] })));
+        registry.Register(
+            new ProviderRegistryTests.Fake(
+                "indexed",
+                [Capabilities.SymbolSearch],
+                execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Name = "indexed" }] }),
+                freshness: "indexed"
+            )
+        );
+        registry.Register(
+            new ProviderRegistryTests.Fake(
+                "live",
+                [Capabilities.SymbolSearch],
+                execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Name = "live" }] })
+            )
+        );
         var tools = new ProviderTools(registry, session);
         var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>("""{"query":"A","kind":"symbol"}""")!;
         await fixture.GitAsync("switch", "-c", "new-branch");
@@ -316,7 +377,11 @@ public sealed class SyncTests
         fixture.Write("a.cs", "cancelled edit");
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(Token);
         await using var index = new Index { Started = new(), Delay = true };
-        var run = new ProjectSynchronizer(fixture.Lifecycle).RunAsync(fixture.Root, new() { Refreshers = [index] }, cancel.Token);
+        var run = new ProjectSynchronizer(fixture.Lifecycle).RunAsync(
+            fixture.Root,
+            new() { Refreshers = [index] },
+            cancel.Token
+        );
         await index.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
         await cancel.CancelAsync();
         await FluentActions.Awaiting(() => run).Should().ThrowAsync<OperationCanceledException>();
@@ -329,6 +394,7 @@ public sealed class SyncTests
     {
         private int _calls;
         public TaskCompletionSource Queued { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public override DateTimeOffset GetUtcNow()
         {
             var call = Interlocked.Increment(ref _calls);
@@ -340,6 +406,7 @@ public sealed class SyncTests
             return DateTimeOffset.UtcNow.AddMinutes(call);
         }
     }
+
     internal sealed class Index : IProviderRefresher
     {
         public string Name => "fixture-index";
@@ -347,10 +414,22 @@ public sealed class SyncTests
         public Exception? Failure { get; set; }
         public bool Delay { get; set; }
         public TaskCompletionSource? Started { get; init; }
-        public IReadOnlyList<CapabilityInfo> Capabilities() => [new(Core.Providers.Capabilities.SymbolSearch, Name, "low", "low", "indexed")];
-        public ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default) => ValueTask.FromResult(new ProviderHealth("ready"));
-        public Task<ProviderResult> ExecuteAsync(ProviderRequest request, CancellationToken cancellationToken = default) => Task.FromResult(new ProviderResult());
-        public async Task<RefreshResult> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken = default)
+
+        public IReadOnlyList<CapabilityInfo> Capabilities() =>
+            [new(Core.Providers.Capabilities.SymbolSearch, Name, "low", "low", "indexed")];
+
+        public ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ProviderHealth("ready"));
+
+        public Task<ProviderResult> ExecuteAsync(
+            ProviderRequest request,
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(new ProviderResult());
+
+        public async Task<RefreshResult> RefreshAsync(
+            RefreshRequest request,
+            CancellationToken cancellationToken = default
+        )
         {
             Requests.Add(request);
             Started?.TrySetResult();
@@ -366,6 +445,7 @@ public sealed class SyncTests
 
             return new(false, "refreshed fixture");
         }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
@@ -378,6 +458,7 @@ internal sealed class SyncFixture : IDisposable
     public ProjectLifecycle Lifecycle => new(Path.Combine(Global, "config.toml"), "test");
     public string Worktree { get; private set; } = "";
     public string DatabasePath { get; private set; } = "";
+
     public static async Task<SyncFixture> CreateAsync(bool commit = true)
     {
         var fixture = new SyncFixture();
@@ -396,21 +477,65 @@ internal sealed class SyncFixture : IDisposable
                 await fixture.CommitAsync("base");
             }
 
-            var initialized = await fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: TestContext.Current.CancellationToken);
+            var initialized = await fixture.Lifecycle.InitAsync(
+                fixture.Root,
+                cancellationToken: TestContext.Current.CancellationToken
+            );
             fixture.Worktree = initialized.Registration!.Worktree.Id;
             fixture.DatabasePath = initialized.Location.DatabasePath;
             return fixture;
         }
-        catch { fixture.Dispose(); throw; }
+        catch
+        {
+            fixture.Dispose();
+            throw;
+        }
     }
-    public Task<ProjectSyncResult> RunAsync(SyncOptions? options = null) => new ProjectSynchronizer(Lifecycle).RunAsync(Root, options, TestContext.Current.CancellationToken);
+
+    public Task<ProjectSyncResult> RunAsync(SyncOptions? options = null) =>
+        new ProjectSynchronizer(Lifecycle).RunAsync(Root, options, TestContext.Current.CancellationToken);
+
     public HarnessDatabase Database() => HarnessDatabase.Open(DatabasePath);
-    public IReadOnlyDictionary<string, string> Hashes() { using var db = Database(); return SyncStore.FileHashes(db, Worktree); }
-    [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Fixture SQL is constant, test-owned fault injection; no external data.")]
-    public void Sql(string text) { using var db = Database(); using var connection = db.OpenConnection(); using var command = connection.CreateCommand(); command.CommandText = text; command.ExecuteNonQuery(); }
-    public void Write(string path, string text) { var file = Path.Combine(Root, path); Directory.CreateDirectory(Path.GetDirectoryName(file)!); File.WriteAllText(file, text); }
-    public async Task CommitAsync(string message) { await GitAsync("add", "-A"); await GitAsync("commit", "-m", message); }
-    public async Task GitAsync(params string[] args) { var result = await ProcessAsync("git", ["-C", Root, .. args]); result.Code.Should().Be(0, result.Error); }
+
+    public IReadOnlyDictionary<string, string> Hashes()
+    {
+        using var db = Database();
+        return SyncStore.FileHashes(db, Worktree);
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "Fixture SQL is constant, test-owned fault injection; no external data."
+    )]
+    public void Sql(string text)
+    {
+        using var db = Database();
+        using var connection = db.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = text;
+        command.ExecuteNonQuery();
+    }
+
+    public void Write(string path, string text)
+    {
+        var file = Path.Combine(Root, path);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, text);
+    }
+
+    public async Task CommitAsync(string message)
+    {
+        await GitAsync("add", "-A");
+        await GitAsync("commit", "-m", message);
+    }
+
+    public async Task GitAsync(params string[] args)
+    {
+        var result = await ProcessAsync("git", ["-C", Root, .. args]);
+        result.Code.Should().Be(0, result.Error);
+    }
+
     public Task<(int Code, string Output, string Error)> CliAsync(params string[] args)
     {
 #if DEBUG
@@ -418,12 +543,43 @@ internal sealed class SyncFixture : IDisposable
 #else
         const string Configuration = "Release";
 #endif
-        return ProcessAsync("dotnet", [Path.Combine(ProviderFixture.RepositoryRoot, "src", "Harness.Cli", "bin", Configuration, "net10.0", "harness.dll"), .. args, "--project", Root]);
+        return ProcessAsync(
+            "dotnet",
+            [
+                Path.Combine(
+                    ProviderFixture.RepositoryRoot,
+                    "src",
+                    "Harness.Cli",
+                    "bin",
+                    Configuration,
+                    "net10.0",
+                    "harness.dll"
+                ),
+                .. args,
+                "--project",
+                Root,
+            ]
+        );
     }
-    [SuppressMessage("Security", "S4036:Searching OS commands in PATH is security-sensitive", Justification = "Tests intentionally exercise installed Git and dotnet without a command shell.")]
+
+    [SuppressMessage(
+        "Security",
+        "S4036:Searching OS commands in PATH is security-sensitive",
+        Justification = "Tests intentionally exercise installed Git and dotnet without a command shell."
+    )]
     internal async Task<(int Code, string Output, string Error)> ProcessAsync(string executable, string[] args)
     {
-        using var process = new Process { StartInfo = new(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = DirectoryRoot } };
+        using var process = new Process
+        {
+            StartInfo = new(executable)
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = DirectoryRoot,
+            },
+        };
         foreach (var arg in args)
         {
             process.StartInfo.ArgumentList.Add(arg);
@@ -442,13 +598,30 @@ internal sealed class SyncFixture : IDisposable
         var stdout = process.StandardOutput.ReadToEndAsync(token);
         var stderr = process.StandardError.ReadToEndAsync(token);
         try
-        { await process.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(60), token); return (process.ExitCode, await stdout, await stderr); }
-        finally { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(CancellationToken.None); } }
+        {
+            await process.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(60), token);
+            return (process.ExitCode, await stdout, await stderr);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None);
+            }
+        }
     }
+
     public void Dispose()
     {
         Path.GetFullPath(DirectoryRoot).Should().StartWith(Path.GetFullPath(Path.GetTempPath()));
-        foreach (var file in Directory.EnumerateFiles(DirectoryRoot, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }))
+        foreach (
+            var file in Directory.EnumerateFiles(
+                DirectoryRoot,
+                "*",
+                new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }
+            )
+        )
         {
             File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
         }

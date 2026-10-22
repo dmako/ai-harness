@@ -17,21 +17,50 @@ public sealed record GraphifyOptions(string Root, string Command)
 
 public sealed record GraphifySession
 {
-    [JsonPropertyName("id")] public string Id { get; init; } = "";
-    [JsonPropertyName("pid")] public int Pid { get; init; }
-    [JsonPropertyName("reachable")] public bool Reachable { get; init; }
-    [JsonPropertyName("state")] public string State { get; init; } = "";
-    [JsonPropertyName("ready")] public bool Ready { get; init; }
-    [JsonPropertyName("stage")] public string Stage { get; init; } = "";
-    [JsonPropertyName("root")] public string Root { get; init; } = "";
-    [JsonPropertyName("input")] public string Input { get; init; } = "";
-    [JsonPropertyName("memory_bytes")] public long MemoryBytes { get; init; }
-    [JsonPropertyName("uptime_ms")] public long UptimeMs { get; init; }
-    [JsonPropertyName("started_by")] public string StartedBy { get; init; } = "";
-    [JsonPropertyName("discovery_incomplete")] public string DiscoveryIncomplete { get; init; } = "";
-    [JsonPropertyName("last_query")] public string LastQuery { get; init; } = "";
-    [JsonPropertyName("load_took_ms")] public long LoadTookMs { get; init; }
-    public TimeSpan Remaining() => Ready ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Max(0, LoadTookMs - UptimeMs));
+    [JsonPropertyName("id")]
+    public string Id { get; init; } = "";
+
+    [JsonPropertyName("pid")]
+    public int Pid { get; init; }
+
+    [JsonPropertyName("reachable")]
+    public bool Reachable { get; init; }
+
+    [JsonPropertyName("state")]
+    public string State { get; init; } = "";
+
+    [JsonPropertyName("ready")]
+    public bool Ready { get; init; }
+
+    [JsonPropertyName("stage")]
+    public string Stage { get; init; } = "";
+
+    [JsonPropertyName("root")]
+    public string Root { get; init; } = "";
+
+    [JsonPropertyName("input")]
+    public string Input { get; init; } = "";
+
+    [JsonPropertyName("memory_bytes")]
+    public long MemoryBytes { get; init; }
+
+    [JsonPropertyName("uptime_ms")]
+    public long UptimeMs { get; init; }
+
+    [JsonPropertyName("started_by")]
+    public string StartedBy { get; init; } = "";
+
+    [JsonPropertyName("discovery_incomplete")]
+    public string DiscoveryIncomplete { get; init; } = "";
+
+    [JsonPropertyName("last_query")]
+    public string LastQuery { get; init; } = "";
+
+    [JsonPropertyName("load_took_ms")]
+    public long LoadTookMs { get; init; }
+
+    public TimeSpan Remaining() =>
+        Ready ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Max(0, LoadTookMs - UptimeMs));
 }
 
 public interface IGraphifyWatch

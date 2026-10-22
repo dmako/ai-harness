@@ -8,6 +8,7 @@ public sealed class EventBus<T> : IAsyncDisposable
     private readonly object _gate = new();
     private readonly List<Subscription> _subscriptions = [];
     private Task? _closed;
+
     public void Subscribe(string name, Func<T, Task> consume, int capacity = 256)
     {
         ArgumentNullException.ThrowIfNull(consume);
@@ -21,6 +22,7 @@ public sealed class EventBus<T> : IAsyncDisposable
             _subscriptions.Add(new(name, consume, capacity));
         }
     }
+
     public void Publish(T value)
     {
         lock (_gate)
@@ -40,14 +42,30 @@ public sealed class EventBus<T> : IAsyncDisposable
             }
         }
     }
+
     public IReadOnlyDictionary<string, long> Dropped()
     {
         lock (_gate)
         {
-            return _subscriptions.ToDictionary(s => s.Name, s => Interlocked.Read(ref s.Dropped), StringComparer.Ordinal);
+            return _subscriptions.ToDictionary(
+                s => s.Name,
+                s => Interlocked.Read(ref s.Dropped),
+                StringComparer.Ordinal
+            );
         }
     }
-    public long Failures { get { lock (_gate) { return _subscriptions.Sum(s => Interlocked.Read(ref s.Failures)); } } }
+
+    public long Failures
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _subscriptions.Sum(s => Interlocked.Read(ref s.Failures));
+            }
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         lock (_gate)
@@ -64,6 +82,7 @@ public sealed class EventBus<T> : IAsyncDisposable
             return new(_closed);
         }
     }
+
     private sealed class Subscription
     {
         public string Name { get; }
@@ -71,10 +90,18 @@ public sealed class EventBus<T> : IAsyncDisposable
         public Task Worker { get; }
         public long Dropped;
         public long Failures;
+
         public Subscription(string name, Func<T, Task> consume, int capacity)
         {
             Name = name;
-            Queue = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait, AllowSynchronousContinuations = false });
+            Queue = Channel.CreateBounded<T>(
+                new BoundedChannelOptions(capacity)
+                {
+                    SingleReader = true,
+                    FullMode = BoundedChannelFullMode.Wait,
+                    AllowSynchronousContinuations = false,
+                }
+            );
             Worker = Task.Run(async () =>
             {
                 await foreach (var value in Queue.Reader.ReadAllAsync().ConfigureAwait(false))
@@ -83,12 +110,22 @@ public sealed class EventBus<T> : IAsyncDisposable
                 }
             });
         }
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A failing optional subscriber must neither terminate its queue nor fail the publisher.")]
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "A failing optional subscriber must neither terminate its queue nor fail the publisher."
+        )]
         private async Task ConsumeAsync(Func<T, Task> consume, T value)
         {
             try
-            { await consume(value).ConfigureAwait(false); }
-            catch (Exception) { Interlocked.Increment(ref Failures); }
+            {
+                await consume(value).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                Interlocked.Increment(ref Failures);
+            }
         }
     }
 }

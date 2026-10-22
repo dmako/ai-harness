@@ -5,13 +5,15 @@ namespace Harness.Infrastructure.Processes;
 
 internal sealed class NativeMemory : SafeHandleZeroOrMinusOneIsInvalid
 {
-    internal NativeMemory(int size) : base(true)
+    internal NativeMemory(int size)
+        : base(true)
     {
         SetHandle(Marshal.AllocHGlobal(size));
         Marshal.Copy(new byte[size], 0, handle, size);
     }
 
-    internal NativeMemory(string value, bool unicode = false) : base(true)
+    internal NativeMemory(string value, bool unicode = false)
+        : base(true)
     {
         if (unicode)
         {

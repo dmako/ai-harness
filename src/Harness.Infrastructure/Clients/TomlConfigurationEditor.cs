@@ -11,7 +11,9 @@ namespace Harness.Infrastructure.Clients;
 public static class TomlConfigurationEditor
 {
     public const string Marker = "# Managed by 'harness install'; 'harness uninstall' removes this block.";
-    private const string LayoutError = "the harness entry uses a layout harness cannot edit safely (inline table or dotted value); edit it by hand";
+    private const string LayoutError =
+        "the harness entry uses a layout harness cannot edit safely (inline table or dotted value); edit it by hand";
+
     public static TomlTable Parse(string source)
     {
         var syntax = SyntaxParser.Parse(source);
@@ -22,7 +24,9 @@ public static class TomlConfigurationEditor
 
         return TomlSerializer.Deserialize<TomlTable>(source) ?? new();
     }
+
     private static JsonObject Json(TomlTable table) => JsonSerializer.SerializeToNode(table)!.AsObject();
+
     private static string Name(KeySyntax? key)
     {
         if (key is null)
@@ -30,21 +34,37 @@ public static class TomlConfigurationEditor
             throw new InvalidDataException(LayoutError);
         }
 
-        static string Part(SyntaxNode? value) => value switch { BareKeySyntax bare => bare.Key?.Text ?? throw new InvalidDataException(LayoutError), StringValueSyntax quoted => quoted.Value ?? throw new InvalidDataException(LayoutError), _ => throw new InvalidDataException(LayoutError) };
+        static string Part(SyntaxNode? value) =>
+            value switch
+            {
+                BareKeySyntax bare => bare.Key?.Text ?? throw new InvalidDataException(LayoutError),
+                StringValueSyntax quoted => quoted.Value ?? throw new InvalidDataException(LayoutError),
+                _ => throw new InvalidDataException(LayoutError),
+            };
         return string.Join('.', new[] { Part(key.Key) }.Concat(key.DotKeys.Select(part => Part(part.Key))));
     }
+
     public static TextEdit Edit(string source, ServerSpec? spec)
     {
         var before = Json(Parse(source));
         var entry = before["mcp_servers"]?["harness"] as JsonObject;
-        if (spec is not null && entry?["command"]?.GetValue<string>() == spec.Command && JsonNode.DeepEquals(entry["args"], JsonSerializer.SerializeToNode(spec.Args)))
+        if (
+            spec is not null
+            && entry?["command"]?.GetValue<string>() == spec.Command
+            && JsonNode.DeepEquals(entry["args"], JsonSerializer.SerializeToNode(spec.Args))
+        )
         {
             return new(source, "unchanged");
         }
 
         var document = SyntaxParser.Parse(source);
         var tables = document.Tables.ToArray();
-        var owned = tables.Select((table, index) => (Table: table, Index: index, Name: Name(table.Name))).Where(t => t.Name is "mcp_servers.harness" || t.Name.StartsWith("mcp_servers.harness.", StringComparison.Ordinal)).ToArray();
+        var owned = tables
+            .Select((table, index) => (Table: table, Index: index, Name: Name(table.Name)))
+            .Where(t =>
+                t.Name is "mcp_servers.harness" || t.Name.StartsWith("mcp_servers.harness.", StringComparison.Ordinal)
+            )
+            .ToArray();
         var main = owned.FirstOrDefault(t => t.Name is "mcp_servers.harness").Table;
         string output;
         string action;
@@ -59,7 +79,10 @@ public static class TomlConfigurationEditor
             foreach (var item in owned.Reverse())
             {
                 var start = LineStart(source, item.Table.OpenBracket!.Span.Offset);
-                var end = item.Index + 1 < tables.Length ? LineStart(source, tables[item.Index + 1].OpenBracket!.Span.Offset) : source.Length;
+                var end =
+                    item.Index + 1 < tables.Length
+                        ? LineStart(source, tables[item.Index + 1].OpenBracket!.Span.Offset)
+                        : source.Length;
                 var previous = start > 0 ? LineStart(source, start - 1) : 0;
                 if (source[previous..start].Trim() == Marker)
                 {
@@ -68,7 +91,10 @@ public static class TomlConfigurationEditor
 
                 if (end < source.Length)
                 {
-                    while (end > item.Table.CloseBracket!.Span.Offset && source[LineStart(source, end - 1)..end].Trim().Length is 0)
+                    while (
+                        end > item.Table.CloseBracket!.Span.Offset
+                        && source[LineStart(source, end - 1)..end].Trim().Length is 0
+                    )
                     {
                         end = LineStart(source, end - 1);
                     }
@@ -101,7 +127,13 @@ public static class TomlConfigurationEditor
                 output += "\n";
             }
 
-            output += Marker + "\n[mcp_servers.harness]\ncommand = " + Quote(spec.Command) + "\nargs = " + Args(spec.Args) + "\n";
+            output +=
+                Marker
+                + "\n[mcp_servers.harness]\ncommand = "
+                + Quote(spec.Command)
+                + "\nargs = "
+                + Args(spec.Args)
+                + "\n";
             action = "add";
         }
         else
@@ -124,7 +156,11 @@ public static class TomlConfigurationEditor
             {
                 var end = source.IndexOf('\n', main.CloseBracket!.Span.Offset);
                 var newline = MarkedBlock.Newline(source);
-                edits.Add(end < 0 ? (source.Length, 0, newline + string.Join(newline, missing) + newline) : (end + 1, 0, string.Join(newline, missing) + newline));
+                edits.Add(
+                    end < 0
+                        ? (source.Length, 0, newline + string.Join(newline, missing) + newline)
+                        : (end + 1, 0, string.Join(newline, missing) + newline)
+                );
             }
             output = source;
             foreach (var edit in edits.OrderByDescending(e => e.Start))
@@ -137,8 +173,12 @@ public static class TomlConfigurationEditor
         Verify(before, Json(Parse(output)), spec);
         return new(output, action);
     }
-    private static int LineStart(string source, int offset) => offset <= 0 ? 0 : source.LastIndexOf('\n', offset - 1) + 1;
+
+    private static int LineStart(string source, int offset) =>
+        offset <= 0 ? 0 : source.LastIndexOf('\n', offset - 1) + 1;
+
     private static string Args(IReadOnlyList<string> args) => "[" + string.Join(", ", args.Select(Quote)) + "]";
+
     private static string Quote(string text)
     {
         if (text.Any(c => c < 0x20 || c is '\x7f'))
@@ -146,20 +186,32 @@ public static class TomlConfigurationEditor
             throw new InvalidDataException("command or argument contains control characters");
         }
 
-        return "\"" + text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
+        return "\""
+            + text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)
+            + "\"";
     }
+
     private static void Verify(JsonObject before, JsonObject after, ServerSpec? spec)
     {
         var previous = before["mcp_servers"]?["harness"] as JsonObject;
         var current = after["mcp_servers"]?["harness"] as JsonObject;
-        if (spec is null ? current is not null : current?["command"]?.GetValue<string>() != spec.Command || !JsonNode.DeepEquals(current?["args"], JsonSerializer.SerializeToNode(spec.Args)))
+        if (
+            spec is null
+                ? current is not null
+                : current?["command"]?.GetValue<string>() != spec.Command
+                    || !JsonNode.DeepEquals(current?["args"], JsonSerializer.SerializeToNode(spec.Args))
+        )
         {
             throw new InvalidDataException("harness entry not as intended after edit; nothing written");
         }
 
         if (spec is not null && previous is not null)
         {
-            if (previous.Where(p => p.Key is not ("command" or "args")).Any(pair => !JsonNode.DeepEquals(pair.Value, current?[pair.Key])))
+            if (
+                previous
+                    .Where(p => p.Key is not ("command" or "args"))
+                    .Any(pair => !JsonNode.DeepEquals(pair.Value, current?[pair.Key]))
+            )
             {
                 throw new InvalidDataException("edit would change another harness key; nothing written");
             }

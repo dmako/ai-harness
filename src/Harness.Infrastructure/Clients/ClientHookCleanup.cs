@@ -7,7 +7,9 @@ namespace Harness.Infrastructure.Clients;
 /// <summary>Ownership-aware editing of client hooks.</summary>
 public static class ClientHookCleanup
 {
-    public const string CodexTrustNote = "Codex runs new hooks only after you trust them: run /hooks in Codex and approve harness's.";
+    public const string CodexTrustNote =
+        "Codex runs new hooks only after you trust them: run /hooks in Codex and approve harness's.";
+
     public static IReadOnlyList<ClientTarget> Targets(ClientPaths paths, string client, string scope, string root)
     {
         if (client is not ("claude-code" or "codex"))
@@ -19,8 +21,12 @@ public static class ClientHookCleanup
         {
             throw new ArgumentException(client + " has no " + scope + " scope for hooks");
         }
-        return scopes.Where(s => scope is "all" || s == scope).Select(s => new ClientTarget(client, s, TargetPath(paths, client, s, root), [])).ToArray();
+        return scopes
+            .Where(s => scope is "all" || s == scope)
+            .Select(s => new ClientTarget(client, s, TargetPath(paths, client, s, root), []))
+            .ToArray();
     }
+
     private static string TargetPath(ClientPaths paths, string client, string scope, string root)
     {
         if (client is "codex")
@@ -40,14 +46,20 @@ public static class ClientHookCleanup
         {
             throw new ArgumentException("unknown hook client", nameof(client));
         }
-        if (executable.IndexOfAny(['\r', '\n', '\0']) >= 0 || (windows ?? OperatingSystem.IsWindows()) && executable.Contains('"', StringComparison.Ordinal))
+        if (
+            executable.IndexOfAny(['\r', '\n', '\0']) >= 0
+            || (windows ?? OperatingSystem.IsWindows()) && executable.Contains('"', StringComparison.Ordinal)
+        )
         {
             throw new ArgumentException("invalid hook executable path", nameof(executable));
         }
         var quoted = executable;
         if (windows ?? OperatingSystem.IsWindows())
         {
-            quoted = '"' + executable.Replace("$", "\\$", StringComparison.Ordinal).Replace("`", "\\`", StringComparison.Ordinal) + '"';
+            quoted =
+                '"'
+                + executable.Replace("$", "\\$", StringComparison.Ordinal).Replace("`", "\\`", StringComparison.Ordinal)
+                + '"';
         }
         else if (executable.Any(c => !char.IsLetterOrDigit(c) && c is not ('/' or '_' or '-' or '.')))
         {
@@ -55,6 +67,7 @@ public static class ClientHookCleanup
         }
         return quoted + " hook event --client " + client;
     }
+
     public static string Installed(string path, string subcommand = "event")
     {
         if (!File.Exists(path))
@@ -67,12 +80,23 @@ public static class ClientHookCleanup
             return "";
         }
         var root = JsonConfigurationEditor.ParseObject(text);
-        if (root["hooks"] is not JsonObject hooks || hooks[subcommand is "session" ? "SessionStart" : "PostToolUse"] is not JsonArray groups)
+        if (
+            root["hooks"] is not JsonObject hooks
+            || hooks[subcommand is "session" ? "SessionStart" : "PostToolUse"] is not JsonArray groups
+        )
         {
             return "";
         }
-        return groups.OfType<JsonObject>().SelectMany(g => g["hooks"] is JsonArray items ? items : []).OfType<JsonObject>().Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand)).Select(h => Text(h["command"])).FirstOrDefault() ?? "";
+        return groups
+                .OfType<JsonObject>()
+                .SelectMany(g => g["hooks"] is JsonArray items ? items : [])
+                .OfType<JsonObject>()
+                .Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand))
+                .Select(h => Text(h["command"]))
+                .FirstOrDefault()
+            ?? "";
     }
+
     public static string CommandProblem(string command)
     {
         if (command.Length is 0)
@@ -84,21 +108,33 @@ public static class ClientHookCleanup
         {
             return "the executable's path is not quoted: Git Bash drops its backslashes; run 'harness hooks install' again";
         }
-        return Path.IsPathRooted(exe) && !File.Exists(new ClientConfiguration(ClientPaths.Current()).Expand(exe)) ? "executable does not exist; run 'harness hooks install' again" : "";
+        return Path.IsPathRooted(exe) && !File.Exists(new ClientConfiguration(ClientPaths.Current()).Expand(exe))
+            ? "executable does not exist; run 'harness hooks install' again"
+            : "";
     }
-    public static FileChange Install(string path, string client, string command, bool dryRun = false) => Edit(path, client, command, dryRun);
+
+    public static FileChange Install(string path, string client, string command, bool dryRun = false) =>
+        Edit(path, client, command, dryRun);
+
     public static FileChange Install(ClientTarget target, string command, bool dryRun = false)
     {
         ArgumentNullException.ThrowIfNull(target);
         return Edit(target.Path, target.Client, command, dryRun, () => Missing(target));
     }
+
     public static FileChange Remove(string path, string client, bool dryRun = false) => Edit(path, client, "", dryRun);
+
     public static FileChange Remove(ClientTarget target, bool dryRun = false)
     {
         ArgumentNullException.ThrowIfNull(target);
         return Edit(target.Path, target.Client, "", dryRun, () => Missing(target));
     }
-    private static string Missing(ClientTarget target) => target.Scope is "user" && !Directory.Exists(Path.GetDirectoryName(target.Path)) ? target.Client + " does not appear to be installed (client directory missing)" : "";
+
+    private static string Missing(ClientTarget target) =>
+        target.Scope is "user" && !Directory.Exists(Path.GetDirectoryName(target.Path))
+            ? target.Client + " does not appear to be installed (client directory missing)"
+            : "";
+
     public static bool IsHarness(string command, string subcommand)
     {
         var (exe, rest) = SplitExecutable(command);
@@ -106,6 +142,7 @@ public static class ClientHookCleanup
         var name = Path.GetFileName(exe);
         return name is "harness" or "harness.exe" && words.Length >= 2 && words[0] is "hook" && words[1] == subcommand;
     }
+
     public static (string Executable, string Remainder) SplitExecutable(string command)
     {
         command = command.Trim();
@@ -131,7 +168,11 @@ public static class ClientHookCleanup
                 continue;
             }
             if (quote is '\'' && command.AsSpan(i).StartsWith("'\\''", StringComparison.Ordinal))
-            { result.Append('\''); i += 4; continue; }
+            {
+                result.Append('\'');
+                i += 4;
+                continue;
+            }
             if (command[i] == quote)
             {
                 return (result.ToString(), command[(i + 1)..]);
@@ -142,31 +183,56 @@ public static class ClientHookCleanup
         }
         return (result.ToString(), "");
     }
-    private static FileChange Edit(string path, string client, string command, bool dryRun, Func<string>? skipMissing = null) => FileEditor.Apply(path, (source, exists) =>
-    {
-        if ((!exists || string.IsNullOrWhiteSpace(source)) && command.Length is 0)
-        {
-            return new(source, "absent");
-        }
-        var output = string.IsNullOrWhiteSpace(source) ? "{}\n" : source;
-        HashSet<string> actions = [];
-        foreach (var (eventName, subcommand) in client is "claude-code" ? new[] { ("PostToolUse", "event"), ("SessionStart", "session") } : [("PostToolUse", "event")])
-        {
-            var result = EditEvent(output, client, eventName, subcommand, command.Replace(" hook event ", " hook " + subcommand + " ", StringComparison.Ordinal));
-            output = result.Text;
-            actions.Add(result.Action);
-        }
-        var action = actions switch
-        {
-            _ when actions.Contains("update") => "update",
-            _ when actions.Contains("add") && actions.Contains("unchanged") => "update",
-            _ when actions.Contains("add") => "add",
-            _ when actions.Contains("remove") => "remove",
-            _ when actions.Contains("unchanged") => "unchanged",
-            _ => "absent",
-        };
-        return new(output, action);
-    }, dryRun, backup: true, skipMissing: skipMissing);
+
+    private static FileChange Edit(
+        string path,
+        string client,
+        string command,
+        bool dryRun,
+        Func<string>? skipMissing = null
+    ) =>
+        FileEditor.Apply(
+            path,
+            (source, exists) =>
+            {
+                if ((!exists || string.IsNullOrWhiteSpace(source)) && command.Length is 0)
+                {
+                    return new(source, "absent");
+                }
+                var output = string.IsNullOrWhiteSpace(source) ? "{}\n" : source;
+                HashSet<string> actions = [];
+                foreach (
+                    var (eventName, subcommand) in client is "claude-code"
+                        ? new[] { ("PostToolUse", "event"), ("SessionStart", "session") }
+                        : [("PostToolUse", "event")]
+                )
+                {
+                    var result = EditEvent(
+                        output,
+                        client,
+                        eventName,
+                        subcommand,
+                        command.Replace(" hook event ", " hook " + subcommand + " ", StringComparison.Ordinal)
+                    );
+                    output = result.Text;
+                    actions.Add(result.Action);
+                }
+                var action = actions switch
+                {
+                    _ when actions.Contains("update") => "update",
+                    _ when actions.Contains("add") && actions.Contains("unchanged") => "update",
+                    _ when actions.Contains("add") => "add",
+                    _ when actions.Contains("remove") => "remove",
+                    _ when actions.Contains("unchanged") => "unchanged",
+                    _ => "absent",
+                };
+                return new(output, action);
+            },
+            dryRun,
+            backup: true,
+            skipMissing: skipMissing
+        );
+
     private static TextEdit EditEvent(string source, string client, string eventName, string subcommand, string wanted)
     {
         var root = JsonConfigurationEditor.ParseObject(source);
@@ -181,7 +247,15 @@ public static class ClientHookCleanup
             throw new InvalidDataException("hooks." + eventName + " is not an array");
         }
         var groups = raw as JsonArray ?? [];
-        var current = groups.OfType<JsonObject>().SelectMany(g => g["hooks"] is JsonArray items ? items : []).OfType<JsonObject>().Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand)).Select(h => Text(h["command"])).FirstOrDefault() ?? "";
+        var current =
+            groups
+                .OfType<JsonObject>()
+                .SelectMany(g => g["hooks"] is JsonArray items ? items : [])
+                .OfType<JsonObject>()
+                .Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand))
+                .Select(h => Text(h["command"]))
+                .FirstOrDefault()
+            ?? "";
         var rest = WithoutHarness(groups, subcommand);
         if (wanted.Length is 0 && current.Length is 0)
         {
@@ -193,7 +267,12 @@ public static class ClientHookCleanup
         }
         if (wanted.Length > 0)
         {
-            JsonObject item = new() { ["type"] = "command", ["command"] = wanted, ["timeout"] = 10 };
+            JsonObject item = new()
+            {
+                ["type"] = "command",
+                ["command"] = wanted,
+                ["timeout"] = 10,
+            };
             if (client is "codex")
             {
                 item["async"] = true;
@@ -217,13 +296,19 @@ public static class ClientHookCleanup
         {
             output = JsonConfigurationEditor.Delete(output, [], "hooks").Text;
         }
-        if (!JsonNode.DeepEquals(Strip(root, eventName, subcommand), Strip(JsonConfigurationEditor.ParseObject(output), eventName, subcommand)))
+        if (
+            !JsonNode.DeepEquals(
+                Strip(root, eventName, subcommand),
+                Strip(JsonConfigurationEditor.ParseObject(output), eventName, subcommand)
+            )
+        )
         {
             throw new InvalidDataException("hook edit would change unrelated configuration; nothing written");
         }
         var action = wanted.Length is 0 ? "remove" : "add";
         return new(output, current.Length > 0 && wanted.Length > 0 ? "update" : action);
     }
+
     private static JsonObject Strip(JsonObject root, string eventName, string subcommand)
     {
         var copy = (JsonObject)root.DeepClone();
@@ -242,14 +327,25 @@ public static class ClientHookCleanup
         }
         return copy;
     }
+
     private static JsonArray WithoutHarness(JsonArray groups, string subcommand)
     {
         JsonArray result = [];
         foreach (var group in groups)
         {
             if (group is not JsonObject obj || obj["hooks"] is not JsonArray items)
-            { result.Add(group?.DeepClone()); continue; }
-            var rest = items.Where(item => item is not JsonObject hook || Text(hook["type"]) is not "command" || !IsHarness(Text(hook["command"]), subcommand)).Select(item => item?.DeepClone()).ToArray();
+            {
+                result.Add(group?.DeepClone());
+                continue;
+            }
+            var rest = items
+                .Where(item =>
+                    item is not JsonObject hook
+                    || Text(hook["type"]) is not "command"
+                    || !IsHarness(Text(hook["command"]), subcommand)
+                )
+                .Select(item => item?.DeepClone())
+                .ToArray();
             if (rest.Length == items.Count)
             {
                 result.Add(group.DeepClone());
@@ -263,5 +359,7 @@ public static class ClientHookCleanup
         }
         return result;
     }
-    private static string Text(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : "";
+
+    private static string Text(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<string>(out var text) ? text : "";
 }

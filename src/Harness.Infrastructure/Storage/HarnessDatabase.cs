@@ -28,10 +28,18 @@ public sealed class HarnessDatabase : IDisposable
 
     public static int LatestSchemaVersion => MigrationCatalog.All.Count;
 
-    public static HarnessDatabase Open(string path, StorageOptions? options = null, CancellationToken cancellationToken = default) =>
-        Open(path, options ?? new StorageOptions(), MigrationCatalog.All, cancellationToken);
+    public static HarnessDatabase Open(
+        string path,
+        StorageOptions? options = null,
+        CancellationToken cancellationToken = default
+    ) => Open(path, options ?? new StorageOptions(), MigrationCatalog.All, cancellationToken);
 
-    internal static HarnessDatabase Open(string path, StorageOptions options, IReadOnlyList<Migration> migrations, CancellationToken cancellationToken = default)
+    internal static HarnessDatabase Open(
+        string path,
+        StorageOptions options,
+        IReadOnlyList<Migration> migrations,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         if (path.Contains('?', StringComparison.Ordinal))
@@ -109,7 +117,10 @@ public sealed class HarnessDatabase : IDisposable
         {
             connection.Open();
             var milliseconds = checked((int)_options.EffectiveBusyTimeout.TotalMilliseconds);
-            MigrationRunner.Execute(connection, $"PRAGMA busy_timeout = {milliseconds.ToString(CultureInfo.InvariantCulture)}");
+            MigrationRunner.Execute(
+                connection,
+                $"PRAGMA busy_timeout = {milliseconds.ToString(CultureInfo.InvariantCulture)}"
+            );
             return connection;
         }
         catch
@@ -145,7 +156,10 @@ public sealed class HarnessDatabase : IDisposable
         }
     }
 
-    public T WithTransaction<T>(Func<SqliteConnection, SqliteTransaction, T> action, CancellationToken cancellationToken = default)
+    public T WithTransaction<T>(
+        Func<SqliteConnection, SqliteTransaction, T> action,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(action);
         cancellationToken.ThrowIfCancellationRequested();
@@ -157,7 +171,10 @@ public sealed class HarnessDatabase : IDisposable
         return result;
     }
 
-    public T ReadTransaction<T>(Func<SqliteConnection, SqliteTransaction, T> action, CancellationToken cancellationToken = default)
+    public T ReadTransaction<T>(
+        Func<SqliteConnection, SqliteTransaction, T> action,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(action);
         cancellationToken.ThrowIfCancellationRequested();
@@ -199,7 +216,8 @@ public sealed class HarnessDatabase : IDisposable
         return command.ExecuteScalar() is string value ? value : throw new KeyNotFoundException("not found");
     }
 
-    public static string FormatTime(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'00Z'", CultureInfo.InvariantCulture);
+    public static string FormatTime(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'00Z'", CultureInfo.InvariantCulture);
 
     public void Dispose()
     {
@@ -229,7 +247,8 @@ public sealed class HarnessDatabase : IDisposable
 
                 return;
             }
-            catch (SqliteException exception) when (exception.SqliteErrorCode == 5 && timer.Elapsed < _options.EffectiveBusyTimeout)
+            catch (SqliteException exception)
+                when (exception.SqliteErrorCode == 5 && timer.Elapsed < _options.EffectiveBusyTimeout)
             {
                 if (cancellationToken.WaitHandle.WaitOne(delay))
                 {

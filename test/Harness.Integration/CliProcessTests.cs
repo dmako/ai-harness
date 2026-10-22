@@ -22,7 +22,15 @@ public sealed class CliProcessTests
 #else
         const string Configuration = "Release";
 #endif
-        var binary = Path.Combine(directory.FullName, "src", "Harness.Cli", "bin", Configuration, "net10.0", "harness.dll");
+        var binary = Path.Combine(
+            directory.FullName,
+            "src",
+            "Harness.Cli",
+            "bin",
+            Configuration,
+            "net10.0",
+            "harness.dll"
+        );
         var start = new ProcessStartInfo("dotnet")
         {
             UseShellExecute = false,
@@ -39,7 +47,9 @@ public sealed class CliProcessTests
         {
             var stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             var stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+            await process
+                .WaitForExitAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
             process.ExitCode.Should().Be(0);
             (await stderr).Should().BeEmpty();
             using var json = JsonDocument.Parse(await stdout);

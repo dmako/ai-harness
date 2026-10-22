@@ -18,7 +18,11 @@ public static class ConfigurationLoader
     };
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-    public static LoadedConfiguration Load(string root) => LoadFiles(ConfigurationPaths.GlobalPath(), string.IsNullOrEmpty(root) ? "" : ConfigurationPaths.ProjectPath(root));
+    public static LoadedConfiguration Load(string root) =>
+        LoadFiles(
+            ConfigurationPaths.GlobalPath(),
+            string.IsNullOrEmpty(root) ? "" : ConfigurationPaths.ProjectPath(root)
+        );
 
     public static LoadedConfiguration LoadFiles(string globalPath, string projectPath)
     {
@@ -68,20 +72,36 @@ public static class ConfigurationLoader
             {
                 // Same semantics when the optional parent directory does not exist.
             }
-            catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or TomlException or ArgumentException)
+            catch (Exception exception)
+                when (exception
+                        is IOException
+                            or InvalidDataException
+                            or UnauthorizedAccessException
+                            or JsonException
+                            or TomlException
+                            or ArgumentException
+                )
             {
                 throw new InvalidDataException($"config {path}: {exception.Message}", exception);
             }
         }
 
-        return new LoadedConfiguration(effective.Deserialize<HarnessConfiguration>(JsonOptions)!, new ConfigurationSources(sources[0], sources[1]));
+        return new LoadedConfiguration(
+            effective.Deserialize<HarnessConfiguration>(JsonOptions)!,
+            new ConfigurationSources(sources[0], sources[1])
+        );
     }
 
-    public static IReadOnlyList<string> Packs { get; } = typeof(ConfigurationLoader).Assembly.GetManifestResourceNames()
-        .Where(name => name.StartsWith("Harness.Packs.", StringComparison.Ordinal))
-        .Select(name => name["Harness.Packs.".Length..^".toml".Length]).Order(StringComparer.Ordinal).ToArray();
+    public static IReadOnlyList<string> Packs { get; } =
+        typeof(ConfigurationLoader)
+            .Assembly.GetManifestResourceNames()
+            .Where(name => name.StartsWith("Harness.Packs.", StringComparison.Ordinal))
+            .Select(name => name["Harness.Packs.".Length..^".toml".Length])
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
-    private static JsonObject Parse(string text) => JsonSerializer.SerializeToNode(TomlSerializer.Deserialize<TomlTable>(text))!.AsObject();
+    private static JsonObject Parse(string text) =>
+        JsonSerializer.SerializeToNode(TomlSerializer.Deserialize<TomlTable>(text))!.AsObject();
 
     private static void ExpandPacks(JsonObject layer)
     {
@@ -94,7 +114,11 @@ public static class ConfigurationLoader
         {
             var table = value!.AsObject();
             var pack = table["pack"]?.GetValue<string>() ?? "";
-            if (pack.Length == 0 && string.IsNullOrEmpty(table["type"]?.GetValue<string>()) && Packs.Contains(name, StringComparer.Ordinal))
+            if (
+                pack.Length == 0
+                && string.IsNullOrEmpty(table["type"]?.GetValue<string>())
+                && Packs.Contains(name, StringComparer.Ordinal)
+            )
             {
                 pack = name;
             }
@@ -109,7 +133,9 @@ public static class ConfigurationLoader
                 throw new InvalidDataException($"providers.{name}.pack: unknown provider pack '{pack}'");
             }
 
-            using var stream = typeof(ConfigurationLoader).Assembly.GetManifestResourceStream($"Harness.Packs.{pack}.toml")!;
+            using var stream = typeof(ConfigurationLoader).Assembly.GetManifestResourceStream(
+                $"Harness.Packs.{pack}.toml"
+            )!;
             using var reader = new StreamReader(stream, StrictUtf8);
             var expanded = Parse(reader.ReadToEnd());
             foreach (var (key, setting) in table)

@@ -4,7 +4,15 @@ using Harness.Core.Instructions;
 
 namespace Harness.Infrastructure.Clients;
 
-public sealed record FileChange(string Path, string Action, string Before, string After, string Reason = "", string Backup = "", bool Deleted = false)
+public sealed record FileChange(
+    string Path,
+    string Action,
+    string Before,
+    string After,
+    string Reason = "",
+    string Backup = "",
+    bool Deleted = false
+)
 {
     public bool Writes => Action is "add" or "update" or "remove";
 }
@@ -14,22 +22,30 @@ public static class FileEditor
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     public const int MaximumBytes = 16 * 1024 * 1024;
+
     public static string Resolve(string path)
     {
         var absolute = System.IO.Path.GetFullPath(path);
         var root = System.IO.Path.GetPathRoot(absolute)!;
-        foreach (var part in absolute[root.Length..].Split(System.IO.Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        foreach (
+            var part in absolute[root.Length..]
+                .Split(System.IO.Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+        )
         {
             root = System.IO.Path.Combine(root, part);
             FileSystemInfo item = Directory.Exists(root) ? new DirectoryInfo(root) : new FileInfo(root);
             if (item.LinkTarget is not null)
             {
-                root = item.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? throw new IOException("Cannot resolve link: " + root);
+                root =
+                    item.ResolveLinkTarget(returnFinalTarget: true)?.FullName
+                    ?? throw new IOException("Cannot resolve link: " + root);
             }
         }
         return root;
     }
+
     public static string Read(string path) => Utf8.GetString(ReadBytes(Resolve(path)));
+
     private static byte[] ReadBytes(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -56,14 +72,27 @@ public static class FileEditor
 
         return output.ToArray();
     }
-    public static FileChange Apply(string path, Func<string, bool, TextEdit> edit, bool dryRun = false, bool backup = false, Func<string>? skipMissing = null, Func<string, bool>? empty = null)
+
+    public static FileChange Apply(
+        string path,
+        Func<string, bool, TextEdit> edit,
+        bool dryRun = false,
+        bool backup = false,
+        Func<string>? skipMissing = null,
+        Func<string, bool>? empty = null
+    )
     {
         ArgumentNullException.ThrowIfNull(edit);
         var real = Resolve(path);
         byte[]? before;
         try
-        { before = ReadBytes(real); }
-        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { before = null; }
+        {
+            before = ReadBytes(real);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            before = null;
+        }
         if (before is null && skipMissing?.Invoke() is { Length: > 0 } reason)
         {
             return new(path, "skip", "", "", reason);
@@ -71,7 +100,13 @@ public static class FileEditor
 
         var text = before is null ? "" : Utf8.GetString(before);
         var result = edit(text, before is not null);
-        var change = new FileChange(path, result.Action, text, result.Text, Deleted: result.Action is "remove" && (empty?.Invoke(result.Text) ?? string.IsNullOrWhiteSpace(result.Text)));
+        var change = new FileChange(
+            path,
+            result.Action,
+            text,
+            result.Text,
+            Deleted: result.Action is "remove" && (empty?.Invoke(result.Text) ?? string.IsNullOrWhiteSpace(result.Text))
+        );
         if (!change.Writes)
         {
             return change;
@@ -105,9 +140,15 @@ public static class FileEditor
         var temporary = System.IO.Path.Combine(directory, ".harness-edit-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            var mode = !OperatingSystem.IsWindows() && before is not null ? File.GetUnixFileMode(real) : UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+            var mode =
+                !OperatingSystem.IsWindows() && before is not null
+                    ? File.GetUnixFileMode(real)
+                    : UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
             using (var stream = new FileStream(temporary, Options(mode)))
-            { stream.Write(bytes); stream.Flush(flushToDisk: true); }
+            {
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
             if (!OperatingSystem.IsWindows())
             {
                 File.SetUnixFileMode(temporary, mode);
@@ -121,27 +162,37 @@ public static class FileEditor
 
             File.Move(temporary, real, overwrite: before is not null);
         }
-        finally { if (File.Exists(temporary))
+        finally
+        {
+            if (File.Exists(temporary))
             {
                 File.Delete(temporary);
             }
         }
         return change;
     }
+
     private static void Check(string path, byte[]? expected)
     {
         byte[]? current;
         try
-        { current = ReadBytes(path); }
-        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException) { current = null; }
+        {
+            current = ReadBytes(path);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            current = null;
+        }
         if (expected is null ? current is not null : current is null || !current.AsSpan().SequenceEqual(expected))
         {
             throw new IOException("file changed while harness was editing it; nothing was written, retry");
         }
     }
+
     private static string Backup(string path, byte[] bytes)
     {
-        var prefix = path + ".bak-harness-" + DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmss.fff", CultureInfo.InvariantCulture);
+        var prefix =
+            path + ".bak-harness-" + DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmss.fff", CultureInfo.InvariantCulture);
         for (var attempt = 0; attempt < 1000; attempt++)
         {
             var name = attempt is 0 ? prefix : prefix + "-" + attempt.ToString(CultureInfo.InvariantCulture);
@@ -151,7 +202,10 @@ public static class FileEditor
                 var mode = OperatingSystem.IsWindows() ? UnixFileMode.None : File.GetUnixFileMode(path);
                 stream = new FileStream(name, Options(mode));
             }
-            catch (IOException) when (File.Exists(name)) { continue; }
+            catch (IOException) when (File.Exists(name))
+            {
+                continue;
+            }
             using (stream)
             {
                 if (!OperatingSystem.IsWindows())
@@ -166,9 +220,15 @@ public static class FileEditor
         }
         throw new IOException("cannot allocate a unique harness backup");
     }
+
     private static FileStreamOptions Options(UnixFileMode mode)
     {
-        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
         if (!OperatingSystem.IsWindows())
         {
             options.UnixCreateMode = mode;

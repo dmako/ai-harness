@@ -7,7 +7,11 @@ using Xunit;
 
 namespace Harness.Integration.Providers;
 
-[SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Register transfers ownership to the registry; its all-provider disposal, including failure paths, is tested explicitly.")]
+[SuppressMessage(
+    "Reliability",
+    "CA2000:Dispose objects before losing scope",
+    Justification = "Register transfers ownership to the registry; its all-provider disposal, including failure paths, is tested explicitly."
+)]
 public sealed class ProviderRegistryTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -33,7 +37,20 @@ public sealed class ProviderRegistryTests
                     bothStarted.SetResult();
                 }
                 await bothStarted.Task.WaitAsync(token);
-                return new() { Items = [new() { Name = "partial", Provider = "origin", Tool = "search" }], Bytes = 73, Truncated = true };
+                return new()
+                {
+                    Items =
+                    [
+                        new()
+                        {
+                            Name = "partial",
+                            Provider = "origin",
+                            Tool = "search",
+                        },
+                    ],
+                    Bytes = 73,
+                    Truncated = true,
+                };
             }
         }
         registry.Register(new Fake("z", [Capabilities.TextSearch], Execute));
@@ -41,18 +58,23 @@ public sealed class ProviderRegistryTests
         registry.Register(new Fake("other", [Capabilities.Overview]));
         var observed = new List<ProviderResult>();
         registry.SetObserver((result, _) => observed.Add(result));
-        var results = await registry.CallAsync(new(Capabilities.TextSearch, "needle", "src", 2, "destination", 800), cancellationToken: Token);
+        var results = await registry.CallAsync(
+            new(Capabilities.TextSearch, "needle", "src", 2, "destination", 800),
+            cancellationToken: Token
+        );
         results.Select(result => result.Provider).Should().Equal("z", "a");
         observed.Should().Equal(results);
-        results.Should().AllSatisfy(result =>
-        {
-            result.Error.Should().BeNull();
-            result.Capability.Should().Be(Capabilities.TextSearch);
-            result.Truncated.Should().BeTrue();
-            result.Bytes.Should().Be(73);
-            result.Items[0].Provider.Should().Be("origin");
-            result.Items[0].Tool.Should().Be("search");
-        });
+        results
+            .Should()
+            .AllSatisfy(result =>
+            {
+                result.Error.Should().BeNull();
+                result.Capability.Should().Be(Capabilities.TextSearch);
+                result.Truncated.Should().BeTrue();
+                result.Bytes.Should().Be(73);
+                result.Items[0].Provider.Should().Be("origin");
+                result.Items[0].Tool.Should().Be("search");
+            });
     }
 
     [Fact]
@@ -62,18 +84,50 @@ public sealed class ProviderRegistryTests
         var hint = new ProviderException("failure", "boom", "lookup", "try y");
         registry.Register(new Fake("healthy", [Capabilities.TextSearch]));
         registry.Register(new Fake("failure", [Capabilities.TextSearch], (_, _) => throw hint));
-        registry.Register(new Fake("partial", [Capabilities.TextSearch], (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Name = "kept" }], Error = new ProviderNotIndexedException() })));
-        registry.Register(new Fake("cancel", [Capabilities.TextSearch], async (_, token) => { await Task.Delay(Timeout.InfiniteTimeSpan, token); return new(); }));
+        registry.Register(
+            new Fake(
+                "partial",
+                [Capabilities.TextSearch],
+                (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult
+                        {
+                            Items = [new() { Name = "kept" }],
+                            Error = new ProviderNotIndexedException(),
+                        }
+                    )
+            )
+        );
+        registry.Register(
+            new Fake(
+                "cancel",
+                [Capabilities.TextSearch],
+                async (_, token) =>
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    return new();
+                }
+            )
+        );
         var release = new TaskCompletionSource<ProviderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         registry.Register(new Fake("ignores", [Capabilities.TextSearch], (_, _) => release.Task));
-        var results = await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token).WaitAsync(TimeSpan.FromSeconds(5), Token);
+        var results = await registry
+            .CallAsync(new(Capabilities.TextSearch), cancellationToken: Token)
+            .WaitAsync(TimeSpan.FromSeconds(5), Token);
         release.SetException(new InvalidOperationException("late fault is observed"));
         results[0].Error.Should().BeNull();
         results[1].Error.Should().BeSameAs(hint);
         results[1].Error!.Message.Should().Be("failure (lookup): boom — try y");
         results[2].Error.Should().BeOfType<ProviderNotIndexedException>();
         results[2].Items[0].Name.Should().Be("kept");
-        results.Skip(3).Should().AllSatisfy(result => { result.TimedOut.Should().BeTrue(); result.Error.Should().NotBeNull(); });
+        results
+            .Skip(3)
+            .Should()
+            .AllSatisfy(result =>
+            {
+                result.TimedOut.Should().BeTrue();
+                result.Error.Should().NotBeNull();
+            });
     }
 
     [Fact]
@@ -81,7 +135,18 @@ public sealed class ProviderRegistryTests
     {
         await using var registry = new ProviderRegistry(TimeSpan.FromSeconds(20));
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        registry.Register(new Fake("a", [Capabilities.Context], async (_, token) => { started.SetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, token); return new(); }));
+        registry.Register(
+            new Fake(
+                "a",
+                [Capabilities.Context],
+                async (_, token) =>
+                {
+                    started.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    return new();
+                }
+            )
+        );
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
         var call = registry.CallAsync(new(Capabilities.Context), cancellationToken: cancellation.Token);
         await started.Task.WaitAsync(Token);
@@ -102,7 +167,11 @@ public sealed class ProviderRegistryTests
         registry.ExcludeFromContext("z");
         registry.InContext("z").Should().BeFalse();
         registry.InContext("a").Should().BeTrue();
-        registry.Capabilities().Select(info => info.Capability + "/" + info.Provider).Should().Equal("code.symbol_search/z", "code.text_search/a", "code.text_search/z");
+        registry
+            .Capabilities()
+            .Select(info => info.Capability + "/" + info.Provider)
+            .Should()
+            .Equal("code.symbol_search/z", "code.text_search/a", "code.text_search/z");
         registry.IndexedProviders().Should().Equal("z");
         var results = await registry.CallAsync(new(Capabilities.TextSearch), name => !registry.InContext(name), Token);
         results.Should().ContainSingle().Which.Provider.Should().Be("a");
@@ -129,14 +198,37 @@ public sealed class ProviderRegistryTests
     public async Task PathFilterRunsBeforeObserverAndPreservesPathlessItems()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("a", [Capabilities.TextSearch], (_, _) => Task.FromResult(new ProviderResult
-        {
-            Items = [new() { Path = "src/a.cs" }, new() { Path = ".claude/worktrees/x/src/a.cs" }, new() { Name = "pathless" }],
-            Bytes = 100,
-        })));
+        registry.Register(
+            new Fake(
+                "a",
+                [Capabilities.TextSearch],
+                (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult
+                        {
+                            Items =
+                            [
+                                new() { Path = "src/a.cs" },
+                                new() { Path = ".claude/worktrees/x/src/a.cs" },
+                                new() { Name = "pathless" },
+                            ],
+                            Bytes = 100,
+                        }
+                    )
+            )
+        );
         registry.SetPathFilter(path => path.StartsWith(".claude/worktrees/", StringComparison.Ordinal));
-        registry.SetObserver((result, _) => { result.Items.Count.Should().Be(2); result.Bytes.Should().Be(100); });
-        var result = (await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token)).Should().ContainSingle().Which;
+        registry.SetObserver(
+            (result, _) =>
+            {
+                result.Items.Count.Should().Be(2);
+                result.Bytes.Should().Be(100);
+            }
+        );
+        var result = (await registry.CallAsync(new(Capabilities.TextSearch), cancellationToken: Token))
+            .Should()
+            .ContainSingle()
+            .Which;
         result.Items.Select(item => item.Path).Should().Equal("src/a.cs", null);
     }
 
@@ -144,8 +236,25 @@ public sealed class ProviderRegistryTests
     public async Task OverviewKeepsStructuredAnswersAndOnlyFirstErrorLine()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("a", [Capabilities.Overview], (_, _) => Task.FromResult(new ProviderResult { Summary = new Dictionary<string, JsonElement> { ["name"] = JsonSerializer.SerializeToElement("project") } })));
-        registry.Register(new Fake("error", [Capabilities.Overview], (_, _) => throw new ProviderException("error", "first\nsecond")));
+        registry.Register(
+            new Fake(
+                "a",
+                [Capabilities.Overview],
+                (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult
+                        {
+                            Summary = new Dictionary<string, JsonElement>
+                            {
+                                ["name"] = JsonSerializer.SerializeToElement("project"),
+                            },
+                        }
+                    )
+            )
+        );
+        registry.Register(
+            new Fake("error", [Capabilities.Overview], (_, _) => throw new ProviderException("error", "first\nsecond"))
+        );
         var skipped = new Fake("skipped", [Capabilities.Overview]);
         registry.Register(skipped);
         var (structure, errors) = await registry.OverviewAsync(name => name == "skipped", Token);
@@ -166,13 +275,25 @@ public sealed class ProviderRegistryTests
         await registry.WarmAsync();
         a.Discoveries.Should().Be(1);
         b.Discoveries.Should().Be(1);
-        var error = (await FluentActions.Awaiting(() => registry.DisposeAsync().AsTask()).Should().ThrowExactlyAsync<IOException>()).Which;
+        var error = (
+            await FluentActions
+                .Awaiting(() => registry.DisposeAsync().AsTask())
+                .Should()
+                .ThrowExactlyAsync<IOException>()
+        ).Which;
         error.Message.Should().Be("first");
         a.Closes.Should().Be(1);
         b.Closes.Should().Be(1);
     }
 
-    internal class Fake(string name, string[] capabilities, Func<ProviderRequest, CancellationToken, Task<ProviderResult>>? execute = null, string freshness = "live", string latency = "low", string health = "ready") : IProvider, IVersionedProvider
+    internal class Fake(
+        string name,
+        string[] capabilities,
+        Func<ProviderRequest, CancellationToken, Task<ProviderResult>>? execute = null,
+        string freshness = "live",
+        string latency = "low",
+        string health = "ready"
+    ) : IProvider, IVersionedProvider
     {
         private int _calls;
         private int _discoveries;
@@ -184,11 +305,15 @@ public sealed class ProviderRegistryTests
         public int Probes => _probes;
         public int Closes { get; private set; }
         public Exception? CloseError { get; init; }
+
         public IReadOnlyList<CapabilityInfo> Capabilities()
         {
             Interlocked.Increment(ref _discoveries);
-            return capabilities.Select(capability => new CapabilityInfo(capability, name, "low", latency, freshness, "project")).ToArray();
+            return capabilities
+                .Select(capability => new CapabilityInfo(capability, name, "low", latency, freshness, "project"))
+                .ToArray();
         }
+
         public ValueTask<ProviderHealth> HealthAsync(bool probe, CancellationToken cancellationToken = default)
         {
             if (probe)
@@ -197,11 +322,13 @@ public sealed class ProviderRegistryTests
             }
             return ValueTask.FromResult(new ProviderHealth(health));
         }
+
         public Task<ProviderResult> ExecuteAsync(ProviderRequest request, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref _calls);
             return execute?.Invoke(request, cancellationToken) ?? Task.FromResult(new ProviderResult());
         }
+
         public ValueTask DisposeAsync()
         {
             Closes++;

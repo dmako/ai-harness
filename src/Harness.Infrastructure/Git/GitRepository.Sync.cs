@@ -11,11 +11,18 @@ public sealed partial record GitRepository
     }
 
     public async Task<IReadOnlyList<string>> ListFilesAsync(CancellationToken token = default) =>
-        SplitNul(await ReadGitAsync(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], token).ConfigureAwait(false)).Distinct(StringComparer.Ordinal).ToArray();
+        SplitNul(
+                await ReadGitAsync(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], token)
+                    .ConfigureAwait(false)
+            )
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
     public async Task<IReadOnlyList<string>> DirtyPathsAsync(CancellationToken token = default)
     {
-        var fields = SplitNul(await ReadGitAsync(["status", "--porcelain=v1", "-z", "--untracked-files=all"], token).ConfigureAwait(false));
+        var fields = SplitNul(
+            await ReadGitAsync(["status", "--porcelain=v1", "-z", "--untracked-files=all"], token).ConfigureAwait(false)
+        );
         List<string> paths = [];
         var i = 0;
         while (i < fields.Length)
@@ -42,7 +49,10 @@ public sealed partial record GitRepository
             throw new InvalidDataException(commit + ": commit not found in repository");
         }
 
-        var fields = SplitNul(await ReadGitAsync(["diff", "--name-status", "-z", "-M", "--no-ext-diff", commit, "--"], token).ConfigureAwait(false));
+        var fields = SplitNul(
+            await ReadGitAsync(["diff", "--name-status", "-z", "-M", "--no-ext-diff", commit, "--"], token)
+                .ConfigureAwait(false)
+        );
         List<GitChange> changes = [];
         var i = 0;
         while (i < fields.Length)
@@ -54,19 +64,28 @@ public sealed partial record GitRepository
                 throw new InvalidDataException("Git returned an incomplete name-status record.");
             }
 
-            changes.Add(status switch
-            {
-                'R' => new("renamed", fields[i + 1], fields[i]),
-                'C' => new("added", fields[i + 1]),
-                'A' => new("added", fields[i]),
-                'D' => new("deleted", fields[i]),
-                _ => new("modified", fields[i]),
-            });
+            changes.Add(
+                status switch
+                {
+                    'R' => new("renamed", fields[i + 1], fields[i]),
+                    'C' => new("added", fields[i + 1]),
+                    'A' => new("added", fields[i]),
+                    'D' => new("deleted", fields[i]),
+                    _ => new("modified", fields[i]),
+                }
+            );
             i += count;
         }
-        var deleted = changes.Select((change, index) => (change, index)).Where(pair => pair.change.Kind is "deleted").ToDictionary(pair => pair.change.Path, pair => pair.index, StringComparer.Ordinal);
+        var deleted = changes
+            .Select((change, index) => (change, index))
+            .Where(pair => pair.change.Kind is "deleted")
+            .ToDictionary(pair => pair.change.Path, pair => pair.index, StringComparer.Ordinal);
         List<string> added = [];
-        foreach (var path in SplitNul(await ReadGitAsync(["ls-files", "-z", "--others", "--exclude-standard"], token).ConfigureAwait(false)))
+        foreach (
+            var path in SplitNul(
+                await ReadGitAsync(["ls-files", "-z", "--others", "--exclude-standard"], token).ConfigureAwait(false)
+            )
+        )
         {
             if (deleted.Remove(path, out var index))
             {
@@ -86,10 +105,18 @@ public sealed partial record GitRepository
         return changes;
     }
 
-    private async Task PairRenamesAsync(string commit, List<GitChange> changes, Dictionary<string, int> deleted, List<string> added, CancellationToken token)
+    private async Task PairRenamesAsync(
+        string commit,
+        List<GitChange> changes,
+        Dictionary<string, int> deleted,
+        List<string> added,
+        CancellationToken token
+    )
     {
         Dictionary<string, string> blobs = new(StringComparer.Ordinal);
-        foreach (var entry in SplitNul(await ReadGitAsync(["ls-tree", "-r", "-z", commit], token).ConfigureAwait(false)))
+        foreach (
+            var entry in SplitNul(await ReadGitAsync(["ls-tree", "-r", "-z", commit], token).ConfigureAwait(false))
+        )
         {
             var split = entry.IndexOf('\t', StringComparison.Ordinal);
             if (split < 0 || !deleted.ContainsKey(entry[(split + 1)..]))
@@ -107,7 +134,10 @@ public sealed partial record GitRepository
         List<string> remaining = [];
         foreach (var batch in added.Chunk(32))
         {
-            var hashes = (await ReadGitAsync(["hash-object", "--", .. batch], token).ConfigureAwait(false)).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var hashes = (await ReadGitAsync(["hash-object", "--", .. batch], token).ConfigureAwait(false)).Split(
+                (char[]?)null,
+                StringSplitOptions.RemoveEmptyEntries
+            );
             for (var i = 0; i < batch.Length; i++)
             {
                 if (i < hashes.Length && blobs.Remove(hashes[i], out var old))
@@ -134,7 +164,9 @@ public sealed partial record GitRepository
 
         return result.Output;
     }
+
     private static string[] SplitNul(string output) => output.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+
     private static void ValidateRevision(string value)
     {
         if (string.IsNullOrEmpty(value) || value[0] is '-' || value.Contains('\0', StringComparison.Ordinal))

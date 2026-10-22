@@ -18,9 +18,24 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
     public static IGraphifyWatch Start(ProviderProcessOptions options, string log)
     {
         var (executable, directory, environment) = ProviderProcessFactory.Prepare(options);
-        using var input = File.OpenHandle(OperatingSystem.IsWindows() ? "NUL" : "/dev/null", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var output = File.OpenHandle(OperatingSystem.IsWindows() ? "NUL" : "/dev/null", FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
-        using var error = File.OpenHandle(log, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        using var input = File.OpenHandle(
+            OperatingSystem.IsWindows() ? "NUL" : "/dev/null",
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite
+        );
+        using var output = File.OpenHandle(
+            OperatingSystem.IsWindows() ? "NUL" : "/dev/null",
+            FileMode.Open,
+            FileAccess.Write,
+            FileShare.ReadWrite
+        );
+        using var error = File.OpenHandle(
+            log,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.ReadWrite | FileShare.Delete
+        );
         return OperatingSystem.IsWindows()
             ? Windows(executable, options.Arguments, directory, environment, input, output, error)
             : Unix(executable, options.Arguments, directory, environment, input, output, error);
@@ -34,16 +49,40 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
         }
 
         if (!OperatingSystem.IsWindows())
-        { _ = UnixProviderProcess.Native.kill(-Id, 9); return; }
+        {
+            _ = UnixProviderProcess.Native.kill(-Id, 9);
+            return;
+        }
         try
-        { using var process = Process.GetProcessById(Id); process.Kill(entireProcessTree: true); }
-        catch (ArgumentException) { /* Already exited. */ }
+        {
+            using var process = Process.GetProcessById(Id);
+            process.Kill(entireProcessTree: true);
+        }
+        catch (ArgumentException)
+        { /* Already exited. */
+        }
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2025:Do not pass disposable objects into unawaited tasks", Justification = "The successful launch transfers Process ownership to WaitAsync, which disposes it after the detached watch exits.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2025:Do not pass disposable objects into unawaited tasks",
+        Justification = "The successful launch transfers Process ownership to WaitAsync, which disposes it after the detached watch exits."
+    )]
     [SupportedOSPlatform("windows")]
-    [SuppressMessage("Blocker Code Smell", "S3869:SafeHandle.DangerousGetHandle should not be called", Justification = "Borrowed handles are held alive through CreateProcess by the synchronous caller's using scopes.")]
-    private static DetachedProcess Windows(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment, SafeFileHandle input, SafeFileHandle output, SafeFileHandle error)
+    [SuppressMessage(
+        "Blocker Code Smell",
+        "S3869:SafeHandle.DangerousGetHandle should not be called",
+        Justification = "Borrowed handles are held alive through CreateProcess by the synchronous caller's using scopes."
+    )]
+    private static DetachedProcess Windows(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string directory,
+        Dictionary<string, string> environment,
+        SafeFileHandle input,
+        SafeFileHandle output,
+        SafeFileHandle error
+    )
     {
         foreach (var handle in new[] { input, output, error })
         {
@@ -51,25 +90,74 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
         }
 
         using var handles = new NativeMemory(IntPtr.Size * 3);
-        Marshal.Copy(new[] { input.DangerousGetHandle(), output.DangerousGetHandle(), error.DangerousGetHandle() }, 0, handles.Pointer, 3);
+        Marshal.Copy(
+            new[] { input.DangerousGetHandle(), output.DangerousGetHandle(), error.DangerousGetHandle() },
+            0,
+            handles.Pointer,
+            3
+        );
         nuint size = 0;
         _ = WindowsProviderProcess.Native.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
         using var attributes = new NativeMemory(checked((int)size));
         Check(WindowsProviderProcess.Native.InitializeProcThreadAttributeList(attributes.Pointer, 1, 0, ref size));
         try
         {
-            Check(WindowsProviderProcess.Native.UpdateProcThreadAttribute(attributes.Pointer, 0, 0x20002, handles.Pointer, (nuint)(3 * IntPtr.Size), IntPtr.Zero, IntPtr.Zero));
+            Check(
+                WindowsProviderProcess.Native.UpdateProcThreadAttribute(
+                    attributes.Pointer,
+                    0,
+                    0x20002,
+                    handles.Pointer,
+                    (nuint)(3 * IntPtr.Size),
+                    IntPtr.Zero,
+                    IntPtr.Zero
+                )
+            );
             var startup = new WindowsProviderProcess.StartupInfoEx
             {
-                Startup = new() { Size = Marshal.SizeOf<WindowsProviderProcess.StartupInfoEx>(), Flags = 0x100, Input = input.DangerousGetHandle(), Output = output.DangerousGetHandle(), Error = error.DangerousGetHandle() },
+                Startup = new()
+                {
+                    Size = Marshal.SizeOf<WindowsProviderProcess.StartupInfoEx>(),
+                    Flags = 0x100,
+                    Input = input.DangerousGetHandle(),
+                    Output = output.DangerousGetHandle(),
+                    Error = error.DangerousGetHandle(),
+                },
                 Attributes = attributes.Pointer,
             };
-            using var commandLine = new NativeMemory(string.Join(' ', new[] { executable }.Concat(arguments).Select(WindowsProviderProcess.Quote)), unicode: true);
-            using var block = new NativeMemory(string.Join('\0', environment.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase).Select(pair => pair.Key + "=" + pair.Value)) + "\0\0", unicode: true);
+            using var commandLine = new NativeMemory(
+                string.Join(' ', new[] { executable }.Concat(arguments).Select(WindowsProviderProcess.Quote)),
+                unicode: true
+            );
+            using var block = new NativeMemory(
+                string.Join(
+                    '\0',
+                    environment
+                        .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                        .Select(pair => pair.Key + "=" + pair.Value)
+                ) + "\0\0",
+                unicode: true
+            );
             // BREAKAWAY_FROM_JOB + EXTENDED_STARTUPINFO + UNICODE_ENVIRONMENT + NEW_PROCESS_GROUP + DETACHED_PROCESS.
-            if (!WindowsProviderProcess.Native.CreateProcessW(executable, commandLine.Pointer, IntPtr.Zero, IntPtr.Zero, true, 0x01080608, block.Pointer, directory, ref startup, out var info))
+            if (
+                !WindowsProviderProcess.Native.CreateProcessW(
+                    executable,
+                    commandLine.Pointer,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    true,
+                    0x01080608,
+                    block.Pointer,
+                    directory,
+                    ref startup,
+                    out var info
+                )
+            )
             {
-                throw new Win32Exception(Marshal.GetLastPInvokeError(), "Cannot detach graphify watch; a containing Windows job may forbid process breakaway.");
+                throw new Win32Exception(
+                    Marshal.GetLastPInvokeError(),
+                    "Cannot detach graphify watch; a containing Windows job may forbid process breakaway."
+                );
             }
 
             using var processHandle = new SafeProcessHandle(info.Process, true);
@@ -80,9 +168,16 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
                 _ = process.SafeHandle;
                 return new(info.Id, WaitAsync(process));
             }
-            catch { process.Dispose(); throw; }
+            catch
+            {
+                process.Dispose();
+                throw;
+            }
         }
-        finally { WindowsProviderProcess.Native.DeleteProcThreadAttributeList(attributes.Pointer); }
+        finally
+        {
+            WindowsProviderProcess.Native.DeleteProcThreadAttributeList(attributes.Pointer);
+        }
     }
 
     private static async Task<int> WaitAsync(Process process)
@@ -95,8 +190,20 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
     }
 
     [UnsupportedOSPlatform("windows")]
-    [SuppressMessage("Blocker Code Smell", "S3869:SafeHandle.DangerousGetHandle should not be called", Justification = "posix_spawn dup2 actions borrow descriptors held alive by the synchronous caller.")]
-    private static DetachedProcess Unix(string executable, IReadOnlyList<string> arguments, string directory, Dictionary<string, string> environment, SafeFileHandle input, SafeFileHandle output, SafeFileHandle error)
+    [SuppressMessage(
+        "Blocker Code Smell",
+        "S3869:SafeHandle.DangerousGetHandle should not be called",
+        Justification = "posix_spawn dup2 actions borrow descriptors held alive by the synchronous caller."
+    )]
+    private static DetachedProcess Unix(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string directory,
+        Dictionary<string, string> environment,
+        SafeFileHandle input,
+        SafeFileHandle output,
+        SafeFileHandle error
+    )
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
         {
@@ -117,26 +224,54 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
                 Check(UnixProviderProcess.Native.posix_spawn_file_actions_addchdir_np(actions.Pointer, cwd.Pointer));
                 foreach (var (handle, target) in new[] { (input, 0), (output, 1), (error, 2) })
                 {
-                    Check(UnixProviderProcess.Native.posix_spawn_file_actions_adddup2(actions.Pointer, handle.DangerousGetHandle().ToInt32(), target));
+                    Check(
+                        UnixProviderProcess.Native.posix_spawn_file_actions_adddup2(
+                            actions.Pointer,
+                            handle.DangerousGetHandle().ToInt32(),
+                            target
+                        )
+                    );
                 }
 
                 using var argv = new UnixProviderProcess.StringVector(new[] { executable }.Concat(arguments));
-                using var env = new UnixProviderProcess.StringVector(environment.Select(pair => pair.Key + "=" + pair.Value));
+                using var env = new UnixProviderProcess.StringVector(
+                    environment.Select(pair => pair.Key + "=" + pair.Value)
+                );
                 using var name = new NativeMemory(executable);
-                Check(UnixProviderProcess.Native.posix_spawn(out var pid, name.Pointer, actions.Pointer, attributes.Pointer, argv.Pointer, env.Pointer));
+                Check(
+                    UnixProviderProcess.Native.posix_spawn(
+                        out var pid,
+                        name.Pointer,
+                        actions.Pointer,
+                        attributes.Pointer,
+                        argv.Pointer,
+                        env.Pointer
+                    )
+                );
                 return new(pid, UnixProviderProcess.Reap(pid));
             }
-            finally { _ = UnixProviderProcess.Native.posix_spawn_file_actions_destroy(actions.Pointer); }
+            finally
+            {
+                _ = UnixProviderProcess.Native.posix_spawn_file_actions_destroy(actions.Pointer);
+            }
         }
-        finally { _ = UnixProviderProcess.Native.posix_spawnattr_destroy(attributes.Pointer); }
+        finally
+        {
+            _ = UnixProviderProcess.Native.posix_spawnattr_destroy(attributes.Pointer);
+        }
     }
 
-    private static void Check(bool success) { if (!success)
+    private static void Check(bool success)
+    {
+        if (!success)
         {
             throw new Win32Exception(Marshal.GetLastPInvokeError());
         }
     }
-    private static void Check(int error) { if (error is not 0)
+
+    private static void Check(int error)
+    {
+        if (error is not 0)
         {
             throw new Win32Exception(error);
         }

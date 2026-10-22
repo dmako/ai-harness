@@ -25,18 +25,37 @@ public sealed class StorageTests
             var migration = MigrationCatalog.All[index];
             migration.Version.Should().Be(index + 1);
             migration.Name.Should().Be(Path.GetFileNameWithoutExtension(frozen[index].GetProperty("path").GetString()));
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(migration.Sql))).Should().Be(frozen[index].GetProperty("sha256").GetString());
+            Convert
+                .ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(migration.Sql)))
+                .Should()
+                .Be(frozen[index].GetProperty("sha256").GetString());
         }
     }
 
     [Fact]
     public void MigrationFilesMustHaveValidNamesAndContiguousUniqueVersions()
     {
-        FluentActions.Invoking(() => MigrationCatalog.Load([("readme.txt", "")])).Should().ThrowExactly<InvalidDataException>();
-        FluentActions.Invoking(() => MigrationCatalog.Load([("0002_gap.sql", "")])).Should().ThrowExactly<InvalidDataException>();
-        FluentActions.Invoking(() => MigrationCatalog.Load([("0000_zero.sql", "")])).Should().ThrowExactly<InvalidDataException>();
-        FluentActions.Invoking(() => MigrationCatalog.Load([("0001_one.sql", ""), ("0001_other.sql", "")])).Should().ThrowExactly<InvalidDataException>();
-        MigrationCatalog.Load([("0002_two.sql", ""), ("0001_one.sql", "")]).Select(migration => migration.Version).Should().Equal(1, 2);
+        FluentActions
+            .Invoking(() => MigrationCatalog.Load([("readme.txt", "")]))
+            .Should()
+            .ThrowExactly<InvalidDataException>();
+        FluentActions
+            .Invoking(() => MigrationCatalog.Load([("0002_gap.sql", "")]))
+            .Should()
+            .ThrowExactly<InvalidDataException>();
+        FluentActions
+            .Invoking(() => MigrationCatalog.Load([("0000_zero.sql", "")]))
+            .Should()
+            .ThrowExactly<InvalidDataException>();
+        FluentActions
+            .Invoking(() => MigrationCatalog.Load([("0001_one.sql", ""), ("0001_other.sql", "")]))
+            .Should()
+            .ThrowExactly<InvalidDataException>();
+        MigrationCatalog
+            .Load([("0002_two.sql", ""), ("0001_one.sql", "")])
+            .Select(migration => migration.Version)
+            .Should()
+            .Equal(1, 2);
     }
 
     [Fact]
@@ -51,10 +70,16 @@ public sealed class StorageTests
             Scalar(connection, "PRAGMA journal_mode").Should().Be("wal");
             Scalar(connection, "PRAGMA foreign_keys").Should().Be(1L);
             Scalar(connection, "PRAGMA busy_timeout").Should().Be(5000L);
-            FluentActions.Invoking(() => Execute(connection, "INSERT INTO schema_migrations VALUES ('text', 'bad', 'bad')")).Should().ThrowExactly<SqliteException>();
+            FluentActions
+                .Invoking(() => Execute(connection, "INSERT INTO schema_migrations VALUES ('text', 'bad', 'bad')"))
+                .Should()
+                .ThrowExactly<SqliteException>();
             Scalar(connection, "SELECT COUNT(*) FROM pragma_foreign_key_check").Should().Be(0L);
             database.PutDiagnostic("quote';--", "žluťoučký 🧪");
-            FluentActions.Invoking(() => database.GetDiagnostic("absent")).Should().ThrowExactly<KeyNotFoundException>();
+            FluentActions
+                .Invoking(() => database.GetDiagnostic("absent"))
+                .Should()
+                .ThrowExactly<KeyNotFoundException>();
         }
 
         using var reopened = Open(directory.DatabasePath);
@@ -106,11 +131,19 @@ public sealed class StorageTests
     public void ForeignKeyRebuildPreservesCompletedAndBlockedTasksAndReferences()
     {
         using var directory = new TestDirectory();
-        using (var historical = Open(directory.DatabasePath, new StorageOptions(), MigrationCatalog.All.Take(15).ToArray()))
+        using (
+            var historical = Open(directory.DatabasePath, new StorageOptions(), MigrationCatalog.All.Take(15).ToArray())
+        )
         {
             using var connection = historical.OpenConnection();
-            Execute(connection, "INSERT INTO tasks (id, title, status, completed_at, created_at, updated_at) VALUES ('A', 'a', 'done', 'now', 'now', 'now')");
-            Execute(connection, "INSERT INTO tasks (id, title, status, blocked_reason, created_at, updated_at) VALUES ('B', 'b', 'blocked', 'later', 'now', 'now')");
+            Execute(
+                connection,
+                "INSERT INTO tasks (id, title, status, completed_at, created_at, updated_at) VALUES ('A', 'a', 'done', 'now', 'now', 'now')"
+            );
+            Execute(
+                connection,
+                "INSERT INTO tasks (id, title, status, blocked_reason, created_at, updated_at) VALUES ('B', 'b', 'blocked', 'later', 'now', 'now')"
+            );
             Execute(connection, "INSERT INTO task_dependencies VALUES ('B', 'A')");
         }
 
@@ -132,8 +165,24 @@ public sealed class StorageTests
             created.SchemaVersion().Should().Be(1);
         }
 
-        var error = FluentActions.Invoking(() => Open(directory.DatabasePath, new StorageOptions(),
-            [initial, new Migration(2, "0002_bad", "DELETE FROM one; CREATE TABLE partial (x INTEGER); INSERT INTO missing VALUES (1);")])).Should().ThrowExactly<IOException>().Which;
+        var error = FluentActions
+            .Invoking(() =>
+                Open(
+                    directory.DatabasePath,
+                    new StorageOptions(),
+                    [
+                        initial,
+                        new Migration(
+                            2,
+                            "0002_bad",
+                            "DELETE FROM one; CREATE TABLE partial (x INTEGER); INSERT INTO missing VALUES (1);"
+                        ),
+                    ]
+                )
+            )
+            .Should()
+            .ThrowExactly<IOException>()
+            .Which;
         error.Message.Should().Contain("saved as");
         error.InnerException.Should().BeOfType<SqliteException>();
         using var database = HarnessDatabase.OpenReadOnly(directory.DatabasePath);
@@ -141,7 +190,9 @@ public sealed class StorageTests
         database.SchemaVersion().Should().Be(1);
         Scalar(connection, "SELECT x FROM one").Should().Be(7L);
         Scalar(connection, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'partial'").Should().Be(0L);
-        using var backup = HarnessDatabase.OpenReadOnly(DatabaseBackups.List(directory.DatabasePath).Should().ContainSingle().Which);
+        using var backup = HarnessDatabase.OpenReadOnly(
+            DatabaseBackups.List(directory.DatabasePath).Should().ContainSingle().Which
+        );
         backup.SchemaVersion().Should().Be(1);
     }
 
@@ -149,23 +200,46 @@ public sealed class StorageTests
     public void ForeignKeyViolationsDuringRebuildRollBackAndRestoreEnforcement()
     {
         using var directory = new TestDirectory();
-        var initial = new Migration(1, "0001_one", "CREATE TABLE parent (id TEXT PRIMARY KEY) STRICT; CREATE TABLE child (id TEXT REFERENCES parent(id)) STRICT; INSERT INTO parent VALUES ('p'); INSERT INTO child VALUES ('p');");
+        var initial = new Migration(
+            1,
+            "0001_one",
+            "CREATE TABLE parent (id TEXT PRIMARY KEY) STRICT; CREATE TABLE child (id TEXT REFERENCES parent(id)) STRICT; INSERT INTO parent VALUES ('p'); INSERT INTO child VALUES ('p');"
+        );
         using (var created = Open(directory.DatabasePath, new StorageOptions(), [initial]))
         {
             created.SchemaVersion().Should().Be(1);
         }
 
-        var failure = FluentActions.Invoking(() => Open(directory.DatabasePath, new StorageOptions(),
-            [initial, new Migration(2, "0002_bad", "-- harness: foreign keys off\nDELETE FROM parent;")])).Should().ThrowExactly<IOException>().Which;
+        var failure = FluentActions
+            .Invoking(() =>
+                Open(
+                    directory.DatabasePath,
+                    new StorageOptions(),
+                    [initial, new Migration(2, "0002_bad", "-- harness: foreign keys off\nDELETE FROM parent;")]
+                )
+            )
+            .Should()
+            .ThrowExactly<IOException>()
+            .Which;
         failure.InnerException.Should().BeOfType<InvalidDataException>();
         failure.Message.Should().Contain("saved as");
         using var database = HarnessDatabase.OpenReadOnly(directory.DatabasePath);
         using var connection = database.OpenConnection();
         database.SchemaVersion().Should().Be(1);
         Scalar(connection, "SELECT COUNT(*) FROM parent").Should().Be(1L);
-        using var writable = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = directory.DatabasePath, ForeignKeys = true, Pooling = false }.ToString());
+        using var writable = new SqliteConnection(
+            new SqliteConnectionStringBuilder
+            {
+                DataSource = directory.DatabasePath,
+                ForeignKeys = true,
+                Pooling = false,
+            }.ToString()
+        );
         writable.Open();
-        FluentActions.Invoking(() => Execute(writable, "INSERT INTO child VALUES ('missing')")).Should().ThrowExactly<SqliteException>();
+        FluentActions
+            .Invoking(() => Execute(writable, "INSERT INTO child VALUES ('missing')"))
+            .Should()
+            .ThrowExactly<SqliteException>();
     }
 
     [Theory]
@@ -205,7 +279,10 @@ public sealed class StorageTests
     {
         using var directory = new TestDirectory();
         var missing = Path.Combine(directory.Path, "missing", "h.db");
-        FluentActions.Invoking(() => HarnessDatabase.OpenReadOnly(missing)).Should().ThrowExactly<FileNotFoundException>();
+        FluentActions
+            .Invoking(() => HarnessDatabase.OpenReadOnly(missing))
+            .Should()
+            .ThrowExactly<FileNotFoundException>();
         Directory.Exists(Path.GetDirectoryName(missing)).Should().BeFalse();
         File.Copy(Fixture("schema-01.db"), directory.DatabasePath);
         var before = SHA256.HashData(File.ReadAllBytes(directory.DatabasePath));
@@ -214,7 +291,10 @@ public sealed class StorageTests
             database.InspectMigrationState().Pending.Should().BeTrue();
             database.InspectMigrationState().Applied.Should().Be(1);
             database.GetDiagnostic("fixture").Should().Be("žluťoučký 🧪");
-            FluentActions.Invoking(() => database.PutDiagnostic("fixture", "changed")).Should().ThrowExactly<SqliteException>();
+            FluentActions
+                .Invoking(() => database.PutDiagnostic("fixture", "changed"))
+                .Should()
+                .ThrowExactly<SqliteException>();
         }
 
         SHA256.HashData(File.ReadAllBytes(directory.DatabasePath)).Should().Equal(before);
@@ -234,7 +314,10 @@ public sealed class StorageTests
         var backupDirectory = DatabaseBackups.DirectoryPath(directory.DatabasePath);
         File.WriteAllText(backupDirectory, "blocking-file");
         migrations.Add(new Migration(2, "0002_second", "CREATE TABLE t2 (x INTEGER) STRICT;"));
-        FluentActions.Invoking(() => Open(directory.DatabasePath, new StorageOptions(), migrations)).Should().ThrowExactly<IOException>();
+        FluentActions
+            .Invoking(() => Open(directory.DatabasePath, new StorageOptions(), migrations))
+            .Should()
+            .ThrowExactly<IOException>();
         using (var unchanged = HarnessDatabase.OpenReadOnly(directory.DatabasePath))
         {
             unchanged.SchemaVersion().Should().Be(1);
@@ -245,7 +328,9 @@ public sealed class StorageTests
         {
             if (version > 2)
             {
-                migrations.Add(new Migration(version, $"{version:0000}_next", $"CREATE TABLE t{version} (x INTEGER) STRICT;"));
+                migrations.Add(
+                    new Migration(version, $"{version:0000}_next", $"CREATE TABLE t{version} (x INTEGER) STRICT;")
+                );
             }
 
             using var upgraded = Open(directory.DatabasePath, new StorageOptions(), migrations);
@@ -269,31 +354,64 @@ public sealed class StorageTests
     {
         using var directory = new TestDirectory();
         using var database = Open(directory.DatabasePath);
-        WriteTransaction(database, (connection, transaction) =>
-        {
-            Execute(connection, "INSERT INTO diagnostics VALUES ('committed', 'yes', 'now')", transaction);
-            return 0;
-        });
-        FluentActions.Invoking(() => WriteTransaction<int>(database, (connection, transaction) =>
-        {
-            Execute(connection, "DELETE FROM diagnostics", transaction);
-            throw new InvalidOperationException("rollback");
-        })).Should().ThrowExactly<InvalidOperationException>();
+        WriteTransaction(
+            database,
+            (connection, transaction) =>
+            {
+                Execute(connection, "INSERT INTO diagnostics VALUES ('committed', 'yes', 'now')", transaction);
+                return 0;
+            }
+        );
+        FluentActions
+            .Invoking(() =>
+                WriteTransaction<int>(
+                    database,
+                    (connection, transaction) =>
+                    {
+                        Execute(connection, "DELETE FROM diagnostics", transaction);
+                        throw new InvalidOperationException("rollback");
+                    }
+                )
+            )
+            .Should()
+            .ThrowExactly<InvalidOperationException>();
         database.GetDiagnostic("committed").Should().Be("yes");
-        FluentActions.Invoking(() => ReadTransaction(database, (connection, transaction) =>
-        {
-            Execute(connection, "DELETE FROM diagnostics", transaction);
-            return 0;
-        })).Should().ThrowExactly<SqliteException>();
-        ReadTransaction(database, (connection, transaction) => Scalar(connection, "SELECT value FROM diagnostics", transaction)).Should().Be("yes");
+        FluentActions
+            .Invoking(() =>
+                ReadTransaction(
+                    database,
+                    (connection, transaction) =>
+                    {
+                        Execute(connection, "DELETE FROM diagnostics", transaction);
+                        return 0;
+                    }
+                )
+            )
+            .Should()
+            .ThrowExactly<SqliteException>();
+        ReadTransaction(
+                database,
+                (connection, transaction) => Scalar(connection, "SELECT value FROM diagnostics", transaction)
+            )
+            .Should()
+            .Be("yes");
         database.PutDiagnostic("after-reader", "still writable");
         using var cancel = new CancellationTokenSource();
-        FluentActions.Invoking(() => WriteTransaction(database, (connection, transaction) =>
-        {
-            Execute(connection, "DELETE FROM diagnostics", transaction);
-            cancel.Cancel();
-            return 0;
-        }, cancel.Token)).Should().ThrowExactly<OperationCanceledException>();
+        FluentActions
+            .Invoking(() =>
+                WriteTransaction(
+                    database,
+                    (connection, transaction) =>
+                    {
+                        Execute(connection, "DELETE FROM diagnostics", transaction);
+                        cancel.Cancel();
+                        return 0;
+                    },
+                    cancel.Token
+                )
+            )
+            .Should()
+            .ThrowExactly<OperationCanceledException>();
         database.GetDiagnostic("committed").Should().Be("yes");
     }
 
@@ -302,7 +420,9 @@ public sealed class StorageTests
     {
         if (OperatingSystem.IsWindows())
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Unix mode bits do not apply on Windows; as in Go, Windows files inherit the containing directory ACL.");
+            throw Xunit.Sdk.SkipException.ForSkip(
+                "Unix mode bits do not apply on Windows; as in Go, Windows files inherit the containing directory ACL."
+            );
         }
 
         using var directory = new TestDirectory();
@@ -316,8 +436,12 @@ public sealed class StorageTests
             File.GetUnixFileMode(file).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
         }
 
-        File.GetUnixFileMode(Path.GetDirectoryName(path)!).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        File.GetUnixFileMode(DatabaseBackups.DirectoryPath(path)).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.GetUnixFileMode(Path.GetDirectoryName(path)!)
+            .Should()
+            .Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.GetUnixFileMode(DatabaseBackups.DirectoryPath(path))
+            .Should()
+            .Be(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 
     [Fact]
@@ -325,7 +449,10 @@ public sealed class StorageTests
     {
         using var directory = new TestDirectory();
         FluentActions.Invoking(() => Open(string.Empty)).Should().ThrowExactly<ArgumentException>();
-        FluentActions.Invoking(() => Open(Path.Combine(directory.Path, "bad?mode=memory"))).Should().ThrowExactly<ArgumentException>();
+        FluentActions
+            .Invoking(() => Open(Path.Combine(directory.Path, "bad?mode=memory")))
+            .Should()
+            .ThrowExactly<ArgumentException>();
         var path = Path.Combine(directory.Path, "with space # ; ž", "h.db");
         using (var database = Open(path))
         {
@@ -334,9 +461,19 @@ public sealed class StorageTests
 
         using var read = HarnessDatabase.OpenReadOnly(path);
         read.GetDiagnostic("k").Should().Be("v");
-        HarnessDatabase.FormatTime(DateTimeOffset.Parse("2026-01-02T05:04:05.1234567+02:00", CultureInfo.InvariantCulture)).Should().Be("2026-01-02T03:04:05.123456700Z");
+        HarnessDatabase
+            .FormatTime(DateTimeOffset.Parse("2026-01-02T05:04:05.1234567+02:00", CultureInfo.InvariantCulture))
+            .Should()
+            .Be("2026-01-02T03:04:05.123456700Z");
         var zero = DateTimeOffset.Parse("2026-01-02T03:04:05Z", CultureInfo.InvariantCulture);
-        (string.CompareOrdinal(HarnessDatabase.FormatTime(zero), HarnessDatabase.FormatTime(zero.AddMilliseconds(100))) < 0).Should().BeTrue();
+        (
+            string.CompareOrdinal(
+                HarnessDatabase.FormatTime(zero),
+                HarnessDatabase.FormatTime(zero.AddMilliseconds(100))
+            ) < 0
+        )
+            .Should()
+            .BeTrue();
     }
 
     [Fact]
@@ -384,22 +521,57 @@ public sealed class StorageTests
         using var child = StartWorker("hold", directory.DatabasePath);
         try
         {
-            (await child.StandardOutput.ReadLineAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken)).Should().Be("LOCKED");
-            using var current = Open(directory.DatabasePath, new StorageOptions { BusyTimeout = TimeSpan.FromSeconds(1) });
-            ReadTransaction(current, (connection, transaction) => Convert.ToInt32(Scalar(connection, "SELECT MAX(version) FROM schema_migrations", transaction), CultureInfo.InvariantCulture)).Should().Be(19);
+            (
+                await child
+                    .StandardOutput.ReadLineAsync(TestContext.Current.CancellationToken)
+                    .AsTask()
+                    .WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken)
+            )
+                .Should()
+                .Be("LOCKED");
+            using var current = Open(
+                directory.DatabasePath,
+                new StorageOptions { BusyTimeout = TimeSpan.FromSeconds(1) }
+            );
+            ReadTransaction(
+                    current,
+                    (connection, transaction) =>
+                        Convert.ToInt32(
+                            Scalar(connection, "SELECT MAX(version) FROM schema_migrations", transaction),
+                            CultureInfo.InvariantCulture
+                        )
+                )
+                .Should()
+                .Be(19);
             var timer = Stopwatch.StartNew();
-            var locked = FluentActions.Invoking(() => WriteTransaction(current, (connection, transaction) => 0)).Should().ThrowExactly<SqliteException>().Which;
+            var locked = FluentActions
+                .Invoking(() => WriteTransaction(current, (connection, transaction) => 0))
+                .Should()
+                .ThrowExactly<SqliteException>()
+                .Which;
             locked.SqliteErrorCode.Should().Be(5);
-            timer.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(850)).And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(3));
-            using var shortBudget = Open(directory.DatabasePath, new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(100) });
+            timer
+                .Elapsed.Should()
+                .BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(850))
+                .And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(3));
+            using var shortBudget = Open(
+                directory.DatabasePath,
+                new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(100) }
+            );
             using (var connection = shortBudget.OpenConnection())
             {
                 Scalar(connection, "PRAGMA busy_timeout").Should().Be(100L);
             }
 
             timer.Restart();
-            FluentActions.Invoking(() => WriteTransaction(shortBudget, (connection, transaction) => 0)).Should().ThrowExactly<SqliteException>();
-            timer.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(75)).And.BeLessThanOrEqualTo(TimeSpan.FromMilliseconds(750));
+            FluentActions
+                .Invoking(() => WriteTransaction(shortBudget, (connection, transaction) => 0))
+                .Should()
+                .ThrowExactly<SqliteException>();
+            timer
+                .Elapsed.Should()
+                .BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(75))
+                .And.BeLessThanOrEqualTo(TimeSpan.FromMilliseconds(750));
             await child.StandardInput.WriteLineAsync("release");
             await child.StandardInput.FlushAsync(TestContext.Current.CancellationToken);
             await ExpectSuccess(child);
@@ -416,7 +588,9 @@ public sealed class StorageTests
         var helper = Environment.GetEnvironmentVariable("HARNESS_GO_STORAGE_ORACLE");
         if (string.IsNullOrEmpty(helper))
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_STORAGE_ORACLE to the helper built by Storage/Go/build-oracle.ps1.");
+            throw Xunit.Sdk.SkipException.ForSkip(
+                "Set HARNESS_GO_STORAGE_ORACLE to the helper built by Storage/Go/build-oracle.ps1."
+            );
         }
 
         using var directory = new TestDirectory();
@@ -447,18 +621,29 @@ public sealed class StorageTests
     private static HarnessDatabase Open(string path, StorageOptions options, IReadOnlyList<Migration> migrations) =>
         HarnessDatabase.Open(path, options, migrations, TestContext.Current.CancellationToken);
 
-    private static T WriteTransaction<T>(HarnessDatabase database, Func<SqliteConnection, SqliteTransaction, T> action) =>
-        database.WithTransaction(action, TestContext.Current.CancellationToken);
+    private static T WriteTransaction<T>(
+        HarnessDatabase database,
+        Func<SqliteConnection, SqliteTransaction, T> action
+    ) => database.WithTransaction(action, TestContext.Current.CancellationToken);
 
-    private static T WriteTransaction<T>(HarnessDatabase database, Func<SqliteConnection, SqliteTransaction, T> action, CancellationToken cancellationToken) =>
-        database.WithTransaction(action, cancellationToken);
+    private static T WriteTransaction<T>(
+        HarnessDatabase database,
+        Func<SqliteConnection, SqliteTransaction, T> action,
+        CancellationToken cancellationToken
+    ) => database.WithTransaction(action, cancellationToken);
 
-    private static T ReadTransaction<T>(HarnessDatabase database, Func<SqliteConnection, SqliteTransaction, T> action) =>
-        database.ReadTransaction(action, TestContext.Current.CancellationToken);
+    private static T ReadTransaction<T>(
+        HarnessDatabase database,
+        Func<SqliteConnection, SqliteTransaction, T> action
+    ) => database.ReadTransaction(action, TestContext.Current.CancellationToken);
 
     private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 
-    [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Test-only helper executes fixed test SQL, never external input.")]
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "Test-only helper executes fixed test SQL, never external input."
+    )]
     private static object? Scalar(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();
@@ -467,7 +652,11 @@ public sealed class StorageTests
         return command.ExecuteScalar();
     }
 
-    [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Test-only helper executes fixed test SQL and deliberate invalid-schema fixtures.")]
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "Test-only helper executes fixed test SQL and deliberate invalid-schema fixtures."
+    )]
     private static void Execute(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();
@@ -490,7 +679,17 @@ public sealed class StorageTests
 #else
         const string Configuration = "Release";
 #endif
-        var worker = Path.Combine(root.FullName, "test", "Harness.Integration", "Storage", "Worker", "bin", Configuration, "net10.0", "Harness.StorageWorker.dll");
+        var worker = Path.Combine(
+            root.FullName,
+            "test",
+            "Harness.Integration",
+            "Storage",
+            "Worker",
+            "bin",
+            Configuration,
+            "net10.0",
+            "Harness.StorageWorker.dll"
+        );
         File.Exists(worker).Should().BeTrue($"Missing storage worker: {worker}");
         return Start("dotnet", [worker, .. arguments]);
     }
@@ -521,7 +720,9 @@ public sealed class StorageTests
         {
             var output = child.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             var error = child.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-            await child.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(25), TestContext.Current.CancellationToken);
+            await child
+                .WaitForExitAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(25), TestContext.Current.CancellationToken);
             (child.ExitCode == 0).Should().BeTrue(await error);
             return await output;
         }

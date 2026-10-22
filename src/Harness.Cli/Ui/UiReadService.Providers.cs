@@ -34,60 +34,143 @@ internal sealed partial class UiReadService
         checks.AddRange(ClientChecks(inspection.Location.Root));
         foreach (var (name, provider) in inspection.Location.Configuration.Value.Providers)
         {
-            checks.Add(new(name, "ok", provider.IsEnabled() ? "configured: " + provider.Command + " (not probed)" : "disabled"));
+            checks.Add(
+                new(name, "ok", provider.IsEnabled() ? "configured: " + provider.Command + " (not probed)" : "disabled")
+            );
         }
         if (probe)
         {
-            await using var providers = ConfiguredProviders.Build(inspection.Location.Configuration.Value.Providers, inspection.Location.Root, new ProviderProcessFactory());
+            await using var providers = ConfiguredProviders.Build(
+                inspection.Location.Configuration.Value.Providers,
+                inspection.Location.Root,
+                new ProviderProcessFactory()
+            );
             foreach (var provider in providers.Providers())
             {
                 var health = await provider.HealthAsync(true, token);
                 checks.RemoveAll(c => c.Name == provider.Name);
-                checks.Add(new(provider.Name, health.State switch { "ready" or "idle" => "ok", "degraded" => "warn", _ => "fail" }, health.Detail ?? health.State, health.Fix));
+                checks.Add(
+                    new(
+                        provider.Name,
+                        health.State switch
+                        {
+                            "ready" or "idle" => "ok",
+                            "degraded" => "warn",
+                            _ => "fail",
+                        },
+                        health.Detail ?? health.State,
+                        health.Fix
+                    )
+                );
             }
         }
-        return UiJson.Node(new { status = HealthStatus(project, inspection, token), checks, healthy = !checks.Any(c => c.Level is "fail"), probed = probe });
+        return UiJson.Node(
+            new
+            {
+                status = HealthStatus(project, inspection, token),
+                checks,
+                healthy = !checks.Any(c => c.Level is "fail"),
+                probed = probe,
+            }
+        );
     }
+
     internal static IReadOnlyList<HealthCheck> ClientChecks(string root)
     {
         var clients = new ClientConfiguration(ClientPaths.Current());
-        return clients.All.Select(client =>
-        {
-            var status = clients.Detect(client, root);
-            if (status.Errors.Count > 0)
-            { return new HealthCheck(client.Id, "fail", "unreadable config: " + status.Errors[0], "fix the syntax in that file; harness will not modify a malformed client config"); }
-            if (!status.Configured)
-            { return new HealthCheck(client.Id, "warn", "harness MCP server not configured (checked " + string.Join(", ", status.Checked) + ")", "harness install (or see: harness docs connecting-claude-code-and-codex)"); }
-            if (status.Entries.FirstOrDefault(e => e.Problem.Length > 0) is { } broken)
-            { return new HealthCheck(client.Id, "fail", broken.Scope + " scope in " + broken.ConfigPath + ": " + broken.Problem, "correct the command path in " + broken.ConfigPath); }
-            return new HealthCheck(client.Id, "ok", string.Join("; ", status.Entries.Select(e => e.Scope + " scope: " + e.Command + " " + string.Join(' ', e.Args))));
-        }).ToArray();
+        return clients
+            .All.Select(client =>
+            {
+                var status = clients.Detect(client, root);
+                if (status.Errors.Count > 0)
+                {
+                    return new HealthCheck(
+                        client.Id,
+                        "fail",
+                        "unreadable config: " + status.Errors[0],
+                        "fix the syntax in that file; harness will not modify a malformed client config"
+                    );
+                }
+                if (!status.Configured)
+                {
+                    return new HealthCheck(
+                        client.Id,
+                        "warn",
+                        "harness MCP server not configured (checked " + string.Join(", ", status.Checked) + ")",
+                        "harness install (or see: harness docs connecting-claude-code-and-codex)"
+                    );
+                }
+                if (status.Entries.FirstOrDefault(e => e.Problem.Length > 0) is { } broken)
+                {
+                    return new HealthCheck(
+                        client.Id,
+                        "fail",
+                        broken.Scope + " scope in " + broken.ConfigPath + ": " + broken.Problem,
+                        "correct the command path in " + broken.ConfigPath
+                    );
+                }
+                return new HealthCheck(
+                    client.Id,
+                    "ok",
+                    string.Join(
+                        "; ",
+                        status.Entries.Select(e => e.Scope + " scope: " + e.Command + " " + string.Join(' ', e.Args))
+                    )
+                );
+            })
+            .ToArray();
     }
+
     private static JsonObject HealthStatus(JsonObject project, ProjectInspection inspection, CancellationToken token)
     {
         var status = UiJson.Node(inspection.Status())!.AsObject();
         var clients = new ClientConfiguration(ClientPaths.Current());
-        status["clients"] = UiJson.Node(clients.All.Select(client =>
-        {
-            var detected = clients.Detect(client, inspection.Location.Root);
-            return new { client = client.Id, configured = detected.Configured, scopes = detected.Entries.Count is 0 ? null : detected.Entries.Select(e => e.Scope).ToArray() };
-        }).ToArray());
-        foreach (var section in new[] { status, status["project"] as JsonObject, status["config"] as JsonObject, status["database"] as JsonObject }.OfType<JsonObject>())
+        status["clients"] = UiJson.Node(
+            clients
+                .All.Select(client =>
+                {
+                    var detected = clients.Detect(client, inspection.Location.Root);
+                    return new
+                    {
+                        client = client.Id,
+                        configured = detected.Configured,
+                        scopes = detected.Entries.Count is 0 ? null : detected.Entries.Select(e => e.Scope).ToArray(),
+                    };
+                })
+                .ToArray()
+        );
+        foreach (
+            var section in new[]
+            {
+                status,
+                status["project"] as JsonObject,
+                status["config"] as JsonObject,
+                status["database"] as JsonObject,
+            }.OfType<JsonObject>()
+        )
         {
             foreach (var key in section.Where(p => p.Value is null).Select(p => p.Key).ToArray())
-            { section.Remove(key); }
+            {
+                section.Remove(key);
+            }
         }
         if (project["live"]?["state"]?.GetValue<string>() is not "ok")
-        { return status; }
+        {
+            return status;
+        }
         using var database = Open(project);
         var worktree = inspection.Worktrees.FirstOrDefault(w => w.Path == inspection.Location.Root);
         if (worktree is null)
-        { return status; }
+        {
+            return status;
+        }
         var state = SyncStore.LoadState(database, worktree.Id);
         JsonObject sync = new() { ["runs"] = UiJson.Node(SyncStore.RecentRuns(database, worktree.Id, 10)) };
         var stale = project["live"]?["stale"]?.GetValue<string>() ?? "";
         if (stale.Length > 0)
-        { sync["stale"] = stale; }
+        {
+            sync["stale"] = stale;
+        }
         if (state is not null)
         {
             sync["branch"] = state.Branch;
@@ -98,6 +181,7 @@ internal sealed partial class UiReadService
         status["sync"] = sync;
         return status;
     }
+
     private static void RequirePresent(JsonObject project)
     {
         if (project["live"]?["state"]?.GetValue<string>() is "missing")
@@ -105,43 +189,75 @@ internal sealed partial class UiReadService
             throw new UiRequestException(409, project["live"]?["detail"]?.GetValue<string>() ?? "repository not found");
         }
     }
+
     private async Task<JsonNode?> ArchitectureAsync(JsonObject project, UiReadRequest request, CancellationToken token)
     {
         Trusted(request, "loading the architecture starts providers");
         RequirePresent(project);
         var root = UiProjectCatalog.Text(project, "root");
         var location = await lifecycle.LocateAsync(root, cancellationToken: token);
-        await using var registry = ConfiguredProviders.Build(location.Configuration.Value.Providers, root, new ProviderProcessFactory());
+        await using var registry = ConfiguredProviders.Build(
+            location.Configuration.Value.Providers,
+            root,
+            new ProviderProcessFactory()
+        );
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(60));
         await registry.DiscoverAsync(deadline.Token);
         var indexed = registry.IndexedProviders();
         var stale = project["live"]?["stale"]?.GetValue<string>() ?? "";
         List<string> withheld = [];
-        var result = await registry.OverviewAsync(name =>
-        {
-            if (stale.Contains("branch", StringComparison.Ordinal) && indexed.Contains(name))
+        var result = await registry.OverviewAsync(
+            name =>
             {
-                withheld.Add(name);
-                return true;
+                if (stale.Contains("branch", StringComparison.Ordinal) && indexed.Contains(name))
+                {
+                    withheld.Add(name);
+                    return true;
+                }
+                return false;
+            },
+            deadline.Token
+        );
+        return UiJson.Node(
+            new
+            {
+                structure = result.Structure,
+                errors = result.Errors,
+                withheld = withheld.Count is 0 ? null : withheld,
+                stale,
             }
-            return false;
-        }, deadline.Token);
-        return UiJson.Node(new { structure = result.Structure, errors = result.Errors, withheld = withheld.Count is 0 ? null : withheld, stale });
+        );
     }
+
     private async Task<JsonNode?> CouplingAsync(JsonObject project, UiReadRequest request, CancellationToken token)
     {
         Trusted(request, "change coupling starts providers");
         RequirePresent(project);
         var root = UiProjectCatalog.Text(project, "root");
         var location = await lifecycle.LocateAsync(root, cancellationToken: token);
-        await using var registry = ConfiguredProviders.Build(location.Configuration.Value.Providers, root, new ProviderProcessFactory());
+        await using var registry = ConfiguredProviders.Build(
+            location.Configuration.Value.Providers,
+            root,
+            new ProviderProcessFactory()
+        );
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(60));
         await registry.DiscoverAsync(deadline.Token);
         var repository = await GitRepository.DiscoverAsync(root, deadline.Token);
         var hotspots = await ChangeCoupling.HotspotsAsync(repository, registry, 10, 3, deadline.Token);
-        var result = UiJson.Node(new { hotspots = hotspots.Hotspots, commits = hotspots.Commits, window_days = 180, providers = registry.For(Capabilities.ArchChangeCoupling).Count, errors = hotspots.Errors })!.AsObject();
+        var result = UiJson
+            .Node(
+                new
+                {
+                    hotspots = hotspots.Hotspots,
+                    commits = hotspots.Commits,
+                    window_days = 180,
+                    providers = registry.For(Capabilities.ArchChangeCoupling).Count,
+                    errors = hotspots.Errors,
+                }
+            )!
+            .AsObject();
         var changed = await repository.DirtyPathsAsync(deadline.Token);
         if (changed.Count > 0)
         {
@@ -152,7 +268,13 @@ internal sealed partial class UiReadService
         }
         return result;
     }
-    private async Task<JsonNode?> ProvidersAsync(JsonObject project, HarnessDatabase database, UiReadRequest request, CancellationToken token)
+
+    private async Task<JsonNode?> ProvidersAsync(
+        JsonObject project,
+        HarnessDatabase database,
+        UiReadRequest request,
+        CancellationToken token
+    )
     {
         var root = UiProjectCatalog.Text(project, "root");
         var location = await lifecycle.LocateAsync(root, cancellationToken: token);
@@ -165,36 +287,86 @@ internal sealed partial class UiReadService
         List<JsonObject> providers = [];
         foreach (var (name, configured) in configuration.Providers.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
-            JsonObject view = new() { ["name"] = name, ["type"] = configured.Type, ["command"] = configured.Command, ["enabled"] = configured.IsEnabled() };
+            JsonObject view = new()
+            {
+                ["name"] = name,
+                ["type"] = configured.Type,
+                ["command"] = configured.Command,
+                ["enabled"] = configured.IsEnabled(),
+            };
             void Optional(string key, string value)
-            { if (value.Length > 0) { view[key] = value; } }
+            {
+                if (value.Length > 0)
+                {
+                    view[key] = value;
+                }
+            }
             Optional("pack", configured.Pack);
-            Optional("inactive", configured.IsEnabled() ? ProviderRouting.Inactive(configured.Languages, languages) : "disabled");
+            Optional(
+                "inactive",
+                configured.IsEnabled() ? ProviderRouting.Inactive(configured.Languages, languages) : "disabled"
+            );
             if (configured.Languages.Length > 0)
-            { view["languages"] = UiJson.Node(configured.Languages); }
+            {
+                view["languages"] = UiJson.Node(configured.Languages);
+            }
             if (configured.Only.Length > 0)
-            { view["only"] = UiJson.Node(configured.Only); }
+            {
+                view["only"] = UiJson.Node(configured.Only);
+            }
             var declared = configured.Capabilities.ToDictionary(p => p.Key, p => p.Value.Tool, StringComparer.Ordinal);
             foreach (var capability in configured.Only.Where(_ => configured.Type is not "mcp"))
-            { declared.TryAdd(capability, ""); }
-            var observed = metrics.Providers.Where(p => p.Provider == name).ToDictionary(p => p.Capability, StringComparer.Ordinal);
-            var capabilities = declared.Keys.Where(c => configured.Only.Length is 0 || configured.Only.Contains(c, StringComparer.Ordinal)).Concat(observed.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(capability =>
             {
-                JsonObject item = new() { ["capability"] = capability, ["declared"] = declared.ContainsKey(capability) };
-                if (declared.GetValueOrDefault(capability) is { Length: > 0 } tool)
-                { item["tool"] = tool; }
-                if (observed.TryGetValue(capability, out var row))
-                { item["metrics"] = UiJson.Node(row); }
-                if (trends.FirstOrDefault(t => t.Provider == name && t.Capability == capability) is { } trend)
-                { item["trend"] = UiJson.Node(trend); }
-                return item;
-            }).ToArray();
+                declared.TryAdd(capability, "");
+            }
+            var observed = metrics
+                .Providers.Where(p => p.Provider == name)
+                .ToDictionary(p => p.Capability, StringComparer.Ordinal);
+            var capabilities = declared
+                .Keys.Where(c => configured.Only.Length is 0 || configured.Only.Contains(c, StringComparer.Ordinal))
+                .Concat(observed.Keys)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .Select(capability =>
+                {
+                    JsonObject item = new()
+                    {
+                        ["capability"] = capability,
+                        ["declared"] = declared.ContainsKey(capability),
+                    };
+                    if (declared.GetValueOrDefault(capability) is { Length: > 0 } tool)
+                    {
+                        item["tool"] = tool;
+                    }
+                    if (observed.TryGetValue(capability, out var row))
+                    {
+                        item["metrics"] = UiJson.Node(row);
+                    }
+                    if (trends.FirstOrDefault(t => t.Provider == name && t.Capability == capability) is { } trend)
+                    {
+                        item["trend"] = UiJson.Node(trend);
+                    }
+                    return item;
+                })
+                .ToArray();
             view["capabilities"] = capabilities.Length is 0 ? null : UiJson.Node(capabilities);
             providers.Add(view);
         }
-        return UiJson.Node(new { languages, providers = providers.Count is 0 ? null : providers, architecture = ArchitectureProviders.Coverage(configuration) });
+        return UiJson.Node(
+            new
+            {
+                languages,
+                providers = providers.Count is 0 ? null : providers,
+                architecture = ArchitectureProviders.Coverage(configuration),
+            }
+        );
     }
-    private static async Task<JsonNode?> HooksAsync(JsonObject project, HarnessDatabase database, CancellationToken token)
+
+    private static async Task<JsonNode?> HooksAsync(
+        JsonObject project,
+        HarnessDatabase database,
+        CancellationToken token
+    )
     {
         var root = UiProjectCatalog.Text(project, "root");
         JsonObject result = new() { ["git"] = new JsonArray(), ["clients"] = new JsonArray() };
@@ -202,27 +374,52 @@ internal sealed partial class UiReadService
         {
             var hooks = await GitHooks.ForAsync(await GitRepository.DiscoverAsync(root, token), token);
             result["git_dir"] = hooks.DirectoryPath;
-            result["git"] = UiJson.Node(hooks.Status().Select(c => new { name = Path.GetFileName(c.Path), installed = c.Action is "unchanged" }).ToArray());
+            result["git"] = UiJson.Node(
+                hooks
+                    .Status()
+                    .Select(c => new { name = Path.GetFileName(c.Path), installed = c.Action is "unchanged" })
+                    .ToArray()
+            );
         }
-        catch (Exception exception) when (ReadError(exception)) { result["git_error"] = exception.Message; }
+        catch (Exception exception) when (ReadError(exception))
+        {
+            result["git_error"] = exception.Message;
+        }
         var installed = false;
         foreach (var client in new[] { "claude-code", "codex" })
         {
             foreach (var target in ClientHookCleanup.Targets(ClientPaths.Current(), client, "all", root))
             {
-                JsonObject item = new() { ["client"] = client, ["scope"] = target.Scope, ["path"] = target.Path };
+                JsonObject item = new()
+                {
+                    ["client"] = client,
+                    ["scope"] = target.Scope,
+                    ["path"] = target.Path,
+                };
                 try
                 {
                     var command = ClientHookCleanup.Installed(target.Path);
                     installed |= command.Length > 0;
                     if (command.Length > 0)
-                    { item["command"] = command; }
+                    {
+                        item["command"] = command;
+                    }
                     if (ClientHookCleanup.CommandProblem(command) is { Length: > 0 } problem)
-                    { item["problem"] = problem; }
-                    if (client is "claude-code" && ClientHookCleanup.Installed(target.Path, "session") is { Length: > 0 } session)
-                    { item["session"] = session; }
+                    {
+                        item["problem"] = problem;
+                    }
+                    if (
+                        client is "claude-code"
+                        && ClientHookCleanup.Installed(target.Path, "session") is { Length: > 0 } session
+                    )
+                    {
+                        item["session"] = session;
+                    }
                 }
-                catch (Exception exception) when (ReadError(exception)) { item["error"] = exception.Message; }
+                catch (Exception exception) when (ReadError(exception))
+                {
+                    item["error"] = exception.Message;
+                }
                 result["clients"]!.AsArray().Add(item);
             }
         }
@@ -230,10 +427,12 @@ internal sealed partial class UiReadService
         result["events"] = UiJson.Node(events);
         if (installed && events.Events is 0)
         {
-            result["note"] = "A client hook is installed but recorded no event in 7 days: it may not run. Start an agent session with HARNESS_HOOK_DEBUG=1 in its environment and look at the hook's output (Claude Code: verbose mode, ctrl+o): no output means the command does not run, a message says why the event was dropped.";
+            result["note"] =
+                "A client hook is installed but recorded no event in 7 days: it may not run. Start an agent session with HARNESS_HOOK_DEBUG=1 in its environment and look at the hook's output (Claude Code: verbose mode, ctrl+o): no output means the command does not run, a message says why the event was dropped.";
         }
         return result;
     }
+
     private async Task<JsonNode?> GraphifySessionsAsync(UiReadRequest request, CancellationToken token)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -245,19 +444,33 @@ internal sealed partial class UiReadService
             List<JsonObject> result = [];
             foreach (var session in listed)
             {
-                var project = projects.FirstOrDefault(p => GraphifyDiscovery.PathComparer.Equals(GraphifyDiscovery.Canonical(UiProjectCatalog.Text(p, "root")), session.Root));
+                var project = projects.FirstOrDefault(p =>
+                    GraphifyDiscovery.PathComparer.Equals(
+                        GraphifyDiscovery.Canonical(UiProjectCatalog.Text(p, "root")),
+                        session.Root
+                    )
+                );
                 var id = project is null ? "" : UiProjectCatalog.Text(project, "id");
                 if (request.Parameter("project") is { Length: > 0 } only && only != id)
-                { continue; }
+                {
+                    continue;
+                }
                 var view = UiJson.Node(session)!.AsObject();
                 view["summary"] = GraphifyProvider.Summary(session);
                 if (project is not null)
-                { view["project_id"] = id; view["project_name"] = UiProjectCatalog.Text(project, "name"); }
+                {
+                    view["project_id"] = id;
+                    view["project_name"] = UiProjectCatalog.Text(project, "name");
+                }
                 result.Add(view);
             }
             return UiJson.Node(new { sessions = result });
         }
-        catch (Exception exception) when (ReadError(exception) || exception is TimeoutException || exception is OperationCanceledException && !token.IsCancellationRequested)
+        catch (Exception exception)
+            when (ReadError(exception)
+                || exception is TimeoutException
+                || exception is OperationCanceledException && !token.IsCancellationRequested
+            )
         {
             return UiJson.Node(new { sessions = Array.Empty<object>(), error = exception.Message });
         }

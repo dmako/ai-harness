@@ -19,7 +19,9 @@ public sealed class UiLiveLifecycleTests
         {
             var source = new Source();
             lock (gate)
-            { sources.Add(source); }
+            {
+                sources.Add(source);
+            }
             return source;
         }
         await using var app = UiHost.Create("127.0.0.1:0", _ => new Reads(), changes: Create);
@@ -34,7 +36,10 @@ public sealed class UiLiveLifecycleTests
         await UiLiveTests.FrameAsync(secondReader);
         Source original;
         lock (gate)
-        { sources.Should().ContainSingle(); original = sources[0]; }
+        {
+            sources.Should().ContainSingle();
+            original = sources[0];
+        }
         await original.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
         first.Dispose();
         original.Disposed.Task.IsCompleted.Should().BeFalse("the other page still needs live updates");
@@ -45,7 +50,10 @@ public sealed class UiLiveLifecycleTests
         (await UiLiveTests.FrameAsync(reader)).Should().Contain("retry: 3000");
         Source replacement;
         lock (gate)
-        { sources.Should().HaveCount(2); replacement = sources[1]; }
+        {
+            sources.Should().HaveCount(2);
+            replacement = sources[1];
+        }
         await replacement.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
         reconnected.Dispose();
         await replacement.Disposed.Task.WaitAsync(TimeSpan.FromSeconds(5), Token);
@@ -54,17 +62,21 @@ public sealed class UiLiveLifecycleTests
 
     private sealed class Reads : IUiReadApi
     {
-        public Task<JsonNode?> ReadAsync(UiReadRequest request, CancellationToken token) => Task.FromResult<JsonNode?>(null);
+        public Task<JsonNode?> ReadAsync(UiReadRequest request, CancellationToken token) =>
+            Task.FromResult<JsonNode?>(null);
     }
+
     private sealed class Source : IUiChangeSource
     {
         internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource Disposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Task<JsonObject> PollAsync(CancellationToken token)
         {
             Started.TrySetResult();
             return Task.FromResult(new JsonObject());
         }
+
         public ValueTask DisposeAsync()
         {
             Disposed.TrySetResult();

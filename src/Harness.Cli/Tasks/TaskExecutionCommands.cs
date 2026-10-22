@@ -7,36 +7,93 @@ namespace Harness.Cli.Tasks;
 
 internal sealed class TaskClaimSettings : TaskIdSettings
 {
-    [CommandOption("--lease")] public string Lease { get; init; } = "2h0m0s";
+    [CommandOption("--lease")]
+    public string Lease { get; init; } = "2h0m0s";
 }
+
 internal sealed class TaskCompleteSettings : TaskIdSettings
 {
-    [CommandOption("--summary")] public string Summary { get; init; } = "";
-    [CommandOption("--commit")] public string Commit { get; init; } = "";
-    [CommandOption("--acc")] public string[] Acceptance { get; init; } = [];
-    [CommandOption("--acc-all")] public string All { get; init; } = "";
-    [CommandOption("--check")] public string[] Checks { get; init; } = [];
+    [CommandOption("--summary")]
+    public string Summary { get; init; } = "";
+
+    [CommandOption("--commit")]
+    public string Commit { get; init; } = "";
+
+    [CommandOption("--acc")]
+    public string[] Acceptance { get; init; } = [];
+
+    [CommandOption("--acc-all")]
+    public string All { get; init; } = "";
+
+    [CommandOption("--check")]
+    public string[] Checks { get; init; } = [];
 }
+
 internal sealed class TaskProposalListSettings : InspectSettings
 {
-    [CommandOption("--status")] public string Status { get; init; } = "pending";
+    [CommandOption("--status")]
+    public string Status { get; init; } = "pending";
 }
+
 internal sealed class TaskApproveSettings : TaskIdSettings
 {
-    [CommandOption("--prefix")] public string Prefix { get; init; } = "";
+    [CommandOption("--prefix")]
+    public string Prefix { get; init; } = "";
 }
+
 internal sealed class TaskClaimCommand(TaskCommandRunner runner) : AsyncCommand<TaskClaimSettings>
-{ public override Task<int> ExecuteAsync(CommandContext context, TaskClaimSettings settings, CancellationToken cancellationToken) => runner.RunAsync("claim", settings, cancellationToken); }
+{
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        TaskClaimSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.RunAsync("claim", settings, cancellationToken);
+}
+
 internal sealed class TaskReleaseCommand(TaskCommandRunner runner) : AsyncCommand<TaskReasonSettings>
-{ public override Task<int> ExecuteAsync(CommandContext context, TaskReasonSettings settings, CancellationToken cancellationToken) => runner.RunAsync("release", settings, cancellationToken); }
+{
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        TaskReasonSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.RunAsync("release", settings, cancellationToken);
+}
+
 internal sealed class TaskCompleteCommand(TaskCommandRunner runner) : AsyncCommand<TaskCompleteSettings>
-{ public override Task<int> ExecuteAsync(CommandContext context, TaskCompleteSettings settings, CancellationToken cancellationToken) => runner.RunAsync("complete", settings, cancellationToken); }
+{
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        TaskCompleteSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.RunAsync("complete", settings, cancellationToken);
+}
+
 internal sealed class TaskProposalsCommand(TaskCommandRunner runner) : AsyncCommand<TaskProposalListSettings>
-{ public override Task<int> ExecuteAsync(CommandContext context, TaskProposalListSettings settings, CancellationToken cancellationToken) => runner.RunAsync("proposals", settings, cancellationToken); }
+{
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        TaskProposalListSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.RunAsync("proposals", settings, cancellationToken);
+}
+
 internal sealed class TaskApproveCommand(TaskCommandRunner runner) : AsyncCommand<TaskApproveSettings>
-{ public override Task<int> ExecuteAsync(CommandContext context, TaskApproveSettings settings, CancellationToken cancellationToken) => runner.RunAsync("approve", settings, cancellationToken); }
+{
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        TaskApproveSettings settings,
+        CancellationToken cancellationToken
+    ) => runner.RunAsync("approve", settings, cancellationToken);
+}
+
 internal sealed class TaskRejectCommand(TaskCommandRunner runner) : AsyncCommand<TaskReadySettings>
-{ public override Task<int> ExecuteAsync(CommandContext context, TaskReadySettings settings, CancellationToken cancellationToken) => runner.RunAsync("reject", settings, cancellationToken); }
+{
+    public override Task<int> ExecuteAsync(
+        CommandContext context,
+        TaskReadySettings settings,
+        CancellationToken cancellationToken
+    ) => runner.RunAsync("reject", settings, cancellationToken);
+}
 
 internal static partial class TaskCliInput
 {
@@ -56,9 +113,18 @@ internal static partial class TaskCliInput
                 throw new TaskUsageException($"--acc {TaskWorkflow.Quote(value)}: want N=pass[:evidence]");
             }
 
-            if (!long.TryParse(parts[0].Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var index))
+            if (
+                !long.TryParse(
+                    parts[0].Trim(),
+                    NumberStyles.AllowLeadingSign,
+                    CultureInfo.InvariantCulture,
+                    out var index
+                )
+            )
             {
-                throw new TaskUsageException($"--acc {TaskWorkflow.Quote(value)}: {TaskWorkflow.Quote(parts[0])} is not a criterion number");
+                throw new TaskUsageException(
+                    $"--acc {TaskWorkflow.Quote(value)}: {TaskWorkflow.Quote(parts[0])} is not a criterion number"
+                );
             }
 
             var result = parts[1].Split(':', 2);
@@ -93,8 +159,20 @@ internal static partial class TaskCliInput
             throw new TaskUsageException($"invalid value {TaskWorkflow.Quote(value)} for flag -lease: parse error");
         }
 
-        var ticks = matches.Sum(m => double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) * (m.Groups[2].Value switch
-        { "h" => TimeSpan.TicksPerHour, "m" => TimeSpan.TicksPerMinute, "s" => TimeSpan.TicksPerSecond, "ms" => TimeSpan.TicksPerMillisecond, "us" or "µs" or "μs" => 10, _ => 0.01 }));
+        var ticks = matches.Sum(m =>
+            double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture)
+            * (
+                m.Groups[2].Value switch
+                {
+                    "h" => TimeSpan.TicksPerHour,
+                    "m" => TimeSpan.TicksPerMinute,
+                    "s" => TimeSpan.TicksPerSecond,
+                    "ms" => TimeSpan.TicksPerMillisecond,
+                    "us" or "µs" or "μs" => 10,
+                    _ => 0.01,
+                }
+            )
+        );
         if (!double.IsFinite(ticks) || ticks > long.MaxValue / 100d)
         {
             throw new TaskUsageException($"invalid value {TaskWorkflow.Quote(value)} for flag -lease: parse error");
@@ -102,6 +180,7 @@ internal static partial class TaskCliInput
 
         return TimeSpan.FromTicks((long)(negative ? -Math.Ceiling(ticks) : Math.Ceiling(ticks)));
     }
+
     [GeneratedRegex(@"([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(ns|us|µs|μs|ms|s|m|h)", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex DurationPattern();
 }

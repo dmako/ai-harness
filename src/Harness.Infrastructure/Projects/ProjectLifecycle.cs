@@ -8,25 +8,44 @@ using Microsoft.Data.Sqlite;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed record ProjectLocation(string Root, string StateRoot, string DatabasePath, GitRepository? Repository, LoadedConfiguration Configuration)
+public sealed record ProjectLocation(
+    string Root,
+    string StateRoot,
+    string DatabasePath,
+    GitRepository? Repository,
+    LoadedConfiguration Configuration
+)
 {
     public bool Initialized => File.Exists(DatabasePath);
 }
 
 public sealed record InitAction(string Verb, string Path, string Note);
 
-public sealed record InitResult(ProjectLocation Location, GitHead Head, bool DryRun, IReadOnlyList<InitAction> Actions, ProjectRegistration? Registration);
+public sealed record InitResult(
+    ProjectLocation Location,
+    GitHead Head,
+    bool DryRun,
+    IReadOnlyList<InitAction> Actions,
+    ProjectRegistration? Registration
+);
 
 public sealed class ProjectLifecycle(string? globalConfigurationPath = null, string version = "dev")
 {
-    private const string IgnoreTemplate = "# Managed by harness: keep local state out of Git.\n*.db\n*.db-wal\n*.db-shm\n";
-    private const string ConfigurationTemplate = "# Harness project configuration. Values here override the global config.\n# Everything is optional; uncomment to change a default.\n\n# [storage]\n# db_path = \".harness/harness.db\"\n# busy_timeout_ms = 5000\n\n# [log]\n# level = \"info\"\n";
+    private const string IgnoreTemplate =
+        "# Managed by harness: keep local state out of Git.\n*.db\n*.db-wal\n*.db-shm\n";
+    private const string ConfigurationTemplate =
+        "# Harness project configuration. Values here override the global config.\n# Everything is optional; uncomment to change a default.\n\n# [storage]\n# db_path = \".harness/harness.db\"\n# busy_timeout_ms = 5000\n\n# [log]\n# level = \"info\"\n";
 
     public string GlobalConfigurationPath => globalConfigurationPath ?? ConfigurationPaths.GlobalPath();
     public string Version => version;
-    public MachineRegistry Registry => new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigurationPath))!, "projects.json"));
+    public MachineRegistry Registry =>
+        new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigurationPath))!, "projects.json"));
 
-    public async Task<ProjectLocation> LocateAsync(string directory, bool allowNonGit = false, CancellationToken cancellationToken = default)
+    public async Task<ProjectLocation> LocateAsync(
+        string directory,
+        bool allowNonGit = false,
+        CancellationToken cancellationToken = default
+    )
     {
         GitRepository? repository;
         try
@@ -40,11 +59,24 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
 
         var root = repository?.Root ?? Path.GetFullPath(directory);
         var state = repository?.StateRoot ?? root;
-        var configuration = ConfigurationLoader.LoadFiles(GlobalConfigurationPath, ConfigurationPaths.ProjectPath(root));
-        return new ProjectLocation(root, state, configuration.Value.ResolveDatabasePath(state), repository, configuration);
+        var configuration = ConfigurationLoader.LoadFiles(
+            GlobalConfigurationPath,
+            ConfigurationPaths.ProjectPath(root)
+        );
+        return new ProjectLocation(
+            root,
+            state,
+            configuration.Value.ResolveDatabasePath(state),
+            repository,
+            configuration
+        );
     }
 
-    public async Task<InitResult> InitAsync(string directory, bool dryRun = false, CancellationToken cancellationToken = default)
+    public async Task<InitResult> InitAsync(
+        string directory,
+        bool dryRun = false,
+        CancellationToken cancellationToken = default
+    )
     {
         var location = await LocateAsync(directory, cancellationToken: cancellationToken);
         var repository = location.Repository!;
@@ -61,10 +93,24 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             steps.Add((configDir, null, "worktree config directory"));
         }
 
-        steps.Add((ConfigurationPaths.ProjectPath(location.Root), ConfigurationTemplate, "project config (all defaults commented out)"));
+        steps.Add(
+            (
+                ConfigurationPaths.ProjectPath(location.Root),
+                ConfigurationTemplate,
+                "project config (all defaults commented out)"
+            )
+        );
         var pending = steps.Where(step => !Path.Exists(step.Path)).ToArray();
-        var actions = steps.Select(step => new InitAction(Path.Exists(step.Path) ? "exists" : "create", step.Path, step.Note)).ToList();
-        actions.Add(new InitAction(location.Initialized ? "open" : "create", location.DatabasePath, location.Initialized ? "project database (migrated if needed)" : "project database"));
+        var actions = steps
+            .Select(step => new InitAction(Path.Exists(step.Path) ? "exists" : "create", step.Path, step.Note))
+            .ToList();
+        actions.Add(
+            new InitAction(
+                location.Initialized ? "open" : "create",
+                location.DatabasePath,
+                location.Initialized ? "project database (migrated if needed)" : "project database"
+            )
+        );
         actions.Add(new InitAction("register", "", "project identity and worktree " + repository.Root));
         if (dryRun)
         {
@@ -86,13 +132,32 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             }
         }
 
-        using var database = HarnessDatabase.Open(location.DatabasePath, new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs) }, cancellationToken);
+        using var database = HarnessDatabase.Open(
+            location.DatabasePath,
+            new StorageOptions
+            {
+                BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs),
+            },
+            cancellationToken
+        );
         var registration = ProjectStore.Register(database, repository, head, cancellationToken);
         try
         {
-            await Registry.NoteInitAsync(registration.Project, ProjectStore.Worktrees(database), version, cancellationToken);
+            await Registry.NoteInitAsync(
+                registration.Project,
+                ProjectStore.Worktrees(database),
+                version,
+                cancellationToken
+            );
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or UnauthorizedAccessException
+                        or JsonException
+                        or InvalidOperationException
+            )
         {
             // Machine discovery is best effort; a registry failure must not fail project init.
         }
@@ -112,7 +177,8 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             root = repository.Root;
             head = await repository.ReadHeadAsync(cancellationToken);
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+        catch (Exception exception)
+            when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
             gitError = exception.Message.Split('\n')[0];
         }
@@ -124,7 +190,13 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         {
             loaded = ConfigurationLoader.LoadFiles(GlobalConfigurationPath, ConfigurationPaths.ProjectPath(root));
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or UnauthorizedAccessException
+                        or InvalidOperationException
+            )
         {
             configError = exception.Message;
         }
@@ -138,15 +210,28 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
 
         try
         {
-            using var database = HarnessDatabase.OpenReadOnly(location.DatabasePath, new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(loaded.Value.Storage.BusyTimeoutMs) });
+            using var database = HarnessDatabase.OpenReadOnly(
+                location.DatabasePath,
+                new StorageOptions { BusyTimeout = TimeSpan.FromMilliseconds(loaded.Value.Storage.BusyTimeoutMs) }
+            );
             var migration = database.InspectMigrationState();
-            inspection = inspection with { SchemaVersion = migration.Applied, SchemaLatest = migration.Latest, DatabaseError = migration.Error?.Message };
+            inspection = inspection with
+            {
+                SchemaVersion = migration.Applied,
+                SchemaLatest = migration.Latest,
+                DatabaseError = migration.Error?.Message,
+            };
             if (migration.Error is null && !migration.Pending)
             {
-                inspection = inspection with { Project = ProjectStore.Load(database), Worktrees = ProjectStore.Worktrees(database) };
+                inspection = inspection with
+                {
+                    Project = ProjectStore.Load(database),
+                    Worktrees = ProjectStore.Worktrees(database),
+                };
             }
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException)
+        catch (Exception exception)
+            when (exception is IOException or InvalidDataException or SqliteException or UnauthorizedAccessException)
         {
             inspection = inspection with { DatabaseError = exception.Message };
         }

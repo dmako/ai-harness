@@ -28,7 +28,10 @@ public sealed class UiLiveTests
         await Task.Delay(TimeSpan.FromSeconds(2), Token);
         using (var database = fixture.Database())
         {
-            new MemoryStore(database).Put(new MemoryInput { Type = "goal", Content = "Stream notices an independent SQLite writer" }, Token);
+            new MemoryStore(database).Put(
+                new MemoryInput { Type = "goal", Content = "Stream notices an independent SQLite writer" },
+                Token
+            );
         }
         var changed = await ChangeAsync(reader);
         var id = UiWriteTests.ProjectId(fixture);
@@ -43,7 +46,10 @@ public sealed class UiLiveTests
         using var again = await server.Client.GetAsync("/api/events", HttpCompletionOption.ResponseHeadersRead, Token);
         using var againReader = new StreamReader(await again.Content.ReadAsStreamAsync(Token));
         (await FrameAsync(againReader)).Should().Contain("retry: 3000");
-        (await UiTests.ReadAsync(server.Client, "/api/projects"))["projects"]![0]!["name"]!.GetValue<string>().Should().Be("changed-outside-server");
+        (await UiTests.ReadAsync(server.Client, "/api/projects"))["projects"]![0]!["name"]!
+            .GetValue<string>()
+            .Should()
+            .Be("changed-outside-server");
     }
 
     [Fact]
@@ -60,18 +66,27 @@ public sealed class UiLiveTests
         {
             for (var i = 0; i < 16; i++)
             {
-                var stream = await server.Client.GetAsync("/api/events", HttpCompletionOption.ResponseHeadersRead, Token);
+                var stream = await server.Client.GetAsync(
+                    "/api/events",
+                    HttpCompletionOption.ResponseHeadersRead,
+                    Token
+                );
                 streams.Add(stream);
                 stream.StatusCode.Should().Be(HttpStatusCode.OK);
             }
             using var excess = await server.Client.GetAsync("/api/events", Token);
             excess.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-            JsonNode.Parse(await excess.Content.ReadAsStringAsync(Token))!["error"]!.GetValue<string>().Should().Contain("too many");
+            JsonNode.Parse(await excess.Content.ReadAsStringAsync(Token))!["error"]!
+                .GetValue<string>()
+                .Should()
+                .Contain("too many");
         }
         finally
         {
             foreach (var stream in streams)
-            { stream.Dispose(); }
+            {
+                stream.Dispose();
+            }
         }
     }
 
@@ -83,11 +98,14 @@ public sealed class UiLiveTests
         while (await reader.ReadLineAsync(timeout.Token) is { } line)
         {
             if (line.Length is 0)
-            { return string.Join('\n', lines); }
+            {
+                return string.Join('\n', lines);
+            }
             lines.Add(line);
         }
         throw new IOException("Event stream closed before a complete frame");
     }
+
     private static async Task<JsonNode> ChangeAsync(StreamReader reader)
     {
         var frame = await FrameAsync(reader);

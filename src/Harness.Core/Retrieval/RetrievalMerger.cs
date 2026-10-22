@@ -17,25 +17,54 @@ public static class RetrievalMerger
             else
             {
                 ids.Add(candidate.Id, output.Count);
-                output.Add(candidate with { Scores = new(candidate.Scores, StringComparer.Ordinal), Provenance = candidate.Provenance.ToArray() });
+                output.Add(
+                    candidate with
+                    {
+                        Scores = new(candidate.Scores, StringComparer.Ordinal),
+                        Provenance = candidate.Provenance.ToArray(),
+                    }
+                );
             }
         }
-        var definitions = output.Select((candidate, index) => (candidate, index))
-            .Where(pair => pair.candidate.Source is "code" && pair.candidate.Role is "definition" && pair.candidate.StartLine > 0 && pair.candidate.EndLine > pair.candidate.StartLine)
-            .GroupBy(pair => pair.candidate.Path, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var definitions = output
+            .Select((candidate, index) => (candidate, index))
+            .Where(pair =>
+                pair.candidate.Source is "code"
+                && pair.candidate.Role is "definition"
+                && pair.candidate.StartLine > 0
+                && pair.candidate.EndLine > pair.candidate.StartLine
+            )
+            .GroupBy(pair => pair.candidate.Path, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
         HashSet<int> removed = [];
         for (var i = 0; i < output.Count; i++)
         {
             var candidate = output[i];
-            if (candidate.Source is not "code" || candidate.Role is "definition" || candidate.StartLine is 0 || candidate.EndLine > candidate.StartLine || !definitions.TryGetValue(candidate.Path, out var spans))
+            if (
+                candidate.Source is not "code"
+                || candidate.Role is "definition"
+                || candidate.StartLine is 0
+                || candidate.EndLine > candidate.StartLine
+                || !definitions.TryGetValue(candidate.Path, out var spans)
+            )
             {
                 continue;
             }
 
-            foreach (var (definition, index) in spans.Where(span => span.index != i && candidate.StartLine >= span.candidate.StartLine && candidate.StartLine <= span.candidate.EndLine))
+            foreach (
+                var (definition, index) in spans.Where(span =>
+                    span.index != i
+                    && candidate.StartLine >= span.candidate.StartLine
+                    && candidate.StartLine <= span.candidate.EndLine
+                )
+            )
             {
                 var target = output[index];
-                output[index] = target with { Provenance = target.Provenance.Concat(candidate.Provenance).Distinct().ToArray(), Evidence = candidate.Evidence is "exact" ? "exact" : target.Evidence };
+                output[index] = target with
+                {
+                    Provenance = target.Provenance.Concat(candidate.Provenance).Distinct().ToArray(),
+                    Evidence = candidate.Evidence is "exact" ? "exact" : target.Evidence,
+                };
                 removed.Add(i);
                 folded.Add(new(candidate, definition.Id, "line inside " + definition.Name));
                 break;
@@ -66,7 +95,12 @@ public static class RetrievalMerger
 
         if (result.EndLine is 0 && next.EndLine > 0)
         {
-            result = result with { EndLine = next.EndLine, Size = result.SizeEstimated || result.Size is 0 ? next.Size : result.Size, SizeEstimated = result.SizeEstimated || result.Size is 0 ? next.SizeEstimated : result.SizeEstimated };
+            result = result with
+            {
+                EndLine = next.EndLine,
+                Size = result.SizeEstimated || result.Size is 0 ? next.Size : result.Size,
+                SizeEstimated = result.SizeEstimated || result.Size is 0 ? next.SizeEstimated : result.SizeEstimated,
+            };
         }
 
         if (next.Depth > 0 && (result.Depth is 0 || next.Depth < result.Depth) && result.Role == next.Role)

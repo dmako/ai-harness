@@ -4,12 +4,26 @@ using Harness.Core.Architecture;
 
 namespace Harness.Infrastructure.Architecture.Clones;
 
-public sealed record SequenceOptions(int MinStatements = 2, int MinTokens = 14, int MinPlain = 21, int Places = 3, int LongStatements = 5, int LongTokens = 50, int MaxSeed = 400);
+public sealed record SequenceOptions(
+    int MinStatements = 2,
+    int MinTokens = 14,
+    int MinPlain = 21,
+    int Places = 3,
+    int LongStatements = 5,
+    int LongTokens = 50,
+    int MaxSeed = 400
+);
 
 public static class CloneSequences
 {
     private sealed record Position(int Function, int Unit);
-    public static IReadOnlyList<CloneSequence> Find(IReadOnlyList<CloneFunction> functions, IReadOnlyList<CloneCopy> copies, IReadOnlyList<CloneTemplate> templates, SequenceOptions? options = null)
+
+    public static IReadOnlyList<CloneSequence> Find(
+        IReadOnlyList<CloneFunction> functions,
+        IReadOnlyList<CloneCopy> copies,
+        IReadOnlyList<CloneTemplate> templates,
+        SequenceOptions? options = null
+    )
     {
         options ??= new();
         Dictionary<string, string> groups = new(StringComparer.Ordinal);
@@ -30,20 +44,36 @@ public static class CloneSequences
         }
 
         Dictionary<string, int> ids = new(StringComparer.Ordinal);
-        var sequences = functions.Select(function => function.Statements.Select(unit =>
-        {
-            if (!ids.TryGetValue(unit.Key, out var id))
-            { id = ids.Count; ids.Add(unit.Key, id); }
-            return id;
-        }).ToArray()).ToArray();
+        var sequences = functions
+            .Select(function =>
+                function
+                    .Statements.Select(unit =>
+                    {
+                        if (!ids.TryGetValue(unit.Key, out var id))
+                        {
+                            id = ids.Count;
+                            ids.Add(unit.Key, id);
+                        }
+                        return id;
+                    })
+                    .ToArray()
+            )
+            .ToArray();
         Dictionary<(int First, int Second), List<Position>> seeds = [];
         for (var number = 0; number < functions.Count; number++)
         {
-            foreach (var unit in Enumerable.Range(0, Math.Max(0, functions[number].Statements.Count - 1)).Where(unit => !functions[number].Statements[unit].Idiom))
+            foreach (
+                var unit in Enumerable
+                    .Range(0, Math.Max(0, functions[number].Statements.Count - 1))
+                    .Where(unit => !functions[number].Statements[unit].Idiom)
+            )
             {
                 var key = (sequences[number][unit], sequences[number][unit + 1]);
                 if (!seeds.TryGetValue(key, out var positions))
-                { positions = []; seeds.Add(key, positions); }
+                {
+                    positions = [];
+                    seeds.Add(key, positions);
+                }
                 positions.Add(new(number, unit));
             }
         }
@@ -52,7 +82,11 @@ public static class CloneSequences
         HashSet<string> seen = new(StringComparer.Ordinal);
         void Grow(List<Position> positions, int length, int parent)
         {
-            var next = positions.Where(position => position.Unit + length < sequences[position.Function].Length).GroupBy(position => sequences[position.Function][position.Unit + length]).Select(group => group.ToList()).ToArray();
+            var next = positions
+                .Where(position => position.Unit + length < sequences[position.Function].Length)
+                .GroupBy(position => sequences[position.Function][position.Unit + length])
+                .Select(group => group.ToList())
+                .ToArray();
             var reported = parent;
             if (!next.Any(group => group.Count == positions.Count))
             {
@@ -73,17 +107,36 @@ public static class CloneSequences
                 Grow(group, length + 1, reported);
             }
         }
-        foreach (var seed in seeds.Where(pair => pair.Value.Count >= 2 && pair.Value.Count <= options.MaxSeed && LeftMaximal(functions, sequences, pair.Value)).OrderBy(pair => pair.Key.First).ThenBy(pair => pair.Key.Second))
+        foreach (
+            var seed in seeds
+                .Where(pair =>
+                    pair.Value.Count >= 2
+                    && pair.Value.Count <= options.MaxSeed
+                    && LeftMaximal(functions, sequences, pair.Value)
+                )
+                .OrderBy(pair => pair.Key.First)
+                .ThenBy(pair => pair.Key.Second)
+        )
         {
             Grow(seed.Value, 2, 0);
         }
 
         List<CloneSequence> output = [];
         List<HashSet<string>> sets = [];
-        foreach (var sequence in found.OrderByDescending(sequence => sequence.Places.Count).ThenByDescending(sequence => sequence.Statements))
+        foreach (
+            var sequence in found
+                .OrderByDescending(sequence => sequence.Places.Count)
+                .ThenByDescending(sequence => sequence.Statements)
+        )
         {
             var idsOfFunctions = sequence.Places.Select(place => place.Function.Id).ToHashSet(StringComparer.Ordinal);
-            if (output.Select((other, index) => (other, index)).Any(pair => sequence.Statements < 2 * pair.other.Statements && idsOfFunctions.IsSubsetOf(sets[pair.index])))
+            if (
+                output
+                    .Select((other, index) => (other, index))
+                    .Any(pair =>
+                        sequence.Statements < 2 * pair.other.Statements && idsOfFunctions.IsSubsetOf(sets[pair.index])
+                    )
+            )
             {
                 continue;
             }
@@ -93,11 +146,18 @@ public static class CloneSequences
         }
         return output.OrderByDescending(sequence => sequence.Tokens * sequence.Places.Count).ToArray();
     }
+
     private static bool LeftMaximal(IReadOnlyList<CloneFunction> functions, int[][] sequences, List<Position> positions)
     {
         for (var back = 1; back <= positions.Min(position => position.Unit) + 1; back++)
         {
-            if (positions.Any(position => position.Unit - back < 0 || sequences[position.Function][position.Unit - back] != sequences[positions[0].Function][positions[0].Unit - back]))
+            if (
+                positions.Any(position =>
+                    position.Unit - back < 0
+                    || sequences[position.Function][position.Unit - back]
+                        != sequences[positions[0].Function][positions[0].Unit - back]
+                )
+            )
             {
                 return true;
             }
@@ -109,7 +169,14 @@ public static class CloneSequences
         }
         return true;
     }
-    private static List<CloneSequence> Runs(IReadOnlyList<CloneFunction> functions, List<Position> positions, int length, Dictionary<string, string> groups, SequenceOptions options)
+
+    private static List<CloneSequence> Runs(
+        IReadOnlyList<CloneFunction> functions,
+        List<Position> positions,
+        int length,
+        Dictionary<string, string> groups,
+        SequenceOptions options
+    )
     {
         var units = functions[positions[0].Function].Statements.Skip(positions[0].Unit).Take(length).ToList();
         while (units.Count > 0 && units[^1].Idiom)
@@ -121,7 +188,12 @@ public static class CloneSequences
         var statements = units.Count(unit => !unit.Idiom && unit.Work);
         var tokens = units.Where(unit => !unit.Idiom).Sum(unit => unit.Size);
         var data = units.Any(unit => !unit.Idiom && unit.Data);
-        if (statements < options.MinStatements || tokens < options.MinTokens || !data && tokens < options.MinPlain || OneCall(units))
+        if (
+            statements < options.MinStatements
+            || tokens < options.MinTokens
+            || !data && tokens < options.MinPlain
+            || OneCall(units)
+        )
         {
             return [];
         }
@@ -133,8 +205,13 @@ public static class CloneSequences
         {
             var function = functions[position.Function];
             var group = groups.GetValueOrDefault(function.Id, "");
-            var where = function.Path + ":" + function.Statements[position.Unit].Line.ToString(CultureInfo.InvariantCulture);
-            if (group.Length > 0 && taken.Contains(group) || taken.Contains(where) || ends.TryGetValue(position.Function, out var end) && position.Unit < end)
+            var where =
+                function.Path + ":" + function.Statements[position.Unit].Line.ToString(CultureInfo.InvariantCulture);
+            if (
+                group.Length > 0 && taken.Contains(group)
+                || taken.Contains(where)
+                || ends.TryGetValue(position.Function, out var end) && position.Unit < end
+            )
             {
                 continue;
             }
@@ -152,10 +229,18 @@ public static class CloneSequences
         {
             Dictionary<string, int> names = new(StringComparer.Ordinal);
             StringBuilder key = new();
-            foreach (var name in functions[position.Function].Statements.Skip(position.Unit).Take(length).SelectMany(unit => unit.Own))
+            foreach (
+                var name in functions[position.Function]
+                    .Statements.Skip(position.Unit)
+                    .Take(length)
+                    .SelectMany(unit => unit.Own)
+            )
             {
                 if (!names.TryGetValue(name, out var id))
-                { id = names.Count; names.Add(name, id); }
+                {
+                    id = names.Count;
+                    names.Add(name, id);
+                }
                 key.Append(id.ToString(CultureInfo.InvariantCulture)).Append(',');
             }
             return key.ToString();
@@ -182,7 +267,10 @@ public static class CloneSequences
                         {
                             var key = (number, token);
                             if (!values.TryGetValue(key, out var set))
-                            { set = new(StringComparer.Ordinal); values.Add(key, set); }
+                            {
+                                set = new(StringComparer.Ordinal);
+                                values.Add(key, set);
+                            }
                             set.Add(raw[token]);
                         }
                     }
@@ -200,22 +288,43 @@ public static class CloneSequences
                     var raw = function.Statements[position.Unit + number].Raw;
                     for (var token = 0; token < raw.Count; token++)
                     {
-                        if (values.TryGetValue((number, token), out var set) && set.Count > 1 && !differs.Contains(raw[token], StringComparer.Ordinal))
+                        if (
+                            values.TryGetValue((number, token), out var set)
+                            && set.Count > 1
+                            && !differs.Contains(raw[token], StringComparer.Ordinal)
+                        )
                         {
                             differs.Add(raw[token]);
                         }
                     }
                 }
-                places.Add(new(function, function.Statements[position.Unit].Line, differs.Count is 0 ? null : differs.Take(4).ToArray()));
+                places.Add(
+                    new(
+                        function,
+                        function.Statements[position.Unit].Line,
+                        differs.Count is 0 ? null : differs.Take(4).ToArray()
+                    )
+                );
                 if (holder is null && Holds(function, position.Unit, length))
                 {
                     holder = function;
                 }
             }
-            output.Add(new(places, statements, tokens, units.Select(unit => Render(unit.Raw)).ToArray(), data, holder, string.Join('\n', units.Select(unit => unit.Key)) + "\n" + part.Key));
+            output.Add(
+                new(
+                    places,
+                    statements,
+                    tokens,
+                    units.Select(unit => Render(unit.Raw)).ToArray(),
+                    data,
+                    holder,
+                    string.Join('\n', units.Select(unit => unit.Key)) + "\n" + part.Key
+                )
+            );
         }
         return output;
     }
+
     private static bool OneCall(List<CloneStatement> units)
     {
         var name = "";
@@ -240,11 +349,24 @@ public static class CloneSequences
         }
         return name.Length > 0;
     }
+
     private static bool Holds(CloneFunction function, int start, int length)
     {
-        var last = function.Statements.Select((unit, index) => (unit, index)).Where(pair => !pair.unit.Idiom).Select(pair => pair.index).DefaultIfEmpty(-1).Max();
-        return !function.Statements.Select((unit, index) => (unit, index)).Any(pair => (pair.index < start || pair.index >= start + length) && !pair.unit.Idiom && !(pair.index == last && pair.index >= start + length && pair.unit.Raw[0] is "return"));
+        var last = function
+            .Statements.Select((unit, index) => (unit, index))
+            .Where(pair => !pair.unit.Idiom)
+            .Select(pair => pair.index)
+            .DefaultIfEmpty(-1)
+            .Max();
+        return !function
+            .Statements.Select((unit, index) => (unit, index))
+            .Any(pair =>
+                (pair.index < start || pair.index >= start + length)
+                && !pair.unit.Idiom
+                && !(pair.index == last && pair.index >= start + length && pair.unit.Raw[0] is "return")
+            );
     }
+
     internal static string Render(IReadOnlyList<string> raw)
     {
         StringBuilder output = new();
@@ -255,7 +377,14 @@ public static class CloneSequences
             {
                 var previous = raw[index - 1];
                 var unary = previous is "*" or "&" or "<-" or "-" && (index < 2 || !Word(raw[index - 2]));
-                var tight = "([.!".Contains(previous[^1], StringComparison.Ordinal) && previous is not "!=" || unary || previous is "]" && index >= 2 && raw[index - 2] is "[" || ")].,;:".Contains(token[0], StringComparison.Ordinal) && token is not (":=" or "::") || token is "(" or "[" && Word(previous) || token is "++" or "--" or "?." || previous is "?.";
+                var tight =
+                    "([.!".Contains(previous[^1], StringComparison.Ordinal) && previous is not "!="
+                    || unary
+                    || previous is "]" && index >= 2 && raw[index - 2] is "["
+                    || ")].,;:".Contains(token[0], StringComparison.Ordinal) && token is not (":=" or "::")
+                    || token is "(" or "[" && Word(previous)
+                    || token is "++" or "--" or "?."
+                    || previous is "?.";
                 if (!tight)
                 {
                     output.Append(' ');
@@ -265,5 +394,7 @@ public static class CloneSequences
         }
         return output.ToString();
     }
-    private static bool Word(string text) => text.Length > 0 && (char.IsAsciiLetterOrDigit(text[^1]) || text[^1] is '_' or '>' or ')' or ']');
+
+    private static bool Word(string text) =>
+        text.Length > 0 && (char.IsAsciiLetterOrDigit(text[^1]) || text[^1] is '_' or '>' or ')' or ']');
 }

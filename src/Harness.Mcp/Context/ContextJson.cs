@@ -13,6 +13,7 @@ public static class ContextJson
         Write(JsonSerializer.SerializeToElement(value), output);
         return output.ToString();
     }
+
     public static int Size(object value) => Encoding.UTF8.GetByteCount(Serialize(value));
 
     private static void Write(JsonElement element, StringBuilder output)
@@ -22,7 +23,9 @@ public static class ContextJson
             case JsonValueKind.Object:
                 output.Append('{');
                 var first = true;
-                foreach (var property in element.EnumerateObject().OrderBy(property => property.Name, Utf8Comparer.Instance))
+                foreach (
+                    var property in element.EnumerateObject().OrderBy(property => property.Name, Utf8Comparer.Instance)
+                )
                 {
                     if (!first)
                     {
@@ -40,7 +43,11 @@ public static class ContextJson
                 output.Append('[');
                 var separator = "";
                 foreach (var item in element.EnumerateArray())
-                { output.Append(separator); separator = ","; Write(item, output); }
+                {
+                    output.Append(separator);
+                    separator = ",";
+                    Write(item, output);
+                }
                 output.Append(']');
                 break;
             case JsonValueKind.String:
@@ -51,12 +58,23 @@ public static class ContextJson
                 break;
         }
     }
+
     private static void String(string value, StringBuilder output)
     {
         output.Append('"');
         foreach (var rune in value.EnumerateRunes())
         {
-            var escape = rune.Value switch { 34 => "\\\"", 92 => "\\\\", 8 => "\\b", 12 => "\\f", 10 => "\\n", 13 => "\\r", 9 => "\\t", _ => null };
+            var escape = rune.Value switch
+            {
+                34 => "\\\"",
+                92 => "\\\\",
+                8 => "\\b",
+                12 => "\\f",
+                10 => "\\n",
+                13 => "\\r",
+                9 => "\\t",
+                _ => null,
+            };
             if (escape is not null)
             {
                 output.Append(escape);
@@ -72,10 +90,13 @@ public static class ContextJson
         }
         output.Append('"');
     }
+
     private sealed class Utf8Comparer : IComparer<string>
     {
         public static Utf8Comparer Instance { get; } = new();
-        public int Compare(string? x, string? y) => Encoding.UTF8.GetBytes(x ?? "").AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(y ?? ""));
+
+        public int Compare(string? x, string? y) =>
+            Encoding.UTF8.GetBytes(x ?? "").AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(y ?? ""));
     }
 }
 

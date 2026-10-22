@@ -34,7 +34,13 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
                 {
                     continue;
                 }
-                var name = word switch { "hook" => "hooks", "task" => "tasks", "workspaces" => "workspace", _ => word };
+                var name = word switch
+                {
+                    "hook" => "hooks",
+                    "task" => "tasks",
+                    "workspaces" => "workspace",
+                    _ => word,
+                };
                 leaf = container.Commands.FirstOrDefault(c => c.Name == name);
                 if (leaf is null)
                 {
@@ -43,7 +49,15 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
                 container = leaf;
                 continue;
             }
-            if (i == words.Length - 2 && word.StartsWith('-') && !word.Contains('=', StringComparison.Ordinal) && leaf?.Parameters.OfType<ICommandOption>().Any(p => p.LongNames.Contains(word.TrimStart('-'), StringComparer.Ordinal) && !p.IsFlag) is true)
+            if (
+                i == words.Length - 2
+                && word.StartsWith('-')
+                && !word.Contains('=', StringComparison.Ordinal)
+                && leaf
+                    ?.Parameters.OfType<ICommandOption>()
+                    .Any(p => p.LongNames.Contains(word.TrimStart('-'), StringComparer.Ordinal) && !p.IsFlag)
+                    is true
+            )
             {
                 return [];
             }
@@ -61,14 +75,34 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
             }
             if (leaf is not null)
             {
-                candidates = leaf.Parameters.OfType<ICommandOption>().Where(p => !p.IsHidden).SelectMany(p => p.LongNames.Select(n => ("--" + n, p.Description ?? ""))).OrderBy(p => p.Item1, StringComparer.Ordinal).Append(("--help", "show help"));
+                candidates = leaf
+                    .Parameters.OfType<ICommandOption>()
+                    .Where(p => !p.IsHidden)
+                    .SelectMany(p => p.LongNames.Select(n => ("--" + n, p.Description ?? "")))
+                    .OrderBy(p => p.Item1, StringComparer.Ordinal)
+                    .Append(("--help", "show help"));
             }
         }
         foreach (var (name, description) in candidates)
         {
-            output.WriteLine(shell switch { "zsh" => name.Replace(":", "\\:", StringComparison.Ordinal) + ":" + description, "fish" or "pwsh" => name + "\t" + description, _ => name });
+            output.WriteLine(
+                shell switch
+                {
+                    "zsh" => name.Replace(":", "\\:", StringComparison.Ordinal) + ":" + description,
+                    "fish" or "pwsh" => name + "\t" + description,
+                    _ => name,
+                }
+            );
         }
         return [];
     }
-    private static string Default(string group) => group switch { "hooks" => "choose", "completion" => "status", "workspace" or "projects" => "list", _ => "" };
+
+    private static string Default(string group) =>
+        group switch
+        {
+            "hooks" => "choose",
+            "completion" => "status",
+            "workspace" or "projects" => "list",
+            _ => "",
+        };
 }

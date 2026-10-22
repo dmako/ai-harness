@@ -16,9 +16,11 @@ internal sealed class HostTypeRegistrar(HostApplicationBuilder builder) : ITypeR
 
     public void Register(Type service, Type implementation) => builder.Services.AddSingleton(service, implementation);
 
-    public void RegisterInstance(Type service, object implementation) => builder.Services.AddSingleton(service, implementation);
+    public void RegisterInstance(Type service, object implementation) =>
+        builder.Services.AddSingleton(service, implementation);
 
-    public void RegisterLazy(Type service, Func<object> factory) => builder.Services.AddSingleton(service, _ => factory());
+    public void RegisterLazy(Type service, Func<object> factory) =>
+        builder.Services.AddSingleton(service, _ => factory());
 
     public void Dispose() => _host?.Dispose();
 

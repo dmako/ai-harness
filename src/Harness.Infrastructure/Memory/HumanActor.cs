@@ -17,6 +17,9 @@ public static class HumanActor
             var user = Environment.UserName;
             return user.Length is 0 ? "human" : "human:" + user;
         }
-        catch (SecurityException) { return "human"; }
+        catch (SecurityException)
+        {
+            return "human";
+        }
     }
 }

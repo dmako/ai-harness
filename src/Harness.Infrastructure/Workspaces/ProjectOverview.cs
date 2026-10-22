@@ -12,13 +12,32 @@ namespace Harness.Infrastructure.Workspaces;
 /// <summary>Machine overview reads existing state without starting providers or migrating databases.</summary>
 public static class ProjectOverview
 {
-    public static async Task<JsonObject> InspectAsync(ProjectLifecycle lifecycle, JsonObject project, CancellationToken token)
+    public static async Task<JsonObject> InspectAsync(
+        ProjectLifecycle lifecycle,
+        JsonObject project,
+        CancellationToken token
+    )
     {
         var root = project["root"]?.GetValue<string>() ?? "";
-        var live = new JsonObject { ["state"] = "missing", ["context_answers_30d"] = 0, ["context_hit_rate_30d"] = 0d, ["pending_proposals"] = 0, ["pending_arch_proposals"] = 0, ["pending_task_proposals"] = 0, ["checks_failed"] = 0, ["checks_warned"] = 0 };
+        var live = new JsonObject
+        {
+            ["state"] = "missing",
+            ["context_answers_30d"] = 0,
+            ["context_hit_rate_30d"] = 0d,
+            ["pending_proposals"] = 0,
+            ["pending_arch_proposals"] = 0,
+            ["pending_task_proposals"] = 0,
+            ["checks_failed"] = 0,
+            ["checks_warned"] = 0,
+        };
         if (!Directory.Exists(root))
         {
-            live["detail"] = "repository not found at " + root + " (moved or deleted? 'harness projects forget " + project["id"]?.GetValue<string>() + "')";
+            live["detail"] =
+                "repository not found at "
+                + root
+                + " (moved or deleted? 'harness projects forget "
+                + project["id"]?.GetValue<string>()
+                + "')";
             return live;
         }
         var inspection = await lifecycle.InspectAsync(root, token).ConfigureAwait(false);
@@ -32,7 +51,10 @@ public static class ProjectOverview
             { GitError: { } error } => ("error", error),
             { Location.Initialized: false } => ("not_initialized", "no project database (run 'harness init')"),
             { DatabaseError: { } error } => ("error", error),
-            { SchemaVersion: var version } when version < HarnessDatabase.LatestSchemaVersion => ("schema_outdated", "migrations pending (run 'harness sync')"),
+            { SchemaVersion: var version } when version < HarnessDatabase.LatestSchemaVersion => (
+                "schema_outdated",
+                "migrations pending (run 'harness sync')"
+            ),
             _ => ("ok", ""),
         };
         live["state"] = state;
@@ -79,7 +101,10 @@ public static class ProjectOverview
                 SELECT o.call_id, o.path, o.hit FROM context_outcomes o
                 JOIN context_calls c ON c.id=o.call_id WHERE c.at >= $since
                 """;
-            command.Parameters.AddWithValue("$since", DateTimeOffset.UtcNow.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue(
+                "$since",
+                DateTimeOffset.UtcNow.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture)
+            );
             Dictionary<long, (int Hits, int Changed)> answers = [];
             using (var scores = await command.ExecuteReaderAsync(token).ConfigureAwait(false))
             {
@@ -97,7 +122,9 @@ public static class ProjectOverview
             }
             live["context_answers_30d"] = answers.Count;
             var scored = answers.Values.Where(answer => answer.Changed > 0).ToArray();
-            live["context_hit_rate_30d"] = scored.Length is 0 ? 0 : scored.Average(answer => (double)answer.Hits / answer.Changed);
+            live["context_hit_rate_30d"] = scored.Length is 0
+                ? 0
+                : scored.Average(answer => (double)answer.Hits / answer.Changed);
             var worktree = inspection.Worktrees.FirstOrDefault(tree => tree.Path == inspection.Location.Root);
             var sync = worktree is null ? null : SyncStore.LoadState(database, worktree.Id);
             if (sync is not null)
@@ -105,13 +132,21 @@ public static class ProjectOverview
                 live["synced_at"] = sync.SyncedAt;
             }
 
-            var stale = SyncFreshness.Staleness(sync, inspection.Head?.Branch ?? "", inspection.Head?.Commit ?? "", inspection.Head?.Detached ?? false);
+            var stale = SyncFreshness.Staleness(
+                sync,
+                inspection.Head?.Branch ?? "",
+                inspection.Head?.Commit ?? "",
+                inspection.Head?.Detached ?? false
+            );
             if (stale.Length > 0)
             {
                 live["stale"] = stale;
             }
         }
-        catch (Exception error) when (error is SqliteException or IOException or InvalidDataException or UnauthorizedAccessException) { /* Preserve the independent checks if optional observations are unavailable. */ }
+        catch (Exception error)
+            when (error is SqliteException or IOException or InvalidDataException or UnauthorizedAccessException)
+        { /* Preserve the independent checks if optional observations are unavailable. */
+        }
         return live;
     }
 }

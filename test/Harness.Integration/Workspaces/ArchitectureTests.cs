@@ -11,10 +11,15 @@ using Xunit;
 
 namespace Harness.Integration.Workspaces;
 
-[SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Read-only database and provider fixtures are owned by using declarations/registries.")]
+[SuppressMessage(
+    "Reliability",
+    "CA2000:Dispose objects before losing scope",
+    Justification = "Read-only database and provider fixtures are owned by using declarations/registries."
+)]
 public sealed class ArchitectureTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task ApplicableKnowledgeUsesNarrowGroupsAndPreservesEveryRuleProvenance()
     {
@@ -25,17 +30,41 @@ public sealed class ArchitectureTests
         var workspaces = levels.Load();
         using (var own = HarnessDatabase.Open(fixture.Members[0].DatabasePath, cancellationToken: Token))
         {
-            new MemoryStore(own).Put(new() { Type = "constraint", Content = "group Domain = *.Core; forbid: Domain -> *.WebApi", Source = new(Ref: "architecture fixture") }, Token);
+            new MemoryStore(own).Put(
+                new()
+                {
+                    Type = "constraint",
+                    Content = "group Domain = *.Core; forbid: Domain -> *.WebApi",
+                    Source = new(Ref: "architecture fixture"),
+                },
+                Token
+            );
         }
 
         using (var workspace = levels.OpenLevel(workspaces, new("workspace", "one"), fixture.Members[0].Id, Token))
         {
-            new MemoryStore(workspace).Put(new() { Type = "decision", Content = "group Domain = *.Other; only: Domain -> *.Models", Source = new(Ref: "workspace fixture") }, Token);
+            new MemoryStore(workspace).Put(
+                new()
+                {
+                    Type = "decision",
+                    Content = "group Domain = *.Other; only: Domain -> *.Models",
+                    Source = new(Ref: "workspace fixture"),
+                },
+                Token
+            );
         }
 
         using (var user = levels.OpenLevel(workspaces, MemoryScope.User, fixture.Members[0].Id, Token))
         {
-            new MemoryStore(user).Put(new() { Type = "convention", Content = "layers: WebApi > Core > Models", Source = new(Ref: "user fixture") }, Token);
+            new MemoryStore(user).Put(
+                new()
+                {
+                    Type = "convention",
+                    Content = "layers: WebApi > Core > Models",
+                    Source = new(Ref: "user fixture"),
+                },
+                Token
+            );
         }
 
         var hashes = fixture.Hashes();
@@ -46,25 +75,48 @@ public sealed class ArchitectureTests
         rules.Rules.Select(rule => rule.Reference.Scope).Should().BeEquivalentTo("project", "workspace:one", "user");
         var core = new BuildUnit { Name = "App.Core", Path = "Core.csproj" };
         core.References.Add("Web.csproj");
-        var findings = rules.Check([core, new() { Name = "App.WebApi", Path = "Web.csproj", Kind = "entry" }]);
+        var findings = rules.Check([
+            core,
+            new()
+            {
+                Name = "App.WebApi",
+                Path = "Web.csproj",
+                Kind = "entry",
+            },
+        ]);
         findings.Should().HaveCount(3);
         findings.Should().Contain(finding => finding.Level == "problem" && finding.Rule!.Scope == "project");
         fixture.Hashes().Should().Equal(hashes);
     }
+
     [Fact]
     public async Task WorkspaceUsageAndUnknownMembersDoNotManufactureNegativeFindings()
     {
         using var fixture = await WorkspaceFixture.CreateAsync();
-        fixture.Repositories[0].Write("Core.csproj", "<Project><PropertyGroup><PackageId>Example.Core</PackageId></PropertyGroup></Project>");
-        fixture.Repositories[1].Write("Host.csproj", "<Project><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><PackageReference Include=\"Example.Core\" Version=\"1\"/></ItemGroup></Project>");
+        fixture
+            .Repositories[0]
+            .Write(
+                "Core.csproj",
+                "<Project><PropertyGroup><PackageId>Example.Core</PackageId></PropertyGroup></Project>"
+            );
+        fixture
+            .Repositories[1]
+            .Write(
+                "Host.csproj",
+                "<Project><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><PackageReference Include=\"Example.Core\" Version=\"1\"/></ItemGroup></Project>"
+            );
         fixture.Repositories[2].Write("Other.csproj", "<Project/>");
         var hashes = fixture.Hashes();
         var reader = new ArchitectureReader(fixture.Members);
         var project = await reader.ProjectAsync(fixture.Members[0], null, true, Token);
         project.Architecture.Should().NotBeNull();
         project.Architecture.Findings.Should().NotContain(finding => finding.Kind == "unused");
-        (await reader.SystemAsync(Token)).Nodes.Should().Contain(node => node.MemberId == fixture.Members[0].Id && node.Kind == "library");
-        fixture.Repositories[1].Write("Host.csproj", "<Project><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup></Project>");
+        (await reader.SystemAsync(Token))
+            .Nodes.Should()
+            .Contain(node => node.MemberId == fixture.Members[0].Id && node.Kind == "library");
+        fixture
+            .Repositories[1]
+            .Write("Host.csproj", "<Project><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup></Project>");
         project = await new ArchitectureReader(fixture.Members).ProjectAsync(fixture.Members[0], null, true, Token);
         project.Architecture!.Findings.Should().Contain(finding => finding.Kind == "unused" && finding.Level == "info");
         var missing = fixture.Members.ToArray();
@@ -76,11 +128,36 @@ public sealed class ArchitectureTests
         quick.Architecture!.Findings.Should().NotContain(finding => finding.Kind == "unused");
         fixture.Hashes().Should().Equal(hashes);
     }
+
     [Fact]
     public async Task ProviderCyclesRetainEvidenceAndHealthyEmptyDiffersFromUnavailable()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Providers.ProviderRegistryTests.Fake("graph", [Capabilities.ArchCycles], execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Members = ["B", "A"], Path = "src/a.cs", StartLine = 3, Confidence = 0.8, Provider = "graph", Tool = "cycles" }, new() { Members = ["Self"] }] })));
+        registry.Register(
+            new Providers.ProviderRegistryTests.Fake(
+                "graph",
+                [Capabilities.ArchCycles],
+                execute: (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult
+                        {
+                            Items =
+                            [
+                                new()
+                                {
+                                    Members = ["B", "A"],
+                                    Path = "src/a.cs",
+                                    StartLine = 3,
+                                    Confidence = 0.8,
+                                    Provider = "graph",
+                                    Tool = "cycles",
+                                },
+                                new() { Members = ["Self"] },
+                            ],
+                        }
+                    )
+            )
+        );
         var answer = await ArchitectureProviders.CyclesAsync(registry, Token);
         answer.Answered.Should().BeTrue();
         var cycle = answer.Findings.Should().ContainSingle().Subject;
@@ -95,7 +172,13 @@ public sealed class ArchitectureTests
         empty.Answered.Should().BeTrue();
         empty.Findings.Should().BeEmpty();
         await using var unavailable = new ProviderRegistry();
-        unavailable.Register(new Providers.ProviderRegistryTests.Fake("failed", [Capabilities.ArchCycles], execute: (_, _) => throw new IOException("fixture unavailable")));
+        unavailable.Register(
+            new Providers.ProviderRegistryTests.Fake(
+                "failed",
+                [Capabilities.ArchCycles],
+                execute: (_, _) => throw new IOException("fixture unavailable")
+            )
+        );
         var failed = await ArchitectureProviders.CyclesAsync(unavailable, Token);
         failed.Answered.Should().BeFalse();
         failed.Notes.Should().NotBeEmpty();

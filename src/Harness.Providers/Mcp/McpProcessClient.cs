@@ -40,17 +40,37 @@ public sealed class McpProcessClient : IAsyncDisposable
 
     public int Id => _process.Id;
     public bool Alive => _closed is 0 && !_process.Completion.IsCompleted && _client?.Completion.IsCompleted is false;
-    public Task Completion => _client is null ? _process.Completion : Task.WhenAny(_process.Completion, _client.Completion);
-    public string ServerVersion => Alive && _client!.ServerInfo.Version.Length > 0 ? _client.ServerInfo.Name + " " + _client.ServerInfo.Version : "";
+    public Task Completion =>
+        _client is null ? _process.Completion : Task.WhenAny(_process.Completion, _client.Completion);
+    public string ServerVersion =>
+        Alive && _client!.ServerInfo.Version.Length > 0
+            ? _client.ServerInfo.Name + " " + _client.ServerInfo.Version
+            : "";
 
-    [SuppressMessage("Reliability", "CA2025:Do not pass disposable objects into unawaited tasks", Justification = "A timed-out native launch cannot be interrupted; its separate reaper owns the late process and never captures the deadline or linked cancellation sources.")]
-    public static async Task<McpProcessClient> StartAsync(IProviderProcessFactory factory, McpProcessOptions options, CancellationToken cancellationToken = default)
+    [SuppressMessage(
+        "Reliability",
+        "CA2025:Do not pass disposable objects into unawaited tasks",
+        Justification = "A timed-out native launch cannot be interrupted; its separate reaper owns the late process and never captures the deadline or linked cancellation sources."
+    )]
+    public static async Task<McpProcessClient> StartAsync(
+        IProviderProcessFactory factory,
+        McpProcessOptions options,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(options);
-        if (options.StartTimeout <= TimeSpan.Zero || options.CallTimeout <= TimeSpan.Zero || options.StderrLimit is <= 0 or > 4 * 1024 * 1024 || options.MaximumFrameBytes is <= 0 or > 64 * 1024 * 1024)
+        if (
+            options.StartTimeout <= TimeSpan.Zero
+            || options.CallTimeout <= TimeSpan.Zero
+            || options.StderrLimit is <= 0 or > 4 * 1024 * 1024
+            || options.MaximumFrameBytes is <= 0 or > 64 * 1024 * 1024
+        )
         {
-            throw new ArgumentOutOfRangeException(nameof(options), "Timeouts must be positive; stderr and frames are limited to 4 MiB and 64 MiB respectively.");
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Timeouts must be positive; stderr and frames are limited to 4 MiB and 64 MiB respectively."
+            );
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -77,12 +97,18 @@ public sealed class McpProcessClient : IAsyncDisposable
         try
         {
             var output = new BoundedFrameStream(process.Output, options.MaximumFrameBytes, process.KillTree);
-            client._client = await McpClient.CreateAsync(new StreamClientTransport(process.Input, output), new McpClientOptions
-            {
-                ClientInfo = new() { Name = "harness", Version = options.ClientVersion },
-                ProtocolVersion = "2025-11-25",
-                InitializationTimeout = options.StartTimeout,
-            }, cancellationToken: linked.Token).ConfigureAwait(false);
+            client._client = await McpClient
+                .CreateAsync(
+                    new StreamClientTransport(process.Input, output),
+                    new McpClientOptions
+                    {
+                        ClientInfo = new() { Name = "harness", Version = options.ClientVersion },
+                        ProtocolVersion = "2025-11-25",
+                        InitializationTimeout = options.StartTimeout,
+                    },
+                    cancellationToken: linked.Token
+                )
+                .ConfigureAwait(false);
             return client;
         }
         catch (Exception error)
@@ -99,28 +125,49 @@ public sealed class McpProcessClient : IAsyncDisposable
         }
     }
 
-    public Task<CallToolResult> CallToolAsync(string name, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken = default) =>
-        CallAsync(name, token => _client!.CallToolAsync(name, arguments, cancellationToken: token).AsTask(), cancellationToken);
+    public Task<CallToolResult> CallToolAsync(
+        string name,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken = default
+    ) =>
+        CallAsync(
+            name,
+            token => _client!.CallToolAsync(name, arguments, cancellationToken: token).AsTask(),
+            cancellationToken
+        );
 
-    public Task<IReadOnlyList<Tool>> ListToolsAsync(CancellationToken cancellationToken = default) => CallAsync<IReadOnlyList<Tool>>("tools/list", async token =>
-    {
-        List<Tool> tools = [];
-        HashSet<string> cursors = new(StringComparer.Ordinal);
-        string? cursor = null;
-        do
-        {
-            var page = await _client!.ListToolsAsync(new ListToolsRequestParams { Cursor = cursor }, token).ConfigureAwait(false);
-            tools.AddRange(page.Tools);
-            cursor = page.NextCursor;
-            if (tools.Count > 10000 || !string.IsNullOrEmpty(cursor) && (!cursors.Add(cursor) || cursors.Count > 256))
+    public Task<IReadOnlyList<Tool>> ListToolsAsync(CancellationToken cancellationToken = default) =>
+        CallAsync<IReadOnlyList<Tool>>(
+            "tools/list",
+            async token =>
             {
-                throw new InvalidDataException("tools/list exceeded pagination limits");
-            }
-        } while (!string.IsNullOrEmpty(cursor));
-        return tools;
-    }, cancellationToken);
+                List<Tool> tools = [];
+                HashSet<string> cursors = new(StringComparer.Ordinal);
+                string? cursor = null;
+                do
+                {
+                    var page = await _client!
+                        .ListToolsAsync(new ListToolsRequestParams { Cursor = cursor }, token)
+                        .ConfigureAwait(false);
+                    tools.AddRange(page.Tools);
+                    cursor = page.NextCursor;
+                    if (
+                        tools.Count > 10000
+                        || !string.IsNullOrEmpty(cursor) && (!cursors.Add(cursor) || cursors.Count > 256)
+                    )
+                    {
+                        throw new InvalidDataException("tools/list exceeded pagination limits");
+                    }
+                } while (!string.IsNullOrEmpty(cursor));
+                return tools;
+            },
+            cancellationToken
+        );
 
-    public string StderrTail(int lines = 5) => CredentialRedactor.Redact(string.Join('\n', _stderr.Text.TrimEnd('\n').Split('\n').TakeLast(Math.Max(0, lines))).Trim());
+    public string StderrTail(int lines = 5) =>
+        CredentialRedactor.Redact(
+            string.Join('\n', _stderr.Text.TrimEnd('\n').Split('\n').TakeLast(Math.Max(0, lines))).Trim()
+        );
 
     public ValueTask DisposeAsync()
     {
@@ -150,11 +197,18 @@ public sealed class McpProcessClient : IAsyncDisposable
                     await _client.DisposeAsync().ConfigureAwait(false);
                 }
             }
-            finally { await Task.WhenAll(_stderrReader, _processExit).ConfigureAwait(false); }
+            finally
+            {
+                await Task.WhenAll(_stderrReader, _processExit).ConfigureAwait(false);
+            }
         }
     }
 
-    private async Task<T> CallAsync<T>(string operation, Func<CancellationToken, Task<T>> call, CancellationToken cancellationToken)
+    private async Task<T> CallAsync<T>(
+        string operation,
+        Func<CancellationToken, Task<T>> call,
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!Alive)
@@ -176,14 +230,19 @@ public sealed class McpProcessClient : IAsyncDisposable
                 _process.KillTree();
                 throw new TimeoutException(Message(operation + ": timed out"), error);
             }
-            throw new IOException(Message(operation + ": " + (!Alive ? "provider process exited" : error.Message)), error);
+            throw new IOException(
+                Message(operation + ": " + (!Alive ? "provider process exited" : error.Message)),
+                error
+            );
         }
     }
 
     private string Message(string message)
     {
         var tail = StderrTail();
-        return CredentialRedactor.Redact(_options.Name + ": " + message + (tail.Length is 0 ? "" : "\nstderr (last lines):\n" + tail));
+        return CredentialRedactor.Redact(
+            _options.Name + ": " + message + (tail.Length is 0 ? "" : "\nstderr (last lines):\n" + tail)
+        );
     }
 
     private async Task ReadStderrAsync()
@@ -197,7 +256,9 @@ public sealed class McpProcessClient : IAsyncDisposable
                 _stderr.Append(buffer.AsSpan(0, count));
             }
         }
-        catch (Exception error) when (error is IOException or ObjectDisposedException) { /* Process cleanup closes the pipe. */ }
+        catch (Exception error) when (error is IOException or ObjectDisposedException)
+        { /* Process cleanup closes the pipe. */
+        }
     }
 
     private async Task ReapDescendantsAsync()
@@ -220,7 +281,15 @@ public sealed class McpProcessClient : IAsyncDisposable
             process.KillTree();
             await process.DisposeAsync().ConfigureAwait(false);
         }
-        catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or TimeoutException or ObjectDisposedException) { /* Startup failure was already reported; observe a late launcher failure as well. */ }
+        catch (Exception error)
+            when (error
+                    is IOException
+                        or System.ComponentModel.Win32Exception
+                        or TimeoutException
+                        or ObjectDisposedException
+            )
+        { /* Startup failure was already reported; observe a late launcher failure as well. */
+        }
     }
 
     private sealed class ByteTail(int limit)
@@ -228,7 +297,17 @@ public sealed class McpProcessClient : IAsyncDisposable
         private readonly byte[] _bytes = new byte[limit];
         private readonly object _gate = new();
         private int _count;
-        internal string Text { get { lock (_gate) { return Encoding.UTF8.GetString(_bytes, 0, _count); } } }
+        internal string Text
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return Encoding.UTF8.GetString(_bytes, 0, _count);
+                }
+            }
+        }
+
         internal void Append(ReadOnlySpan<byte> bytes)
         {
             lock (_gate)

@@ -16,23 +16,66 @@ using Fake = Harness.Integration.Providers.ProviderRegistryTests.Fake;
 
 namespace Harness.Integration.Providers;
 
-[SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Registered fake providers are owned and disposed by each awaited registry.")]
+[SuppressMessage(
+    "Reliability",
+    "CA2000:Dispose objects before losing scope",
+    Justification = "Registered fake providers are owned and disposed by each awaited registry."
+)]
 public sealed class ProviderFacadeTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
-    private static async Task<JsonElement> Call(ProviderTools tools, string tool, string json = """{}""") => JsonSerializer.SerializeToElement(await tools.CallAsync(tool, JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json), Token));
+
+    private static async Task<JsonElement> Call(ProviderTools tools, string tool, string json = """{}""") =>
+        JsonSerializer.SerializeToElement(
+            await tools.CallAsync(tool, JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json), Token)
+        );
 
     [Fact]
     public async Task SearchMergesPartialErrorsKeepsProvenanceAndOnlyEmitsDetailsInDebug()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("graph", [Capabilities.SymbolSearch], execute: (request, _) =>
-        {
-            request.Query.Should().Be("Alpha");
-            request.Limit.Should().Be(2);
-            return Task.FromResult(new ProviderResult { Bytes = 123, Truncated = true, Items = [new() { Kind = "symbol", Name = "Alpha", QualifiedName = "A.Alpha", Path = "src/A.cs", StartLine = 7, Provider = "graph", Tool = "find", Score = 0.8 }] });
-        }));
-        registry.Register(new Fake("grep", [Capabilities.TextSearch], execute: (_, _) => Task.FromResult(new ProviderResult { Error = new ProviderException("grep", "not installed\nextra") })));
+        registry.Register(
+            new Fake(
+                "graph",
+                [Capabilities.SymbolSearch],
+                execute: (request, _) =>
+                {
+                    request.Query.Should().Be("Alpha");
+                    request.Limit.Should().Be(2);
+                    return Task.FromResult(
+                        new ProviderResult
+                        {
+                            Bytes = 123,
+                            Truncated = true,
+                            Items =
+                            [
+                                new()
+                                {
+                                    Kind = "symbol",
+                                    Name = "Alpha",
+                                    QualifiedName = "A.Alpha",
+                                    Path = "src/A.cs",
+                                    StartLine = 7,
+                                    Provider = "graph",
+                                    Tool = "find",
+                                    Score = 0.8,
+                                },
+                            ],
+                        }
+                    );
+                }
+            )
+        );
+        registry.Register(
+            new Fake(
+                "grep",
+                [Capabilities.TextSearch],
+                execute: (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult { Error = new ProviderException("grep", "not installed\nextra") }
+                    )
+            )
+        );
         var tools = new ProviderTools(registry);
         var result = await Call(tools, "search_project", """{"query":" Alpha ","limit":2}""");
         result.GetProperty("results").GetArrayLength().Should().Be(1);
@@ -50,8 +93,50 @@ public sealed class ProviderFacadeTests
     public async Task NotIndexedIsDegradedAndCrossBranchResultsAndStructureAreWithheld()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("index", [Capabilities.SymbolSearch, Capabilities.Overview], freshness: "indexed", execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Kind = "symbol", Name = "OtherBranch", Provider = "index" }], Summary = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>("""{"nodes":2}""") })));
-        registry.Register(new Fake("live", [Capabilities.SymbolSearch], execute: (_, _) => Task.FromResult(new ProviderResult { Items = [new() { Kind = "symbol", Name = "Current", Provider = "live" }] })));
+        registry.Register(
+            new Fake(
+                "index",
+                [Capabilities.SymbolSearch, Capabilities.Overview],
+                freshness: "indexed",
+                execute: (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult
+                        {
+                            Items =
+                            [
+                                new()
+                                {
+                                    Kind = "symbol",
+                                    Name = "OtherBranch",
+                                    Provider = "index",
+                                },
+                            ],
+                            Summary = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>("""{"nodes":2}"""),
+                        }
+                    )
+            )
+        );
+        registry.Register(
+            new Fake(
+                "live",
+                [Capabilities.SymbolSearch],
+                execute: (_, _) =>
+                    Task.FromResult(
+                        new ProviderResult
+                        {
+                            Items =
+                            [
+                                new()
+                                {
+                                    Kind = "symbol",
+                                    Name = "Current",
+                                    Provider = "live",
+                                },
+                            ],
+                        }
+                    )
+            )
+        );
         var tools = new ProviderTools(registry, new Snapshot(new("root", Stale: "branch changed", CrossBranch: true)));
         var search = await Call(tools, "search_project", """{"query":"x","kind":"symbol"}""");
         search.GetProperty("results").GetArrayLength().Should().Be(1);
@@ -59,7 +144,14 @@ public sealed class ProviderFacadeTests
         search.GetProperty("stale").GetString().Should().Contain("index were withheld");
         var overview = await Call(tools, "project_overview");
         overview.TryGetProperty("structure", out _).Should().BeFalse();
-        registry.Register(new Fake("missing", [Capabilities.Callers], execute: (_, _) => Task.FromResult(new ProviderResult { Error = new ProviderNotIndexedException("not indexed yet") })));
+        registry.Register(
+            new Fake(
+                "missing",
+                [Capabilities.Callers],
+                execute: (_, _) =>
+                    Task.FromResult(new ProviderResult { Error = new ProviderNotIndexedException("not indexed yet") })
+            )
+        );
         var empty = await Call(tools, "search_project", """{"query":"x","kind":"callers"}""");
         empty.TryGetProperty("errors", out _).Should().BeFalse();
         empty.GetProperty("note").GetString().Should().Contain("not indexed yet").And.Contain("try kind text");
@@ -69,21 +161,33 @@ public sealed class ProviderFacadeTests
     public async Task PackagesRouteOnlyToPackageCapabilitiesAndUnsupportedActionsStayExplicit()
     {
         await using var registry = new ProviderRegistry();
-        registry.Register(new Fake("nuget", [Capabilities.PackageTypeDefinition, Capabilities.PackageInfo], execute: (request, _) =>
-        {
-            if (request.Capability == Capabilities.PackageInfo)
-            {
-                return Task.FromResult(new ProviderResult { Error = new IOException("private feed unavailable") });
-            }
+        registry.Register(
+            new Fake(
+                "nuget",
+                [Capabilities.PackageTypeDefinition, Capabilities.PackageInfo],
+                execute: (request, _) =>
+                {
+                    if (request.Capability == Capabilities.PackageInfo)
+                    {
+                        return Task.FromResult(
+                            new ProviderResult { Error = new IOException("private feed unavailable") }
+                        );
+                    }
 
-            request.Package.Should().Be("Foo");
-            request.Version.Should().Be("1.2");
-            request.Type.Should().Be("Result");
-            request.Limit.Should().Be(50);
-            return Task.FromResult(new ProviderResult { Provider = "nuget", Text = "public class Result" });
-        }));
+                    request.Package.Should().Be("Foo");
+                    request.Version.Should().Be("1.2");
+                    request.Type.Should().Be("Result");
+                    request.Limit.Should().Be(50);
+                    return Task.FromResult(new ProviderResult { Provider = "nuget", Text = "public class Result" });
+                }
+            )
+        );
         var tools = new ProviderTools(registry);
-        var result = await Call(tools, "package_api", """{"action":"definition","package":" Foo ","version":" 1.2 ","type":"Result","limit":500}""");
+        var result = await Call(
+            tools,
+            "package_api",
+            """{"action":"definition","package":" Foo ","version":" 1.2 ","type":"Result","limit":500}"""
+        );
         result.GetProperty("answers")[0].GetProperty("text").GetString().Should().Be("public class Result");
         var failed = await Call(tools, "package_api", """{"action":"info","package":"Foo"}""");
         failed.GetProperty("note").GetString().Should().Contain("no package provider could answer");
@@ -100,22 +204,56 @@ public sealed class ProviderFacadeTests
     [InlineData("package_api", """{"action":"info"}""", "info needs package")]
     [InlineData("package_api", """{"action":"definition","package":"Foo"}""", "definition needs type")]
     public async Task InvalidFacadeArgumentsAreRejected(string tool, string args, string error) =>
-        await FluentActions.Awaiting(() => Call(new(), tool, args)).Should().ThrowAsync<ArgumentException>().WithMessage("*" + error + "*");
+        await FluentActions
+            .Awaiting(() => Call(new(), tool, args))
+            .Should()
+            .ThrowAsync<ArgumentException>()
+            .WithMessage("*" + error + "*");
 
     [Fact]
     public async Task EmbeddedPacksMatchFrozenSourceAndOverridesRouteCodeAndPackagesLazily()
     {
         using var fixture = new ProviderFixture();
-        using var baseline = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(ProviderFixture.RepositoryRoot, "doc", "port", "inventory", "providers.json"), Token));
+        using var baseline = JsonDocument.Parse(
+            await File.ReadAllTextAsync(
+                Path.Combine(ProviderFixture.RepositoryRoot, "doc", "port", "inventory", "providers.json"),
+                Token
+            )
+        );
         foreach (var pack in ConfigurationLoader.Packs)
         {
-            var current = Path.Combine(ProviderFixture.RepositoryRoot, "src", "Harness.Infrastructure", "Configuration", "Packs", pack + ".toml");
-            (await File.ReadAllTextAsync(current, Token)).ReplaceLineEndings("\n").Should().Be(baseline.RootElement.GetProperty("packs").EnumerateArray().Single(entry => entry.GetProperty("path").GetString()!.EndsWith("/" + pack + ".toml", StringComparison.Ordinal)).GetProperty("toml").GetString()!.ReplaceLineEndings("\n"));
+            var current = Path.Combine(
+                ProviderFixture.RepositoryRoot,
+                "src",
+                "Harness.Infrastructure",
+                "Configuration",
+                "Packs",
+                pack + ".toml"
+            );
+            (await File.ReadAllTextAsync(current, Token))
+                .ReplaceLineEndings("\n")
+                .Should()
+                .Be(
+                    baseline
+                        .RootElement.GetProperty("packs")
+                        .EnumerateArray()
+                        .Single(entry =>
+                            entry
+                                .GetProperty("path")
+                                .GetString()!
+                                .EndsWith("/" + pack + ".toml", StringComparison.Ordinal)
+                        )
+                        .GetProperty("toml")
+                        .GetString()!
+                        .ReplaceLineEndings("\n")
+                );
         }
         ConfigurationLoader.Packs.Should().Equal("codebase-memory", "graphify-csharp", "nuget", "rg-fd", "ripwire");
         var file = Path.Combine(fixture.Root, "config.toml");
         fixture.Write("App.csproj", "<Project />");
-        fixture.Write("config.toml", """
+        fixture.Write(
+            "config.toml",
+            """
             [providers.codebase-memory]
             command = "overridden"
             only = ["code.symbol_search"]
@@ -124,7 +262,8 @@ public sealed class ProviderFacadeTests
             [providers.disabled]
             pack = "ripwire"
             enabled = false
-            """);
+            """
+        );
         var configuration = ConfigurationLoader.LoadFiles("", file).Value;
         var factory = new CountingFactory();
         await using var registry = ConfiguredProviders.Build(configuration.Providers, fixture.Root, factory);
@@ -141,7 +280,11 @@ public sealed class ProviderFacadeTests
         using var fixture = new ProviderFixture();
         var lifecycle = new ProjectLifecycle(Path.Combine(fixture.Root, "global", "config.toml"));
         var location = await lifecycle.LocateAsync(fixture.Root, allowNonGit: true, Token);
-        await using var session = new HarnessStateSession(location, lifecycle.Registry, new("test", "", "test", "test"));
+        await using var session = new HarnessStateSession(
+            location,
+            lifecycle.Registry,
+            new("test", "", "test", "test")
+        );
         var tools = new ProviderTools(project: session);
         (await Call(tools, "project_overview")).GetProperty("project_root").GetString().Should().Be(fixture.Root);
         await Call(tools, "provider_status");
@@ -159,8 +302,26 @@ public sealed class ProviderFacadeTests
 
         await using (var recorder = new ProviderCallRecorder(location.DatabasePath))
         {
-            recorder.Observe(new() { Provider = "p", Capability = Capabilities.SymbolSearch, Bytes = 12, Latency = TimeSpan.FromMilliseconds(10) }, new(Capabilities.SymbolSearch, "query"));
-            recorder.Observe(new() { Provider = "p", Capability = Capabilities.SymbolSearch, Error = new IOException("failed"), Bytes = 4 }, new(Capabilities.SymbolSearch));
+            recorder.Observe(
+                new()
+                {
+                    Provider = "p",
+                    Capability = Capabilities.SymbolSearch,
+                    Bytes = 12,
+                    Latency = TimeSpan.FromMilliseconds(10),
+                },
+                new(Capabilities.SymbolSearch, "query")
+            );
+            recorder.Observe(
+                new()
+                {
+                    Provider = "p",
+                    Capability = Capabilities.SymbolSearch,
+                    Error = new IOException("failed"),
+                    Bytes = 4,
+                },
+                new(Capabilities.SymbolSearch)
+            );
         }
         var stats = await session.ReadProviderStatisticsAsync("p", Token);
         stats["recent_24h"].GetProperty("calls").GetInt32().Should().Be(2);
@@ -170,7 +331,12 @@ public sealed class ProviderFacadeTests
 
     private sealed class Snapshot(ProviderProjectSnapshot snapshot) : IProviderProjectSession
     {
-        public Task<ProviderProjectSnapshot> ReadProviderProjectAsync(CancellationToken cancellationToken) => Task.FromResult(snapshot);
-        public Task<IReadOnlyDictionary<string, JsonElement>> ReadProviderStatisticsAsync(string provider, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyDictionary<string, JsonElement>>(new Dictionary<string, JsonElement>());
+        public Task<ProviderProjectSnapshot> ReadProviderProjectAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(snapshot);
+
+        public Task<IReadOnlyDictionary<string, JsonElement>> ReadProviderStatisticsAsync(
+            string provider,
+            CancellationToken cancellationToken
+        ) => Task.FromResult<IReadOnlyDictionary<string, JsonElement>>(new Dictionary<string, JsonElement>());
     }
 }

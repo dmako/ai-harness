@@ -45,7 +45,14 @@ public readonly record struct MemoryTimestamp : IComparable<MemoryTimestamp>
             seconds = text[..dot] + text[end..];
         }
 
-        var second = DateTimeOffset.ParseExact(seconds, ["yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:sszzz"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal).ToUniversalTime();
+        var second = DateTimeOffset
+            .ParseExact(
+                seconds,
+                ["yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:sszzz"],
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal
+            )
+            .ToUniversalTime();
         return new MemoryTimestamp(second, nanoseconds);
     }
 
@@ -64,13 +71,23 @@ public readonly record struct MemoryTimestamp : IComparable<MemoryTimestamp>
             return ToRfc3339();
         }
 
-        return _second.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + "." + _nanoseconds.ToString("D9", CultureInfo.InvariantCulture).TrimEnd('0') + "Z";
+        return _second.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture)
+            + "."
+            + _nanoseconds.ToString("D9", CultureInfo.InvariantCulture).TrimEnd('0')
+            + "Z";
     }
 
-    public override string ToString() => _second.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + "." + _nanoseconds.ToString("D9", CultureInfo.InvariantCulture) + "Z";
+    public override string ToString() =>
+        _second.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture)
+        + "."
+        + _nanoseconds.ToString("D9", CultureInfo.InvariantCulture)
+        + "Z";
 
     public static bool operator <(MemoryTimestamp left, MemoryTimestamp right) => left.CompareTo(right) < 0;
+
     public static bool operator >(MemoryTimestamp left, MemoryTimestamp right) => left.CompareTo(right) > 0;
+
     public static bool operator <=(MemoryTimestamp left, MemoryTimestamp right) => left.CompareTo(right) <= 0;
+
     public static bool operator >=(MemoryTimestamp left, MemoryTimestamp right) => left.CompareTo(right) >= 0;
 }
