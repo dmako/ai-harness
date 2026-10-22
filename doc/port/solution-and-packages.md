@@ -189,10 +189,11 @@ third-party notices for the wrapper and other shipped dependencies; the receipt
 contains the actual restored package license declarations, not a legal audit or
 release SBOM.
 
-The native bundle contains win-x64, linux-x64, linux-arm64, osx-x64 and osx-arm64
-assets, matching the existing RID list. Only win-x64 was executed. Linux/macOS
-loader behavior, file locks, executable permissions, Git availability and both
-ARM64 targets still need native CI smoke tests. Musl is a separate RID; do not
+The supported native release RIDs are win-x64, linux-x64, linux-arm64 and
+osx-arm64; Intel macOS support was removed for TASK-0031. Native extraction and
+functionality were manually verified by the user on Windows, Linux and macOS;
+see [release validation](releases.md) for automated evidence and platform notes.
+Musl is a separate RID; do not
 claim Alpine support from a linux-x64 asset. Choose framework-dependent or
 self-contained publishing per release; framework-dependent Cli includes Web and
 therefore needs the ASP.NET Core runtime as well as .NET. Single-file publishing

@@ -21,7 +21,6 @@ jobs:
           - { host: windows-2025, rid: win-x64, goos: windows, goarch: amd64, suffix: .exe }
           - { host: ubuntu-24.04, rid: linux-x64, goos: linux, goarch: amd64, suffix: '' }
           - { host: ubuntu-24.04-arm, rid: linux-arm64, goos: linux, goarch: arm64, suffix: '' }
-          - { host: macos-15-intel, rid: osx-x64, goos: darwin, goarch: amd64, suffix: '' }
           - { host: macos-15, rid: osx-arm64, goos: darwin, goarch: arm64, suffix: '' }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60

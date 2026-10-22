@@ -2,7 +2,7 @@
   "schema": 1,
   "task": "TASK-0031",
   "recorded_utc": "2026-10-22T00:25:08.449316+00:00",
-  "qualification": "pending",
+  "qualification": "pass",
   "version": "0.1.0-port-preview.2",
   "release_directory": "dist/0.1.0-port-preview.2",
   "manifest_sha256": "af3783f7fd0430d45fec9adbe63cf73d2dbf1fa24d5f8606a752c25fff288558",
@@ -646,216 +646,6 @@
       "archive_contents_verified": true
     },
     {
-      "rid": "osx-x64",
-      "group": "main",
-      "file": "harness-0.1.0-port-preview.2-darwin-amd64.tar.gz",
-      "bytes": 85697565,
-      "sha256": "9c3e31cf1ad67f4d6af883b67da9cb0f0d3a7ebda57186a8a40c3dbed733b021",
-      "binaries": [
-        {
-          "file": "harness",
-          "bytes": 109575256,
-          "sha256": "959323f23a880a6ef22afab3cc1ad25afbb87e3850049b5a946164655c62ebb2",
-          "repeat_publish_verified": true
-        },
-        {
-          "file": "harness-graphify",
-          "bytes": 79533233,
-          "sha256": "f7077511c672b020ecc1f119b81d34dac57c9911b2c28d4a84929bb3cebd43f4",
-          "repeat_publish_verified": true
-        }
-      ],
-      "licenses": [
-        {
-          "package": "Microsoft.AspNetCore.App.Runtime.osx-x64",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Data.Sqlite",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Data.Sqlite.Core",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Extensions.AI.Abstractions",
-          "version": "10.8.3",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Extensions.DependencyInjection.Abstractions",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Extensions.Logging.Abstractions",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.NETCore.App.Runtime.osx-x64",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "ModelContextProtocol.Core",
-          "version": "2.2.0",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.bundle_e_sqlite3",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.core",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.lib.e_sqlite3",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.provider.e_sqlite3",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "Spectre.Console",
-          "version": "0.57.2",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Spectre.Console.Ansi",
-          "version": "0.57.2",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Spectre.Console.Cli",
-          "version": "0.57.2",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Tomlyn",
-          "version": "2.10.1",
-          "license_type": "expression",
-          "license": "BSD-2-Clause"
-        },
-        {
-          "package": "YamlDotNet",
-          "version": "18.1.0",
-          "license_type": "expression",
-          "license": "MIT"
-        }
-      ],
-      "archive_contents_verified": true
-    },
-    {
-      "rid": "osx-x64",
-      "group": "developer",
-      "file": "developer-tools/harness-0.1.0-port-preview.2-darwin-amd64.tar.gz",
-      "bytes": 96224290,
-      "sha256": "4bb6ee5e0b62bc4fc4ff450631dafa5aa8e011daeb8189b0b5d95d6124126058",
-      "binaries": [
-        {
-          "file": "harness-collect",
-          "bytes": 104992368,
-          "sha256": "0340813f5ad0eca5f2491e42b4864ab4a0d0d0db9b7416771eea39ceb1d7fb6a",
-          "repeat_publish_verified": true
-        },
-        {
-          "file": "harness-share",
-          "bytes": 104999550,
-          "sha256": "5e56dd255be69ea799b915ad3ac32f10222b0f4e1340ef0aaa9b815d82ee0ecf",
-          "repeat_publish_verified": true
-        }
-      ],
-      "licenses": [
-        {
-          "package": "Microsoft.AspNetCore.App.Runtime.osx-x64",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Data.Sqlite",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.Data.Sqlite.Core",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "Microsoft.NETCore.App.Runtime.osx-x64",
-          "version": "10.0.13",
-          "license_type": "expression",
-          "license": "MIT"
-        },
-        {
-          "package": "SQLitePCLRaw.bundle_e_sqlite3",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.core",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.lib.e_sqlite3",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "SQLitePCLRaw.provider.e_sqlite3",
-          "version": "2.1.13",
-          "license_type": "expression",
-          "license": "Apache-2.0"
-        },
-        {
-          "package": "Tomlyn",
-          "version": "2.10.1",
-          "license_type": "expression",
-          "license": "BSD-2-Clause"
-        },
-        {
-          "package": "YamlDotNet",
-          "version": "18.1.0",
-          "license_type": "expression",
-          "license": "MIT"
-        }
-      ],
-      "archive_contents_verified": true
-    },
-    {
       "rid": "osx-arm64",
       "group": "main",
       "file": "harness-0.1.0-port-preview.2-darwin-arm64.tar.gz",
@@ -1192,10 +982,6 @@
         "MEASURE harness uninstall --all --delete-data 3996.10 ms"
       ]
     },
-    "macos_x64": {
-      "status": "pending",
-      "reason": "No macOS host/runner available"
-    },
     "macos_arm64": {
       "status": "pending",
       "reason": "No macOS host/runner available"
@@ -1241,5 +1027,238 @@
     "Initial unmodified Windows Go runner could not start the .NET bundle without writable cache variables; initial Linux tmpfs was noexec; corrected fixtures are recorded separately",
     "Core requires supported native OS dependencies; writable executable extraction storage is required for bundled native SQLite",
     "Top-level license for new C# contributions is undeclared; packaging preserves upstream MIT and actual package/runtime notices without inventing a license"
-  ]
+  ],
+  "automated_qualification": "pending",
+  "qualification_basis": "Original automated evidence plus user-confirmed native extraction/functionality and inventory acceptance on 2026-10-22.",
+  "accepted_on": "2026-10-22",
+  "acceptance_receipt": "doc/port/inventory/release-acceptance.json",
+  "supported_rids": [
+    "win-x64",
+    "linux-x64",
+    "linux-arm64",
+    "osx-arm64"
+  ],
+  "retired_artifacts": [
+    {
+      "rid": "osx-x64",
+      "group": "main",
+      "file": "harness-0.1.0-port-preview.2-darwin-amd64.tar.gz",
+      "bytes": 85697565,
+      "sha256": "9c3e31cf1ad67f4d6af883b67da9cb0f0d3a7ebda57186a8a40c3dbed733b021",
+      "binaries": [
+        {
+          "file": "harness",
+          "bytes": 109575256,
+          "sha256": "959323f23a880a6ef22afab3cc1ad25afbb87e3850049b5a946164655c62ebb2",
+          "repeat_publish_verified": true
+        },
+        {
+          "file": "harness-graphify",
+          "bytes": 79533233,
+          "sha256": "f7077511c672b020ecc1f119b81d34dac57c9911b2c28d4a84929bb3cebd43f4",
+          "repeat_publish_verified": true
+        }
+      ],
+      "licenses": [
+        {
+          "package": "Microsoft.AspNetCore.App.Runtime.osx-x64",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Data.Sqlite",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Data.Sqlite.Core",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Extensions.AI.Abstractions",
+          "version": "10.8.3",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Extensions.DependencyInjection.Abstractions",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Extensions.Logging.Abstractions",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.NETCore.App.Runtime.osx-x64",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "ModelContextProtocol.Core",
+          "version": "2.2.0",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.bundle_e_sqlite3",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.core",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.lib.e_sqlite3",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.provider.e_sqlite3",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "Spectre.Console",
+          "version": "0.57.2",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Spectre.Console.Ansi",
+          "version": "0.57.2",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Spectre.Console.Cli",
+          "version": "0.57.2",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Tomlyn",
+          "version": "2.10.1",
+          "license_type": "expression",
+          "license": "BSD-2-Clause"
+        },
+        {
+          "package": "YamlDotNet",
+          "version": "18.1.0",
+          "license_type": "expression",
+          "license": "MIT"
+        }
+      ],
+      "archive_contents_verified": true
+    },
+    {
+      "rid": "osx-x64",
+      "group": "developer",
+      "file": "developer-tools/harness-0.1.0-port-preview.2-darwin-amd64.tar.gz",
+      "bytes": 96224290,
+      "sha256": "4bb6ee5e0b62bc4fc4ff450631dafa5aa8e011daeb8189b0b5d95d6124126058",
+      "binaries": [
+        {
+          "file": "harness-collect",
+          "bytes": 104992368,
+          "sha256": "0340813f5ad0eca5f2491e42b4864ab4a0d0d0db9b7416771eea39ceb1d7fb6a",
+          "repeat_publish_verified": true
+        },
+        {
+          "file": "harness-share",
+          "bytes": 104999550,
+          "sha256": "5e56dd255be69ea799b915ad3ac32f10222b0f4e1340ef0aaa9b815d82ee0ecf",
+          "repeat_publish_verified": true
+        }
+      ],
+      "licenses": [
+        {
+          "package": "Microsoft.AspNetCore.App.Runtime.osx-x64",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Data.Sqlite",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.Data.Sqlite.Core",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "Microsoft.NETCore.App.Runtime.osx-x64",
+          "version": "10.0.13",
+          "license_type": "expression",
+          "license": "MIT"
+        },
+        {
+          "package": "SQLitePCLRaw.bundle_e_sqlite3",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.core",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.lib.e_sqlite3",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "SQLitePCLRaw.provider.e_sqlite3",
+          "version": "2.1.13",
+          "license_type": "expression",
+          "license": "Apache-2.0"
+        },
+        {
+          "package": "Tomlyn",
+          "version": "2.10.1",
+          "license_type": "expression",
+          "license": "BSD-2-Clause"
+        },
+        {
+          "package": "YamlDotNet",
+          "version": "18.1.0",
+          "license_type": "expression",
+          "license": "MIT"
+        }
+      ],
+      "archive_contents_verified": true
+    }
+  ],
+  "retired_execution": {
+    "macos_x64": {
+      "status": "pending",
+      "reason": "Intel macOS support removed by user decision; original automated execution status retained for history."
+    }
+  },
+  "manual_execution_acceptance": {
+    "windows": "Everything works as expected.",
+    "linux": "Works after a system update; libssl3t64 had to be installed. Native prerequisites vary by distribution.",
+    "macos": "Works after a system update and explicitly trusting unsigned/quarantined executables; Apple Silicon is the supported target."
+  }
 }

@@ -112,7 +112,7 @@ Managed development builds default to AnyCPU; x64 and ARM64 configurations are
 available. The misspelled/ineffective `PlatformTargets` property was removed.
 The SDK infers the executable's actual PlatformTarget from its publish RID;
 `linux-arm64` evaluation was verified to produce `arm64`. The existing RID list
-remains win-x64, linux-x64, linux-arm64, osx-x64 and osx-arm64. Native non-Windows
+remains win-x64, linux-x64, linux-arm64 and osx-arm64. Native non-Windows
 execution still belongs in the corresponding CI/release checks.
 
 ## Release publish settings

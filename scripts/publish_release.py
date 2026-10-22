@@ -21,7 +21,7 @@ import zipfile
 from release_licenses import inventory
 
 ROOT = Path(__file__).resolve().parents[1]
-RIDS = {"win-x64": ("windows", "amd64"), "linux-x64": ("linux", "amd64"), "linux-arm64": ("linux", "arm64"), "osx-x64": ("darwin", "amd64"), "osx-arm64": ("darwin", "arm64")}
+RIDS = {"win-x64": ("windows", "amd64"), "linux-x64": ("linux", "amd64"), "linux-arm64": ("linux", "arm64"), "osx-arm64": ("darwin", "arm64")}
 PRODUCTS = {"Cli": "harness", "Graphify": "harness-graphify", "Collect": "harness-collect", "Share": "harness-share"}
 
 
@@ -94,10 +94,10 @@ def main():
     environment["NUGET_PACKAGES"] = str(packages)
     common = ["-p:PublishProfile=Release", "-p:VERSION_LABEL=" + a.version, "-p:SourceRevisionId=" + commit, "-p:BuildTimestamp=" + stamp, "-p:RepositoryModified=" + str(modified).lower(), "-p:PathMap=" + str(ROOT) + "=/_/"]
     source_files = git("ls-files", "--cached", "--others", "--exclude-standard").splitlines()
-    source_files = [name for name in source_files if name.split("/")[0] in ("src", "configuration", "scripts") or name in ("global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "NuGet.config", ".editorconfig", "doc/port/inventory/baseline.json")]
+    source_files = [name for name in source_files if name.split("/")[0] in ("src", "configuration", "scripts") or name in ("global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "NuGet.config", ".editorconfig", "doc/port/inventory/baseline.json", "README.md")]
     source_hashes = {name: sha(ROOT / name) for name in source_files if (ROOT / name).is_file()}
     manifest = {"schema": 1, "version": a.version, "commit": commit, "modified": modified, "source_date_epoch": epoch, "sdk": subprocess.check_output(["dotnet", "--version"], cwd=ROOT, env=environment).decode().strip(), "build_directory": build.relative_to(ROOT).as_posix(), "self_contained": True, "single_file": True, "trimmed": False, "native_aot": False, "source_sha256": source_hashes, "companion_policy": "Main archives contain harness and harness-graphify. Optional collect/share developer archives are separate and never installed by harness.", "repository_license_declaration": None, "artifacts": []}
-    notes = "# Harness " + a.version + "\n\nSelf-contained .NET 10 binaries. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools.\n\nMain archives: harness + harness-graphify. Developer archives: harness-collect + harness-share, not installed with the main CLI.\n\nCross-compilation does not imply native qualification. See doc/port/releases.md and the validation receipt for host/architecture execution status. Trimming and NativeAOT are disabled.\n"
+    notes = "# Harness " + a.version + "\n\nSelf-contained .NET 10 binaries. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools. See the included README.md for distribution dependencies (including libssl3t64 where applicable) and explicit trust steps for unsigned macOS downloads.\n\nMain archives: harness + harness-graphify. Developer archives: harness-collect + harness-share, not installed with the main CLI.\n\nCross-compilation does not imply native qualification. See doc/port/releases.md and the validation receipt for host/architecture execution status. Trimming and NativeAOT are disabled.\n"
     (output / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
     upstream = json.loads((ROOT / "doc/port/inventory/baseline.json").read_text(encoding="utf-8"))["source_license"]
     for rid in a.rids:
@@ -134,6 +134,7 @@ def main():
                 shutil.copytree(license_stage / "LICENSES", tree / "LICENSES", dirs_exist_ok=True)
                 for entry in entries:
                     licenses[entry["package"] + "/" + entry["version"]] = entry
+            shutil.copyfile(ROOT / "README.md", tree / "README.md")
             (tree / "LICENSE-GO.txt").write_text(upstream, encoding="utf-8")
             (tree / "NOTICE.md").write_text("Contains MIT-licensed code and assets derived from the frozen Go harness; LICENSE-GO.txt preserves its notice. Package/runtime licenses are listed in THIRD_PARTY_NOTICES.json and LICENSES. This repository has no separate top-level license declaration for new C# contributions; no additional license is inferred by the packaging script.\n", encoding="utf-8")
             (tree / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
