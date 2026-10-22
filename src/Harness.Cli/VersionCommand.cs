@@ -1,24 +1,21 @@
-using System.ComponentModel;
 using System.Text.Json;
-using Spectre.Console.Cli;
+using Harness.Core.Serialization;
 
 namespace Harness.Cli;
 
-internal sealed class VersionSettings : CommandSettings
+internal sealed class VersionSettings
 {
-    [CommandOption("--json")]
-    [Description("Machine-readable output")]
     public bool Json { get; init; }
 }
 
-internal sealed class VersionCommand(BuildInformation information, TextWriter output) : Command<VersionSettings>
+internal sealed class VersionCommand(BuildInformation information, TextWriter output)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public override int Execute(CommandContext context, VersionSettings settings, CancellationToken cancellationToken)
+    public int Execute(VersionSettings settings, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        output.WriteLine(settings.Json ? JsonSerializer.Serialize(information, JsonOptions) : information.ToString());
+        output.WriteLine(settings.Json ? HarnessJson.Serialize(information, JsonOptions) : information.ToString());
         return 0;
     }
 }

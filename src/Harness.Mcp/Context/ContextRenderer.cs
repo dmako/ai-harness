@@ -1,4 +1,5 @@
 using Harness.Core.Retrieval;
+using Harness.Core.Serialization;
 using Harness.Mcp.Workspaces;
 
 namespace Harness.Mcp.Context;
@@ -288,29 +289,32 @@ public static class ContextRenderer
             ["used_bytes"] = 999999,
             ["budget_bytes"] = 999999,
             ["omitted"] = 9999,
-            ["memory"] = new[] { new { id = "", type = "" } },
+            ["memory"] = new[]
+            {
+                new JsonObjectMap { ["id"] = "", ["type"] = "" },
+            },
             ["changes"] = new[]
             {
-                new
+                new JsonObjectMap
                 {
-                    commit = "",
-                    subject = "",
-                    path = "",
-                    when = "",
+                    ["commit"] = "",
+                    ["subject"] = "",
+                    ["path"] = "",
+                    ["when"] = "",
                 },
             },
             ["areas"] = new Dictionary<string, int> { [""] = 0 },
             ["note"] = string.Join("; ", notes.Append(new string('x', 140))),
         };
         return ContextJson.Size(output)
-            - ContextJson.Size(new { id = "", type = "" })
+            - ContextJson.Size(new JsonObjectMap { ["id"] = "", ["type"] = "" })
             - ContextJson.Size(
-                new
+                new JsonObjectMap
                 {
-                    commit = "",
-                    subject = "",
-                    path = "",
-                    when = "",
+                    ["commit"] = "",
+                    ["subject"] = "",
+                    ["path"] = "",
+                    ["when"] = "",
                 }
             )
             - ContextJson.Size("");

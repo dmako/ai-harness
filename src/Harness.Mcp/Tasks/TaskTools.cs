@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 
 namespace Harness.Mcp.Tasks;
@@ -19,7 +20,7 @@ internal static class TaskTools
         CancellationToken token
     )
     {
-        var values = JsonSerializer.SerializeToElement(
+        var values = HarnessJson.SerializeToElement(
             arguments ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal)
         );
         var id = Text(values, "id").Trim().ToUpperInvariant();
@@ -36,7 +37,11 @@ internal static class TaskTools
                 var ready = await session.NextTaskAsync(milestone, token);
                 return ready is null
                     ? Empty()
-                    : new { task = TaskViews.Task(ready), hint = "Call task_claim with this id before starting work." };
+                    : new JsonObjectMap
+                    {
+                        ["task"] = TaskViews.Task(ready),
+                        ["hint"] = "Call task_claim with this id before starting work.",
+                    };
             case "task_get":
                 var task = await session.ReadTaskAsync(id, token);
                 Dictionary<string, object?> output = new() { ["task"] = TaskViews.Task(task) };
@@ -53,9 +58,9 @@ internal static class TaskTools
                 return Claimed(await session.ClaimTaskAsync(id, actor, Lease(values), token));
             case "task_update":
                 var status = Text(values, "status");
-                return new
+                return new JsonObjectMap
                 {
-                    task = TaskViews.Task(
+                    ["task"] = TaskViews.Task(
                         await session.UpdateTaskAsync(
                             id,
                             actor,
@@ -189,31 +194,32 @@ internal static class TaskTools
                     Scope = Strings(values, "scope"),
                     DependsOn = Strings(values, "depends_on").Select(d => d.Trim().ToUpperInvariant()).ToArray(),
                 };
-                return new
+                return new JsonObjectMap
                 {
-                    proposal = TaskViews.Proposal(
+                    ["proposal"] = TaskViews.Proposal(
                         await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token)
                     ),
-                    note = "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
+                    ["note"] =
+                        "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
                 };
             default:
                 throw new InvalidOperationException("Unknown task tool.");
         }
     }
 
-    private static object Empty() =>
-        new
+    private static JsonObjectMap Empty() =>
+        new JsonObjectMap
         {
-            task = (object?)null,
-            hint = "No ready task. Everything is done, waiting on dependencies, claimed or blocked.",
+            ["task"] = (object?)null,
+            ["hint"] = "No ready task. Everything is done, waiting on dependencies, claimed or blocked.",
         };
 
-    private static object Claimed(TaskClaimResult claim) =>
-        new
+    private static JsonObjectMap Claimed(TaskClaimResult claim) =>
+        new JsonObjectMap
         {
-            task = TaskViews.Task(claim.Task),
-            claim_token = claim.Token,
-            hint = ClaimHint,
+            ["task"] = TaskViews.Task(claim.Task),
+            ["claim_token"] = claim.Token,
+            ["hint"] = ClaimHint,
         };
 
     private static TimeSpan Lease(JsonElement values)

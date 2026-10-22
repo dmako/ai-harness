@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Harness.Core.Findings;
+using Harness.Core.Serialization;
 
 namespace Harness.Infrastructure.Findings;
 
@@ -19,7 +20,7 @@ public sealed partial class FindingStore
             Basis = r.GetString(4),
             Title = r.GetString(5),
             Body = r.GetString(6),
-            Evidence = JsonSerializer.Deserialize<string[]>(r.GetString(7)) ?? [],
+            Evidence = HarnessJson.Deserialize<string[]>(r.GetString(7)) ?? [],
             Status = r.GetString(8),
             ProposedBy = r.GetString(9),
             ProposedAt = r.GetString(10),
@@ -92,7 +93,7 @@ public sealed partial class FindingStore
                     ("$basis", p.Basis),
                     ("$title", p.Title),
                     ("$body", p.Body),
-                    ("$evidence", JsonSerializer.Serialize(p.Evidence, Json)),
+                    ("$evidence", HarnessJson.Serialize(p.Evidence, Json)),
                     ("$by", p.ProposedBy),
                     ("$at", p.ProposedAt)
                 );

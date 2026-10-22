@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
@@ -35,7 +36,7 @@ public static class ProtocolServer
             {
                 Name = ProviderProtocol.InfoTool,
                 Description = "Harness provider protocol handshake: protocol version, provider name and capabilities.",
-                InputSchema = JsonSerializer.Deserialize<JsonElement>(
+                InputSchema = HarnessJson.Deserialize<JsonElement>(
                     """{"type":"object","additionalProperties":false}"""
                 ),
             }
@@ -75,7 +76,7 @@ public static class ProtocolServer
 
                     try
                     {
-                        var args = JsonSerializer.SerializeToElement(
+                        var args = HarnessJson.SerializeToElement(
                             request.Params.Arguments ?? new Dictionary<string, JsonElement>()
                         );
                         var schema = tools.First(tool => tool.Name == name).InputSchema;
@@ -103,7 +104,10 @@ public static class ProtocolServer
                         else if (name == ProviderProtocol.RefreshTool && provider is IProviderRefresher refresher)
                         {
                             var refreshed = await refresher
-                                .RefreshAsync(args.Deserialize<RefreshRequest>(ProviderProtocol.JsonOptions)!, token)
+                                .RefreshAsync(
+                                    HarnessJson.Deserialize<RefreshRequest>(args, ProviderProtocol.JsonOptions)!,
+                                    token
+                                )
                                 .ConfigureAwait(false);
                             var envelope = new Dictionary<string, object?>(StringComparer.Ordinal);
                             if (refreshed.Skipped)
@@ -123,7 +127,10 @@ public static class ProtocolServer
                             var capability = capabilities
                                 .First(cap => ProviderProtocol.ToolFor(cap.Capability) == name)
                                 .Capability;
-                            var inputRequest = args.Deserialize<CapabilityRequest>(ProviderProtocol.JsonOptions)!;
+                            var inputRequest = HarnessJson.Deserialize<CapabilityRequest>(
+                                args,
+                                ProviderProtocol.JsonOptions
+                            )!;
                             var answer = await provider
                                 .ExecuteAsync(
                                     new(
@@ -152,7 +159,7 @@ public static class ProtocolServer
                                 answer.Text
                             );
                         }
-                        var body = JsonSerializer.SerializeToElement(result, ProviderProtocol.JsonOptions);
+                        var body = HarnessJson.SerializeToElement(result, ProviderProtocol.JsonOptions);
                         return new CallToolResult
                         {
                             StructuredContent = body,
@@ -184,7 +191,7 @@ public static class ProtocolServer
     }
 
     private static JsonElement RequestSchema(bool refresh) =>
-        JsonSerializer.Deserialize<JsonElement>(
+        HarnessJson.Deserialize<JsonElement>(
             refresh
                 ? """
                 {"type":"object","additionalProperties":false,"properties":{"full":{"type":"boolean"},"changed":{"type":["null","array"],"items":{"type":"string"}}}}
@@ -226,7 +233,7 @@ public static class ProtocolServer
         }
     }
 
-    private sealed record CapabilityRequest(
+    internal sealed record CapabilityRequest(
         string Query = "",
         string Path = "",
         int Limit = 0,

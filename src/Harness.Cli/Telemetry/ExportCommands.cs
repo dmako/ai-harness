@@ -6,19 +6,13 @@ using Harness.Cli.Memory;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Telemetry;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli.Telemetry;
 
-internal sealed class ExportSettings : CommandSettings
+internal sealed class ExportSettings
 {
-    [CommandOption("--endpoint")]
     public string Endpoint { get; init; } = "";
-
-    [CommandOption("--token")]
     public string Token { get; init; } = "";
-
-    [CommandOption("--auto")]
     public bool Auto { get; init; }
 }
 
@@ -228,47 +222,32 @@ internal sealed class ExportCommandRunner(
     }
 }
 
-internal sealed class ExportStatusCommand(ExportCommandRunner runner) : AsyncCommand<ExportSettings>
+internal sealed class ExportStatusCommand(ExportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ExportSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("status", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ExportSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("status", settings, cancellationToken);
 }
 
-internal sealed class ExportEnableCommand(ExportCommandRunner runner) : AsyncCommand<ExportSettings>
+internal sealed class ExportEnableCommand(ExportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ExportSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("enable", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ExportSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("enable", settings, cancellationToken);
 }
 
-internal sealed class ExportDisableCommand(ExportCommandRunner runner) : AsyncCommand<ExportSettings>
+internal sealed class ExportDisableCommand(ExportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ExportSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("disable", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ExportSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("disable", settings, cancellationToken);
 }
 
-internal sealed class ExportPreviewCommand(ExportCommandRunner runner) : AsyncCommand<ExportSettings>
+internal sealed class ExportPreviewCommand(ExportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ExportSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("preview", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ExportSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("preview", settings, cancellationToken);
 }
 
-internal sealed class ExportSendCommand(ExportCommandRunner runner) : AsyncCommand<ExportSettings>
+internal sealed class ExportSendCommand(ExportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ExportSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("send", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ExportSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("send", settings, cancellationToken);
 }

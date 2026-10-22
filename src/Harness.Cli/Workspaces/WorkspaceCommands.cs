@@ -1,150 +1,101 @@
-using Spectre.Console.Cli;
-
 namespace Harness.Cli.Workspaces;
 
 internal class WorkspaceSettings : InspectSettings
 {
-    [CommandArgument(0, "<workspace>")]
     public string Name { get; init; } = "";
 }
 
 internal sealed class WorkspaceCreateSettings : WorkspaceSettings
 {
-    [CommandOption("--discover")]
     public string Discover { get; init; } = "";
-
-    [CommandOption("--title")]
     public string Title { get; init; } = "";
 }
 
 internal sealed class WorkspaceDiscoverSettings : InspectSettings
 {
-    [CommandArgument(0, "<directory>")]
     public string Directory { get; init; } = "";
 }
 
 internal class RenameSettings : InspectSettings
 {
-    [CommandOption("--to")]
     public string To { get; init; } = "";
-
-    [CommandOption("--title")]
     public string Title { get; init; } = "";
-
-    [CommandOption("--clear-title")]
     public bool ClearTitle { get; init; }
-
-    [CommandOption("--reset-name")]
     public bool ResetName { get; init; }
 }
 
 internal sealed class WorkspaceRenameSettings : RenameSettings
 {
-    [CommandArgument(0, "<workspace>")]
     public string Name { get; init; } = "";
 }
 
 internal sealed class ProjectForgetSettings : InspectSettings
 {
-    [CommandArgument(0, "<id>")]
     public string Id { get; init; } = "";
 }
 
-internal sealed class WorkspaceListCommand(WorkspaceCommandRunner runner) : AsyncCommand<InspectSettings>
+internal sealed class WorkspaceListCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        InspectSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "list", settings, cancellationToken);
+    public Task<int> ExecuteAsync(InspectSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "list", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceCreateCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceCreateSettings>
+internal sealed class WorkspaceCreateCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceCreateSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "create", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceCreateSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "create", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceDiscoverCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceDiscoverSettings>
+internal sealed class WorkspaceDiscoverCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceDiscoverSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "discover", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceDiscoverSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "discover", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceShowCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceSettings>
+internal sealed class WorkspaceShowCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "show", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "show", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceJoinCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceSettings>
+internal sealed class WorkspaceJoinCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "join", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "join", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceLeaveCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceSettings>
+internal sealed class WorkspaceLeaveCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "leave", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "leave", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceDeleteCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceSettings>
+internal sealed class WorkspaceDeleteCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "delete", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "delete", settings, cancellationToken);
 }
 
-internal sealed class WorkspaceRenameCommand(WorkspaceCommandRunner runner) : AsyncCommand<WorkspaceRenameSettings>
+internal sealed class WorkspaceRenameCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        WorkspaceRenameSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("workspace", "rename", settings, cancellationToken);
+    public Task<int> ExecuteAsync(WorkspaceRenameSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("workspace", "rename", settings, cancellationToken);
 }
 
-internal sealed class ProjectsListCommand(WorkspaceCommandRunner runner) : AsyncCommand<InspectSettings>
+internal sealed class ProjectsListCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        InspectSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("projects", "list", settings, cancellationToken);
+    public Task<int> ExecuteAsync(InspectSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("projects", "list", settings, cancellationToken);
 }
 
-internal sealed class ProjectsForgetCommand(WorkspaceCommandRunner runner) : AsyncCommand<ProjectForgetSettings>
+internal sealed class ProjectsForgetCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ProjectForgetSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("projects", "forget", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ProjectForgetSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("projects", "forget", settings, cancellationToken);
 }
 
-internal sealed class ProjectsRenameCommand(WorkspaceCommandRunner runner) : AsyncCommand<RenameSettings>
+internal sealed class ProjectsRenameCommand(WorkspaceCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        RenameSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("projects", "rename", settings, cancellationToken);
+    public Task<int> ExecuteAsync(RenameSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("projects", "rename", settings, cancellationToken);
 }

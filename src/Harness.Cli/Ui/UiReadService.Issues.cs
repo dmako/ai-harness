@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Harness.Core.Retrieval;
+using Harness.Core.Serialization;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Workspaces;
@@ -32,7 +33,7 @@ internal sealed partial class UiReadService
         "vitest",
         "mocha",
         "eslint",
-        "prettier"
+        "prettier",
     ];
 
     private static JsonObject Issue(
@@ -196,9 +197,9 @@ internal sealed partial class UiReadService
             );
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                issues = issues
+                ["issues"] = issues
                     .OrderBy(i =>
                         i["level"]!.GetValue<string>() switch
                         {
@@ -208,7 +209,7 @@ internal sealed partial class UiReadService
                         }
                     )
                     .ToArray(),
-                notes = new[]
+                ["notes"] = new[]
                 {
                     "read from the members' files: manifests, declarations and code; evidence for you to judge",
                 },
@@ -216,7 +217,7 @@ internal sealed partial class UiReadService
         );
     }
 
-    private sealed record PackageUse(string Package, string Version, string Project, string Path, int Line, bool Test);
+    internal sealed record PackageUse(string Package, string Version, string Project, string Path, int Line, bool Test);
 
     private static async Task<List<JsonObject>> VersionDriftAsync(
         IReadOnlyList<WorkspaceMember> members,
@@ -282,7 +283,8 @@ internal sealed partial class UiReadService
                 .Select(g => g.Key.Split('.')[0].TrimStart('~', '^', 'v'))
                 .Distinct(StringComparer.Ordinal)
                 .Count();
-            var tooling = package.All(u => u.Test) || ToolingPackagenames.Contains(package.Key, StringComparer.OrdinalIgnoreCase);
+            var tooling =
+                package.All(u => u.Test) || ToolingPackagenames.Contains(package.Key, StringComparer.OrdinalIgnoreCase);
             var why = (tooling, majors > 1) switch
             {
                 (true, _) =>

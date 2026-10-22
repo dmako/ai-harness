@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Harness.Core.Serialization;
 
 namespace Harness.Mcp.Context;
 
@@ -10,7 +11,7 @@ public static class ContextJson
     public static string Serialize(object value)
     {
         var output = new StringBuilder();
-        Write(JsonSerializer.SerializeToElement(value), output);
+        Write(HarnessJson.SerializeToElement(value), output);
         return output.ToString();
     }
 

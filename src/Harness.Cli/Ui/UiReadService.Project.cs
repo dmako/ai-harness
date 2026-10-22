@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Core.Web;
 using Harness.Infrastructure.Findings;
@@ -18,7 +19,7 @@ internal sealed partial class UiReadService
         var endpoint = request.Endpoint["/api/projects/{id}/".Length..];
         return endpoint switch
         {
-            "summary" => UiJson.Node(new { project }),
+            "summary" => UiJson.Node(new JsonObjectMap { ["project"] = project }),
             "health" => await HealthAsync(project, request, token),
             "architecture" => await ArchitectureAsync(project, request, token),
             "coupling" => await CouplingAsync(project, request, token),
@@ -51,18 +52,25 @@ internal sealed partial class UiReadService
             "applies" => Applying(project, database, request, token),
             "proposals" => Proposals(database, request, token),
             "tasks" => Tasks(tasks, request, token),
-            "milestones" => UiJson.Node(new { milestones = tasks.Milestones(token).Select(TaskViews.Milestone) }),
-            "tasks/{tid}/events" => UiJson.Node(
-                new { events = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }
+            "milestones" => UiJson.Node(
+                new JsonObjectMap { ["milestones"] = tasks.Milestones(token).Select(TaskViews.Milestone) }
             ),
-            "tasks-next-id" => UiJson.Node(new { id = tasks.NextId(request.Parameter("prefix"), token) }),
+            "tasks/{tid}/events" => UiJson.Node(
+                new JsonObjectMap { ["events"] = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }
+            ),
+            "tasks-next-id" => UiJson.Node(
+                new JsonObjectMap { ["id"] = tasks.NextId(request.Parameter("prefix"), token) }
+            ),
             "task-proposals" => UiJson.Node(
-                new { proposals = tasks.Proposals(request.Parameter("status"), token).Select(TaskViews.Proposal) }
+                new JsonObjectMap
+                {
+                    ["proposals"] = tasks.Proposals(request.Parameter("status"), token).Select(TaskViews.Proposal),
+                }
             ),
             "arch-proposals" => UiJson.Node(
-                new
+                new JsonObjectMap
                 {
-                    proposals = new FindingStore(database).Proposals(
+                    ["proposals"] = new FindingStore(database).Proposals(
                         request.Parameter("status") is { Length: > 0 } status ? status : "pending",
                         token
                     ),
@@ -107,10 +115,13 @@ internal sealed partial class UiReadService
         {
             using var layers = Levels.OpenLayers(store, UiProjectCatalog.Text(project, "id"), token);
             return UiJson.Node(
-                new { memories = layers.Layers.Search(query, token).Memories.Select(MemoryViews.Memory) }
+                new JsonObjectMap
+                {
+                    ["memories"] = layers.Layers.Search(query, token).Memories.Select(MemoryViews.Memory),
+                }
             );
         }
-        return UiJson.Node(new { memories = store.Search(query, token).Select(MemoryViews.Memory) });
+        return UiJson.Node(new JsonObjectMap { ["memories"] = store.Search(query, token).Select(MemoryViews.Memory) });
     }
 
     private static JsonNode? MemoryDetail(HarnessDatabase database, string id, CancellationToken token)
@@ -139,13 +150,13 @@ internal sealed partial class UiReadService
             token
         );
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                scope = result.Scope,
-                branch = result.Branch,
-                goals = result.Goals.Select(MemoryViews.Memory),
-                constraints = result.Constraints.Select(MemoryViews.Memory),
-                decisions = result.Decisions.Select(MemoryViews.Memory),
+                ["scope"] = result.Scope,
+                ["branch"] = result.Branch,
+                ["goals"] = result.Goals.Select(MemoryViews.Memory),
+                ["constraints"] = result.Constraints.Select(MemoryViews.Memory),
+                ["decisions"] = result.Decisions.Select(MemoryViews.Memory),
             }
         );
     }
@@ -169,7 +180,7 @@ internal sealed partial class UiReadService
                 return view;
             })
             .ToArray();
-        return UiJson.Node(new { proposals });
+        return UiJson.Node(new JsonObjectMap { ["proposals"] = proposals });
     }
 
     private static JsonNode? Tasks(TaskStore store, UiReadRequest request, CancellationToken token)
@@ -183,9 +194,9 @@ internal sealed partial class UiReadService
             throw new UiRequestException(400, "invalid status " + status);
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                tasks = store
+                ["tasks"] = store
                     .List(new() { Milestone = request.Parameter("milestone"), Statuses = statuses }, token)
                     .Select(TaskViews.Task),
             }

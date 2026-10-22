@@ -1,6 +1,3 @@
-using System.ComponentModel;
-using Spectre.Console.Cli;
-
 namespace Harness.Cli.Hooks;
 
 internal sealed record HookOptions
@@ -12,14 +9,9 @@ internal sealed record HookOptions
     public bool DryRun { get; init; }
 }
 
-internal class HookChooseSettings : CommandSettings
+internal class HookChooseSettings
 {
-    [CommandOption("--project")]
-    [DefaultValue(".")]
     public string Project { get; init; } = ".";
-
-    [CommandOption("--scope")]
-    [DefaultValue("user")]
     public string Scope { get; init; } = "user";
 
     public virtual HookOptions Options() => new() { Project = Project, Scope = Scope };
@@ -27,7 +19,6 @@ internal class HookChooseSettings : CommandSettings
 
 internal class HookStatusSettings : HookChooseSettings
 {
-    [CommandOption("--kind")]
     public string Kind { get; init; } = "";
 
     public override HookOptions Options() => base.Options() with { Kind = Kind };
@@ -35,7 +26,6 @@ internal class HookStatusSettings : HookChooseSettings
 
 internal class HookChangeSettings : HookStatusSettings
 {
-    [CommandOption("--dry-run")]
     public bool DryRun { get; init; }
 
     public override HookOptions Options() => base.Options() with { DryRun = DryRun };
@@ -43,84 +33,59 @@ internal class HookChangeSettings : HookStatusSettings
 
 internal sealed class HookInstallSettings : HookChangeSettings
 {
-    [CommandOption("--command")]
     public string Command { get; init; } = "";
 
     public override HookOptions Options() => base.Options() with { Command = Command };
 }
 
-internal sealed class HookEventSettings : CommandSettings
+internal sealed class HookEventSettings
 {
-    [CommandOption("--client")]
-    [DefaultValue("claude-code")]
     public string Client { get; init; } = "claude-code";
 }
 
-internal sealed class CompletionSettings : CommandSettings
+internal sealed class CompletionSettings
 {
-    [CommandOption("--shell")]
     public string Shell { get; init; } = "";
 }
 
-internal sealed class HooksChooseCommand(HookCommandRunner runner) : AsyncCommand<HookChooseSettings>
+internal sealed class HooksChooseCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        HookChooseSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.ChooseAsync(settings.Options(), cancellationToken);
+    public Task<int> ExecuteAsync(HookChooseSettings settings, CancellationToken cancellationToken) =>
+        runner.ChooseAsync(settings.Options(), cancellationToken);
 }
 
-internal sealed class HooksInstallCommand(HookCommandRunner runner) : AsyncCommand<HookInstallSettings>
+internal sealed class HooksInstallCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        HookInstallSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("install", settings.Options(), cancellationToken);
+    public Task<int> ExecuteAsync(HookInstallSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("install", settings.Options(), cancellationToken);
 }
 
-internal sealed class HooksUninstallCommand(HookCommandRunner runner) : AsyncCommand<HookChangeSettings>
+internal sealed class HooksUninstallCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        HookChangeSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("uninstall", settings.Options(), cancellationToken);
+    public Task<int> ExecuteAsync(HookChangeSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("uninstall", settings.Options(), cancellationToken);
 }
 
-internal sealed class HooksStatusCommand(HookCommandRunner runner) : AsyncCommand<HookStatusSettings>
+internal sealed class HooksStatusCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        HookStatusSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("status", settings.Options(), cancellationToken);
+    public Task<int> ExecuteAsync(HookStatusSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("status", settings.Options(), cancellationToken);
 }
 
-internal sealed class CompletionStatusCommand(HookCommandRunner runner) : AsyncCommand<CommandSettings>
+internal sealed class CompletionStatusCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        CommandSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.CompletionAsync("status", new(), cancellationToken);
+    public Task<int> ExecuteAsync(EmptySettings _, CancellationToken cancellationToken) =>
+        runner.CompletionAsync("status", new(), cancellationToken);
 }
 
-internal sealed class CompletionInstallCommand(HookCommandRunner runner) : AsyncCommand<CompletionSettings>
+internal sealed class CompletionInstallCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        CompletionSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.CompletionAsync("install", settings, cancellationToken);
+    public Task<int> ExecuteAsync(CompletionSettings settings, CancellationToken cancellationToken) =>
+        runner.CompletionAsync("install", settings, cancellationToken);
 }
 
-internal sealed class CompletionUninstallCommand(HookCommandRunner runner) : AsyncCommand<CompletionSettings>
+internal sealed class CompletionUninstallCommand(HookCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        CompletionSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.CompletionAsync("uninstall", settings, cancellationToken);
+    public Task<int> ExecuteAsync(CompletionSettings settings, CancellationToken cancellationToken) =>
+        runner.CompletionAsync("uninstall", settings, cancellationToken);
 }

@@ -1,3 +1,4 @@
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 
 namespace Harness.Infrastructure.Tasks;
@@ -122,7 +123,7 @@ public sealed partial class TaskStore
                             reader.GetString(0),
                             reader.GetString(1),
                             reader.GetString(2),
-                            System.Text.Json.JsonSerializer.Deserialize<string[]>(reader.GetString(3)) ?? [],
+                            HarnessJson.Deserialize<string[]>(reader.GetString(3)) ?? [],
                             reader.GetString(4)
                         );
                         byId[d.Id] = new(d, true, new Dictionary<string, int>(StringComparer.Ordinal));

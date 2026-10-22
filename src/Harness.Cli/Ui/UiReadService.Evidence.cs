@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Harness.Core.Architecture;
 using Harness.Core.Findings;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Web;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Architecture;
@@ -45,7 +46,7 @@ internal sealed partial class UiReadService
         try
         {
             var repository = await RepositoryAsync(root, token);
-            return UiJson.Node(new { snippet = EvidenceSnippets.Read(repository, site, span) });
+            return UiJson.Node(new JsonObjectMap { ["snippet"] = EvidenceSnippets.Read(repository, site, span) });
         }
         catch (Exception exception) when (ReadError(exception) || exception is ArgumentException)
         {
@@ -109,11 +110,11 @@ internal sealed partial class UiReadService
                             .AsArray()
                             .Add(
                                 UiJson.Node(
-                                    new
+                                    new JsonObjectMap
                                     {
-                                        member = member.Title.Length > 0 ? member.Title : member.Name,
-                                        member_id = member.Id,
-                                        project = unit.Path,
+                                        ["member"] = member.Title.Length > 0 ? member.Title : member.Name,
+                                        ["member_id"] = member.Id,
+                                        ["project"] = unit.Path,
                                     }
                                 )
                             );
@@ -350,6 +351,6 @@ internal sealed partial class UiReadService
             shared["note"] = "not synced yet (harness sync in a member)";
         }
         rows.AddRange([between, shared]);
-        return UiJson.Node(new { rows });
+        return UiJson.Node(new JsonObjectMap { ["rows"] = rows });
     }
 }

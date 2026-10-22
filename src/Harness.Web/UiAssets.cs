@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.RegularExpressions;
+using Harness.Core.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
@@ -65,20 +66,20 @@ public static partial class UiAssets
             "/api/docs",
             ["GET", "HEAD"],
             () =>
-                Results.Json(
-                    new
+                WireJson(
+                    new JsonObjectMap
                     {
-                        docs = Documents.Select(d => new Dictionary<string, string>
+                        ["docs"] = Documents.Select(d => new Dictionary<string, string>
                         {
                             ["Name"] = d.Name,
                             ["File"] = d.File,
                             ["Title"] = d.Title,
                         }),
-                        sections = Sections.Select(s => new
+                        ["sections"] = Sections.Select(s => new JsonObjectMap
                         {
-                            doc = s.Doc,
-                            slug = s.Slug,
-                            title = s.Title,
+                            ["doc"] = s.Doc,
+                            ["slug"] = s.Slug,
+                            ["title"] = s.Title,
                         }),
                     }
                 )
@@ -88,18 +89,21 @@ public static partial class UiAssets
             ["GET", "HEAD"],
             (string slug) =>
                 Find(slug) is { } section
-                    ? Results.Json(
-                        new
+                    ? WireJson(
+                        new JsonObjectMap
                         {
-                            doc = section.Doc,
-                            slug = section.Slug,
-                            title = section.Title,
-                            body = section.Body,
+                            ["doc"] = section.Doc,
+                            ["slug"] = section.Slug,
+                            ["title"] = section.Title,
+                            ["body"] = section.Body,
                         }
                     )
-                    : Results.Json(new { error = "no such section" }, statusCode: 400)
+                    : WireJson(new JsonObjectMap { ["error"] = "no such section" }, statusCode: 400)
         );
     }
+
+    private static IResult WireJson(object value, int statusCode = 200) =>
+        Results.Text(HarnessJson.Serialize(value), "application/json; charset=utf-8", statusCode: statusCode);
 
     public static UiSection? Find(string query)
     {

@@ -3,6 +3,7 @@ using Harness.Core.Architecture;
 using Harness.Core.Findings;
 using Harness.Core.Graphify;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Web;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Configuration;
@@ -36,7 +37,7 @@ internal sealed partial class UiReadService
             var added = fields.List("project_ids").Length is 0
                 ? []
                 : await Workspaces.JoinAsync(workspace.Name, fields.List("project_ids"), token);
-            return UiJson.Node(new { workspace = workspace.Name, added });
+            return UiJson.Node(new JsonObjectMap { ["workspace"] = workspace.Name, ["added"] = added });
         }
         return action switch
         {
@@ -52,7 +53,7 @@ internal sealed partial class UiReadService
     {
         _ = new UiWriteBody(body);
         await Workspaces.DeleteAsync(name, token);
-        return UiJson.Node(new { deleted = name });
+        return UiJson.Node(new JsonObjectMap { ["deleted"] = name });
     }
 
     private async Task<JsonNode?> RenameWorkspaceAsync(string name, JsonObject body, CancellationToken token)
@@ -63,7 +64,7 @@ internal sealed partial class UiReadService
             throw new UiRequestException(400, "give a new name or a title");
         }
         var workspace = await Workspaces.RenameAsync(name, fields.Text("name"), fields.Optional("title"), token);
-        return UiJson.Node(new { workspace = workspace.Name, title = workspace.Title });
+        return UiJson.Node(new JsonObjectMap { ["workspace"] = workspace.Name, ["title"] = workspace.Title });
     }
 
     private void Registered(IReadOnlyList<string> ids)
@@ -86,7 +87,9 @@ internal sealed partial class UiReadService
             throw new UiRequestException(400, "project_ids is empty: choose the projects to add");
         }
         Registered(ids);
-        return UiJson.Node(new { workspace = name, added = await Workspaces.JoinAsync(name, ids, token) });
+        return UiJson.Node(
+            new JsonObjectMap { ["workspace"] = name, ["added"] = await Workspaces.JoinAsync(name, ids, token) }
+        );
     }
 
     private async Task<JsonNode?> LeaveAsync(string name, JsonObject body, CancellationToken token)
@@ -96,7 +99,7 @@ internal sealed partial class UiReadService
         {
             throw new UiRequestException(400, id + " is not a member of " + name);
         }
-        return UiJson.Node(new { workspace = name, removed = id });
+        return UiJson.Node(new JsonObjectMap { ["workspace"] = name, ["removed"] = id });
     }
 
     private async Task<JsonNode?> TriageProjectAsync(
@@ -203,9 +206,9 @@ internal sealed partial class UiReadService
         if (action is "mark")
         {
             return UiJson.Node(
-                new
+                new JsonObjectMap
                 {
-                    mark = review.Mark(
+                    ["mark"] = review.Mark(
                         finding,
                         body.Text("reason"),
                         human,
@@ -243,9 +246,9 @@ internal sealed partial class UiReadService
             }
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                mark = store.Put(
+                ["mark"] = store.Put(
                     finding,
                     new()
                     {
@@ -282,7 +285,7 @@ internal sealed partial class UiReadService
             fields.Text("body"),
             token
         );
-        return UiJson.Node(new { proposal });
+        return UiJson.Node(new JsonObjectMap { ["proposal"] = proposal });
     }
 
     private async Task<JsonNode?> WriteGraphifyAsync(UiWriteRequest request, CancellationToken token)
@@ -328,7 +331,7 @@ internal sealed partial class UiReadService
             }
             await manager.StopAsync(sessionId, deadline.Token);
             sessions.Forget();
-            return UiJson.Node(new { stopped = 1 });
+            return UiJson.Node(new JsonObjectMap { ["stopped"] = 1 });
         }
         var mine = listed
             .Where(s => s.Reachable && GraphifyDiscovery.PathComparer.Equals(s.Root, manager.Root))
@@ -347,6 +350,6 @@ internal sealed partial class UiReadService
             changed = await manager.StartAsync(deadline.Token) is not null ? 1 : 0;
         }
         sessions.Forget();
-        return UiJson.Node(new { changed });
+        return UiJson.Node(new JsonObjectMap { ["changed"] = changed });
     }
 }

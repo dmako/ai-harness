@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using ModelContextProtocol.Protocol;
 
 namespace Harness.Providers.Mcp;
@@ -15,7 +16,7 @@ internal static class McpMapping
     internal readonly record struct Entry(JsonElement Value, string? Key = null)
     {
         internal JsonElement Field(string path) =>
-            path == "$key" ? JsonSerializer.SerializeToElement(Key) : Lookup(Value, path);
+            path == "$key" ? HarnessJson.SerializeToElement(Key) : Lookup(Value, path);
     }
 
     internal static string Text(CallToolResult result) =>
@@ -65,7 +66,7 @@ internal static class McpMapping
         var text = Text(result).Trim();
         try
         {
-            return JsonSerializer.Deserialize<JsonElement>(text);
+            return HarnessJson.Deserialize<JsonElement>(text);
         }
         catch (JsonException error)
         {
@@ -335,7 +336,7 @@ internal static class McpMapping
         foreach (Match match in pattern.Matches(text))
         {
             yield return new(
-                JsonSerializer.SerializeToElement(
+                HarnessJson.SerializeToElement(
                     names.ToDictionary(
                         name => name,
                         name => WebUtility.HtmlDecode(match.Groups[name].Value),

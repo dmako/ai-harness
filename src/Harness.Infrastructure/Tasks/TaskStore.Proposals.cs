@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Microsoft.Data.Sqlite;
 
@@ -61,7 +62,7 @@ public sealed partial class TaskStore
                     t,
                     "INSERT INTO task_proposals(id,definition,reason,status,proposed_by,proposed_at) VALUES($id,$definition,$reason,'pending',$by,$at)",
                     ("$id", proposal.Id),
-                    ("$definition", JsonSerializer.Serialize(TaskViews.Definition(d), JsonOptions)),
+                    ("$definition", HarnessJson.Serialize(TaskViews.Definition(d), JsonOptions)),
                     ("$reason", proposal.Reason),
                     ("$by", by),
                     ("$at", proposal.ProposedAt)

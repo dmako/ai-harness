@@ -185,6 +185,10 @@ public static class UiHost
             return Task.CompletedTask;
         }
         context.Response.StatusCode = status;
-        return context.Response.WriteAsJsonAsync(new JsonObject { ["error"] = message }, context.RequestAborted);
+        context.Response.ContentType = "application/json; charset=utf-8";
+        return context.Response.WriteAsync(
+            new JsonObject { ["error"] = message }.ToJsonString(),
+            context.RequestAborted
+        );
     }
 }

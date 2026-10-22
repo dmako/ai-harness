@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Tomlyn;
 using Tomlyn.Model;
 
@@ -48,7 +49,7 @@ public static class ProviderServerMap
         {
             try
             {
-                return JsonSerializer.Deserialize<ClientConfiguration>(ReadText(path), JsonOptions);
+                return HarnessJson.Deserialize<ClientConfiguration>(ReadText(path), JsonOptions);
             }
             catch (Exception error) when (Optional(error))
             {
@@ -61,8 +62,13 @@ public static class ProviderServerMap
         Add(user?.McpServers);
         try
         {
-            var node = JsonSerializer.SerializeToNode(TomlSerializer.Deserialize<TomlTable>(ReadText(codexFile)));
-            Add(node?["mcp_servers"]?.Deserialize<Dictionary<string, Server?>>(JsonOptions));
+            var node = HarnessJson.SerializeToNode(
+                TomlSerializer.Deserialize(
+                    ReadText(codexFile),
+                    Harness.Infrastructure.Configuration.ConfigurationTomlContext.Default.TomlTable
+                )
+            );
+            Add(HarnessJson.Deserialize<Dictionary<string, Server?>>(node?["mcp_servers"], JsonOptions));
         }
         catch (Exception error) when (Optional(error))
         { /* Individual malformed client files are optional. */
@@ -90,11 +96,11 @@ public static class ProviderServerMap
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private sealed record Server(
+    internal sealed record Server(
         [property: System.Text.Json.Serialization.JsonPropertyName("command")] string? Command
     );
 
-    private sealed record ClientConfiguration(
+    internal sealed record ClientConfiguration(
         [property: System.Text.Json.Serialization.JsonPropertyName("mcpServers")]
             Dictionary<string, Server?>? McpServers,
         [property: System.Text.Json.Serialization.JsonPropertyName("projects")]

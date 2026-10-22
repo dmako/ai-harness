@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -252,7 +253,7 @@ public sealed partial class TaskStore
                     """,
                     ("$summary", CredentialRedactor.Redact(input.Summary.Trim())),
                     ("$commit", Null(input.Commit)),
-                    ("$checks", JsonSerializer.Serialize(checks, JsonOptions)),
+                    ("$checks", HarnessJson.Serialize(checks, JsonOptions)),
                     ("$by", actor.AuditName),
                     ("$stamp", stamp),
                     ("$id", id)

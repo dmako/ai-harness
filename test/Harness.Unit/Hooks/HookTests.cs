@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
@@ -11,7 +12,6 @@ using Harness.Infrastructure.Clients;
 using Harness.Infrastructure.Completion;
 using Harness.Infrastructure.Hooks;
 using Harness.Unit.Clients;
-using Spectre.Console.Cli;
 using Xunit;
 
 namespace Harness.Unit.Hooks;
@@ -343,7 +343,12 @@ public sealed class HookTests
             output,
             TextWriter.Null,
             null,
-            configuration => configuration.AddDelegate("future-command", (_, _) => 0),
+            (configuration, _) =>
+            {
+                var command = new Command("future-command");
+                command.SetAction(_ => 0);
+                configuration.Subcommands.Add(command);
+            },
             Token
         );
         output.ToString().Should().Contain("future-command").And.NotContain("__complete");

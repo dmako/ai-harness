@@ -5,7 +5,7 @@ namespace Harness.Infrastructure.Architecture.Clones;
 
 public sealed partial class CloneExtractor
 {
-    private sealed record BodyForms(
+    internal sealed record BodyForms(
         List<string> Canonical,
         List<string> Shape,
         HashSet<string> Locals,

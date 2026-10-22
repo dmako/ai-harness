@@ -39,7 +39,7 @@
     <PackageVersion Include="AutoFixture" Version="4.18.1" />
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="5.9.0" />
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
-    <PackageVersion Include="Spectre.Console.Cli" Version="0.57.2" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.13" />
     <PackageVersion Include="System.IO.FileSystem.AccessControl" Version="5.0.0" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
     <PackageVersion Include="System.Reactive.Linq" Version="6.1.0" />

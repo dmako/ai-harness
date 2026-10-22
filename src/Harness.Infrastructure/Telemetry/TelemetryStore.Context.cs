@@ -5,9 +5,9 @@ namespace Harness.Infrastructure.Telemetry;
 
 public sealed partial class TelemetryStore
 {
-    private sealed record Outcome(long Call, string Path, string LanguageName, bool Hit, string From);
+    internal sealed record Outcome(long Call, string Path, string LanguageName, bool Hit, string From);
 
-    private sealed record ScoredUnit(
+    internal sealed record ScoredUnit(
         long Call,
         string Provider,
         string Capability,

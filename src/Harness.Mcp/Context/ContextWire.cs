@@ -1,4 +1,5 @@
 using Harness.Core.Retrieval;
+using Harness.Core.Serialization;
 
 namespace Harness.Mcp.Context;
 
@@ -96,7 +97,7 @@ internal static class ContextWire
             .ToArray();
         if (!previous.Contains(c.Path, StringComparer.Ordinal))
         {
-            size += ContextJson.Size(new { path = c.Path, units = (object?)null }) + 1 - 4;
+            size += ContextJson.Size(new JsonObjectMap { ["path"] = c.Path, ["units"] = (object?)null }) + 1 - 4;
         }
 
         if (!previous.Any(path => Area(path) == Area(c.Path)))
@@ -158,9 +159,9 @@ internal static class ContextWire
                 DebugCandidate(new(fold.Candidate, 0, 0, []), "merged", fold.Reason + " → " + fold.Into)
             )
         );
-        return new
+        return new JsonObjectMap
         {
-            calls = gathered
+            ["calls"] = gathered
                 .Calls.Take(calls)
                 .Select(call =>
                 {
@@ -177,7 +178,7 @@ internal static class ContextWire
                     return value;
                 })
                 .ToArray(),
-            candidates = entries.Take(candidates).ToArray(),
+            ["candidates"] = entries.Take(candidates).ToArray(),
         };
     }
 

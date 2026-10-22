@@ -8,7 +8,7 @@ namespace Harness.Cli.Ui;
 
 internal sealed class UiProjectCatalog(ProjectLifecycle lifecycle) : IDisposable
 {
-    private sealed record Snapshot(string Key, DateTimeOffset At, IReadOnlyList<JsonObject> Projects);
+    internal sealed record Snapshot(string Key, DateTimeOffset At, IReadOnlyList<JsonObject> Projects);
 
     private readonly SemaphoreSlim _gate = new(1);
     private Snapshot? _snapshot;

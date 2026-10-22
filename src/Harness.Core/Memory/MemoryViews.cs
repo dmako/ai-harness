@@ -1,3 +1,5 @@
+using Harness.Core.Serialization;
+
 namespace Harness.Core.Memory;
 
 /// <summary>Shared memory output shapes used by MCP, CLI detail and later web adapters.</summary>
@@ -88,13 +90,17 @@ public static class MemoryViews
     public static object Similar(SimilarMemory similar)
     {
         ArgumentNullException.ThrowIfNull(similar);
-        return new { memory = Memory(similar.Memory), similarity = Math.Truncate(similar.Similarity * 100) / 100 };
+        return new JsonObjectMap
+        {
+            ["memory"] = Memory(similar.Memory),
+            ["similarity"] = Math.Truncate(similar.Similarity * 100) / 100,
+        };
     }
 
     public static object Found(FoundMemory found)
     {
         ArgumentNullException.ThrowIfNull(found);
-        return new { project = found.Project, memory = Memory(found.Memory) };
+        return new JsonObjectMap { ["project"] = found.Project, ["memory"] = Memory(found.Memory) };
     }
 
     private static Dictionary<string, object?> Event(MemoryEvent item)

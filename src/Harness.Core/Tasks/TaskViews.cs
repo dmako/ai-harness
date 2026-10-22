@@ -1,3 +1,5 @@
+using Harness.Core.Serialization;
+
 namespace Harness.Core.Tasks;
 
 public static class TaskViews
@@ -55,7 +57,9 @@ public static class TaskViews
         Add(view, "blocked_reason", t.BlockedReason);
         if (t.Dependencies.Count is not 0)
         {
-            view["depends_on"] = t.Dependencies.Select(x => new { id = x.Id, status = x.Status }).ToArray();
+            view["depends_on"] = t
+                .Dependencies.Select(x => new JsonObjectMap { ["id"] = x.Id, ["status"] = x.Status })
+                .ToArray();
         }
 
         if (t.Criteria.Count is not 0)

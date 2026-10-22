@@ -25,6 +25,12 @@
           "SQLitePCLRaw.core": "2.1.13"
         }
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "40yrBMsLEcjixBR4G+FiUaBPvxXIPSKJ2OgSrbOZcmSDBda4Sb0k7BWrfDpIvn3IvvDzwOL/tEPa6gDQfh6aRw=="
+      },
       "SonarAnalyzer.CSharp": {
         "type": "Direct",
         "requested": "[10.34.0.3385, )",

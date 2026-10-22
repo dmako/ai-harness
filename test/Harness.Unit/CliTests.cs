@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
@@ -5,7 +6,6 @@ using AwesomeAssertions;
 using Harness.Cli;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Spectre.Console.Cli;
 using Xunit;
 
 namespace Harness.Unit;
@@ -114,16 +114,15 @@ public sealed class CliTests
                 output,
                 error,
                 null,
-                configuration =>
-                    configuration.AddDelegate<ProbeSettings>(
-                        "fail",
-                        (_, _, _) => throw new IOException("probe failure")
-                    ),
+                (configuration, _) =>
+                {
+                    var command = new Command("fail");
+                    command.SetAction(int (_) => throw new IOException("probe failure"));
+                    configuration.Subcommands.Add(command);
+                },
                 TestContext.Current.CancellationToken
             )
-        )
-            .Should()
-            .Be(1);
+        ).Should().Be(1);
         output.ToString().Should().BeEmpty();
         error.ToString().Should().NotBeEmpty();
     }
@@ -144,7 +143,12 @@ public sealed class CliTests
                     builder.Services.AddSingleton(state);
                     builder.Services.AddSingleton<ProbeResource>();
                 },
-                configuration => configuration.AddCommand<ProbeCommand>("probe"),
+                (configuration, services) =>
+                {
+                    var command = new Command("probe");
+                    command.SetAction(_ => ActivatorUtilities.CreateInstance<ProbeCommand>(services).Execute());
+                    configuration.Subcommands.Add(command);
+                },
                 TestContext.Current.CancellationToken
             )
         ).Should().Be(0);
@@ -176,7 +180,14 @@ public sealed class CliTests
                 builder.Services.AddSingleton(state);
                 builder.Services.AddSingleton<ProbeResource>();
             },
-            configuration => configuration.AddCommand<WaitCommand>("wait"),
+            (configuration, services) =>
+            {
+                var command = new Command("wait");
+                command.SetAction(
+                    (_, token) => ActivatorUtilities.CreateInstance<WaitCommand>(services).ExecuteAsync(token)
+                );
+                configuration.Subcommands.Add(command);
+            },
             cancellation.Token
         );
         try
@@ -215,12 +226,9 @@ public sealed class CliTests
         }
     }
 
-    internal sealed class ProbeSettings : CommandSettings;
-
     internal sealed class ProbeCommand(ProbeState state, ProbeResource resource, ILogger<ProbeCommand> logger)
-        : Command<ProbeSettings>
     {
-        public override int Execute(CommandContext context, ProbeSettings settings, CancellationToken cancellationToken)
+        public int Execute()
         {
             state.Shared = ReferenceEquals(state, resource.State);
             logger.LogInformation("probe message");
@@ -228,13 +236,9 @@ public sealed class CliTests
         }
     }
 
-    internal sealed class WaitCommand(ProbeState state, ProbeResource resource) : AsyncCommand<ProbeSettings>
+    internal sealed class WaitCommand(ProbeState state, ProbeResource resource)
     {
-        public override async Task<int> ExecuteAsync(
-            CommandContext context,
-            ProbeSettings settings,
-            CancellationToken cancellationToken
-        )
+        public async Task<int> ExecuteAsync(CancellationToken cancellationToken)
         {
             state.Shared = ReferenceEquals(state, resource.State);
             state.Started.SetResult();

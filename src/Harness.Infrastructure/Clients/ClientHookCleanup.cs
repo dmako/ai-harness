@@ -277,7 +277,9 @@ public static class ClientHookCleanup
             {
                 item["async"] = true;
             }
-            rest.Add(new JsonObject { ["matcher"] = "", ["hooks"] = new JsonArray(item) });
+            rest.Add(
+                (System.Text.Json.Nodes.JsonNode?)new JsonObject { ["matcher"] = "", ["hooks"] = new JsonArray(item) }
+            );
         }
         string output;
         if (node is null)
@@ -354,7 +356,7 @@ public static class ClientHookCleanup
             {
                 var copy = (JsonObject)group.DeepClone();
                 copy["hooks"] = new JsonArray(rest);
-                result.Add(copy);
+                result.Add((System.Text.Json.Nodes.JsonNode?)copy);
             }
         }
         return result;

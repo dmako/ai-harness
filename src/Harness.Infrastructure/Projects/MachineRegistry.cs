@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Core.Projects;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Storage;
 
 namespace Harness.Infrastructure.Projects;
@@ -78,7 +79,7 @@ public sealed class MachineRegistry(string path)
                 if (entry is null)
                 {
                     entry = new JsonObject { ["id"] = project.Id, ["first_seen"] = now };
-                    projects.Add(entry);
+                    projects.Add((System.Text.Json.Nodes.JsonNode?)entry);
                 }
 
                 entry["root"] = project.Root;
@@ -127,7 +128,7 @@ public sealed class MachineRegistry(string path)
         )
         {
             throw new InvalidOperationException(
-                "short name " + JsonSerializer.Serialize(name) + ": use letters, digits, '.', '_' or '-' (max 64)"
+                "short name " + HarnessJson.Serialize(name) + ": use letters, digits, '.', '_' or '-' (max 64)"
             );
         }
 

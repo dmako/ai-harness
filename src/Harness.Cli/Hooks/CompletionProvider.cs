@@ -1,16 +1,15 @@
-using Spectre.Console.Cli.Help;
-using Spectre.Console.Rendering;
+using System.CommandLine;
 
 namespace Harness.Cli.Hooks;
 
 /// <summary>Completes the installed command model instead of keeping a second command tree.</summary>
-internal sealed class CompletionProvider(string[] args, TextWriter output) : IHelpProvider
+internal static class CompletionProvider
 {
-    public IEnumerable<IRenderable> Write(ICommandModel model, ICommandInfo? command)
+    public static void Write(RootCommand model, string[] args, TextWriter output)
     {
         if (args.Length is 0)
         {
-            return [];
+            return;
         }
         var shell = args[0];
         var words = args[1..];
@@ -23,12 +22,12 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
             words = [""];
         }
         var current = words[^1];
-        ICommandContainer container = model;
-        ICommandInfo? leaf = null;
+        Command container = model;
+        Command? leaf = null;
         for (var i = 0; i < words.Length - 1; i++)
         {
             var word = words[i];
-            if (container.Commands.Count > 0)
+            if (container.Subcommands.Count > 0)
             {
                 if (word.StartsWith('-'))
                 {
@@ -41,10 +40,10 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
                     "workspaces" => "workspace",
                     _ => word,
                 };
-                leaf = container.Commands.FirstOrDefault(c => c.Name == name);
+                leaf = container.Subcommands.FirstOrDefault(c => c.Name == name);
                 if (leaf is null)
                 {
-                    return [];
+                    return;
                 }
                 container = leaf;
                 continue;
@@ -53,33 +52,29 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
                 i == words.Length - 2
                 && word.StartsWith('-')
                 && !word.Contains('=', StringComparison.Ordinal)
-                && leaf
-                    ?.Parameters.OfType<ICommandOption>()
-                    .Any(p => p.LongNames.Contains(word.TrimStart('-'), StringComparer.Ordinal) && !p.IsFlag)
-                    is true
+                && leaf?.Options.Any(p => p.Name == word && p.ValueType != typeof(bool)) is true
             )
             {
-                return [];
+                return;
             }
         }
         IEnumerable<(string Name, string Description)> candidates = [];
-        if (container.Commands.Count > 0 && !current.StartsWith('-'))
+        if (container.Subcommands.Count > 0 && !current.StartsWith('-'))
         {
-            candidates = container.Commands.Where(c => !c.IsHidden).Select(c => (c.Name, c.Description ?? ""));
+            candidates = container.Subcommands.Where(c => !c.Hidden).Select(c => (c.Name, c.Description ?? ""));
         }
         else if (current.StartsWith('-'))
         {
-            if (container.Commands.Count > 0)
+            if (container.Subcommands.Count > 0)
             {
-                leaf = container.Commands.FirstOrDefault(c => c.Name == Default(leaf?.Name ?? ""));
+                leaf = container.Subcommands.FirstOrDefault(c => c.Name == Default(leaf?.Name ?? ""));
             }
             if (leaf is not null)
             {
                 candidates = leaf
-                    .Parameters.OfType<ICommandOption>()
-                    .Where(p => !p.IsHidden)
-                    .SelectMany(p => p.LongNames.Select(n => ("--" + n, p.Description ?? "")))
-                    .OrderBy(p => p.Item1, StringComparer.Ordinal)
+                    .Options.Where(p => !p.Hidden)
+                    .Select(p => (p.Name, p.Description ?? ""))
+                    .OrderBy(p => p.Name, StringComparer.Ordinal)
                     .Append(("--help", "show help"));
             }
         }
@@ -94,7 +89,7 @@ internal sealed class CompletionProvider(string[] args, TextWriter output) : IHe
                 }
             );
         }
-        return [];
+        return;
     }
 
     private static string Default(string group) =>

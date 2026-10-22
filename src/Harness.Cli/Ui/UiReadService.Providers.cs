@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Harness.Core.Graphify;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Harness.Core.Web;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Clients;
@@ -65,12 +66,12 @@ internal sealed partial class UiReadService
             }
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                status = HealthStatus(project, inspection, token),
-                checks,
-                healthy = !checks.Any(c => c.Level is "fail"),
-                probed = probe,
+                ["status"] = HealthStatus(project, inspection, token),
+                ["checks"] = checks,
+                ["healthy"] = !checks.Any(c => c.Level is "fail"),
+                ["probed"] = probe,
             }
         );
     }
@@ -130,11 +131,13 @@ internal sealed partial class UiReadService
                 .All.Select(client =>
                 {
                     var detected = clients.Detect(client, inspection.Location.Root);
-                    return new
+                    return new JsonObjectMap
                     {
-                        client = client.Id,
-                        configured = detected.Configured,
-                        scopes = detected.Entries.Count is 0 ? null : detected.Entries.Select(e => e.Scope).ToArray(),
+                        ["client"] = client.Id,
+                        ["configured"] = detected.Configured,
+                        ["scopes"] = detected.Entries.Count is 0
+                            ? null
+                            : detected.Entries.Select(e => e.Scope).ToArray(),
                     };
                 })
                 .ToArray()
@@ -220,12 +223,12 @@ internal sealed partial class UiReadService
             deadline.Token
         );
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                structure = result.Structure,
-                errors = result.Errors,
-                withheld = withheld.Count is 0 ? null : withheld,
-                stale,
+                ["structure"] = result.Structure,
+                ["errors"] = result.Errors,
+                ["withheld"] = withheld.Count is 0 ? null : withheld,
+                ["stale"] = stale,
             }
         );
     }
@@ -248,13 +251,13 @@ internal sealed partial class UiReadService
         var hotspots = await ChangeCoupling.HotspotsAsync(repository, registry, 10, 3, deadline.Token);
         var result = UiJson
             .Node(
-                new
+                new JsonObjectMap
                 {
-                    hotspots = hotspots.Hotspots,
-                    commits = hotspots.Commits,
-                    window_days = 180,
-                    providers = registry.For(Capabilities.ArchChangeCoupling).Count,
-                    errors = hotspots.Errors,
+                    ["hotspots"] = hotspots.Hotspots,
+                    ["commits"] = hotspots.Commits,
+                    ["window_days"] = 180,
+                    ["providers"] = registry.For(Capabilities.ArchChangeCoupling).Count,
+                    ["errors"] = hotspots.Errors,
                 }
             )!
             .AsObject();
@@ -353,11 +356,11 @@ internal sealed partial class UiReadService
             providers.Add(view);
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                languages,
-                providers = providers.Count is 0 ? null : providers,
-                architecture = ArchitectureProviders.Coverage(configuration),
+                ["languages"] = languages,
+                ["providers"] = providers.Count is 0 ? null : providers,
+                ["architecture"] = ArchitectureProviders.Coverage(configuration),
             }
         );
     }
@@ -377,7 +380,11 @@ internal sealed partial class UiReadService
             result["git"] = UiJson.Node(
                 hooks
                     .Status()
-                    .Select(c => new { name = Path.GetFileName(c.Path), installed = c.Action is "unchanged" })
+                    .Select(c => new JsonObjectMap
+                    {
+                        ["name"] = Path.GetFileName(c.Path),
+                        ["installed"] = c.Action is "unchanged",
+                    })
                     .ToArray()
             );
         }
@@ -420,7 +427,7 @@ internal sealed partial class UiReadService
                 {
                     item["error"] = exception.Message;
                 }
-                result["clients"]!.AsArray().Add(item);
+                result["clients"]!.AsArray().Add((JsonNode)item);
             }
         }
         var events = new TelemetryStore(database).Metrics(DateTimeOffset.UtcNow.AddDays(-7)).Hooks;
@@ -464,7 +471,7 @@ internal sealed partial class UiReadService
                 }
                 result.Add(view);
             }
-            return UiJson.Node(new { sessions = result });
+            return UiJson.Node(new JsonObjectMap { ["sessions"] = result });
         }
         catch (Exception exception)
             when (ReadError(exception)
@@ -472,7 +479,9 @@ internal sealed partial class UiReadService
                 || exception is OperationCanceledException && !token.IsCancellationRequested
             )
         {
-            return UiJson.Node(new { sessions = Array.Empty<object>(), error = exception.Message });
+            return UiJson.Node(
+                new JsonObjectMap { ["sessions"] = Array.Empty<object>(), ["error"] = exception.Message }
+            );
         }
     }
 }

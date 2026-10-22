@@ -16,7 +16,7 @@ public sealed record SequenceOptions(
 
 public static class CloneSequences
 {
-    private sealed record Position(int Function, int Unit);
+    internal sealed record Position(int Function, int Unit);
 
     public static IReadOnlyList<CloneSequence> Find(
         IReadOnlyList<CloneFunction> functions,

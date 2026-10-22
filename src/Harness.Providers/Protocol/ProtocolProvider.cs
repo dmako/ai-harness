@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Harness.Providers.Mcp;
 using ModelContextProtocol.Protocol;
 
@@ -308,10 +309,7 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
                 if (!ProviderProtocol.Compatible(info.Protocol ?? ""))
                 {
                     throw new InvalidDataException(
-                        "speaks "
-                            + JsonSerializer.Serialize(info.Protocol)
-                            + "; harness needs "
-                            + ProviderProtocol.Version
+                        "speaks " + HarnessJson.Serialize(info.Protocol) + "; harness needs " + ProviderProtocol.Version
                     );
                 }
 
@@ -354,8 +352,9 @@ public sealed class ProtocolProvider : IProviderRefresher, IVersionedProvider, I
             var body = result.StructuredContent
                 is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } structured
                 ? structured
-                : JsonSerializer.Deserialize<JsonElement>(McpMapping.Text(result).Trim());
-            return body.Deserialize<T>(ProviderProtocol.JsonOptions) ?? throw new JsonException("null response");
+                : HarnessJson.Deserialize<JsonElement>(McpMapping.Text(result).Trim());
+            return HarnessJson.Deserialize<T>(body, ProviderProtocol.JsonOptions)
+                ?? throw new JsonException("null response");
         }
         catch (JsonException error)
         {

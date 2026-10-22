@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 
 namespace Harness.Core.Tasks;
 
@@ -204,7 +205,7 @@ public static partial class TaskWorkflow
             _ => false,
         };
 
-    public static string Quote(string value) => JsonSerializer.Serialize(value, QuoteOptions);
+    public static string Quote(string value) => HarnessJson.Serialize(value, QuoteOptions);
 
     private static readonly JsonSerializerOptions QuoteOptions = new()
     {

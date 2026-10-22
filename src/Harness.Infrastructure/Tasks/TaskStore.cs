@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -306,8 +307,8 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
                     Type = Text(3),
                     Priority = Text(4),
                     Goal = Text(6),
-                    Scope = JsonSerializer.Deserialize<string[]>(Text(7)) ?? [],
-                    Validation = JsonSerializer.Deserialize<string[]>(Text(8)) ?? [],
+                    Scope = HarnessJson.Deserialize<string[]>(Text(7)) ?? [],
+                    Validation = HarnessJson.Deserialize<string[]>(Text(8)) ?? [],
                     Notes = Text(9),
                 },
                 Status = Text(5),
@@ -320,7 +321,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
                 CompletionCommit = Text(16),
                 CompletionChecks = r.IsDBNull(17)
                     ? []
-                    : JsonSerializer.Deserialize<TaskCheck[]>(Text(17), JsonOptions) ?? [],
+                    : HarnessJson.Deserialize<TaskCheck[]>(Text(17), JsonOptions) ?? [],
                 CompletedBy = Text(18),
                 CompletedAt = Time(19),
                 Source = Text(20),

@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Harness.Core.Graphify;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 
 namespace Harness.Providers.Graphify;
 
@@ -542,7 +543,7 @@ public sealed class GraphifyProvider : IProvider
                 try
                 {
                     response =
-                        JsonSerializer.Deserialize<Response>(output, JsonOptions)
+                        HarnessJson.Deserialize<Response>(output, JsonOptions)
                         ?? throw new JsonException("null query response");
                 }
                 catch (JsonException json)
@@ -802,7 +803,7 @@ public sealed class GraphifyProvider : IProvider
             T? decoded;
             try
             {
-                decoded = item.Deserialize<T>(JsonOptions);
+                decoded = HarnessJson.Deserialize<T>(item, JsonOptions);
             }
             catch (JsonException)
             {
@@ -815,26 +816,26 @@ public sealed class GraphifyProvider : IProvider
         }
     }
 
-    private sealed record Location(string File = "", int Line = 0);
+    internal sealed record Location(string File = "", int Line = 0);
 
-    private sealed record Symbol(
+    internal sealed record Symbol(
         string Id = "",
         string Label = "",
         string DeclarationKind = "",
         Location? Location = null
     );
 
-    private sealed record Edge(string Relation = "", Location? Location = null, Symbol? Origin = null);
+    internal sealed record Edge(string Relation = "", Location? Location = null, Symbol? Origin = null);
 
-    private sealed record Page(bool HasMore = false);
+    internal sealed record Page(bool HasMore = false);
 
-    private sealed record Scope(bool? InputDiscoveryComplete = null);
+    internal sealed record Scope(bool? InputDiscoveryComplete = null);
 
-    private sealed record Diagnostic(string Message = "");
+    internal sealed record Diagnostic(string Message = "");
 
-    private sealed record RemoteError(string Code = "", string Message = "");
+    internal sealed record RemoteError(string Code = "", string Message = "");
 
-    private sealed record Response(
+    internal sealed record Response(
         bool Success = false,
         IReadOnlyList<JsonElement>? Items = null,
         Page? Page = null,

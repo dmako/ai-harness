@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Tomlyn;
 using Tomlyn.Model;
 
@@ -26,7 +27,7 @@ public static class ConfigurationLoader
 
     public static LoadedConfiguration LoadFiles(string globalPath, string projectPath)
     {
-        var effective = JsonSerializer.SerializeToNode(new HarnessConfiguration(), JsonOptions)!.AsObject();
+        var effective = HarnessJson.SerializeToNode(new HarnessConfiguration(), JsonOptions)!.AsObject();
         var sources = new string[2];
         var paths = new[] { globalPath, projectPath };
         for (var index = 0; index < paths.Length; index++)
@@ -43,7 +44,7 @@ public static class ConfigurationLoader
                 var text = StrictUtf8.GetString(File.ReadAllBytes(path));
                 var layer = Parse(text.StartsWith('\uFEFF') ? text[1..] : text);
                 // Validate unknown keys and types before pack expansion can obscure the source.
-                _ = layer.Deserialize<HarnessConfiguration>(JsonOptions);
+                _ = HarnessJson.Deserialize<HarnessConfiguration>(layer, JsonOptions);
                 ExpandPacks(layer);
                 foreach (var (key, value) in layer)
                 {
@@ -61,7 +62,9 @@ public static class ConfigurationLoader
                     }
                 }
 
-                ConfigurationValidation.Validate(effective.Deserialize<HarnessConfiguration>(JsonOptions)!);
+                ConfigurationValidation.Validate(
+                    HarnessJson.Deserialize<HarnessConfiguration>(effective, JsonOptions)!
+                );
                 sources[index] = path;
             }
             catch (FileNotFoundException)
@@ -87,7 +90,7 @@ public static class ConfigurationLoader
         }
 
         return new LoadedConfiguration(
-            effective.Deserialize<HarnessConfiguration>(JsonOptions)!,
+            HarnessJson.Deserialize<HarnessConfiguration>(effective, JsonOptions)!,
             new ConfigurationSources(sources[0], sources[1])
         );
     }
@@ -101,7 +104,14 @@ public static class ConfigurationLoader
             .ToArray();
 
     private static JsonObject Parse(string text) =>
-        JsonSerializer.SerializeToNode(TomlSerializer.Deserialize<TomlTable>(text))!.AsObject();
+        HarnessJson
+            .SerializeToNode(
+                TomlSerializer.Deserialize(
+                    text,
+                    Harness.Infrastructure.Configuration.ConfigurationTomlContext.Default.TomlTable
+                )
+            )!
+            .AsObject();
 
     private static void ExpandPacks(JsonObject layer)
     {

@@ -28,7 +28,7 @@ public sealed partial class BuildReader
         "['\"]?([@~#$\\w/-]+)['\"]?\\s*:\\s*(?:path\\.)?(?:resolve|join)\\([^,]*,\\s*['\"]\\.?/?([^'\"]+)['\"]\\)"
     );
 
-    private sealed record PackageInfo(
+    internal sealed record PackageInfo(
         string Name,
         string Version,
         bool Private,
@@ -38,7 +38,7 @@ public sealed partial class BuildReader
         IReadOnlyList<string> Workspaces
     );
 
-    private sealed record TsUnit(BuildUnit Build, string Folder, bool Root, PackageInfo Package)
+    internal sealed record TsUnit(BuildUnit Build, string Folder, bool Root, PackageInfo Package)
     {
         internal HashSet<string> Npm { get; } = new(StringComparer.Ordinal);
     }

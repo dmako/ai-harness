@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Harness.Core.Serialization;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Projects;
 
@@ -27,7 +28,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
 
     public Workspace Find(string name) =>
         Load().FirstOrDefault(workspace => workspace.Name == name)
-        ?? throw new InvalidOperationException("no such workspace " + JsonSerializer.Serialize(name));
+        ?? throw new InvalidOperationException("no such workspace " + HarnessJson.Serialize(name));
 
     private static JsonArray Workspaces(JsonObject file)
     {
@@ -78,7 +79,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
                     if (rows.Any(row => row!["name"]!.GetValue<string>() == name))
                     {
                         throw new InvalidOperationException(
-                            "workspace " + JsonSerializer.Serialize(name) + " already exists"
+                            "workspace " + HarnessJson.Serialize(name) + " already exists"
                         );
                     }
 
@@ -92,7 +93,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
                             System.Globalization.CultureInfo.InvariantCulture
                         ),
                     };
-                    rows.Add(row);
+                    rows.Add((System.Text.Json.Nodes.JsonNode?)row);
                     result = Read(row);
                 },
                 token
@@ -116,7 +117,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
                     var members = row["members"]!.AsArray();
                     foreach (var id in ids.Where(id => !members.Any(member => member!.GetValue<string>() == id)))
                     {
-                        members.Add(id);
+                        members.Add((System.Text.Json.Nodes.JsonNode?)id);
                         added.Add(id);
                     }
                 },
@@ -183,7 +184,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
                     )
                     {
                         throw new InvalidOperationException(
-                            "workspace " + JsonSerializer.Serialize(newName) + " already exists"
+                            "workspace " + HarnessJson.Serialize(newName) + " already exists"
                         );
                     }
 
@@ -285,7 +286,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
 
     private static JsonObject Row(JsonArray rows, string name) =>
         rows.OfType<JsonObject>().FirstOrDefault(row => row["name"]?.GetValue<string>() == name)
-        ?? throw new InvalidOperationException("no such workspace " + JsonSerializer.Serialize(name));
+        ?? throw new InvalidOperationException("no such workspace " + HarnessJson.Serialize(name));
 
     [SuppressMessage(
         "Globalization",
@@ -299,7 +300,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
         {
             throw new InvalidOperationException(
                 "workspace name "
-                    + JsonSerializer.Serialize(name)
+                    + HarnessJson.Serialize(name)
                     + ": use lowercase letters, digits, '.', '_' or '-' (max 64)"
             );
         }

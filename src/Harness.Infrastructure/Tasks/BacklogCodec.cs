@@ -3,7 +3,6 @@ using System.Text;
 using Harness.Core.Tasks;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
-using YamlDotNet.Serialization;
 
 namespace Harness.Infrastructure.Tasks;
 
@@ -192,13 +191,25 @@ public static class BacklogCodec
     internal static string WriteDefinitions(IReadOnlyList<TaskDefinition> definitions) =>
         Serialize(definitions.Select(DefinitionMap).ToArray());
 
-    private static string Serialize(object value) =>
-        new SerializerBuilder()
-            .WithIndentedSequences()
-            .ConfigureDefaultValuesHandling(DefaultValuesHandling.Preserve)
-            .Build()
-            .Serialize(value)
-            .Replace("\r\n", "\n", StringComparison.Ordinal);
+    private static string Serialize(object value)
+    {
+        using var output = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+        new YamlStream(new YamlDocument(Node(value))).Save(output, assignAnchors: false);
+        var yaml = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        return yaml.EndsWith("...\n", StringComparison.Ordinal) ? yaml[..^4] : yaml;
+    }
+
+    private static YamlNode Node(object? value) =>
+        value switch
+        {
+            Dictionary<string, object> map => new YamlMappingNode(
+                map.Select(pair => new KeyValuePair<YamlNode, YamlNode>(new YamlScalarNode(pair.Key), Node(pair.Value)))
+            ),
+            string text => new YamlScalarNode(text) { Style = ScalarStyle.DoubleQuoted },
+            int number => new YamlScalarNode(number.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            System.Collections.IEnumerable sequence => new YamlSequenceNode(sequence.Cast<object>().Select(Node)),
+            _ => throw new InvalidDataException("unsupported backlog value"),
+        };
 
     private static Dictionary<string, object> DefinitionMap(TaskDefinition d)
     {

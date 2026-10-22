@@ -93,7 +93,7 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
     private static string Directory(string file) =>
         Path.GetDirectoryName(file)?.Replace('\\', '/') is { Length: > 0 } dir ? dir : ".";
 
-    private sealed record Declaration(CloneFunction Function, int Parameters, int Body, int End);
+    internal sealed record Declaration(CloneFunction Function, int Parameters, int Body, int End);
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "CodeSmell",

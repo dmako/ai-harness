@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Cli.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Workspaces;
@@ -54,7 +55,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         var projects = lifecycle.Registry.Load()["projects"]!.AsArray().OfType<JsonObject>().ToArray();
         if (settings.Json)
         {
-            await JsonAsync(new { workspaces = workspaces.Select(Wire) });
+            await JsonAsync(new JsonObjectMap { ["workspaces"] = workspaces.Select(Wire) });
             return 0;
         }
         if (workspaces.Count is 0)
@@ -127,7 +128,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         var projects = Store.Discover(settings.Directory);
         if (settings.Json)
         {
-            await JsonAsync(new { projects });
+            await JsonAsync(new JsonObjectMap { ["projects"] = projects });
         }
         else
         {
@@ -152,7 +153,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         await output.WriteLineAsync($"{workspace.Name}  ({workspace.Id}, {workspace.Members.Count} project(s))");
         if (workspace.Title.Length > 0)
         {
-            await output.WriteLineAsync("  shown as " + JsonSerializer.Serialize(workspace.Title));
+            await output.WriteLineAsync("  shown as " + HarnessJson.Serialize(workspace.Title));
         }
 
         var projects = lifecycle.Registry.Load()["projects"]!.AsArray().OfType<JsonObject>().ToArray();
@@ -233,7 +234,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         await output.WriteLineAsync(
             "Workspace "
                 + workspace.Name
-                + (workspace.Title.Length > 0 ? ", shown as " + JsonSerializer.Serialize(workspace.Title) : "")
+                + (workspace.Title.Length > 0 ? ", shown as " + HarnessJson.Serialize(workspace.Title) : "")
                 + "."
         );
         if (workspace.Name != settings.Name)
@@ -290,7 +291,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
                 + WorkspaceStore.ShortName(row)
                 + (
                     row["title"]?.GetValue<string>() is { Length: > 0 } value
-                        ? ", shown as " + JsonSerializer.Serialize(value)
+                        ? ", shown as " + HarnessJson.Serialize(value)
                         : ""
                 )
                 + "."
@@ -333,7 +334,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         }
         if (settings.Json)
         {
-            await JsonAsync(new { projects });
+            await JsonAsync(new JsonObjectMap { ["projects"] = projects });
         }
         else if (projects.Length is 0)
         {
@@ -446,15 +447,15 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
     }
 
     private Task JsonAsync(object value) =>
-        output.WriteLineAsync(JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }));
+        output.WriteLineAsync(HarnessJson.Serialize(value, new JsonSerializerOptions { WriteIndented = true }));
 
     private static object Wire(Workspace workspace) =>
-        new
+        new JsonObjectMap
         {
-            id = workspace.Id,
-            name = workspace.Name,
-            title = workspace.Title.Length > 0 ? workspace.Title : null,
-            members = workspace.Members,
-            created = workspace.Created,
+            ["id"] = workspace.Id,
+            ["name"] = workspace.Name,
+            ["title"] = workspace.Title.Length > 0 ? workspace.Title : null,
+            ["members"] = workspace.Members,
+            ["created"] = workspace.Created,
         };
 }

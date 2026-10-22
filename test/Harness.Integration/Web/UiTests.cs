@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
@@ -26,8 +27,8 @@ public sealed class UiTests
         var help = await fixture.ProcessAsync("dotnet", [UiFixture.CliPath, "ui", "--help"]);
         help.Code.Should().Be(0, help.Error);
         help.Output.Should().Contain("127.0.0.1:17477").And.Contain("--no-open");
-        await using var server = await UiFixture.StartAsync(fixture, address: null);
-        server.Client.BaseAddress!.Port.Should().Be(17477);
+        await using var server = await UiFixture.StartAsync(fixture, address: "127.0.0.1:0");
+        server.Client.BaseAddress!.Port.Should().BeGreaterThan(0);
         var response = await server.Client.GetAsync("/", Token);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync(Token)).Should().Contain("app.js").And.Contain("style.css");
@@ -58,6 +59,20 @@ public sealed class UiTests
             )
         );
         all.Should().Contain(":17477").And.NotContain(":7477");
+    }
+
+    [Fact]
+    public async Task DefaultListenerPortBindsWhenItIsAvailable()
+    {
+        if (IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(endpoint => endpoint.Port is 17477))
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("Port 17477 is already used by another local application.");
+        }
+        using var fixture = await SyncFixture.CreateAsync();
+        await using var server = await UiFixture.StartAsync(fixture, address: null);
+        server.Client.BaseAddress!.Port.Should().Be(17477);
+        using var response = await server.Client.GetAsync("/", Token);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Theory]

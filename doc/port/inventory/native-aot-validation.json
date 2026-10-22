@@ -1,0 +1,436 @@
+{
+  "schema": 1,
+  "task": "TASK-0034",
+  "recorded_utc": "2026-10-22T13:53:37.240877+00:00",
+  "qualification": "pass",
+  "scope": "Windows x64 and WSL Linux x64 Native AOT; macOS and ARM64 native execution pending",
+  "version": "0.1.0-aot-task34",
+  "build_provenance": {
+    "base_commit": "44a8fc62968dd114c2ff809f7322ac805c49a0a6",
+    "working_tree_modified": true,
+    "sdk": "10.0.402",
+    "product_csharp_files_unchanged_since_native_snapshot": 274,
+    "packaging_correction": {
+      "description": "Corrected generated release notes to describe enabled trimming/AOT; native binaries and libraries unchanged.",
+      "publisher_sha256": "ef454292c5f481d294d8ea99667cef5825c5efae306359eb0907b334e11a577c"
+    },
+    "note": "Native builds used the modified task worktree at this base commit, before the implementation commit. Release notes were corrected and archives repacked without changing native binaries/libraries; runtime probes and checksums were rerun. Later edits affect test fixtures, documentation and lockfile line endings."
+  },
+  "acceptance": [
+    {
+      "index": 1,
+      "result": "pass",
+      "evidence": "All nine product projects enable IsAotCompatible. Generated JSON/TOML metadata, explicit YAML and HTTP output, RDG and System.CommandLine replace reflection-based paths. Final managed builds have zero warnings/errors."
+    },
+    {
+      "index": 2,
+      "result": "pass",
+      "evidence": "Release.pubxml PublishTrimmed=true; both host manifest flags verified."
+    },
+    {
+      "index": 3,
+      "result": "pass",
+      "evidence": "Release.pubxml PublishAot=true; native marker/header and repeat hashes checked for all four executables on both hosts."
+    },
+    {
+      "index": 4,
+      "result": "pass",
+      "evidence": "62 Windows and 66 WSL checks pass with PATH empty and nonexistent DOTNET_ROOT, covering CLI/MCP/SQLite/UI/install and companions."
+    }
+  ],
+  "native_hosts": [
+    {
+      "status": "pass",
+      "version": "0.1.0-aot-task34",
+      "manifest_sha256": "3ffa301dbd3f37bcb3dfea826b84f2b9653587b247ce69b14196e18ccc9b1fb7",
+      "build_commit": "44a8fc62968dd114c2ff809f7322ac805c49a0a6",
+      "modified": true,
+      "sdk": "10.0.402",
+      "artifacts": [
+        {
+          "rid": "win-x64",
+          "group": "main",
+          "file": "harness-0.1.0-aot-task34-windows-amd64.zip",
+          "bytes": 22255437,
+          "sha256": "3a439b9c58c9f094e77ff3e20f231cc0c54dd5b70b2df34f1ab1f3587fa1377f",
+          "binaries": [
+            {
+              "file": "harness.exe",
+              "bytes": 43155968,
+              "sha256": "d2002455a39b4b8c9b218f723c6ef141c954508e6e6124b4217675951c28755c",
+              "repeat_publish_verified": true
+            },
+            {
+              "file": "harness-graphify.exe",
+              "bytes": 17277440,
+              "sha256": "d50470eaecdf776e113a3ddbfb9377f107a4a19624edb69b14614331ea05e0ae",
+              "repeat_publish_verified": true
+            }
+          ],
+          "native_library": {
+            "file": "e_sqlite3.dll",
+            "bytes": 1978880,
+            "sha256": "b7385d722c83fb52142a00477a726723745916d22a555711ee89834c1111fb2e"
+          }
+        },
+        {
+          "rid": "win-x64",
+          "group": "developer",
+          "file": "developer-tools/harness-0.1.0-aot-task34-windows-amd64.zip",
+          "bytes": 12921541,
+          "sha256": "eecdedc3aaf9dca5cac91aa961d2385a65ed03e536d4c701af434ffe34965508",
+          "binaries": [
+            {
+              "file": "harness-collect.exe",
+              "bytes": 16239616,
+              "sha256": "6cbebeb5e53d50802131ed3da8f7723f85dc18360cce93dee35ee112c3019a92",
+              "repeat_publish_verified": true
+            },
+            {
+              "file": "harness-share.exe",
+              "bytes": 14878208,
+              "sha256": "d2d3df97e202346e5eded2d692ff9437dddf592acfa862ffb03ed64d409ef813",
+              "repeat_publish_verified": true
+            }
+          ],
+          "native_library": {
+            "file": "e_sqlite3.dll",
+            "bytes": 1978880,
+            "sha256": "b7385d722c83fb52142a00477a726723745916d22a555711ee89834c1111fb2e"
+          }
+        }
+      ],
+      "runtime_probe": {
+        "status": "pass",
+        "exit_code": 0,
+        "host": "Windows-11-10.0.26300-SP0",
+        "machine": "AMD64",
+        "environment": "Native host with PATH empty, nonexistent DOTNET_ROOT, multilevel lookup disabled; private HOME/cache in probe. Host itself may have SDKs installed.",
+        "parent_acl_sddl": "O:S-1-5-21-471201840-2036070073-998832415-1003G:S-1-5-21-471201840-2036070073-998832415-1003D:PAI(A;OICI;FA;;;S-1-5-21-471201840-2036070073-998832415-1003)",
+        "elapsed_seconds": 4.16450369998347,
+        "passed_checks": 62,
+        "failures": [],
+        "notes": [
+          "NOTE UI Windows forced cleanup; console Ctrl-C requires a native console runner",
+          "NOTE collector Windows forced cleanup; console Ctrl-C requires a native console runner",
+          "NOTE share Windows forced cleanup; console Ctrl-C requires a native console runner"
+        ],
+        "measurements": [
+          "MEASURE harness version 96.09 ms",
+          "MEASURE harness init 194.90 ms",
+          "MEASURE harness install (Claude Code + Codex) 119.12 ms",
+          "MEASURE harness instructions 107.67 ms",
+          "MEASURE harness doctor 55.44 ms",
+          "MEASURE embedded docs 49.89 ms",
+          "MEASURE five embedded provider packs 64.54 ms",
+          "MEASURE warm version 41.26 ms",
+          "MEASURE native task create 741.70 ms",
+          "MEASURE native task claim 88.37 ms",
+          "MEASURE native task complete 131.03 ms",
+          "MEASURE native YAML task export 117.68 ms",
+          "MEASURE native YAML task reimport 81.73 ms",
+          "MEASURE provider sessions help 44.15 ms",
+          "MEASURE telemetry enable 54.51 ms",
+          "MEASURE telemetry preview 106.18 ms",
+          "MEASURE telemetry send 182.45 ms",
+          "MEASURE telemetry disable 77.29 ms",
+          "MEASURE harness uninstall --all 128.84 ms",
+          "MEASURE harness uninstall --all --delete-data 127.97 ms"
+        ],
+        "files": {
+          "probe-windows-final.exe": "a303de0af9e0fedd160f042a90e266a8370e36575ccb1ddbdf1d6ebabaa18696",
+          "harness-0.1.0-aot-task34-windows-amd64.zip": "eecdedc3aaf9dca5cac91aa961d2385a65ed03e536d4c701af434ffe34965508",
+          "aot-windows-final-smoke.log": "0feac36723be035a1b5acce38d7b7f0b74d9aa2aea4b57612017daa2a4b0dce8"
+        },
+        "archive_sha256": {
+          "main": "3a439b9c58c9f094e77ff3e20f231cc0c54dd5b70b2df34f1ab1f3587fa1377f",
+          "developer": "eecdedc3aaf9dca5cac91aa961d2385a65ed03e536d4c701af434ffe34965508"
+        }
+      }
+    },
+    {
+      "status": "pass",
+      "version": "0.1.0-aot-task34",
+      "manifest_sha256": "0437df0b990086fb81335d02305335375f01e65623278abb3c94a05252c569bf",
+      "build_commit": "44a8fc62968dd114c2ff809f7322ac805c49a0a6",
+      "modified": true,
+      "sdk": "10.0.402",
+      "artifacts": [
+        {
+          "rid": "linux-x64",
+          "group": "main",
+          "file": "harness-0.1.0-aot-task34-linux-amd64.tar.gz",
+          "bytes": 21701205,
+          "sha256": "37a1d1fb9146511fec7fba5516e1cf3c9a6cea76a9e907610f1d14f60d8179b2",
+          "binaries": [
+            {
+              "file": "harness",
+              "bytes": 36140664,
+              "sha256": "dc77c9af2642fea4e3cd92afadd7f5ae1a0ce84a192cc93af99c76c9773f7d38",
+              "repeat_publish_verified": true
+            },
+            {
+              "file": "harness-graphify",
+              "bytes": 14158904,
+              "sha256": "ace84a0a95a824347acd779142e3f1b8a0306e8143e16a85a92cc08f4741a392",
+              "repeat_publish_verified": true
+            }
+          ],
+          "native_library": {
+            "file": "libe_sqlite3.so",
+            "bytes": 1470784,
+            "sha256": "b0f5c48026fedcf9f05cf31c6fadf9e1e001ca59cd85aa68b8b6814e52c18a07"
+          }
+        },
+        {
+          "rid": "linux-x64",
+          "group": "developer",
+          "file": "developer-tools/harness-0.1.0-aot-task34-linux-amd64.tar.gz",
+          "bytes": 12341816,
+          "sha256": "3e5d3dd789cdd8401c0a3f000c33c5fb2e35a6218fc37a453635a85e019db055",
+          "binaries": [
+            {
+              "file": "harness-collect",
+              "bytes": 14174888,
+              "sha256": "d721f471f989179297bd22fc6439cec3e64f52f475cd9e6093ae343685c7380d",
+              "repeat_publish_verified": true
+            },
+            {
+              "file": "harness-share",
+              "bytes": 13093192,
+              "sha256": "fffcf4895cd23e244462620f5a55e16cefc594815b214c1998be9c583d705aee",
+              "repeat_publish_verified": true
+            }
+          ],
+          "native_library": {
+            "file": "libe_sqlite3.so",
+            "bytes": 1470784,
+            "sha256": "b0f5c48026fedcf9f05cf31c6fadf9e1e001ca59cd85aa68b8b6814e52c18a07"
+          }
+        }
+      ],
+      "runtime_probe": {
+        "status": "pass",
+        "exit_code": 0,
+        "host": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.44",
+        "machine": "x86_64",
+        "environment": "Native host with PATH empty, nonexistent DOTNET_ROOT, multilevel lookup disabled; private HOME/cache in probe. Host itself may have SDKs installed.",
+        "parent_acl_sddl": null,
+        "elapsed_seconds": 4.853792144014733,
+        "passed_checks": 66,
+        "failures": [],
+        "notes": [],
+        "measurements": [
+          "MEASURE harness version 41.43 ms",
+          "MEASURE harness init 59.63 ms",
+          "MEASURE harness install (Claude Code + Codex) 57.61 ms",
+          "MEASURE harness instructions 54.19 ms",
+          "MEASURE harness doctor 46.87 ms",
+          "MEASURE embedded docs 38.17 ms",
+          "MEASURE five embedded provider packs 39.38 ms",
+          "MEASURE warm version 39.50 ms",
+          "MEASURE native task create 53.76 ms",
+          "MEASURE native task claim 55.68 ms",
+          "MEASURE native task complete 57.61 ms",
+          "MEASURE native YAML task export 53.54 ms",
+          "MEASURE native YAML task reimport 51.80 ms",
+          "MEASURE provider sessions help 38.13 ms",
+          "MEASURE telemetry enable 69.67 ms",
+          "MEASURE telemetry preview 70.82 ms",
+          "MEASURE telemetry send 64.88 ms",
+          "MEASURE telemetry disable 45.41 ms",
+          "MEASURE harness uninstall --all 67.45 ms",
+          "MEASURE harness uninstall --all --delete-data 53.08 ms"
+        ],
+        "files": {
+          "probe-linux-final": "49badb474c83b6a523dc1254f5a250a446cea1ce4042eeeb21c3f4bf7da7954e",
+          "harness-0.1.0-aot-task34-linux-amd64.tar.gz": "3e5d3dd789cdd8401c0a3f000c33c5fb2e35a6218fc37a453635a85e019db055",
+          "aot-linux-final-smoke.log": "5510a308c09bc2f7cda9275b0d11987104dee8640dfc6ee599d04b0a968c9f5e"
+        },
+        "archive_sha256": {
+          "main": "37a1d1fb9146511fec7fba5516e1cf3c9a6cea76a9e907610f1d14f60d8179b2",
+          "developer": "3e5d3dd789cdd8401c0a3f000c33c5fb2e35a6218fc37a453635a85e019db055"
+        }
+      }
+    }
+  ],
+  "managed_validation": {
+    "unit": {
+      "trx": "artifacts/aot-unit-final-3/Harness.Unit_net10.0_x64.trx",
+      "sha256": "983b62dd4544e3b368815e6fb2861ae048b6a1805567f91f00cd66d150830a4d",
+      "counts": {
+        "NotExecuted": 1,
+        "Passed": 465
+      },
+      "nonpassing": [
+        {
+          "name": "Harness.Unit.Architecture.ManifestReaderTests.UnixAnalysisLinksCannotEscapeAndMalformedOrOversizedFilesRemainPartialEvidence",
+          "outcome": "NotExecuted"
+        }
+      ]
+    },
+    "full_integration": {
+      "trx": "artifacts/aot-integration-final/Harness.Integration_net10.0_x64.trx",
+      "sha256": "8e01f2b16ef4e8b91f52c8148cc357bbd4bc3586c465a9495c8c42873130e39d",
+      "counts": {
+        "Failed": 3,
+        "NotExecuted": 6,
+        "Passed": 364
+      },
+      "nonpassing": [
+        {
+          "name": "Harness.Integration.Storage.StorageTests.NewFilesAndBackupsAreOwnerOnlyOnUnix",
+          "outcome": "NotExecuted"
+        },
+        {
+          "name": "Harness.Integration.Retrieval.RetrievalIntegrationTests.UnixFileAndDirectoryLinksCannotEscapeTheRepository",
+          "outcome": "NotExecuted"
+        },
+        {
+          "name": "Harness.Integration.Workspaces.CloneEvidenceTests.GitHotspotsPartnersAndMissingChecksMatchFrozenHistoryIncludingRenames",
+          "outcome": "Failed"
+        },
+        {
+          "name": "Harness.Integration.Sync.SyncTests.SymlinkContentHashesTheLinkTextWithoutFollowingItsTarget",
+          "outcome": "NotExecuted"
+        },
+        {
+          "name": "Harness.Integration.Web.UiTests.DefaultListenerPortBindsWhenItIsAvailable",
+          "outcome": "NotExecuted"
+        },
+        {
+          "name": "Harness.Integration.Providers.GraphifyTests.LoadingIsBoundedAndStopOnExitRemovesTheLoadingDescriptor",
+          "outcome": "Failed"
+        },
+        {
+          "name": "Harness.Integration.Findings.FindingsProcessTests.PublicToolsMatchFrozenSchemasAndKeepProposalsPendingUntilAuthorApproval",
+          "outcome": "Failed"
+        },
+        {
+          "name": "Harness.Integration.Clients.SetupProcessTests.ExplicitDataDeletionRefusesRedirectedStateDirectories",
+          "outcome": "NotExecuted"
+        },
+        {
+          "name": "Harness.Integration.Providers.GraphifyRealTests.RealGraphifyAnswersCompilerCallersReferencesAndImpactAndStopsOnlyItsOwnSession",
+          "outcome": "NotExecuted"
+        }
+      ]
+    },
+    "targeted_integration": {
+      "trx": "test/Harness.Integration/bin/Debug/net10.0/artifacts/aot-final-targeted-2/Harness.Integration_net10.0_x64.trx",
+      "sha256": "64368c42d2ec48f80cbbefce8eef78dfdac56e1e6c9857f094d080855f2bbdc4",
+      "counts": {
+        "Passed": 16
+      },
+      "nonpassing": []
+    },
+    "integration_note": "Full invocation is not green: two transient Git process-start access failures and a cold-start fixture deadline failed. All three pass in the sixteen-case targeted rerun, alongside Graphify/UI loading and disposal checks after fixture corrections. Report the invocations separately.",
+    "locked_rid_restores": [
+      {
+        "rid": "win-x64",
+        "project": "Cli",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\win-x64-Cli.log"
+      },
+      {
+        "rid": "win-x64",
+        "project": "Graphify",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\win-x64-Graphify.log"
+      },
+      {
+        "rid": "win-x64",
+        "project": "Collect",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\win-x64-Collect.log"
+      },
+      {
+        "rid": "win-x64",
+        "project": "Share",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\win-x64-Share.log"
+      },
+      {
+        "rid": "linux-x64",
+        "project": "Cli",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-x64-Cli.log"
+      },
+      {
+        "rid": "linux-x64",
+        "project": "Graphify",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-x64-Graphify.log"
+      },
+      {
+        "rid": "linux-x64",
+        "project": "Collect",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-x64-Collect.log"
+      },
+      {
+        "rid": "linux-x64",
+        "project": "Share",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-x64-Share.log"
+      },
+      {
+        "rid": "linux-arm64",
+        "project": "Cli",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-arm64-Cli.log"
+      },
+      {
+        "rid": "linux-arm64",
+        "project": "Graphify",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-arm64-Graphify.log"
+      },
+      {
+        "rid": "linux-arm64",
+        "project": "Collect",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-arm64-Collect.log"
+      },
+      {
+        "rid": "linux-arm64",
+        "project": "Share",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\linux-arm64-Share.log"
+      },
+      {
+        "rid": "osx-arm64",
+        "project": "Cli",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\osx-arm64-Cli.log"
+      },
+      {
+        "rid": "osx-arm64",
+        "project": "Graphify",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\osx-arm64-Graphify.log"
+      },
+      {
+        "rid": "osx-arm64",
+        "project": "Collect",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\osx-arm64-Collect.log"
+      },
+      {
+        "rid": "osx-arm64",
+        "project": "Share",
+        "exit_code": 0,
+        "log": "artifacts\\aot-rid-restores\\osx-arm64-Share.log"
+      }
+    ],
+    "formatting": "356 C# files passed the full check; final UI fixture checked separately.",
+    "final_locked_restore": "dotnet restore Harness.slnx --locked-mode: pass; artifacts/aot-final-locked.log",
+    "build": "dotnet build test/Harness.Integration/Harness.Integration.csproj --no-restore -m: pass, zero warnings/errors; artifacts/aot-fixture-build-2.log"
+  },
+  "limitations": [
+    "WSL host is Ubuntu 26.10 with glibc 2.44 and OpenSSL 3; this does not qualify older Linux distributions. CI uses Ubuntu 24.04.",
+    "Hosts have SDKs installed; child environments hide language runtimes. Clean runtime-dependencies-only containers remain a CI check.",
+    "Native macOS, Linux ARM64 and Windows console-signal qualification were not executed for these changed AOT artifacts. Earlier manual acceptance applies to historical untrimmed releases.",
+    "WSL probes use native Linux temporary storage because Windows-mounted workspace directories lack the required Unix mode semantics."
+  ]
+}

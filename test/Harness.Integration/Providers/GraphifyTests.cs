@@ -252,7 +252,19 @@ public sealed class GraphifyTests
         var provider = new GraphifyProvider(fixture.Options() with { ReadyWait = TimeSpan.FromSeconds(1) }, manager);
         try
         {
+            // Establish the loading session before measuring the query deadline;
+            // cold process startup can itself exceed one second on a busy host.
+            provider.Warm();
+            var startup = Stopwatch.StartNew();
+            while ((await manager.ListAsync(false, Token)).Count is 0 && startup.Elapsed < TimeSpan.FromSeconds(30))
+            {
+                await Task.Delay(100, Token);
+            }
+
+            (await manager.ListAsync(false, Token)).Should().ContainSingle(manager.LastLog());
+            var query = Stopwatch.StartNew();
             var result = await provider.ExecuteAsync(new(Capabilities.SymbolSearch, "Save"), Token);
+            query.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10));
             result.Error!.Message.Should().Contain("still loading").And.Contain("retry shortly");
             var loading = (await manager.ListAsync(false, Token)).Single();
             loading.Ready.Should().BeFalse();

@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Harness.Core.Findings;
+using Harness.Core.Serialization;
 using Harness.Core.Web;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
@@ -18,8 +19,7 @@ internal static class UiJson
 
     private static JsonSerializerOptions Create()
     {
-        var resolver = new DefaultJsonTypeInfoResolver();
-        resolver.Modifiers.Add(info =>
+        var resolver = HarnessJson.Resolver.WithAddedModifier(info =>
         {
             if (
                 info.Type != typeof(FindingMark)
@@ -33,11 +33,19 @@ internal static class UiJson
             foreach (
                 var property in info.Properties.Where(p =>
                     p.PropertyType == typeof(string)
-                    && p
-                        .AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreAttribute), true)
-                        .OfType<JsonIgnoreAttribute>()
-                        .Any(a => a.Condition is JsonIgnoreCondition.WhenWritingNull)
-                        is true
+                    && (
+                        info.Type == typeof(FindingMark)
+                            && p.Name
+                                is "reason"
+                                    or "review_reason"
+                                    or "memory_id"
+                                    or "task_id"
+                                    or "task_project"
+                                    or "proposed_by"
+                        || info.Type == typeof(FindingSnapshot) && p.Name is "commit"
+                        || info.Type == typeof(FindingProposal)
+                            && p.Name is "finding_key" or "body" or "decided_by" or "decided_at" or "note" or "result"
+                    )
                 )
             )
             {
@@ -48,7 +56,7 @@ internal static class UiJson
     }
 
     internal static JsonNode? Node(object? value) =>
-        value is JsonNode node ? node.DeepClone() : JsonSerializer.SerializeToNode(value, Options);
+        value is JsonNode node ? node.DeepClone() : HarnessJson.SerializeToNode(value, Options);
 }
 
 internal sealed partial class UiReadService(ProjectLifecycle lifecycle, UiProjectCatalog catalog, UiSessions sessions)
@@ -71,7 +79,7 @@ internal sealed partial class UiReadService(ProjectLifecycle lifecycle, UiProjec
             }
             return request.Endpoint switch
             {
-                "/api/projects" => UiJson.Node(new { projects = await catalog.ListAsync(token) }),
+                "/api/projects" => UiJson.Node(new JsonObjectMap { ["projects"] = await catalog.ListAsync(token) }),
                 "/api/workspaces" => await WorkspacesAsync(token),
                 "/api/workspaces/discover" => Discover(request),
                 "/api/machine" => Machine(),

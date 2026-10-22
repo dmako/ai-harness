@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Threading.Channels;
+using Harness.Core.Serialization;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 
@@ -52,7 +53,7 @@ internal sealed class CompatibleStdioTransport : ITransport
 
     internal void CompleteCancelledRequest(RequestId requestId)
     {
-        var id = JsonSerializer.SerializeToElement(requestId, McpJsonUtilities.DefaultOptions);
+        var id = HarnessJson.SerializeToElement(requestId, McpJsonUtilities.DefaultOptions);
         lock (_inflight)
         {
             var key = Id(id);
@@ -67,7 +68,7 @@ internal sealed class CompatibleStdioTransport : ITransport
 
     public async Task SendMessageAsync(JsonRpcMessage message, CancellationToken cancellationToken = default)
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(
+        var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             message,
             McpJsonUtilities.DefaultOptions.GetTypeInfo(typeof(JsonRpcMessage))
         );
@@ -97,7 +98,7 @@ internal sealed class CompatibleStdioTransport : ITransport
                     }
 
                     completed = batch.Keys;
-                    bytes = JsonSerializer.SerializeToUtf8Bytes(
+                    bytes = HarnessJson.SerializeToUtf8Bytes(
                         batch.Keys.Select(name => batch.Responses[name]).ToArray()
                     );
                     foreach (var name in completed)
@@ -333,7 +334,7 @@ internal sealed class CompatibleStdioTransport : ITransport
         JsonRpcMessage? decoded;
         try
         {
-            decoded = message.Deserialize<JsonRpcMessage>(McpJsonUtilities.DefaultOptions);
+            decoded = HarnessJson.Deserialize<JsonRpcMessage>(message, McpJsonUtilities.DefaultOptions);
         }
         catch (JsonException)
         {
@@ -403,12 +404,12 @@ internal sealed class CompatibleStdioTransport : ITransport
 
     private Task ReplyAsync(JsonElement? id, int code, string message) =>
         WriteFrameAsync(
-            JsonSerializer.SerializeToUtf8Bytes(
-                new
+            HarnessJson.SerializeToUtf8Bytes(
+                new JsonObjectMap
                 {
-                    jsonrpc = "2.0",
-                    id,
-                    error = new { code, message },
+                    ["jsonrpc"] = "2.0",
+                    ["id"] = id,
+                    ["error"] = new JsonObjectMap { ["code"] = code, ["message"] = message },
                 }
             ),
             _shutdown.Token

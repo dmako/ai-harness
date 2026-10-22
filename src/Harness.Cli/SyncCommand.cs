@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Harness.Cli.Memory;
 using Harness.Core.Sync;
 using Harness.Infrastructure.Findings;
@@ -6,18 +5,12 @@ using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Sync;
 using Harness.Providers.Packs;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli;
 
 internal sealed class SyncSettings : ProjectSettings
 {
-    [CommandOption("--full")]
-    [Description("Rescan every file instead of only what changed")]
     public bool Full { get; init; }
-
-    [CommandOption("--since")]
-    [Description("Compute changes from this commit instead of the last sync")]
     public string Since { get; init; } = "";
 }
 
@@ -26,13 +19,9 @@ internal sealed class SyncCommand(
     TextWriter output,
     CliErrorOutput error,
     Telemetry.ExportCommandRunner export
-) : AsyncCommand<SyncSettings>
+)
 {
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        SyncSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(SyncSettings settings, CancellationToken cancellationToken)
     {
         if (settings.Full && settings.Since.Length > 0)
         {

@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Harness.Core.Memory;
 using Harness.Core.Reports;
+using Harness.Core.Serialization;
 using Harness.Core.Telemetry;
 
 namespace Harness.Infrastructure.Telemetry;
@@ -41,7 +42,7 @@ public sealed class DeveloperExport(string directory)
 
     public ExportState Load() =>
         File.Exists(StatePath)
-            ? JsonSerializer.Deserialize<ExportState>(
+            ? HarnessJson.Deserialize<ExportState>(
                 File.ReadAllText(StatePath, new UTF8Encoding(false, true)),
                 TelemetryJson.Options
             ) ?? throw new InvalidDataException("Invalid telemetry state.")
@@ -53,7 +54,7 @@ public sealed class DeveloperExport(string directory)
         var temporary = StatePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            PrivateExportFiles.Write(temporary, JsonSerializer.SerializeToUtf8Bytes(state, TelemetryJson.Options));
+            PrivateExportFiles.Write(temporary, HarnessJson.SerializeToUtf8Bytes(state, TelemetryJson.Options));
             token.ThrowIfCancellationRequested();
             File.Move(temporary, StatePath, overwrite: true);
         }
@@ -114,71 +115,72 @@ public sealed class DeveloperExport(string directory)
             }
             var context = report.Context;
             projects.Add(
-                new JsonObject
-                {
-                    ["id"] = id,
-                    ["context"] = JsonSerializer.SerializeToNode(
-                        new
-                        {
-                            answers = context.Calls,
-                            hit_rate = context.HitRate,
-                            code_hits = context.Hits,
-                            code_changed = context.Changed,
-                            tests = context.Tests,
-                            callee_misses = context.CalleeMisses,
-                            read_after_rate = context.AfterRead.HitRate,
-                        }
-                    ),
-                    ["tools"] = JsonSerializer.SerializeToNode(
-                        report.Metrics.Tools.Select(t => new
-                        {
-                            tool = Clean(t.Tool),
-                            kind = Clean(t.Kind ?? ""),
-                            calls = t.Calls,
-                            errors = t.Errors,
-                            empty = t.Empty,
-                            p50_ms = t.P50MS,
-                            p95_ms = t.P95MS,
-                            clients = t.Clients?.Select(Clean),
-                        })
-                    ),
-                    ["providers"] = JsonSerializer.SerializeToNode(
-                        report.Metrics.Providers.Select(p => new
-                        {
-                            provider = Clean(p.Provider),
-                            capability = Clean(p.Capability),
-                            calls = p.Calls,
-                            errors = p.Errors,
-                            timeouts = p.Timeouts,
-                            empty = p.Empty,
-                            p50_ms = p.P50MS,
-                            p95_ms = p.P95MS,
-                            context_hit_share = p.HitShare,
-                        })
-                    ),
-                    ["knowledge"] = JsonSerializer.SerializeToNode(
-                        new
-                        {
-                            current_memories = report.Knowledge.Current,
-                            proposed = report.Knowledge.Proposed,
-                            approved = report.Knowledge.Approved,
-                            rejected = report.Knowledge.Rejected,
-                            pending = report.Knowledge.Pending,
-                            reads = report.KnowledgeReads,
-                            writes = report.KnowledgeWrites,
-                        }
-                    ),
-                    ["hook_events"] = report.Metrics.Hooks.Events,
-                    ["languages"] = JsonSerializer.SerializeToNode(context.Language),
-                    ["findings"] = JsonSerializer.SerializeToNode(
-                        (report.Findings ?? []).Select(f => new
-                        {
-                            level = Clean(f.Level),
-                            area = Clean(f.Area),
-                            message = Clean(f.Message),
-                        })
-                    ),
-                }
+                (JsonNode)
+                    new JsonObject
+                    {
+                        ["id"] = id,
+                        ["context"] = HarnessJson.SerializeToNode(
+                            new JsonObjectMap
+                            {
+                                ["answers"] = context.Calls,
+                                ["hit_rate"] = context.HitRate,
+                                ["code_hits"] = context.Hits,
+                                ["code_changed"] = context.Changed,
+                                ["tests"] = context.Tests,
+                                ["callee_misses"] = context.CalleeMisses,
+                                ["read_after_rate"] = context.AfterRead.HitRate,
+                            }
+                        ),
+                        ["tools"] = HarnessJson.SerializeToNode(
+                            report.Metrics.Tools.Select(t => new JsonObjectMap
+                            {
+                                ["tool"] = Clean(t.Tool),
+                                ["kind"] = Clean(t.Kind ?? ""),
+                                ["calls"] = t.Calls,
+                                ["errors"] = t.Errors,
+                                ["empty"] = t.Empty,
+                                ["p50_ms"] = t.P50MS,
+                                ["p95_ms"] = t.P95MS,
+                                ["clients"] = t.Clients?.Select(Clean),
+                            })
+                        ),
+                        ["providers"] = HarnessJson.SerializeToNode(
+                            report.Metrics.Providers.Select(p => new JsonObjectMap
+                            {
+                                ["provider"] = Clean(p.Provider),
+                                ["capability"] = Clean(p.Capability),
+                                ["calls"] = p.Calls,
+                                ["errors"] = p.Errors,
+                                ["timeouts"] = p.Timeouts,
+                                ["empty"] = p.Empty,
+                                ["p50_ms"] = p.P50MS,
+                                ["p95_ms"] = p.P95MS,
+                                ["context_hit_share"] = p.HitShare,
+                            })
+                        ),
+                        ["knowledge"] = HarnessJson.SerializeToNode(
+                            new JsonObjectMap
+                            {
+                                ["current_memories"] = report.Knowledge.Current,
+                                ["proposed"] = report.Knowledge.Proposed,
+                                ["approved"] = report.Knowledge.Approved,
+                                ["rejected"] = report.Knowledge.Rejected,
+                                ["pending"] = report.Knowledge.Pending,
+                                ["reads"] = report.KnowledgeReads,
+                                ["writes"] = report.KnowledgeWrites,
+                            }
+                        ),
+                        ["hook_events"] = report.Metrics.Hooks.Events,
+                        ["languages"] = HarnessJson.SerializeToNode(context.Language),
+                        ["findings"] = HarnessJson.SerializeToNode(
+                            (report.Findings ?? []).Select(f => new JsonObjectMap
+                            {
+                                ["level"] = Clean(f.Level),
+                                ["area"] = Clean(f.Area),
+                                ["message"] = Clean(f.Message),
+                            })
+                        ),
+                    }
             );
         }
         return new()
@@ -191,7 +193,7 @@ public sealed class DeveloperExport(string directory)
             ),
             ["harness"] = build.DeepClone(),
             ["window_days"] = 30,
-            ["provider_versions"] = JsonSerializer.SerializeToNode(
+            ["provider_versions"] = HarnessJson.SerializeToNode(
                 versions.ToDictionary(p => Clean(p.Key), p => Clean(p.Value))
             ),
             ["projects"] = projects,
@@ -248,13 +250,13 @@ public sealed class DeveloperExport(string directory)
                 PrivateExportFiles.OwnerOnly(LogPath);
                 await File.AppendAllTextAsync(
                         LogPath,
-                        JsonSerializer.Serialize(
-                            new
+                        HarnessJson.Serialize(
+                            new JsonObjectMap
                             {
-                                at = now,
-                                bytes = body.Length,
-                                ok = sent,
-                                error = sent ? null : "collector request failed",
+                                ["at"] = now,
+                                ["bytes"] = body.Length,
+                                ["ok"] = sent,
+                                ["error"] = sent ? null : "collector request failed",
                             }
                         ) + "\n",
                         CancellationToken.None

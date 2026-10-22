@@ -3,15 +3,16 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Core.Instructions;
+using Harness.Core.Serialization;
 
 namespace Harness.Infrastructure.Clients;
 
 /// <summary>JSON member splices preserve every byte outside the edited member.</summary>
 public static class JsonConfigurationEditor
 {
-    private sealed record Member(string Key, int KeyStart, Node Value);
+    internal sealed record Member(string Key, int KeyStart, Node Value);
 
-    private sealed record Node(int Start, int End, IReadOnlyList<Member>? Members = null);
+    internal sealed record Node(int Start, int End, IReadOnlyList<Member>? Members = null);
 
     private static readonly JsonSerializerOptions Compact = new()
     {
@@ -181,7 +182,7 @@ public static class JsonConfigurationEditor
             return Splice(source, existing.Value.Start, existing.Value.End, encoded);
         }
 
-        var member = JsonSerializer.Serialize(key, Compact) + ": " + encoded;
+        var member = HarnessJson.Serialize(key, Compact) + ": " + encoded;
         if (members.Count is 0)
         {
             return Splice(
@@ -219,7 +220,7 @@ public static class JsonConfigurationEditor
             IndentCharacter = unit.Contains('\t', StringComparison.Ordinal) ? '\t' : ' ',
             IndentSize = unit.Length,
         };
-        var encoded = JsonSerializer
+        var encoded = HarnessJson
             .Serialize(Sorted(value), options)
             .Replace("<", "\\u003c", StringComparison.Ordinal)
             .Replace(">", "\\u003e", StringComparison.Ordinal)

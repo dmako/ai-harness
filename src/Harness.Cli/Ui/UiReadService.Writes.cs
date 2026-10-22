@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json.Nodes;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Core.Web;
 using Harness.Infrastructure.Findings;
@@ -75,11 +76,11 @@ internal sealed partial class UiReadService : IUiWriteApi
                 token
             );
             return UiJson.Node(
-                new
+                new JsonObjectMap
                 {
-                    project_id = route.Value("id"),
-                    name = WorkspaceStore.ShortName(renamed),
-                    title = UiProjectCatalog.Text(renamed, "title"),
+                    ["project_id"] = route.Value("id"),
+                    ["name"] = WorkspaceStore.ShortName(renamed),
+                    ["title"] = UiProjectCatalog.Text(renamed, "title"),
                 }
             );
         }
@@ -100,9 +101,9 @@ internal sealed partial class UiReadService : IUiWriteApi
             "findings/{action}" => await TriageProjectAsync(project, database, request, token),
             "arch-proposals/{pid}/approve" => await ApproveFindingAsync(project, database, request, token),
             "arch-proposals/{pid}/reject" => UiJson.Node(
-                new
+                new JsonObjectMap
                 {
-                    proposal = new FindingStore(database).Decide(
+                    ["proposal"] = new FindingStore(database).Decide(
                         route.Value("pid"),
                         "rejected",
                         human,
@@ -141,10 +142,10 @@ internal sealed partial class UiReadService : IUiWriteApi
             token
         );
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                status = result.Status,
-                memory = MemoryViews.Memory(result.Memory! with { Scope = scope ?? result.Memory.Scope }),
+                ["status"] = result.Status,
+                ["memory"] = MemoryViews.Memory(result.Memory! with { Scope = scope ?? result.Memory.Scope }),
             }
         );
     }
@@ -161,7 +162,9 @@ internal sealed partial class UiReadService : IUiWriteApi
             ? new UiWriteBody(body, "reason")
             : new UiWriteBody(body, "level", "content", "reason");
         var memory = store.Retire(id, HumanActor.Current(), fields.Text("reason"), token);
-        return UiJson.Node(new { memory = MemoryViews.Memory(memory with { Scope = scope ?? memory.Scope }) });
+        return UiJson.Node(
+            new JsonObjectMap { ["memory"] = MemoryViews.Memory(memory with { Scope = scope ?? memory.Scope }) }
+        );
     }
 
     private static JsonObject? ApproveMemory(MemoryStore store, string id, JsonObject body, CancellationToken token)
@@ -181,11 +184,13 @@ internal sealed partial class UiReadService : IUiWriteApi
         );
         var view = UiJson
             .Node(
-                new
+                new JsonObjectMap
                 {
-                    status = result.Status,
-                    proposal = MemoryViews.Proposal(result.Proposal),
-                    similar = result.Similar.Count is 0 ? null : result.Similar.Select(MemoryViews.Similar).ToArray(),
+                    ["status"] = result.Status,
+                    ["proposal"] = MemoryViews.Proposal(result.Proposal),
+                    ["similar"] = result.Similar.Count is 0
+                        ? null
+                        : result.Similar.Select(MemoryViews.Similar).ToArray(),
                 }
             )!
             .AsObject();
@@ -198,9 +203,9 @@ internal sealed partial class UiReadService : IUiWriteApi
 
     private static JsonNode? RejectMemory(MemoryStore store, string id, JsonObject body, CancellationToken token) =>
         UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                proposal = MemoryViews.Proposal(
+                ["proposal"] = MemoryViews.Proposal(
                     store.Reject(id, HumanActor.Current(), new UiWriteBody(body, "note").Text("note"), token)
                 ),
             }
@@ -248,9 +253,9 @@ internal sealed partial class UiReadService : IUiWriteApi
 
     private static JsonNode? CreateTask(HarnessDatabase database, JsonObject body, CancellationToken token) =>
         UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                task = TaskViews.Task(
+                ["task"] = TaskViews.Task(
                     new TaskStore(database).Create(
                         TaskForm(body),
                         Prefix(body),
@@ -271,14 +276,20 @@ internal sealed partial class UiReadService : IUiWriteApi
             HumanActor.Current(),
             token
         );
-        return UiJson.Node(new { proposal = TaskViews.Proposal(result.Proposal), task = TaskViews.Task(result.Task) });
+        return UiJson.Node(
+            new JsonObjectMap
+            {
+                ["proposal"] = TaskViews.Proposal(result.Proposal),
+                ["task"] = TaskViews.Task(result.Task),
+            }
+        );
     }
 
     private static JsonNode? RejectTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token) =>
         UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                proposal = TaskViews.Proposal(
+                ["proposal"] = TaskViews.Proposal(
                     new TaskStore(database).Reject(
                         request.Route.Value("pid"),
                         new UiWriteBody(request.Body, "note").Text("note"),
@@ -390,13 +401,13 @@ internal sealed partial class UiReadService : IUiWriteApi
         }
         var view = UiJson
             .Node(
-                new
+                new JsonObjectMap
                 {
-                    from = MemoryViews.Memory(result.From),
-                    level = result.Level,
-                    holds_in = result.HoldsIn.Select(MemoryViews.Found).ToArray(),
-                    status = result.Status,
-                    retired = result.Retired,
+                    ["from"] = MemoryViews.Memory(result.From),
+                    ["level"] = result.Level,
+                    ["holds_in"] = result.HoldsIn.Select(MemoryViews.Found).ToArray(),
+                    ["status"] = result.Status,
+                    ["retired"] = result.Retired,
                 }
             )!
             .AsObject();

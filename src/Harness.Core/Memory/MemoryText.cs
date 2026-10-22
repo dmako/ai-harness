@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Harness.Core.Serialization;
 
 namespace Harness.Core.Memory;
 
@@ -153,7 +154,7 @@ public static class MemoryText
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static string Quote(string text) => System.Text.Json.JsonSerializer.Serialize(text, QuoteOptions);
+    public static string Quote(string text) => HarnessJson.Serialize(text, QuoteOptions);
 
     public static string FullTextQuery(string text)
     {

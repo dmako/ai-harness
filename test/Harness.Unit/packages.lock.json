@@ -211,7 +211,8 @@
           "Harness.Mcp": "[0.1.0-localbuild, )",
           "Harness.Providers": "[0.1.0-localbuild, )",
           "Harness.Web": "[0.1.0-localbuild, )",
-          "Spectre.Console.Cli": "[0.57.2, )"
+          "Spectre.Console": "[0.57.2, )",
+          "System.CommandLine": "[2.0.13, )"
         }
       },
       "harness.core": {
@@ -297,14 +298,11 @@
           "Spectre.Console.Ansi": "0.57.2"
         }
       },
-      "Spectre.Console.Cli": {
+      "System.CommandLine": {
         "type": "CentralTransitive",
-        "requested": "[0.57.2, )",
-        "resolved": "0.57.2",
-        "contentHash": "EAiwpJXAAvhyyzH6hljVo7z19ahG7WM+zViKEHtUagyPymYfJrsainXDOHzUakBHj6VYEpuaqPAShgqvs1N9aQ==",
-        "dependencies": {
-          "Spectre.Console": "0.57.2"
-        }
+        "requested": "[2.0.13, )",
+        "resolved": "2.0.13",
+        "contentHash": "TIO2lMV+sSP7WW7pD/oCRHD9ENWY+jqwXmYzgks3R46cEdDzwjQOAhsiBn+M3EegfGjgTpa2h+eIrcU+AM2k6A=="
       },
       "Tomlyn": {
         "type": "CentralTransitive",

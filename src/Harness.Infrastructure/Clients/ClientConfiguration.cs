@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Harness.Core.Instructions;
+using Harness.Core.Serialization;
 
 namespace Harness.Infrastructure.Clients;
 
@@ -133,7 +134,7 @@ public sealed class ClientConfiguration(ClientPaths paths)
 
                 var text = FileEditor.Read(group.Key);
                 var node = client.Id is "codex"
-                    ? System.Text.Json.JsonSerializer.SerializeToNode(TomlConfigurationEditor.Parse(text))!.AsObject()
+                    ? HarnessJson.SerializeToNode(TomlConfigurationEditor.Parse(text))!.AsObject()
                     : JsonConfigurationEditor.ParseObject(text);
                 foreach (var target in group)
                 {
@@ -279,7 +280,7 @@ public sealed class ClientConfiguration(ClientPaths paths)
                 if (
                     Expand(want["command"]?.GetValue<string>() ?? "", paths.Home) == Expand(spec.Command, paths.Home)
                     && (!want.ContainsKey("type") || want["type"]?.GetValue<string>() is "stdio")
-                    && JsonNode.DeepEquals(want["args"], System.Text.Json.JsonSerializer.SerializeToNode(spec.Args))
+                    && JsonNode.DeepEquals(want["args"], HarnessJson.SerializeToNode(spec.Args))
                 )
                 {
                     return new(source, "unchanged");
@@ -287,7 +288,7 @@ public sealed class ClientConfiguration(ClientPaths paths)
 
                 want["type"] = "stdio";
                 want["command"] = spec.Command;
-                want["args"] = System.Text.Json.JsonSerializer.SerializeToNode(spec.Args);
+                want["args"] = HarnessJson.SerializeToNode(spec.Args);
                 edit = JsonConfigurationEditor.Set(source, target.Keys, "harness", want);
             }
             var after = JsonConfigurationEditor.ParseObject(edit.Text);

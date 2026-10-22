@@ -4,10 +4,17 @@ The port produces four release targets: `win-x64`, `linux-x64`, `linux-arm64`,
 and `osx-arm64`. Intel macOS (`osx-x64`) is no longer supported.
 All four executables use the shared
 [`Release.pubxml`](../../configuration/Release.pubxml): self-contained .NET 10,
-single-file apphosts, bundled native SQLite, embedded debug information, and
-trimming/NativeAOT disabled. UI, documentation, SQL migrations, and the five
-provider packs are embedded resources. No new application package dependencies
-were introduced for packaging.
+trimming and Native AOT enabled, with portable build symbols retained outside
+archives. Native AOT executables load the included SQLite native library from
+beside the executable; keep that library when moving or installing the tools.
+UI, documentation, SQL migrations, and the five provider packs remain embedded.
+The CLI uses System.CommandLine 2.0.13 with explicit typed bindings, replacing
+Spectre.Console.Cli. Interactive terminal rendering still uses Spectre.Console.
+See [Native AOT implementation and validation](native-aot.md) for TASK-0034.
+
+The original PORT-031 inventory below describes the earlier untrimmed,
+single-file release. Its user acceptance does not automatically qualify new
+Native AOT builds on every supported OS/architecture.
 
 The local preview is `dist/0.1.0-port-preview.2` (ignored build output).
 [`release-validation.json`](inventory/release-validation.json) records executable
@@ -42,8 +49,8 @@ Sizes above describe the original preview. Its Intel macOS archives are historic
 artifacts and are excluded from the supported release inventory.
 
 The CLI apphost itself is 104.5–114.9 MiB on Unix and 108.2 MiB on Windows.
-This cost is explicit; trimming or NativeAOT must be a separate task with startup,
-reflection/protocol, assets, SQLite, and cross-platform evidence before adoption.
+TASK-0034 replaces that deployment model with Native AOT; its size and execution
+evidence are recorded separately rather than overwriting the historical inventory.
 
 ## Repeatable build
 
@@ -53,15 +60,19 @@ With the pinned SDK from `global.json`, Python 3, Git, and package-feed access:
 python scripts/publish_release.py --version 0.1.0-port-preview.2 --output dist/new-preview --verify-repeat
 ```
 
-Use a fresh output directory. `--rids` selects targets. Every restore uses locked
+Use a fresh output directory. The script defaults to the current supported host
+RID. Native AOT requires a native target toolchain: run on each target OS and
+architecture (the script rejects other RIDs). Every restore uses locked
 `packages.publish.lock.json`; every MSBuild invocation has its own binary log.
 `--refresh-locks` is an explicit bootstrap option: review and commit lock changes
 before locked CI. RID selection uses `-p:RuntimeIdentifier`, retaining the shared
-four-RID lock set. Profiles contain no credentials or deployment settings.
+four-RID lock set. Builds use an isolated artifacts directory, allowing Windows
+and WSL qualification without sharing intermediate files. Profiles contain no
+credentials or deployment settings.
 
 The script pins version, commit, build timestamp/source epoch, path mapping,
 archive order, timestamps, permissions, and tar ownership. `--verify-repeat`
-publishes each apphost twice and rejects unequal executable hashes. The original
+publishes each executable twice and rejects unequal executable or SQLite library hashes. The original
 five-target preview verified 20 executables; 16 of those belong to the four
 currently supported targets. This is same-host binary reproducibility, not a claim that
 independent builds on different SDK hosts produce identical archive bytes.
@@ -95,7 +106,9 @@ unsigned downloads. The [installation README](../../README.md#platform-prerequis
 contains distribution-dependent prerequisites and per-file macOS trust steps,
 with links to Microsoft and Apple documentation.
 
-Bundled SQLite extracts to a writable native-library cache. On locked-down hosts,
+Current Native AOT packages carry a SQLite sidecar and do not extract a managed
+bundle. The following extraction requirements apply to the historical
+untrimmed single-file packages only. Bundled SQLite extracts to a writable native-library cache. On locked-down hosts,
 set `DOTNET_BUNDLE_EXTRACT_BASE_DIR` to an owner-private directory on executable
 storage. The probe uses a private `0700` parent on Unix, an owner-only inheritable
 DACL on Windows, and confirms native SQLite extraction and successful database

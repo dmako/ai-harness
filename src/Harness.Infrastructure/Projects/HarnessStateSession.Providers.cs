@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Git;
 using Microsoft.Data.Sqlite;
 
@@ -94,7 +95,7 @@ public sealed partial class HarnessStateSession
                     stats["last_call_at"] = reader.GetString(4);
                 }
 
-                result["recent_24h"] = JsonSerializer.SerializeToElement(stats);
+                result["recent_24h"] = HarnessJson.SerializeToElement(stats);
             }
             command.Parameters.Clear();
             command.CommandText = """
@@ -114,12 +115,12 @@ public sealed partial class HarnessStateSession
             var changed = hits.GetInt32(1);
             if (changed > 0)
             {
-                result["context_30d"] = JsonSerializer.SerializeToElement(
-                    new
+                result["context_30d"] = HarnessJson.SerializeToElement(
+                    new JsonObjectMap
                     {
-                        hits = hits.GetInt32(0),
-                        changed,
-                        hit_rate = Math.Truncate((double)hits.GetInt32(0) / changed * 100) / 100,
+                        ["hits"] = hits.GetInt32(0),
+                        ["changed"] = changed,
+                        ["hit_rate"] = Math.Truncate((double)hits.GetInt32(0) / changed * 100) / 100,
                     }
                 );
             }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
@@ -118,14 +119,14 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         if (settings.Json)
         {
             await JsonAsync(
-                new
+                new JsonObjectMap
                 {
-                    from = MemoryViews.Memory(result.From),
-                    level = result.Level,
-                    holds_in = result.HoldsIn.Select(MemoryViews.Found).ToArray(),
-                    memory = MemoryViews.Memory(result.Memory!),
-                    status = result.Status,
-                    retired = result.Retired,
+                    ["from"] = MemoryViews.Memory(result.From),
+                    ["level"] = result.Level,
+                    ["holds_in"] = result.HoldsIn.Select(MemoryViews.Found).ToArray(),
+                    ["memory"] = MemoryViews.Memory(result.Memory!),
+                    ["status"] = result.Status,
+                    ["retired"] = result.Retired,
                 }
             );
         }
@@ -203,10 +204,10 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         if (settings.Json)
         {
             await JsonAsync(
-                new
+                new JsonObjectMap
                 {
-                    proposal = MemoryCliViews.Proposal(detail.Proposal),
-                    related = MemoryCliViews.Similar(detail.Related),
+                    ["proposal"] = MemoryCliViews.Proposal(detail.Proposal),
+                    ["related"] = MemoryCliViews.Similar(detail.Related),
                 }
             );
         }
@@ -321,7 +322,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             async token => location.Repository is null ? "" : (await location.Repository.ReadHeadAsync(token)).Branch
         );
 
-    private Task JsonAsync(object? value) => output.WriteLineAsync(JsonSerializer.Serialize(value, JsonOptions));
+    private Task JsonAsync(object? value) => output.WriteLineAsync(HarnessJson.Serialize(value, JsonOptions));
 
     private async Task PrintDetailAsync(MemoryDetail detail)
     {

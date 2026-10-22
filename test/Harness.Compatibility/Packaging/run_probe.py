@@ -16,7 +16,10 @@ p.add_argument('--developer-archive', type=Path, required=True)
 p.add_argument('--output', type=Path, required=True)
 a = p.parse_args()
 a.output.parent.mkdir(parents=True, exist_ok=True)
-with tempfile.TemporaryDirectory(prefix='harness-private-probe-', dir=a.output.parent.resolve()) as temporary:
+# WSL workspaces may live on a Windows mount without POSIX mode metadata.
+# Keep Unix fixtures on the system temporary filesystem to test chmod honestly.
+temporary_parent = a.output.parent.resolve() if os.name == 'nt' else None
+with tempfile.TemporaryDirectory(prefix='harness-private-probe-', dir=temporary_parent) as temporary:
     base = Path(temporary)
     acl = None
     if os.name == 'nt':
@@ -36,6 +39,12 @@ with tempfile.TemporaryDirectory(prefix='harness-private-probe-', dir=a.output.p
     log.write_bytes(result.stdout)
     text = result.stdout.decode('utf-8', errors='replace')
     receipt = {'status': 'pass' if result.returncode == 0 else 'fail', 'exit_code': result.returncode, 'host': platform.platform(), 'machine': platform.machine(), 'environment': 'Native host with PATH empty, nonexistent DOTNET_ROOT, multilevel lookup disabled; private HOME/cache in probe. Host itself may have SDKs installed.', 'parent_acl_sddl': acl, 'elapsed_seconds': elapsed, 'passed_checks': sum(line.startswith('PASS ') for line in text.splitlines()), 'failures': [line for line in text.splitlines() if line.startswith('FAIL ')], 'notes': [line for line in text.splitlines() if line.startswith('NOTE ')], 'measurements': [line for line in text.splitlines() if line.startswith('MEASURE ')], 'files': {str(file.name): hashlib.sha256(file.read_bytes()).hexdigest() for file in (a.probe, a.archive, a.developer_archive, log)}}
+    # Main and developer archives intentionally share a basename; bind each
+    # explicitly instead of relying on the legacy basename-keyed files map.
+    receipt['archive_sha256'] = {
+        'main': hashlib.sha256(a.archive.read_bytes()).hexdigest(),
+        'developer': hashlib.sha256(a.developer_archive.read_bytes()).hexdigest(),
+    }
     a.output.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
     print(text)
     print(a.output)

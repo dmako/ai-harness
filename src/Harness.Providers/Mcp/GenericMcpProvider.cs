@@ -595,11 +595,11 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         }
     }
 
-    private sealed record Call(CapabilityMapping Mapping, Regex? Extraction, Regex? Miss, Regex? Truncated);
+    internal sealed record Call(CapabilityMapping Mapping, Regex? Extraction, Regex? Miss, Regex? Truncated);
 
-    private sealed record Plan(IReadOnlyList<Call> Calls, string Combine);
+    internal sealed record Plan(IReadOnlyList<Call> Calls, string Combine);
 
-    private sealed record Part(ProviderResult Result, bool Miss = false, bool Matched = false);
+    internal sealed record Part(ProviderResult Result, bool Miss = false, bool Matched = false);
 
     private sealed class Refreshing(
         string name,

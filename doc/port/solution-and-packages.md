@@ -63,11 +63,16 @@ project covering storage, providers and transports; add projects when independen
 execution or dependencies justify them. The temporary spike is under ignored
 `artifacts/package-spike`, not a committed product or test scaffold.
 
-## CPM choices
+## Original CPM choices
 
 Versions below were checked against NuGet package metadata and actual restored
 assemblies on 2026-10-20. [Validation receipts](inventory/package-validation.json)
 record the resolved dependency graph, declared licenses and artifact hashes.
+
+TASK-0034 subsequently replaced Spectre.Console.Cli with System.CommandLine
+2.0.13 for trimming and Native AOT. Spectre.Console 0.57.2 remains for interactive
+rendering. The table and alignment discussion below describe the original spike;
+see [Native AOT](native-aot.md) and `Directory.Packages.props` for the current CLI.
 
 | Dependency | Choice and ownership | License / deployment |
 | --- | --- | --- |

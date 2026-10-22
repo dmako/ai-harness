@@ -50,6 +50,13 @@ jobs:
         with:
           go-version: '1.27.1'
           cache: false
+      - name: Install Linux Native AOT compiler prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          sudo apt-get install -y clang zlib1g-dev
+          exit $LASTEXITCODE
       - name: Verify pinned source and build all native test drivers
         run: |
           python test/Harness.Compatibility/snapshot_source.py --repository "$env:GO_SOURCE_URL" --output artifacts/pinned-source
@@ -71,6 +78,8 @@ jobs:
         run: |
           $archive = Get-ChildItem artifacts/package/harness-* | Where-Object { $_.Name -match '\.(zip|tar.gz)$' } | Select-Object -First 1
           python test/Harness.Compatibility/Packaging/run_probe.py --probe "artifacts/probe$env:PROBE_SUFFIX" --archive $archive.FullName --developer-archive (Join-Path $PWD "artifacts/package/developer-tools/$($archive.Name)") --output artifacts/native-smoke.json
+      - name: Verify Native AOT inventory and runtime receipts
+        run: python test/Harness.Compatibility/Packaging/verify_aot.py --release artifacts/package --smoke artifacts/native-smoke.json --output artifacts/native-aot-verification.json
       - name: Clean Linux runtime-dependencies-only container
         if: runner.os == 'Linux'
         run: |
@@ -84,6 +93,7 @@ jobs:
           path: |
             artifacts/package
             artifacts/native-smoke.*
+            artifacts/native-aot-verification.json
             artifacts/container-smoke.log
             artifacts/parity
             artifacts/**/*.binlog

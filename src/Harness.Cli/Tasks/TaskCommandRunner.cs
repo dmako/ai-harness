@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Harness.Cli.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Projects;
@@ -109,7 +110,9 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var claimed = store.Claim(settings.Id.ToUpperInvariant(), actor, requestedLease, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { task = TaskViews.Task(claimed.Task), claim_token = claimed.Token });
+            await JsonAsync(
+                new JsonObjectMap { ["task"] = TaskViews.Task(claimed.Task), ["claim_token"] = claimed.Token }
+            );
         }
         else
         {
@@ -132,7 +135,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var released = store.Release(releasing.Id, actor, releaseReason, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { task = TaskViews.Task(released) });
+            await JsonAsync(new JsonObjectMap { ["task"] = TaskViews.Task(released) });
         }
         else
         {
@@ -169,7 +172,9 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
         if (settings.Json)
         {
-            await JsonAsync(new { task = TaskViews.Task(completed.Task), unlocked = Nil(completed.Unlocked) });
+            await JsonAsync(
+                new JsonObjectMap { ["task"] = TaskViews.Task(completed.Task), ["unlocked"] = Nil(completed.Unlocked) }
+            );
         }
         else
         {
@@ -191,7 +196,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var proposals = store.Proposals(proposalStatus, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { proposals = proposals.Select(TaskViews.Proposal).ToArray() });
+            await JsonAsync(new JsonObjectMap { ["proposals"] = proposals.Select(TaskViews.Proposal).ToArray() });
         }
         else if (proposals.Count is 0)
         {
@@ -247,7 +252,11 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         if (settings.Json)
         {
             await JsonAsync(
-                new { proposal = TaskViews.Proposal(approved.Proposal), task = TaskViews.Task(approved.Task) }
+                new JsonObjectMap
+                {
+                    ["proposal"] = TaskViews.Proposal(approved.Proposal),
+                    ["task"] = TaskViews.Task(approved.Task),
+                }
             );
         }
         else
@@ -268,7 +277,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var rejected = store.Reject(settings.Id, settings.Note, actor.Name, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { proposal = TaskViews.Proposal(rejected) });
+            await JsonAsync(new JsonObjectMap { ["proposal"] = TaskViews.Proposal(rejected) });
         }
         else
         {
@@ -296,7 +305,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var tasks = store.List(new(statuses, settings.Milestone), cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { tasks = tasks.Select(TaskViews.Task).ToArray() });
+            await JsonAsync(new JsonObjectMap { ["tasks"] = tasks.Select(TaskViews.Task).ToArray() });
         }
         else if (tasks.Count is 0)
         {
@@ -325,7 +334,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var milestones = store.Milestones(cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { milestones = milestones.Select(TaskViews.Milestone).ToArray() });
+            await JsonAsync(new JsonObjectMap { ["milestones"] = milestones.Select(TaskViews.Milestone).ToArray() });
         }
         else
         {
@@ -367,7 +376,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var next = store.Next(settings.Milestone, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new { task = next is null ? null : TaskViews.Task(next) });
+            await JsonAsync(new JsonObjectMap { ["task"] = next is null ? null : TaskViews.Task(next) });
         }
         else if (next is null)
         {
@@ -443,7 +452,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         );
         if (settings.Json)
         {
-            await JsonAsync(new { task = TaskViews.Task(created) });
+            await JsonAsync(new JsonObjectMap { ["task"] = TaskViews.Task(created) });
         }
         else
         {
@@ -476,7 +485,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         };
         if (settings.Json)
         {
-            await JsonAsync(new { task = TaskViews.Task(changed) });
+            await JsonAsync(new JsonObjectMap { ["task"] = TaskViews.Task(changed) });
         }
         else
         {
@@ -508,14 +517,14 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             if (settings.Json)
             {
                 await JsonAsync(
-                    new
+                    new JsonObjectMap
                     {
-                        dry_run = settings.DryRun,
-                        export = new
+                        ["dry_run"] = settings.DryRun,
+                        ["export"] = new JsonObjectMap
                         {
-                            path = result.Path,
-                            added = result.Added,
-                            created = result.Created,
+                            ["path"] = result.Path,
+                            ["added"] = result.Added,
+                            ["created"] = result.Created,
                         },
                     }
                 );
@@ -545,15 +554,15 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         if (settings.Json)
         {
             await JsonAsync(
-                new
+                new JsonObjectMap
                 {
-                    dry_run = settings.DryRun,
-                    added = Nil(imported.Added),
-                    updated = Nil(imported.Updated),
-                    unchanged = imported.Unchanged.Count,
-                    orphaned = Nil(imported.Orphaned),
-                    unlocked = Nil(imported.Unlocked),
-                    milestones_changed = milestones,
+                    ["dry_run"] = settings.DryRun,
+                    ["added"] = Nil(imported.Added),
+                    ["updated"] = Nil(imported.Updated),
+                    ["unchanged"] = imported.Unchanged.Count,
+                    ["orphaned"] = Nil(imported.Orphaned),
+                    ["unlocked"] = Nil(imported.Unlocked),
+                    ["milestones_changed"] = milestones,
                 }
             );
         }
@@ -594,7 +603,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         }
     }
 
-    private Task JsonAsync(object value) => output.WriteLineAsync(JsonSerializer.Serialize(value, JsonOptions));
+    private Task JsonAsync(object value) => output.WriteLineAsync(HarnessJson.Serialize(value, JsonOptions));
 
     private static IReadOnlyList<string>? Nil(IReadOnlyList<string> values) => values.Count is 0 ? null : values;
 

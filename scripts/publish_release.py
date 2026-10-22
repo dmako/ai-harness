@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -23,6 +24,19 @@ from release_licenses import inventory
 ROOT = Path(__file__).resolve().parents[1]
 RIDS = {"win-x64": ("windows", "amd64"), "linux-x64": ("linux", "amd64"), "linux-arm64": ("linux", "arm64"), "osx-arm64": ("darwin", "arm64")}
 PRODUCTS = {"Cli": "harness", "Graphify": "harness-graphify", "Collect": "harness-collect", "Share": "harness-share"}
+
+
+def host_rid():
+    system = {"Windows": "win", "Linux": "linux", "Darwin": "osx"}.get(platform.system())
+    architecture = {"amd64": "x64", "x86_64": "x64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine().lower())
+    return f"{system}-{architecture}"
+
+
+def native_dependencies(directory):
+    # Native AOT executables load SQLite alongside the executable. The managed
+    # single-file bundle extractor is not part of a Native AOT deployment.
+    return sorted(path for path in directory.iterdir()
+                  if path.name in ("e_sqlite3.dll", "libe_sqlite3.so", "libe_sqlite3.dylib"))
 
 
 def git(*args):
@@ -71,11 +85,13 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--version", required=True)
     p.add_argument("--output", type=Path)
-    p.add_argument("--rids", nargs="+", choices=list(RIDS), default=list(RIDS))
+    p.add_argument("--rids", nargs="+", choices=list(RIDS), default=[host_rid()])
     p.add_argument("--packages", type=Path)
     p.add_argument("--refresh-locks", action="store_true", help="Bootstrap changed publish lockfiles; review/commit the diff before locked CI")
     p.add_argument("--verify-repeat", action="store_true", help="Repeat each publish and require identical executable hashes")
     a = p.parse_args()
+    if any(rid != host_rid() for rid in a.rids):
+        p.error("Build Native AOT releases on each target host; this host supports " + host_rid())
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+\-]{0,79}", a.version):
         p.error("Version must be a safe archive component")
     output = (a.output or ROOT / "dist" / a.version).resolve()
@@ -92,12 +108,13 @@ def main():
     environment.setdefault("DOTNET_CLI_HOME", str(ROOT / "artifacts/package-spike/cli-home"))
     packages = (a.packages or Path(environment.get("NUGET_PACKAGES", ROOT / "artifacts/package-spike/packages"))).resolve()
     environment["NUGET_PACKAGES"] = str(packages)
-    common = ["-p:PublishProfile=Release", "-p:VERSION_LABEL=" + a.version, "-p:SourceRevisionId=" + commit, "-p:BuildTimestamp=" + stamp, "-p:RepositoryModified=" + str(modified).lower(), "-p:PathMap=" + str(ROOT) + "=/_/"]
+    native_build = build / "dotnet"
+    common = ["-p:UseArtifactsOutput=true", "-p:ArtifactsPath=" + str(native_build), "-p:PublishProfile=Release", "-p:VERSION_LABEL=" + a.version, "-p:SourceRevisionId=" + commit, "-p:BuildTimestamp=" + stamp, "-p:RepositoryModified=" + str(modified).lower(), "-p:PathMap=" + str(ROOT) + "=/_/"]
     source_files = git("ls-files", "--cached", "--others", "--exclude-standard").splitlines()
     source_files = [name for name in source_files if name.split("/")[0] in ("src", "configuration", "scripts") or name in ("global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "NuGet.config", ".editorconfig", "doc/port/inventory/baseline.json", "README.md")]
     source_hashes = {name: sha(ROOT / name) for name in source_files if (ROOT / name).is_file()}
-    manifest = {"schema": 1, "version": a.version, "commit": commit, "modified": modified, "source_date_epoch": epoch, "sdk": subprocess.check_output(["dotnet", "--version"], cwd=ROOT, env=environment).decode().strip(), "build_directory": build.relative_to(ROOT).as_posix(), "self_contained": True, "single_file": True, "trimmed": False, "native_aot": False, "source_sha256": source_hashes, "companion_policy": "Main archives contain harness and harness-graphify. Optional collect/share developer archives are separate and never installed by harness.", "repository_license_declaration": None, "artifacts": []}
-    notes = "# Harness " + a.version + "\n\nSelf-contained .NET 10 binaries. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools. See the included README.md for distribution dependencies (including libssl3t64 where applicable) and explicit trust steps for unsigned macOS downloads.\n\nMain archives: harness + harness-graphify. Developer archives: harness-collect + harness-share, not installed with the main CLI.\n\nCross-compilation does not imply native qualification. See doc/port/releases.md and the validation receipt for host/architecture execution status. Trimming and NativeAOT are disabled.\n"
+    manifest = {"schema": 1, "version": a.version, "commit": commit, "modified": modified, "source_date_epoch": epoch, "sdk": subprocess.check_output(["dotnet", "--version"], cwd=ROOT, env=environment).decode().strip(), "build_directory": build.relative_to(ROOT).as_posix(), "self_contained": True, "single_file": False, "trimmed": True, "native_aot": True, "source_sha256": source_hashes, "companion_policy": "Main archives contain harness and harness-graphify. Optional collect/share developer archives are separate and never installed by harness. Native SQLite libraries must stay beside their executables.", "repository_license_declaration": None, "artifacts": []}
+    notes = "# Harness " + a.version + "\n\nTrimmed Native AOT binaries targeting .NET 10. Keep the included native SQLite library beside the executables. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools. See the included README.md for distribution dependencies (including libssl3t64 where applicable) and explicit trust steps for unsigned macOS downloads.\n\nMain archives: harness + harness-graphify. Developer archives: harness-collect + harness-share, not installed with the main CLI.\n\nCross-compilation does not imply native qualification. See doc/port/releases.md and the validation receipt for host/architecture execution status. Trimming and Native AOT are enabled; release archives contain native executables and the SQLite sidecar.\n"
     (output / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
     upstream = json.loads((ROOT / "doc/port/inventory/baseline.json").read_text(encoding="utf-8"))["source_license"]
     for rid in a.rids:
@@ -114,13 +131,19 @@ def main():
             execute(["dotnet", "publish", str(csproj), "--no-restore", *properties, "-o", str(destination), "-bl:" + str(build / (rid + "-" + project + "-publish-" + uuid.uuid4().hex + ".binlog"))], build / (rid + "-" + project + "-publish.log"), environment)
             binary = destination / (executable + (".exe" if rid.startswith("win-") else ""))
             if not binary.is_file():
-                raise ValueError("Missing single-file apphost")
+                raise ValueError("Missing Native AOT executable")
             if a.verify_repeat:
                 repeat = stage / (project + "-repeat")
                 execute(["dotnet", "publish", str(csproj), "--no-restore", *properties, "-o", str(repeat), "-bl:" + str(build / (rid + "-" + project + "-repeat-" + uuid.uuid4().hex + ".binlog"))], build / (rid + "-" + project + "-repeat.log"), environment)
                 if sha(binary) != sha(repeat / binary.name):
                     raise ValueError("Non-reproducible executable: " + rid + " " + executable)
-            deps = ROOT / "src" / ("Harness." + project) / "bin/Release/net10.0" / rid / (executable + ".deps.json")
+                if {path.name: sha(path) for path in native_dependencies(destination)} != {path.name: sha(path) for path in native_dependencies(repeat)}:
+                    raise ValueError("Non-reproducible native dependencies: " + rid + " " + executable)
+            graphs = list((native_build / "bin").rglob(executable + ".deps.json"))
+            graphs = [path for path in graphs if rid in path.parent.name]
+            if len(graphs) != 1:
+                raise ValueError("Expected one publish dependency graph: " + rid + " " + executable)
+            deps = graphs[0]
             license_stage = stage / (project + "-licenses")
             entries = inventory(deps, packages, license_stage / "LICENSES")
             binaries[project] = (binary, entries, license_stage)
@@ -131,6 +154,11 @@ def main():
             for project in projects:
                 binary, entries, license_stage = binaries[project]
                 shutil.copyfile(binary, tree / binary.name)
+                for dependency in native_dependencies(binary.parent):
+                    target_dependency = tree / dependency.name
+                    if target_dependency.exists() and sha(target_dependency) != sha(dependency):
+                        raise ValueError("Conflicting native dependency: " + dependency.name)
+                    shutil.copyfile(dependency, target_dependency)
                 shutil.copytree(license_stage / "LICENSES", tree / "LICENSES", dirs_exist_ok=True)
                 for entry in entries:
                     licenses[entry["package"] + "/" + entry["version"]] = entry

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 
 namespace Harness.Mcp.Memory;
 
@@ -146,9 +147,9 @@ internal static class MemoryTools
                 };
                 return proposalOutput;
             case "memory_proposals":
-                return new
+                return new JsonObjectMap
                 {
-                    proposals = (
+                    ["proposals"] = (
                         await session.ListProposalsAsync(
                             args.String("status"),
                             args.Integer("limit"),
@@ -168,7 +169,7 @@ internal static class MemoryTools
                         args.String("note"),
                         cancellationToken
                     );
-                    return new { status = "rejected", proposal = MemoryViews.Proposal(rejected) };
+                    return new JsonObjectMap { ["status"] = "rejected", ["proposal"] = MemoryViews.Proposal(rejected) };
                 }
                 if (!action.Equals("approve", StringComparison.OrdinalIgnoreCase))
                 {
@@ -272,7 +273,7 @@ internal static class MemoryTools
         catch (FormatException)
         {
             throw new ArgumentException(
-                $"valid_until must be RFC 3339 (2026-01-31T12:00:00Z) or a date (2026-01-31), got {JsonSerializer.Serialize(value)}"
+                $"valid_until must be RFC 3339 (2026-01-31T12:00:00Z) or a date (2026-01-31), got {HarnessJson.Serialize(value)}"
             );
         }
     }

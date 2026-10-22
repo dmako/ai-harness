@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Harness.Core.Serialization;
 using ModelContextProtocol.Protocol;
 
 namespace Harness.Mcp.Memory;
@@ -35,13 +36,13 @@ internal static class MemoryArguments
         var missing = required.Where(name => !given.ContainsKey(name)).ToArray();
         if (missing.Length > 0)
         {
-            return Prefix + "required: missing properties: " + JsonSerializer.Serialize(missing) + hint;
+            return Prefix + "required: missing properties: " + HarnessJson.Serialize(missing) + hint;
         }
 
         var extra = given.Keys.Except(properties, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         if (extra.Length > 0)
         {
-            return Prefix + "unexpected additional properties " + JsonSerializer.Serialize(extra) + hint;
+            return Prefix + "unexpected additional properties " + HarnessJson.Serialize(extra) + hint;
         }
 
         foreach (var name in given.Keys.Order(StringComparer.Ordinal))
@@ -106,8 +107,8 @@ internal static class MemoryArguments
         {
             var display = value.ValueKind is JsonValueKind.Null ? "<invalid reflect.Value>" : Display(value);
             var want = allowed.Length is 1
-                ? JsonSerializer.Serialize(allowed[0])
-                : "one of " + JsonSerializer.Serialize(string.Join(", ", allowed));
+                ? HarnessJson.Serialize(allowed[0])
+                : "one of " + HarnessJson.Serialize(string.Join(", ", allowed));
             return $"validating {path}: type: {display} has type \"{actual}\", want {want}";
         }
         if (value.ValueKind is JsonValueKind.Array)
@@ -130,7 +131,7 @@ internal static class MemoryArguments
             var missing = required.Except(fields, StringComparer.Ordinal).ToArray();
             if (missing.Length is not 0)
             {
-                return $"validating {path}: required: missing properties: {JsonSerializer.Serialize(missing)}";
+                return $"validating {path}: required: missing properties: {HarnessJson.Serialize(missing)}";
             }
 
             var properties = schema.GetProperty("properties");
@@ -138,7 +139,7 @@ internal static class MemoryArguments
             var extra = fields.Except(allowedNames, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
             if (extra.Length is not 0)
             {
-                return $"validating {path}: unexpected additional properties {JsonSerializer.Serialize(extra)}";
+                return $"validating {path}: unexpected additional properties {HarnessJson.Serialize(extra)}";
             }
 
             foreach (var name in fields.Order(StringComparer.Ordinal))

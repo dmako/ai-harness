@@ -48,7 +48,7 @@ public sealed class AuxiliaryCliTests
             }
         )
         {
-            help.Output.Should().MatchRegex(@"(?m)^\s*" + name + @"(?:\s|$)", name);
+            help.Output.Should().MatchRegex(@"(?m)^\s*(?:[\w-]+,\s*)*" + name + @"(?:\s|,|$)", name);
         }
         var list = await RunAsync(fixture, "docs");
         list.Code.Should().Be(0);

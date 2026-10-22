@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Core.Instructions;
+using Harness.Core.Serialization;
 using Tomlyn;
 using Tomlyn.Model;
 using Tomlyn.Parsing;
@@ -22,10 +23,13 @@ public static class TomlConfigurationEditor
             throw new InvalidDataException("invalid TOML: " + syntax.Diagnostics);
         }
 
-        return TomlSerializer.Deserialize<TomlTable>(source) ?? new();
+        return TomlSerializer.Deserialize(
+                source,
+                Harness.Infrastructure.Configuration.ConfigurationTomlContext.Default.TomlTable
+            ) ?? new();
     }
 
-    private static JsonObject Json(TomlTable table) => JsonSerializer.SerializeToNode(table)!.AsObject();
+    private static JsonObject Json(TomlTable table) => HarnessJson.SerializeToNode(table)!.AsObject();
 
     private static string Name(KeySyntax? key)
     {
@@ -51,7 +55,7 @@ public static class TomlConfigurationEditor
         if (
             spec is not null
             && entry?["command"]?.GetValue<string>() == spec.Command
-            && JsonNode.DeepEquals(entry["args"], JsonSerializer.SerializeToNode(spec.Args))
+            && JsonNode.DeepEquals(entry["args"], HarnessJson.SerializeToNode(spec.Args))
         )
         {
             return new(source, "unchanged");
@@ -199,7 +203,7 @@ public static class TomlConfigurationEditor
             spec is null
                 ? current is not null
                 : current?["command"]?.GetValue<string>() != spec.Command
-                    || !JsonNode.DeepEquals(current?["args"], JsonSerializer.SerializeToNode(spec.Args))
+                    || !JsonNode.DeepEquals(current?["args"], HarnessJson.SerializeToNode(spec.Args))
         )
         {
             throw new InvalidDataException("harness entry not as intended after edit; nothing written");

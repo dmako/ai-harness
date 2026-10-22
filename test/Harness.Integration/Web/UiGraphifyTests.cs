@@ -114,7 +114,7 @@ public sealed class UiGraphifyTests
             var sessions = document.RootElement.GetProperty("sessions");
             return sessions.GetArrayLength() > 0 ? sessions[0].GetProperty("session_id").GetString()! : "";
         }
-        catch (JsonException)
+        catch (Exception error) when (error is JsonException or IOException)
         {
             return "";
         }

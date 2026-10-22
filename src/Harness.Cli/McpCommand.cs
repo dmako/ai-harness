@@ -12,7 +12,6 @@ using Harness.Mcp.Workspaces;
 using Harness.Providers.Packs;
 using Harness.Providers.Registry;
 using Microsoft.Extensions.Logging;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli;
 
@@ -21,18 +20,14 @@ internal sealed class McpCommand(
     BuildInformation information,
     ILoggerFactory loggerFactory,
     IServiceProvider services
-) : AsyncCommand<ProjectSettings>
+)
 {
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "HarnessMcpServer.RunAsync takes ownership of the session and asynchronously disposes it after stopping all requests."
     )]
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        ProjectSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(ProjectSettings settings, CancellationToken cancellationToken)
     {
         if (!Directory.Exists(settings.Project))
         {

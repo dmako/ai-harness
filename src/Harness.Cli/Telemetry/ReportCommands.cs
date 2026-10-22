@@ -1,57 +1,42 @@
-using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Cli.Memory;
 using Harness.Core.Reports;
+using Harness.Core.Serialization;
 using Harness.Core.Telemetry;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Telemetry;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli.Telemetry;
 
 internal class TelemetrySettings : InspectSettings
 {
-    [CommandOption("--days")]
-    [Description("Window in days")]
-    [DefaultValue(30)]
     public int Days { get; init; } = 30;
 }
 
 internal sealed class ReportSettings : TelemetrySettings
 {
-    [CommandOption("--all")]
-    [Description("Every registered project")]
     public bool All { get; init; }
 }
 
-internal sealed class MetricsCommand(ReportCommandRunner runner) : AsyncCommand<TelemetrySettings>
+internal sealed class MetricsCommand(ReportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TelemetrySettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("metrics", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TelemetrySettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("metrics", settings, cancellationToken);
 }
 
-internal sealed class ContextStatsCommand(ReportCommandRunner runner) : AsyncCommand<TelemetrySettings>
+internal sealed class ContextStatsCommand(ReportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TelemetrySettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("context stats", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TelemetrySettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("context stats", settings, cancellationToken);
 }
 
-internal sealed class ReportCommand(ReportCommandRunner runner) : AsyncCommand<ReportSettings>
+internal sealed class ReportCommand(ReportCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ReportSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("report", settings, cancellationToken);
+    public Task<int> ExecuteAsync(ReportSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("report", settings, cancellationToken);
 }
 
 internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error)
@@ -109,7 +94,9 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         if (settings.Json)
         {
-            await output.WriteLineAsync(JsonSerializer.Serialize(new { projects = reports }, TelemetryJson.Options));
+            await output.WriteLineAsync(
+                HarnessJson.Serialize(new JsonObjectMap { ["projects"] = reports }, TelemetryJson.Options)
+            );
         }
         else
         {
@@ -177,7 +164,7 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
 
         if (settings.Json)
         {
-            await output.WriteLineAsync(JsonSerializer.Serialize(result, TelemetryJson.Options));
+            await output.WriteLineAsync(HarnessJson.Serialize(result, TelemetryJson.Options));
         }
         else if (result is MetricsReport metrics)
         {

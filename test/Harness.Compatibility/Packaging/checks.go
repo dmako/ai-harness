@@ -4,6 +4,7 @@ package main
 import (
     "bufio"
     "bytes"
+    "encoding/json"
     "fmt"
     "io"
     "net/http"
@@ -57,6 +58,16 @@ func releaseChecks(harness, bin, home, repo string, env []string, archive string
     run("five embedded provider packs", "init", "--dry-run", "--project", repo)
     must(os.Remove(configuration))
     run("warm version", "version")
+    created := run("native task create", "tasks", "add", "--title", "AOT lifecycle", "--accept", "first", "--accept", "second", "--json")
+    var task struct { Task struct { ID string `json:"id"` } `json:"task"` }
+    must(json.Unmarshal([]byte(created), &task))
+    check(task.Task.ID != "", "native task JSON identity", created)
+    run("native task claim", "task", "claim", task.Task.ID, "--json")
+    run("native task complete", "tasks", "complete", task.Task.ID, "--summary", "native-complete", "--acc", "1=pass:native", "--acc", "2=pass:native", "--check", "harness version=pass", "--json")
+    taskResults, taskErr := mcpSession(harness, env, repo, []call{{"task_get", map[string]any{"id": task.Task.ID}}})
+    check(taskErr == nil && len(taskResults) == 1 && strings.Contains(taskResults[0], "native-complete"), "native MCP task read after CLI completion", taskErr, taskResults)
+    run("native YAML task export", "tasks", "export", filepath.Join(home, "native-backlog.yaml"))
+    run("native YAML task reimport", "tasks", "import", filepath.Join(home, "native-backlog.yaml"), "--json")
     check(strings.Contains(run("provider sessions help", "providers", "sessions", "--help"), "list"), "provider CLI registered")
     // The sibling protocol adapter must start with no external semantic backend.
     results, err := mcpSession(filepath.Join(bin, "harness-graphify"+exeSuffix()), env, repo,
@@ -68,8 +79,14 @@ func releaseChecks(harness, bin, home, repo string, env []string, archive string
         if !entry.IsDir() && strings.Contains(entry.Name(), "e_sqlite3") { sqlite++ }
         return nil
     }))
-    check(sqlite > 0, "native SQLite extracted from bundle", sqlite)
-    if runtime.GOOS != "windows" {
+    nativeSQLite := 0
+    for _, name := range []string{"e_sqlite3.dll", "libe_sqlite3.so", "libe_sqlite3.dylib"} {
+        if info, err := os.Stat(filepath.Join(bin, name)); err == nil && info.Size() > 0 { nativeSQLite++ }
+    }
+    check(sqlite > 0 || nativeSQLite == 1, "native SQLite available from bundle or AOT sidecar", sqlite, nativeSQLite)
+    if nativeSQLite == 1 {
+        check(sqlite == 0, "Native AOT does not extract a managed bundle", sqlite)
+    } else if runtime.GOOS != "windows" {
         info, err := os.Stat(filepath.Join(home, ".bundle"))
         check(err == nil && info.Mode().Perm() == 0700, "native extraction private owner directory", err)
     } else { fmt.Println("NOTE Windows bundle ACL inherits the isolated current-user temporary directory; ACL audited by host runner") }

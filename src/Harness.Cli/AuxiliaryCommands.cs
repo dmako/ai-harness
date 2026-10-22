@@ -3,35 +3,29 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Cli.Memory;
 using Harness.Core.Graphify;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Graphify;
 using Harness.Infrastructure.Projects;
 using Harness.Web;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli;
 
-internal sealed class DocsSettings : CommandSettings
+internal sealed class DocsSettings
 {
-    [CommandArgument(0, "[section]")]
     public string Section { get; init; } = "";
 }
 
-internal sealed class DocsCommand(TextWriter output, CliErrorOutput error) : AsyncCommand<DocsSettings>
+internal sealed class DocsCommand(TextWriter output, CliErrorOutput error)
 {
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        DocsSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(DocsSettings settings, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (settings.Section.Length > 0)
         {
             if (UiAssets.Find(settings.Section) is not { } section)
             {
                 await error.Writer.WriteLineAsync(
-                    "harness docs: no section "
-                        + JsonSerializer.Serialize(settings.Section)
-                        + " (harness docs lists them)"
+                    "harness docs: no section " + HarnessJson.Serialize(settings.Section) + " (harness docs lists them)"
                 );
                 return 2;
             }
@@ -51,52 +45,38 @@ internal sealed class DocsCommand(TextWriter output, CliErrorOutput error) : Asy
     }
 }
 
-internal sealed class SessionsListSettings : CommandSettings
+internal sealed class SessionsListSettings
 {
-    [CommandOption("--json")]
     public bool Json { get; init; }
 }
 
 internal sealed class SessionStopSettings : ProjectSettings
 {
-    [CommandArgument(0, "[id]")]
     public string Id { get; init; } = "";
 }
 
-internal sealed class SessionsListCommand(SessionCommandRunner runner) : AsyncCommand<SessionsListSettings>
+internal sealed class SessionsListCommand(SessionCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        SessionsListSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("list", ".", "", settings.Json, cancellationToken);
+    public Task<int> ExecuteAsync(SessionsListSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("list", ".", "", settings.Json, cancellationToken);
 }
 
-internal sealed class SessionStartCommand(SessionCommandRunner runner) : AsyncCommand<ProjectSettings>
+internal sealed class SessionStartCommand(SessionCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ProjectSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("start", settings.Project, "", false, cancellationToken);
+    public Task<int> ExecuteAsync(ProjectSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("start", settings.Project, "", false, cancellationToken);
 }
 
-internal sealed class SessionRestartCommand(SessionCommandRunner runner) : AsyncCommand<ProjectSettings>
+internal sealed class SessionRestartCommand(SessionCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        ProjectSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("restart", settings.Project, "", false, cancellationToken);
+    public Task<int> ExecuteAsync(ProjectSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("restart", settings.Project, "", false, cancellationToken);
 }
 
-internal sealed class SessionStopCommand(SessionCommandRunner runner) : AsyncCommand<SessionStopSettings>
+internal sealed class SessionStopCommand(SessionCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        SessionStopSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("stop", settings.Project, settings.Id, false, cancellationToken);
+    public Task<int> ExecuteAsync(SessionStopSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("stop", settings.Project, settings.Id, false, cancellationToken);
 }
 
 internal sealed class SessionCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error)

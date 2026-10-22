@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Harness.Core.Graphify;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Storage;
@@ -155,7 +156,7 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         try
         {
             list =
-                JsonSerializer.Deserialize<SessionList>(bytes, JsonOptions)
+                HarnessJson.Deserialize<SessionList>(bytes, JsonOptions)
                 ?? throw new JsonException("null session list");
         }
         catch (JsonException error)
@@ -575,9 +576,9 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
         return result.ToArray();
     }
 
-    private sealed record SessionList(IReadOnlyList<SessionRow>? Sessions);
+    internal sealed record SessionList(IReadOnlyList<SessionRow>? Sessions);
 
-    private sealed record SessionRow(
+    internal sealed record SessionRow(
         string SessionId = "",
         int ProcessId = 0,
         string Reachability = "",

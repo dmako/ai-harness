@@ -6,6 +6,7 @@ using Harness.Core.Memory;
 using Harness.Core.Projects;
 using Harness.Core.Providers;
 using Harness.Core.Retrieval;
+using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Mcp.Architecture;
 using Harness.Mcp.Context;
@@ -166,7 +167,7 @@ public static class HarnessMcpServer
         var tool =
             Tools.FirstOrDefault(tool => tool.Name == parameters.Name)
             ?? throw new McpProtocolException(
-                $"unknown tool {JsonSerializer.Serialize(parameters.Name)}",
+                $"unknown tool {HarnessJson.Serialize(parameters.Name)}",
                 McpErrorCode.InvalidParams
             );
         if (ValidateArguments(tool, parameters.Arguments) is { } error)
@@ -370,9 +371,9 @@ public static class HarnessMcpServer
             };
         }
         // Go's result adapter writes canonical key order in both representations.
-        var element = JsonSerializer.SerializeToElement(value, JsonOptions);
+        var element = HarnessJson.SerializeToElement(value, JsonOptions);
         var ordered = Order(element);
-        var json = JsonSerializer.SerializeToElement(ordered, JsonOptions);
+        var json = HarnessJson.SerializeToElement(ordered, JsonOptions);
         return new CallToolResult
         {
             Content = [new TextContentBlock { Text = json.GetRawText() }],
@@ -421,7 +422,7 @@ public static class HarnessMcpServer
             .Select(name =>
             {
                 using var stream = assembly.GetManifestResourceStream(name)!;
-                return JsonSerializer.Deserialize<Tool>(stream, McpJsonUtilities.DefaultOptions)!;
+                return HarnessJson.Deserialize<Tool>(stream, McpJsonUtilities.DefaultOptions)!;
             })
             .ToArray();
     }

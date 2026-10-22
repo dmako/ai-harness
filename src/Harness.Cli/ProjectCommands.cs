@@ -1,43 +1,32 @@
-using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Projects;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli;
 
-internal class ProjectSettings : CommandSettings
+internal class ProjectSettings
 {
-    [CommandOption("--project")]
-    [Description("Directory inside the repository")]
     public string Project { get; init; } = ".";
 }
 
 internal sealed class InitSettings : ProjectSettings
 {
-    [CommandOption("--dry-run")]
-    [Description("Show the plan without changing anything")]
     public bool DryRun { get; init; }
 }
 
 internal class InspectSettings : ProjectSettings
 {
-    [CommandOption("--json")]
-    [Description("Machine-readable output")]
     public bool Json { get; init; }
 }
 
 internal sealed class StatusSettings : InspectSettings
 {
-    [CommandOption("--syncs")]
-    [Description("Number of sync runs to include (available once sync is implemented)")]
     public int Syncs { get; init; }
 }
 
 internal sealed class DoctorSettings : InspectSettings
 {
-    [CommandOption("--all")]
-    [Description("Check every project in the machine registry")]
     public bool All { get; init; }
 }
 
@@ -53,7 +42,7 @@ internal static class ProjectOutput
 
     internal static async Task WriteStatusAsync(TextWriter output, ProjectInspection inspection)
     {
-        var node = JsonSerializer.SerializeToNode(inspection.Status(), JsonOptions)!.AsObject();
+        var node = HarnessJson.SerializeToNode(inspection.Status(), JsonOptions)!.AsObject();
         foreach (
             var required in new[] { "project", "git", "worktrees", "clients" }.Where(required =>
                 !node.ContainsKey(required)
@@ -67,24 +56,20 @@ internal static class ProjectOutput
     }
 
     internal static object DoctorResult(IReadOnlyList<HealthCheck> checks, string? id = null, string? root = null) =>
-        new
+        new JsonObjectMap
         {
-            id,
-            root,
-            healthy = checks.All(check => check.Level != "fail"),
-            failures = checks.Count(check => check.Level == "fail"),
-            warnings = checks.Count(check => check.Level == "warn"),
-            checks,
+            ["id"] = id,
+            ["root"] = root,
+            ["healthy"] = checks.All(check => check.Level != "fail"),
+            ["failures"] = checks.Count(check => check.Level == "fail"),
+            ["warnings"] = checks.Count(check => check.Level == "warn"),
+            ["checks"] = checks,
         };
 }
 
-internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output) : AsyncCommand<InitSettings>
+internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
 {
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        InitSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(InitSettings settings, CancellationToken cancellationToken)
     {
         var result = await lifecycle.InitAsync(settings.Project, settings.DryRun, cancellationToken);
         var location = result.Location;
@@ -132,13 +117,9 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
     }
 }
 
-internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter output) : AsyncCommand<StatusSettings>
+internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter output)
 {
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        StatusSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(StatusSettings settings, CancellationToken cancellationToken)
     {
         var inspection = await lifecycle.InspectAsync(settings.Project, cancellationToken);
         if (settings.Json)
@@ -173,13 +154,8 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
 }
 
 internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation information, TextWriter output)
-    : AsyncCommand<DoctorSettings>
 {
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        DoctorSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(DoctorSettings settings, CancellationToken cancellationToken)
     {
         List<object> results = [];
         var failed = false;
@@ -213,7 +189,7 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
             if (settings.Json)
             {
                 await output.WriteLineAsync(
-                    JsonSerializer.Serialize(new { projects = results }, ProjectOutput.JsonOptions)
+                    HarnessJson.Serialize(new JsonObjectMap { ["projects"] = results }, ProjectOutput.JsonOptions)
                 );
             }
         }
@@ -226,7 +202,7 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
             if (settings.Json)
             {
                 await output.WriteLineAsync(
-                    JsonSerializer.Serialize(ProjectOutput.DoctorResult(checks), ProjectOutput.JsonOptions)
+                    HarnessJson.Serialize(ProjectOutput.DoctorResult(checks), ProjectOutput.JsonOptions)
                 );
             }
             else

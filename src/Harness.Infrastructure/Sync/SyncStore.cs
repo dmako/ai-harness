@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Harness.Core.Serialization;
 using Harness.Core.Sync;
 using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -48,7 +49,7 @@ public static class SyncStore
         IReadOnlyList<string> pending;
         try
         {
-            pending = JsonSerializer.Deserialize<string[]>(reader.GetString(6)) ?? [];
+            pending = HarnessJson.Deserialize<string[]>(reader.GetString(6)) ?? [];
         }
         catch (JsonException)
         {
@@ -87,7 +88,7 @@ public static class SyncStore
                     ("$dirty", state.Dirty),
                     ("$count", state.DirtyPaths),
                     ("$at", state.SyncedAt),
-                    ("$pending", JsonSerializer.Serialize(state.Pending)),
+                    ("$pending", HarnessJson.Serialize(state.Pending)),
                     ("$stale", state.ProvidersStale)
                 );
                 return command.ExecuteNonQuery();
@@ -140,7 +141,7 @@ public static class SyncStore
                     reader.GetInt32(7),
                     reader.GetInt32(8),
                     reader.GetInt32(9),
-                    JsonSerializer.Deserialize<ProviderOutcome[]>(reader.GetString(10), JsonOptions) ?? [],
+                    HarnessJson.Deserialize<ProviderOutcome[]>(reader.GetString(10), JsonOptions) ?? [],
                     reader.GetString(11),
                     Text(reader, 12)
                 )
@@ -200,7 +201,7 @@ public static class SyncStore
             ("$removed", run.Files.Removed.Count),
             ("$unchanged", run.Files.Unchanged),
             ("$hashed", run.Files.Hashed),
-            ("$providers", JsonSerializer.Serialize(providers)),
+            ("$providers", HarnessJson.Serialize(providers)),
             ("$status", status),
             ("$error", error is null ? DBNull.Value : Core.Memory.CredentialRedactor.Redact(error.Message)),
             ("$id", run.RunId)

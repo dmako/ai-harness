@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Core.Findings;
+using Harness.Core.Serialization;
 
 namespace Harness.Mcp.Architecture;
 
@@ -29,7 +30,9 @@ public static class FindingsTools
                 Text("scope"),
                 Text("title"),
                 Text("reason"),
-                arguments?.TryGetValue("evidence", out var evidence) is true ? evidence.Deserialize<string[]>() : null
+                arguments?.TryGetValue("evidence", out var evidence) is true
+                    ? HarnessJson.Deserialize<string[]>(evidence)
+                    : null
             );
             var result = await session.ProposeFindingAsync(request, caller, token).ConfigureAwait(false);
             return new Dictionary<string, object?>
@@ -66,13 +69,13 @@ public static class FindingsTools
 
             var summary = selected
                 .GroupBy(f => f.Kind, StringComparer.Ordinal)
-                .Select(g => new
+                .Select(g => new JsonObjectMap
                 {
-                    kind = g.Key,
-                    count = g.Count(),
-                    worst = g.OrderBy(f => Rank(f.Level)).First().Level,
+                    ["kind"] = g.Key,
+                    ["count"] = g.Count(),
+                    ["worst"] = g.OrderBy(f => Rank(f.Level)).First().Level,
                 })
-                .OrderBy(g => Rank(g.worst))
+                .OrderBy(g => Rank((string)g["worst"]!))
                 .ToArray();
             Dictionary<string, object?> output = new() { ["where"] = group.Where, ["summary"] = summary };
             if (group.Snapshot is not null)
@@ -131,13 +134,13 @@ public static class FindingsTools
                         }
                         room -= size;
                         code.Add(
-                            new
+                            new JsonObjectMap
                             {
-                                key = f.Key,
-                                at,
-                                start = snippet.Start,
-                                code = body,
-                                focus = snippet.Focus,
+                                ["key"] = f.Key,
+                                ["at"] = at,
+                                ["start"] = snippet.Start,
+                                ["code"] = body,
+                                ["focus"] = snippet.Focus,
                             }
                         );
                     }
@@ -245,7 +248,7 @@ public static class FindingsTools
     // Go's omitempty omits empty optional strings as well as null pointers.
     private static JsonNode Clean<T>(T value)
     {
-        var node = JsonSerializer.SerializeToNode(value)!;
+        var node = HarnessJson.SerializeToNode(value)!;
         void Visit(JsonNode? item)
         {
             if (item is JsonObject obj)

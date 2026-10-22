@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using Harness.Core.Memory;
+using Harness.Core.Serialization;
 using Harness.Core.Web;
 using Harness.Infrastructure.Clients;
 using Harness.Infrastructure.Memory;
@@ -35,17 +36,17 @@ internal sealed partial class UiReadService
         { /* Only public opt-in metadata is shown. */
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                build = BuildInformation.Current(),
-                paths = new
+                ["build"] = BuildInformation.Current(),
+                ["paths"] = new JsonObjectMap
                 {
-                    global = GlobalDirectory,
-                    registry = Path.Combine(GlobalDirectory, "projects.json"),
-                    workspaces = Path.Combine(GlobalDirectory, "workspaces.json"),
-                    knowledge = Path.Combine(GlobalDirectory, "knowledge"),
+                    ["global"] = GlobalDirectory,
+                    ["registry"] = Path.Combine(GlobalDirectory, "projects.json"),
+                    ["workspaces"] = Path.Combine(GlobalDirectory, "workspaces.json"),
+                    ["knowledge"] = Path.Combine(GlobalDirectory, "knowledge"),
                 },
-                telemetry,
+                ["telemetry"] = telemetry,
             }
         );
     }
@@ -96,7 +97,7 @@ internal sealed partial class UiReadService
                 return view;
             })
             .ToArray();
-        return UiJson.Node(new { workspaces = result });
+        return UiJson.Node(new JsonObjectMap { ["workspaces"] = result });
     }
 
     private JsonNode? Discover(UiReadRequest request)
@@ -107,16 +108,16 @@ internal sealed partial class UiReadService
             throw new UiRequestException(400, "folder must be an absolute path");
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                folder = Path.GetFullPath(folder),
-                projects = Workspaces
+                ["folder"] = Path.GetFullPath(folder),
+                ["projects"] = Workspaces
                     .Discover(folder)
-                    .Select(p => new
+                    .Select(p => new JsonObjectMap
                     {
-                        project_id = UiProjectCatalog.Text(p, "id"),
-                        project = UiProjectCatalog.Display(p),
-                        root = UiProjectCatalog.Text(p, "root"),
+                        ["project_id"] = UiProjectCatalog.Text(p, "id"),
+                        ["project"] = UiProjectCatalog.Display(p),
+                        ["root"] = UiProjectCatalog.Text(p, "root"),
                     }),
             }
         );
@@ -154,10 +155,10 @@ internal sealed partial class UiReadService
             }
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                days,
-                items = items
+                ["days"] = days,
+                ["items"] = items
                     .OrderByDescending(i => MemoryTimestamp.Parse(UiProjectCatalog.Text(i, "at")))
                     .Take(limit)
                     .ToArray(),
@@ -229,7 +230,7 @@ internal sealed partial class UiReadService
                 return view;
             })
             .ToArray();
-        return UiJson.Node(new { level = scope.ToString(), memories = rows });
+        return UiJson.Node(new JsonObjectMap { ["level"] = scope.ToString(), ["memories"] = rows });
     }
 
     [SuppressMessage(
@@ -380,10 +381,10 @@ internal sealed partial class UiReadService
             }
         }
         return UiJson.Node(
-            new
+            new JsonObjectMap
             {
-                query,
-                hits = hits.OrderBy(h =>
+                ["query"] = query,
+                ["hits"] = hits.OrderBy(h =>
                         UiProjectCatalog.Text(h, "kind") switch
                         {
                             "project" => 0,
@@ -394,7 +395,7 @@ internal sealed partial class UiReadService
                         }
                     )
                     .ToArray(),
-                per_kind = 20,
+                ["per_kind"] = 20,
             }
         );
     }

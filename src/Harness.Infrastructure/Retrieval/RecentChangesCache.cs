@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Harness.Core.Retrieval;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Git;
 
 namespace Harness.Infrastructure.Retrieval;
@@ -29,14 +30,14 @@ internal sealed class RecentChangesCache : IDisposable
         var metadata = new[] { "shallow", "info/grafts", "config", "packed-refs", "refs/replace" }
             .Select(path => File.GetLastWriteTimeUtc(Path.Combine(repository.CommonDir, path)).Ticks)
             .ToArray();
-        var key = JsonSerializer.Serialize(
-            new
+        var key = HarnessJson.Serialize(
+            new JsonObjectMap
             {
-                repository.Root,
-                head.Commit,
-                paths,
-                limit,
-                metadata,
+                ["Root"] = repository.Root,
+                ["Commit"] = head.Commit,
+                ["paths"] = paths,
+                ["limit"] = limit,
+                ["metadata"] = metadata,
             }
         );
         await _gate.WaitAsync(token).ConfigureAwait(false);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Harness.Core.Architecture;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 
 namespace Harness.Mcp.Architecture;
 
@@ -18,7 +19,7 @@ public sealed class CouplingTools(IProviderRegistry? providers, IChangeCouplingS
 
         var request = arguments is null
             ? new ChangeCouplingRequest()
-            : JsonSerializer.Deserialize<ChangeCouplingRequest>(JsonSerializer.Serialize(arguments)) ?? new();
+            : HarnessJson.Deserialize<ChangeCouplingRequest>(HarnessJson.Serialize(arguments)) ?? new();
         if (providers is not null)
         {
             await providers.DiscoverAsync(token).ConfigureAwait(false);

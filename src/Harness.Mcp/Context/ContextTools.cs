@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Harness.Core.Providers;
 using Harness.Core.Retrieval;
+using Harness.Core.Serialization;
 using Harness.Mcp.Workspaces;
 
 namespace Harness.Mcp.Context;
@@ -50,7 +51,7 @@ public sealed class ContextTools(
             arguments?.TryGetValue("debug", out var debug) is true && debug.GetBoolean()
         );
         var bytes = ContextRenderer.BudgetBytes(request);
-        if (ContextJson.Size(new { task }) + 200 > bytes)
+        if (ContextJson.Size(new JsonObjectMap { ["task"] = task }) + 200 > bytes)
         {
             throw new ArgumentException(
                 "task metadata exceeds the context budget; raise the budget or shorten the task"

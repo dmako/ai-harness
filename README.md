@@ -14,8 +14,10 @@ Code and Codex, with an embedded web UI.
 
 Intel macOS (`osx-x64`) is no longer supported.
 
-Extract the main archive and put `harness` and `harness-graphify` on your PATH.
-These are self-contained .NET 10 executables: no preinstalled .NET, Node, or
+Extract the main archive into one directory and put that directory on your PATH.
+Keep the included SQLite native library beside `harness` and `harness-graphify`
+(`e_sqlite3.dll`, `libe_sqlite3.so`, or `libe_sqlite3.dylib`). These are trimmed
+Native AOT .NET 10 executables: no preinstalled .NET, Node, or
 Python runtime is required for the core. Git is required for sync/history.
 Optional provider backends have their own prerequisites. The separate
 developer-tools archive contains `harness-collect` and `harness-share`.
@@ -32,9 +34,9 @@ The UI listens on `127.0.0.1:17477` by default.
 
 ## Platform prerequisites
 
-Keep the operating system updated before running the release. Native extraction
-and functionality have been manually verified on Windows, Linux, and macOS.
-Windows worked without additional steps.
+Keep the operating system updated before running the release. The earlier
+untrimmed single-file release was manually verified on Windows, Linux, and macOS.
+The Native AOT build has separate qualification evidence in the release guide.
 
 ### Linux
 
@@ -67,7 +69,7 @@ For trusted command-line downloads, you can instead remove the quarantine
 attribute from the specific extracted binaries:
 
 ```shell
-xattr -d com.apple.quarantine ./harness ./harness-graphify
+xattr -d com.apple.quarantine ./harness ./harness-graphify ./libe_sqlite3.dylib
 ```
 
 Apply the same per-file step to `harness-collect` or `harness-share` if you use
@@ -75,6 +77,6 @@ the optional developer tools. Keep Gatekeeper enabled for the rest of the system
 
 ## Documentation
 
-- [Release packaging, verification, and native extraction](doc/port/releases.md)
+- [Release packaging, verification, and native dependencies](doc/port/releases.md)
 - [C# formatting and development conventions](doc/csharp-formatting.md)
 - [Port compatibility policy](doc/port/compatibility-policy.md)

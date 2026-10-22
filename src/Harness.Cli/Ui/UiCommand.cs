@@ -4,33 +4,13 @@ using Harness.Cli.Memory;
 using Harness.Infrastructure.Projects;
 using Harness.Web;
 using Microsoft.Extensions.Hosting;
-using Spectre.Console;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli.Ui;
 
-internal sealed class UiSettings : CommandSettings
+internal sealed class UiSettings
 {
-    [CommandOption("--addr <ADDRESS>")]
-    [Description("Loopback listen address (default 127.0.0.1:17477)")]
     public string Address { get; init; } = UiHost.DefaultAddress;
-
-    [CommandOption("--no-open")]
-    [Description("Do not open the browser")]
     public bool NoOpen { get; init; }
-
-    public override ValidationResult Validate()
-    {
-        try
-        {
-            UiHost.ParseAddress(Address);
-            return ValidationResult.Success();
-        }
-        catch (ArgumentException exception)
-        {
-            return ValidationResult.Error(exception.Message);
-        }
-    }
 }
 
 internal sealed class UiCommand(
@@ -39,13 +19,9 @@ internal sealed class UiCommand(
     UiSessions sessions,
     TextWriter output,
     CliErrorOutput error
-) : AsyncCommand<UiSettings>
+)
 {
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        UiSettings settings,
-        CancellationToken cancellationToken
-    )
+    public async Task<int> ExecuteAsync(UiSettings settings, CancellationToken cancellationToken)
     {
         await using var app = UiHost.Create(
             settings.Address,

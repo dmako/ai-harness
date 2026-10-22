@@ -70,15 +70,17 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
         await output.WriteLineAsync("Git sync hooks (" + hooks.DirectoryPath + "):");
         var changes = verb is "status"
             ? hooks.Status()
-            : [.. GitHooks
-                .Names.Select(name =>
+            :
+            [
+                .. GitHooks.Names.Select(name =>
                     hooks.Set(
                         name,
                         verb is "install",
                         settings.Command.Length is 0 ? "harness" : settings.Command,
                         settings.DryRun
                     )
-                )];
+                ),
+            ];
         foreach (var change in changes)
         {
             await EditOutput.PrintAsync(output, "  " + change.Path, GitWords, change, settings.DryRun);

@@ -1,4 +1,5 @@
 using Harness.Core.Projects;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Storage;
 
@@ -20,50 +21,51 @@ public sealed record ProjectInspection(
     public string? DatabaseError { get; init; }
 
     public object Status() =>
-        new
+        new JsonObjectMap
         {
-            project_root = Location.Root,
-            state_root = Location.StateRoot,
-            project = ProjectStatus(),
-            git = Head is null
+            ["project_root"] = Location.Root,
+            ["state_root"] = Location.StateRoot,
+            ["project"] = ProjectStatus(),
+            ["git"] = Head is null
                 ? null
                 : (object)
-                    new
+                    new JsonObjectMap
                     {
-                        branch = Head.Branch,
-                        commit = Head.Commit,
-                        detached = Head.Detached,
-                        unborn = Head.Unborn,
-                        linked_worktree = Location.Repository!.Linked,
+                        ["branch"] = Head.Branch,
+                        ["commit"] = Head.Commit,
+                        ["detached"] = Head.Detached,
+                        ["unborn"] = Head.Unborn,
+                        ["linked_worktree"] = Location.Repository!.Linked,
                     },
-            git_error = GitError,
-            worktrees = Worktrees.Count == 0
-                ? null
-                : Worktrees
-                    .Select(tree => new
-                    {
-                        id = tree.Id,
-                        path = tree.Path,
-                        branch = tree.Branch,
-                        linked = tree.Linked,
-                    })
-                    .ToArray(),
-            database = new
+            ["git_error"] = GitError,
+            ["worktrees"] =
+                Worktrees.Count == 0
+                    ? null
+                    : Worktrees
+                        .Select(tree => new JsonObjectMap
+                        {
+                            ["id"] = tree.Id,
+                            ["path"] = tree.Path,
+                            ["branch"] = tree.Branch,
+                            ["linked"] = tree.Linked,
+                        })
+                        .ToArray(),
+            ["database"] = new JsonObjectMap
             {
-                path = Location.DatabasePath,
-                exists = Location.Initialized,
-                schema_version = SchemaVersion,
-                schema_latest = SchemaLatest,
-                error = DatabaseError,
+                ["path"] = Location.DatabasePath,
+                ["exists"] = Location.Initialized,
+                ["schema_version"] = SchemaVersion,
+                ["schema_latest"] = SchemaLatest,
+                ["error"] = DatabaseError,
             },
-            config = new
+            ["config"] = new JsonObjectMap
             {
-                global = EmptyToNull(Location.Configuration.Sources.Global),
-                project = EmptyToNull(Location.Configuration.Sources.Project),
-                error = ConfigurationError,
+                ["global"] = EmptyToNull(Location.Configuration.Sources.Global),
+                ["project"] = EmptyToNull(Location.Configuration.Sources.Project),
+                ["error"] = ConfigurationError,
             },
-            clients = (object?)null,
-            providers = Location
+            ["clients"] = (object?)null,
+            ["providers"] = Location
                 .Configuration.Value.Providers.Where(pair => pair.Value.IsEnabled())
                 .Select(pair => pair.Key)
                 .Order(StringComparer.Ordinal)
@@ -112,8 +114,10 @@ public sealed record ProjectInspection(
 
     private static string? EmptyToNull(string value) => value.Length == 0 ? null : value;
 
-    private object? ProjectStatus() =>
-        Project is null ? null : new { id = Project.Id, copied_from = EmptyToNull(Project.CopiedFrom) };
+    private JsonObjectMap? ProjectStatus() =>
+        Project is null
+            ? null
+            : new JsonObjectMap { ["id"] = Project.Id, ["copied_from"] = EmptyToNull(Project.CopiedFrom) };
 
     private string DatabaseLevel() =>
         (DatabaseError, Location.Initialized && SchemaVersion < HarnessDatabase.LatestSchemaVersion) switch

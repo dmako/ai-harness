@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Harness.Core.Architecture;
 using Harness.Core.Findings;
+using Harness.Core.Serialization;
 using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
@@ -146,7 +147,7 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
             _ => "",
         };
 
-    private sealed record Row(ArchitectureFinding Finding, string Digest, string Status, long Snapshot, string First);
+    internal sealed record Row(ArchitectureFinding Finding, string Digest, string Status, long Snapshot, string First);
 
     private static Dictionary<string, Row> Load(SqliteConnection c, SqliteTransaction? t)
     {
@@ -156,7 +157,7 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
         while (reader.Read())
         {
             var f =
-                JsonSerializer.Deserialize<ArchitectureFinding>(reader.GetString(1))
+                HarnessJson.Deserialize<ArchitectureFinding>(reader.GetString(1))
                 ?? throw new InvalidDataException("invalid finding " + reader.GetString(0));
             rows.Add(
                 reader.GetString(0),
@@ -231,7 +232,7 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
                             c,
                             t,
                             "UPDATE findings SET finding=$data,last_seen=$now WHERE key=$key",
-                            ("$data", JsonSerializer.Serialize(f, Json)),
+                            ("$data", HarnessJson.Serialize(f, Json)),
                             ("$now", now),
                             ("$key", f.Key)
                         );
@@ -277,7 +278,7 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
                         ("$level", f.Level),
                         ("$title", f.Title),
                         ("$measure", f.Measure),
-                        ("$data", JsonSerializer.Serialize(f, Json)),
+                        ("$data", HarnessJson.Serialize(f, Json)),
                         ("$hash", Hash(f)),
                         ("$status", status),
                         ("$id", id),

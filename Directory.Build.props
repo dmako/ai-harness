@@ -7,6 +7,10 @@
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(MSBuildThisFileDirectory)src'))">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
   <PropertyGroup Label="Documentation and localization resources">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1573;CS1591</NoWarn><!-- Remove warning for undocumented members -->
@@ -32,6 +36,7 @@
   <PropertyGroup Label="Build settings">
     <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
     <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
     <!-- Disabling static graph restore due to a bug related to NuGetAuditSuppress. See: https://github.com/NuGet/Home/issues/14300 -->
     <RestoreUseStaticGraphEvaluation>false</RestoreUseStaticGraphEvaluation>
     <RestoreSerializeGlobalProperties>true</RestoreSerializeGlobalProperties>

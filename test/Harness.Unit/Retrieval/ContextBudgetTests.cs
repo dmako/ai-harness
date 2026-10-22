@@ -208,9 +208,11 @@ public sealed class ContextBudgetTests
         ContextRenderer.BudgetBytes(new("x", 9000, 500)).Should().Be(2000);
         ContextRenderer.BudgetBytes(new("x", 120)).Should().Be(1000);
         ContextBudget.FromTokens(1000).Bytes.Should().Be(4000);
-        var text = ContextJson.Serialize(new { text = "é😀 <>&\u2028\u2029\"\\\n" });
+        var text = ContextJson.Serialize(
+            new Harness.Core.Serialization.JsonObjectMap { ["text"] = "é😀 <>&\u2028\u2029\"\\\n" }
+        );
         text.Should().Contain("é😀").And.Contain("\\u003c\\u003e\\u0026\\u2028\\u2029").And.NotContain("\\uD83D");
-        ContextJson.Size(new { text = "😀" }).Should().Be(15);
+        ContextJson.Size(new Harness.Core.Serialization.JsonObjectMap { ["text"] = "😀" }).Should().Be(15);
     }
 
     [Fact]

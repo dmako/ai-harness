@@ -1,98 +1,67 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Harness.Core.Tasks;
-using Spectre.Console.Cli;
 
 namespace Harness.Cli.Tasks;
 
 internal sealed class TaskClaimSettings : TaskIdSettings
 {
-    [CommandOption("--lease")]
     public string Lease { get; init; } = "2h0m0s";
 }
 
 internal sealed class TaskCompleteSettings : TaskIdSettings
 {
-    [CommandOption("--summary")]
     public string Summary { get; init; } = "";
-
-    [CommandOption("--commit")]
     public string Commit { get; init; } = "";
-
-    [CommandOption("--acc")]
     public string[] Acceptance { get; init; } = [];
-
-    [CommandOption("--acc-all")]
     public string All { get; init; } = "";
-
-    [CommandOption("--check")]
     public string[] Checks { get; init; } = [];
 }
 
 internal sealed class TaskProposalListSettings : InspectSettings
 {
-    [CommandOption("--status")]
     public string Status { get; init; } = "pending";
 }
 
 internal sealed class TaskApproveSettings : TaskIdSettings
 {
-    [CommandOption("--prefix")]
     public string Prefix { get; init; } = "";
 }
 
-internal sealed class TaskClaimCommand(TaskCommandRunner runner) : AsyncCommand<TaskClaimSettings>
+internal sealed class TaskClaimCommand(TaskCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TaskClaimSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("claim", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TaskClaimSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("claim", settings, cancellationToken);
 }
 
-internal sealed class TaskReleaseCommand(TaskCommandRunner runner) : AsyncCommand<TaskReasonSettings>
+internal sealed class TaskReleaseCommand(TaskCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TaskReasonSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("release", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TaskReasonSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("release", settings, cancellationToken);
 }
 
-internal sealed class TaskCompleteCommand(TaskCommandRunner runner) : AsyncCommand<TaskCompleteSettings>
+internal sealed class TaskCompleteCommand(TaskCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TaskCompleteSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("complete", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TaskCompleteSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("complete", settings, cancellationToken);
 }
 
-internal sealed class TaskProposalsCommand(TaskCommandRunner runner) : AsyncCommand<TaskProposalListSettings>
+internal sealed class TaskProposalsCommand(TaskCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TaskProposalListSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("proposals", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TaskProposalListSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("proposals", settings, cancellationToken);
 }
 
-internal sealed class TaskApproveCommand(TaskCommandRunner runner) : AsyncCommand<TaskApproveSettings>
+internal sealed class TaskApproveCommand(TaskCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TaskApproveSettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("approve", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TaskApproveSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("approve", settings, cancellationToken);
 }
 
-internal sealed class TaskRejectCommand(TaskCommandRunner runner) : AsyncCommand<TaskReadySettings>
+internal sealed class TaskRejectCommand(TaskCommandRunner runner)
 {
-    public override Task<int> ExecuteAsync(
-        CommandContext context,
-        TaskReadySettings settings,
-        CancellationToken cancellationToken
-    ) => runner.RunAsync("reject", settings, cancellationToken);
+    public Task<int> ExecuteAsync(TaskReadySettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("reject", settings, cancellationToken);
 }
 
 internal static partial class TaskCliInput

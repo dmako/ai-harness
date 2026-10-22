@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Harness.Core.Providers;
+using Harness.Core.Serialization;
 using Harness.Mcp.Workspaces;
 
 namespace Harness.Mcp.Providers;
@@ -278,7 +279,7 @@ public sealed class ProviderTools(
             }
             if (result.Text.Length > 0)
             {
-                answers.Add(new { provider = result.Provider, text = result.Text });
+                answers.Add(new JsonObjectMap { ["provider"] = result.Provider, ["text"] = result.Text });
             }
         }
         if (items.Count > 0)

@@ -9,10 +9,11 @@ internal static class SetupCleanup
 {
     internal sealed record Removal(string Path, Func<FileChange> Apply);
 
-    internal static readonly string[] SourceArray = [ "claude-code", "codex" ];
+    internal static readonly string[] SourceArray = ["claude-code", "codex"];
 
     public static IEnumerable<Removal> ClientHooks(ClientPaths paths, string? root, bool dryRun) =>
-        SourceArray.SelectMany(client => ClientHookCleanup.Targets(paths, client, "all", root ?? ""))
+        SourceArray
+            .SelectMany(client => ClientHookCleanup.Targets(paths, client, "all", root ?? ""))
             .Where(target => root is not null || target.Scope is "user")
             .Select(target => new Removal(
                 target.Path,
