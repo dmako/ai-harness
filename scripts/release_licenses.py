@@ -2,7 +2,24 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import xml.etree.ElementTree as ET
+
+
+def repository_notices(root, destination):
+    destination.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / "LICENSE", destination / "LICENSE")
+    relative = Path("LICENSES/unicode-BSD.txt")
+    notice = destination / relative
+    notice.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / "doc/third-party-notices/unicode-BSD.txt", notice)
+    (destination / "NOTICE.md").write_text(
+        "Harness is licensed under the MIT license in LICENSE. "
+        "Third-party package, runtime and Unicode table notices are listed in "
+        "THIRD_PARTY_NOTICES.json and LICENSES.\n", encoding="utf-8")
+    return [{"package": "Unicode case and character tables", "version": "17.0.0", "kind": "source",
+             "license_type": "expression", "license": "BSD-3-Clause", "nuget_sha512": None,
+             "notices": [{"file": relative.as_posix(), "sha256": hashlib.sha256(notice.read_bytes()).hexdigest()}]}]
 
 
 def inventory(deps, packages, destination):

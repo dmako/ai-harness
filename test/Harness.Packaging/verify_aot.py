@@ -13,6 +13,8 @@ def digest(data):
 
 def verify(release, smoke):
     manifest = json.loads((release / 'RELEASE.json').read_text(encoding='utf-8'))
+    if manifest.get('repository_license_declaration') != 'MIT':
+        raise ValueError('Expected the repository MIT license declaration')
     for flag, expected in {'native_aot': True, 'trimmed': True, 'self_contained': True, 'single_file': False}.items():
         if manifest.get(flag) is not expected:
             raise ValueError('Unexpected deployment flag: ' + flag)
@@ -43,6 +45,8 @@ def verify(release, smoke):
                 raise ValueError('Unsafe or duplicate archive entry')
             if digest(read('README.md')) != manifest['source_sha256']['README.md']:
                 raise ValueError('Installation README mismatch')
+            if digest(read('LICENSE')) != manifest['source_sha256']['LICENSE']:
+                raise ValueError('Repository license mismatch')
             for entry in json.loads(read('THIRD_PARTY_NOTICES.json')):
                 for notice in entry['notices']:
                     if digest(read(notice['file'])) != notice['sha256']:

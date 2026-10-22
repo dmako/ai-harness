@@ -1,4 +1,4 @@
-// Unicode 17.0.0 case and word-character tables. See LICENSE.txt for attribution.
+// Unicode 17.0.0 case and word-character tables.
 using System.Text;
 
 namespace Harness.Core.Memory;

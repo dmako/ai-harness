@@ -24,10 +24,11 @@ then return to locked restores. The main archive contains `harness` and
 Keep their included SQLite native library beside the executables.
 
 Archives carry README, build metadata, release notes and actual dependency
-licenses/notices. Applicable harness attribution is kept in
-[`third-party-notices/harness-MIT.txt`](third-party-notices/harness-MIT.txt) and
-included as `LICENSE-HARNESS.txt`. Package tooling does not invent a license for
-other contributions. `RELEASE.json` records source hashes, SDK, build state,
+licenses/notices. The repository's [MIT license](../LICENSE), with copyright to
+Matus Zakarovsky and David Makovsky, is included as the archive-root `LICENSE`.
+`THIRD_PARTY_NOTICES.json` and `LICENSES` contain dependency/runtime notices and
+the BSD notice for the Unicode tables; the project's own MIT license is separate.
+`RELEASE.json` declares MIT and records source hashes, SDK, build state,
 binary/archive hashes and repeat verification; `SHA256SUMS` covers release files.
 Symbols and managed build outputs stay outside the archives.
 

@@ -10,8 +10,8 @@ Memory models distinguish goals, constraints, decisions, conventions, warnings
 and facts, their scopes, provenance, validity and supersession. Validation and
 credential redaction happen before persistence. Scope matching, similarity and
 content hashes use stable Unicode case and word-character tables; nanosecond
-RFC3339 timestamps retain their precision. Table attribution is embedded from
-`Memory/LICENSE.txt`.
+RFC3339 timestamps retain their precision. Third-party table attribution is retained in
+[the Unicode notice](../third-party-notices/unicode-BSD.txt).
 
 Task definitions include acceptance criteria, dependencies, scope and milestones.
 Execution models distinguish claims, progress, review, blocking, deferral and

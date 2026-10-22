@@ -18,4 +18,5 @@ code evidence between agents and a browser UI. Start with the embedded
 - [Releases and platform prerequisites](releases.md)
 - [Trimming and Native AOT](native-aot.md)
 - [C# formatting conventions](csharp-formatting.md)
-- [Third-party attribution](third-party-notices/harness-MIT.txt)
+- [MIT license](../LICENSE)
+- [Unicode table third-party notice](third-party-notices/unicode-BSD.txt)

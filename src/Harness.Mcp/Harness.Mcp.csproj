@@ -3,7 +3,6 @@
     <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
     <PackageReference Include="ModelContextProtocol.Core" />
     <EmbeddedResource Include="Schemas/*.json" LogicalName="Harness.Mcp.Schemas.%(Filename)%(Extension)" />
-    <EmbeddedResource Include="Schemas/LICENSE.txt" LogicalName="Harness.Mcp.SchemaLicense.txt" />
     <InternalsVisibleTo Include="Harness.Unit" />
   </ItemGroup>
 </Project>
