@@ -1,7 +1,9 @@
 # codebase-memory-mcp: indexed code graph (symbol search, code search,
 # architecture overview). The repository must be indexed in
 # codebase-memory; harness refreshes that index after syncs but never
-# creates one.
+# creates one. Since 0.11 it answers in a text tree unless asked for JSON
+# (format = "json", which earlier versions ignore), and search_graph's
+# rows are positional; both versions are mapped.
 type = "mcp"
 command = "codebase-memory-mcp"
 freshness = "indexed"
@@ -13,6 +15,7 @@ only = ["code.symbol_search", "project.overview", "arch.duplicates"]
 # codebase-memory names projects itself: find this repository's name.
 [resolve]
 tool = "list_projects"
+args = { format = "json" }
 items = "projects"
 match = "root_path"
 value = "name"
@@ -22,23 +25,41 @@ fix = "index it with codebase-memory's index_repository tool (repo_path={root})"
 tool = "index_repository"
 args = { repo_path = "{root}" }
 
+# 0.11 and later: rows of [qualified name, label, file, "start-end", rank];
+# then the results of earlier versions (a version that has no rows moves
+# on to it)
 [capabilities."code.symbol_search"]
 tool = "search_graph"
-args = { project = "{project}", query = "{query}", limit = "{limit}" }
+args = { project = "{project}", query = "{query}", limit = "{limit}", format = "json" }
+items = "rows"
+fields = { qualified_name = "0", label = "1", path = "2", start_line = "3", score = "4" }
+truncated = "has_more"
+
+[[capabilities."code.symbol_search".chain]]
+tool = "search_graph"
+args = { project = "{project}", query = "{query}", limit = "{limit}", format = "json" }
 items = "results"
 fields = { name = "name", qualified_name = "qualified_name", label = "label", path = "file_path", start_line = "start_line", end_line = "end_line", score = "rank" }
 truncated = "has_more"
 
+# The hit line is the first matching line, not the enclosing node's start:
+# 0.11 and later rows [qualified name, label, file, lines, matches, ...],
+# then the results of earlier versions.
 [capabilities."code.text_search"]
 tool = "search_code"
-args = { project = "{project}", pattern = "{query}", limit = "{limit}" }
+args = { project = "{project}", pattern = "{query}", limit = "{limit}", format = "json" }
+items = "rows"
+fields = { qualified_name = "0", label = "1", path = "2", start_line = "4.0", snippet = "4" }
+
+[[capabilities."code.text_search".chain]]
+tool = "search_code"
+args = { project = "{project}", pattern = "{query}", limit = "{limit}", format = "json" }
 items = "results"
-# The hit line is the first matching line, not the enclosing node's start.
 fields = { name = "node", qualified_name = "qualified_name", label = "label", path = "file", start_line = "match_lines.0", snippet = "match_lines" }
 
 [capabilities."project.overview"]
 tool = "get_architecture"
-args = { project = "{project}" }
+args = { project = "{project}", format = "json" }
 
 # Duplicates (HAR-0141): the graph's SIMILAR_TO edges (MinHash Jaccard of
 # the bodies) between functions, then between methods; its Cypher has no
@@ -47,7 +68,7 @@ args = { project = "{project}" }
 # out: the graph reports the first copy's there.
 [capabilities."arch.duplicates"]
 tool = "query_graph"
-args = { project = "{project}", max_rows = "{limit_more}", query = "MATCH (a:Function)-[r:SIMILAR_TO]->(b:Function) RETURN a.name, a.qualified_name, a.file_path, a.start_line, a.end_line, b.name, b.file_path, r.jaccard ORDER BY a.file_path, a.start_line, b.file_path LIMIT {limit_more}" }
+args = { project = "{project}", max_rows = "{limit_more}", format = "json", query = "MATCH (a:Function)-[r:SIMILAR_TO]->(b:Function) RETURN a.name, a.qualified_name, a.file_path, a.start_line, a.end_line, b.name, b.file_path, r.jaccard ORDER BY a.file_path, a.start_line, b.file_path LIMIT {limit_more}" }
 items = "rows"
 fields = { name = "0", qualified_name = "1", path = "2", start_line = "3", end_line = "4", related_name = "5", related_path = "6", confidence = "7" }
 evidence = "inferred"
@@ -55,7 +76,7 @@ combine = "all"
 
 [[capabilities."arch.duplicates".chain]]
 tool = "query_graph"
-args = { project = "{project}", max_rows = "{limit_more}", query = "MATCH (a:Method)-[r:SIMILAR_TO]->(b:Method) RETURN a.name, a.qualified_name, a.file_path, a.start_line, a.end_line, b.name, b.file_path, r.jaccard ORDER BY a.file_path, a.start_line, b.file_path LIMIT {limit_more}" }
+args = { project = "{project}", max_rows = "{limit_more}", format = "json", query = "MATCH (a:Method)-[r:SIMILAR_TO]->(b:Method) RETURN a.name, a.qualified_name, a.file_path, a.start_line, a.end_line, b.name, b.file_path, r.jaccard ORDER BY a.file_path, a.start_line, b.file_path LIMIT {limit_more}" }
 items = "rows"
 fields = { name = "0", qualified_name = "1", path = "2", start_line = "3", end_line = "4", related_name = "5", related_path = "6", confidence = "7" }
 evidence = "inferred"

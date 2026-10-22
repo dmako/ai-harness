@@ -255,6 +255,11 @@ internal static class McpMapping
         var kind = mapping.Kind.Length > 0 ? mapping.Kind : Kind(capability);
         var path = Relative(String(Get("path")), root);
         var name = String(Get("name"));
+        var qualifiedName = String(Get("qualified_name"));
+        if (name.Length is 0 && qualifiedName.Length > 0 && kind is not "file")
+        {
+            name = LastSegment(qualifiedName);
+        }
         if (kind is "file" && name.Length is 0 && path.Length > 0)
         {
             name = Path.GetFileName(path);
@@ -274,15 +279,26 @@ internal static class McpMapping
         var relatedName = String(Get("related_name"));
         var relatedPath = Relative(String(Get("related_path")), root);
         var members = Get("members");
+        var startValue = Get("start_line");
+        var startLine = Integer(startValue);
+        var endLine = Integer(Get("end_line"));
+        if (LineRange(startValue, out var start, out var end))
+        {
+            startLine = start;
+            if (endLine is 0)
+            {
+                endLine = end;
+            }
+        }
         return new()
         {
             Kind = kind,
             Name = name,
-            QualifiedName = String(Get("qualified_name")),
+            QualifiedName = qualifiedName,
             Label = String(Get("label")),
             Path = path,
-            StartLine = Integer(Get("start_line")),
-            EndLine = Integer(Get("end_line")),
+            StartLine = startLine,
+            EndLine = endLine,
             Depth = Integer(Get("depth")),
             Snippet = String(Get("snippet")).Trim(),
             Score = Number(Get("score")),
@@ -375,6 +391,44 @@ internal static class McpMapping
         };
 
     private static int Integer(JsonElement value) => (int)Math.Clamp(Number(value), int.MinValue, int.MaxValue);
+
+    private static bool LineRange(JsonElement value, out int start, out int end)
+    {
+        start = end = 0;
+        if (value.ValueKind is not JsonValueKind.String)
+        {
+            return false;
+        }
+
+        var text = value.GetString().AsSpan();
+        var separator = text.IndexOf('-');
+        return separator >= 0
+            && int.TryParse(
+                text[..separator].Trim(),
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture,
+                out start
+            )
+            && int.TryParse(
+                text[(separator + 1)..].Trim(),
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture,
+                out end
+            );
+    }
+
+    internal static string LastSegment(string text)
+    {
+        text = text.Trim();
+        var dot = text.LastIndexOf('.');
+        return
+            text.Contains(' ', StringComparison.Ordinal)
+            || text.Contains('\t', StringComparison.Ordinal)
+            || dot < 0
+            || dot == text.Length - 1
+            ? text
+            : text[(dot + 1)..];
+    }
 
     internal static string FirstLine(string text) => text.Trim().Split('\n')[0];
 

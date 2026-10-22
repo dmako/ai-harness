@@ -56,9 +56,43 @@ No integration is invented to fill that absent name.
 The loader retains implicit pack selection by provider name, explicit `pack`,
 top-level overrides, per-capability replacement, global/project layering and
 strict validation. Tests compare embedded TOML with the committed source
-inventory and exercise overridden commands, disabled providers, capability
-restriction and separate code/package routing without launching executables.
+inventory plus the reviewed upstream fixture below, and exercise overridden
+commands, disabled providers, capability restriction and separate code/package
+routing without launching executables.
 Graphify execution remains PORT-015; its context exclusion is preserved.
+
+### Upstream MCP compatibility fix (01f8b47)
+
+The 2026-10-22 update ports Go commit
+`01f8b4775910ad8af1fec024c4c3029dd584372a`. It supplements the original frozen
+baseline rather than rewriting its historical inventories and evidence.
+[Source hashes and provenance](../../test/fixtures/compatibility/upstream-mcp-01f8b47.json)
+identify the three upstream files; the embedded-pack comparison uses an exact
+[upstream TOML fixture](../../test/fixtures/compatibility/codebase-memory-01f8b47.toml)
+for codebase-memory while the other four packs retain their original baseline.
+
+The codebase-memory pack requests JSON explicitly for project resolution, symbol
+and text search, architecture overview, and duplicate queries. Modern positional
+`rows` are mapped first; older `results` responses retain fallback mappings. The
+generic mapper reads `"start-end"` line ranges and derives a missing non-file name
+from the qualified name's final segment. Explicit names and nonzero end lines
+retain precedence; file-name fallback stays based on the file path. Text searches
+continue to use the first matching line, not the enclosing symbol's start.
+
+`CodebaseMemoryPackTests` covers both response generations, emitted JSON arguments,
+line-range parsing, malformed ranges, explicit-field precedence, and file names.
+The original default capability restriction remains unchanged: codebase-memory
+text search is available only when explicitly routed back in.
+
+Validation: the C# provider area passed 148 tests (one optional real-Graphify test
+skipped), including the installed codebase-memory server's isolated smoke test.
+All ten new regression cases also passed on Linux. The upstream Go generic MCP
+package passed all 22 tests on Linux; Windows passed 21, with its existing
+`TestSymbolSearchMapsArgsAndFields` fixture failing because it substitutes raw
+Windows backslashes into JSON. The solution built with zero warnings/errors and
+the changed C# files passed the pinned formatter check. The broad unit run passed
+246 cases and skipped 208 (unavailable unrelated Go oracles and a Unix-only
+fixture); those skips are not counted as a full parity replay for this update.
 
 ## Public MCP behavior
 

@@ -412,7 +412,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         var values = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["query"] = request.Query,
-            ["query_name"] = LastSegment(request.Query),
+            ["query_name"] = McpMapping.LastSegment(request.Query),
             ["query_regex"] = QuoteMeta(request.Query),
             ["limit"] = limit.ToString(CultureInfo.InvariantCulture),
             ["limit_more"] = ((long)limit + 1).ToString(CultureInfo.InvariantCulture),
@@ -422,7 +422,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             ["version"] = request.Version,
             ["type"] = request.Type,
             ["target"] = request.Target,
-            ["target_name"] = LastSegment(request.Target),
+            ["target_name"] = McpMapping.LastSegment(request.Target),
         };
         if (request.Budget > 0)
         {
@@ -567,19 +567,6 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
                     : character.ToString()
             )
         );
-
-    private static string LastSegment(string text)
-    {
-        text = text.Trim();
-        var dot = text.LastIndexOf('.');
-        return
-            text.Contains(' ', StringComparison.Ordinal)
-            || text.Contains('\t', StringComparison.Ordinal)
-            || dot < 0
-            || dot == text.Length - 1
-            ? text
-            : text[(dot + 1)..];
-    }
 
     private static string Canonical(string path)
     {

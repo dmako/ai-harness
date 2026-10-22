@@ -211,7 +211,7 @@ public sealed class ProviderFacadeTests
             .WithMessage("*" + error + "*");
 
     [Fact]
-    public async Task EmbeddedPacksMatchFrozenSourceAndOverridesRouteCodeAndPackagesLazily()
+    public async Task EmbeddedPacksMatchReviewedSourcesAndOverridesRouteCodeAndPackagesLazily()
     {
         using var fixture = new ProviderFixture();
         using var baseline = JsonDocument.Parse(
@@ -230,23 +230,29 @@ public sealed class ProviderFacadeTests
                 "Packs",
                 pack + ".toml"
             );
+            var expected = pack is "codebase-memory"
+                ? await File.ReadAllTextAsync(
+                    Path.Combine(
+                        ProviderFixture.RepositoryRoot,
+                        "test",
+                        "fixtures",
+                        "compatibility",
+                        "codebase-memory-01f8b47.toml"
+                    ),
+                    Token
+                )
+                : baseline
+                    .RootElement.GetProperty("packs")
+                    .EnumerateArray()
+                    .Single(entry =>
+                        entry.GetProperty("path").GetString()!.EndsWith("/" + pack + ".toml", StringComparison.Ordinal)
+                    )
+                    .GetProperty("toml")
+                    .GetString()!;
             (await File.ReadAllTextAsync(current, Token))
                 .ReplaceLineEndings("\n")
                 .Should()
-                .Be(
-                    baseline
-                        .RootElement.GetProperty("packs")
-                        .EnumerateArray()
-                        .Single(entry =>
-                            entry
-                                .GetProperty("path")
-                                .GetString()!
-                                .EndsWith("/" + pack + ".toml", StringComparison.Ordinal)
-                        )
-                        .GetProperty("toml")
-                        .GetString()!
-                        .ReplaceLineEndings("\n")
-                );
+                .Be(expected.ReplaceLineEndings("\n"));
         }
         ConfigurationLoader.Packs.Should().Equal("codebase-memory", "graphify-csharp", "nuget", "rg-fd", "ripwire");
         var file = Path.Combine(fixture.Root, "config.toml");
