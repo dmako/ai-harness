@@ -153,7 +153,7 @@ public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposabl
             StringComparer.Ordinal
         );
         var errors = new List<string>();
-        // Preserve Go's overview skip semantics: skip controls inclusion, not execution.
+        // Overview skip controls inclusion, not execution.
         foreach (
             var result in await CallAsync(
                     new(Core.Providers.Capabilities.Overview),

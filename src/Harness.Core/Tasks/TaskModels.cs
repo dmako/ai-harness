@@ -180,7 +180,7 @@ public static partial class TaskWorkflow
     public static bool HoldsClaim(string status) => status is "claimed" or "in_progress" or "review";
 
     public static string NormalizeResult(string value) =>
-        string.Concat(value.Trim().EnumerateRunes().Select(r => GoUnicode.ToLower(r).ToString()));
+        string.Concat(value.Trim().EnumerateRunes().Select(r => UnicodeCharacters.ToLower(r).ToString()));
 
     public static int PriorityRank(string priority) =>
         priority switch

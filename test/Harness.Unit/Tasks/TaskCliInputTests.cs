@@ -13,11 +13,11 @@ public sealed class TaskCliInputTests
     [InlineData("1hX")]
     [InlineData("9999999999999h")]
     [InlineData("١h")]
-    public void InvalidGoStyleDurationIsRejected(string value) =>
+    public void InvalidDurationIsRejected(string value) =>
         FluentActions.Invoking(() => TaskCliInput.Lease(value)).Should().ThrowExactly<TaskUsageException>();
 
     [Fact]
-    public void GoStyleCompoundDurationsAndClrSubtickRoundingAreExplicit()
+    public void CompoundDurationsAndSubtickRoundingAreExplicit()
     {
         TaskCliInput.Lease("1h30m").Should().Be(TimeSpan.FromMinutes(90));
         TaskCliInput.Lease("1.5h").Should().Be(TimeSpan.FromMinutes(90));

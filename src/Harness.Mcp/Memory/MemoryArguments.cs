@@ -29,7 +29,7 @@ internal static class MemoryArguments
         if (tool.Name is "task_complete")
         {
             hint +=
-                "\nacceptance: [{\"index\": 1, \"result\": \"pass\", \"evidence\": \"...\"}] (one per criterion; [] when the task has none); validation: [\"go test ./...\"] or [{\"command\": \"...\", \"result\": \"pass\"}]";
+                "\nacceptance: [{\"index\": 1, \"result\": \"pass\", \"evidence\": \"...\"}] (one per criterion; [] when the task has none); validation: [\"dotnet test\"] or [{\"command\": \"...\", \"result\": \"pass\"}]";
         }
 
         const string Prefix = "validating \"arguments\": validating root: ";

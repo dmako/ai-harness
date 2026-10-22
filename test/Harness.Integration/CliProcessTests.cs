@@ -53,7 +53,7 @@ public sealed class CliProcessTests
             process.ExitCode.Should().Be(0);
             (await stderr).Should().BeEmpty();
             using var json = JsonDocument.Parse(await stdout);
-            json.RootElement.GetProperty("go_version").GetString().Should().StartWith(".NET ");
+            json.RootElement.GetProperty("runtime").GetString().Should().StartWith(".NET ");
             json.RootElement.GetProperty("commit").ValueKind.Should().Be(JsonValueKind.String);
         }
         finally

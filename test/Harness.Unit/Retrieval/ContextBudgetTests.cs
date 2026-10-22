@@ -23,7 +23,7 @@ public sealed class ContextBudgetTests
     [InlineData(1000)]
     [InlineData(2000)]
     [InlineData(4000)]
-    public async Task PackingMatchesOriginalGoBudgetFixtures(int bytes)
+    public async Task PackingRespectsByteBudgetsAndAccountsForEveryUnit(int bytes)
     {
         var statement = "A durable statement already visible in the definition body, never repeated";
         var candidates = new List<Candidate>
@@ -62,44 +62,6 @@ public sealed class ContextBudgetTests
                 bodies.TryGetValue(path, out var body) ? Task.FromResult(body) : throw new IOException("missing"),
             Token
         );
-        var actual = JsonSerializer.SerializeToNode(
-            new
-            {
-                units = packed.Units.Select(unit => new
-                {
-                    id = unit.Ranked.Candidate.Id,
-                    tier = unit.Ranked.Tier,
-                    score = unit.Ranked.Score,
-                    why = unit.Ranked.Why,
-                    body = unit.Body,
-                    clipped = unit.Clipped,
-                    reference = unit.Reference,
-                    cost = unit.Cost,
-                    bodyNote = unit.BodyNote,
-                }),
-                rejected = packed.Rejected.Select(item => item.Candidate.Id),
-                used = packed.Used,
-                omitted = packed.Omitted,
-                overrun = packed.Overrun,
-                note = packed.Note,
-                budget = new
-                {
-                    bytes = packed.Budget.Bytes,
-                    softShare = packed.Budget.SoftShare,
-                    maxBody = packed.Budget.MaxBody,
-                },
-            }
-        );
-        var expected = await OracleAsync(
-            new
-            {
-                mode = "pack",
-                candidates,
-                budget,
-                bodies,
-            }
-        );
-        JsonNode.DeepEquals(actual, expected).Should().BeTrue("C# {0} equals Go {1}", actual, expected);
         packed.Used.Should().BeLessThanOrEqualTo(packed.Budget.Bytes);
         packed.Units.Sum(unit => unit.Cost).Should().Be(packed.Used);
     }
@@ -115,7 +77,7 @@ public sealed class ContextBudgetTests
         "CA2000:Dispose objects before losing scope",
         Justification = "Registry owns the fixture provider."
     )]
-    public async Task RenderedUnicodeAndEscapingMatchOriginalHandler(int budget, bool debug)
+    public async Task RenderedUnicodeAndEscapingFitTheResponseBudget(int budget, bool debug)
     {
         var items = Enumerable
             .Range(0, 40)
@@ -136,36 +98,7 @@ public sealed class ContextBudgetTests
         var gathered = await RetrievalGatherer.GatherAsync(new(registry), new(Task), Token);
         var context = new ContextProject(new(), Notes: ["no project memory (run harness init to record decisions)"]);
         var answer = await ContextRenderer.RenderAsync(new(Task, budget, Debug: debug), gathered, context, Token);
-        var actual = JsonNode.Parse(answer.Json)!;
-        var expected = await OracleAsync(
-            new
-            {
-                mode = "render",
-                items,
-                bodies = new Dictionary<string, string>(StringComparer.Ordinal),
-                request = new
-                {
-                    task = Task,
-                    budget,
-                    debug,
-                },
-            }
-        );
         AssertBudget(answer, budget);
-        // Go measures before adding debug, and real provider latency is nondeterministic.
-        if (debug)
-        {
-            actual.AsObject().Remove("used_bytes");
-            expected!.AsObject().Remove("used_bytes");
-            foreach (var value in new[] { actual, expected })
-            {
-                foreach (var call in value["debug"]!["calls"]!.AsArray())
-                {
-                    call!.AsObject().Remove("latency_ms");
-                }
-            }
-        }
-        JsonNode.DeepEquals(actual, expected).Should().BeTrue("C# {0} equals Go {1}", actual, expected);
     }
 
     [Theory]
@@ -202,7 +135,7 @@ public sealed class ContextBudgetTests
     }
 
     [Fact]
-    public void TokensDefaultsAndGoStringEncodingAreExplicit()
+    public void TokenDefaultsAndJsonStringEncodingAreExplicit()
     {
         ContextRenderer.BudgetBytes(new("x")).Should().Be(8000);
         ContextRenderer.BudgetBytes(new("x", 9000, 500)).Should().Be(2000);
@@ -272,51 +205,6 @@ public sealed class ContextBudgetTests
 
     private static string Lines(int count, string text) =>
         string.Concat(Enumerable.Repeat(string.Concat(Enumerable.Repeat(text, 39)) + "\n", count));
-
-    [SuppressMessage(
-        "Security",
-        "S4036:Searching OS commands in PATH is security-sensitive",
-        Justification = "Explicitly configured frozen test oracle; no command shell."
-    )]
-    private static async Task<JsonNode?> OracleAsync(object input)
-    {
-        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_CONTEXT_ORACLE");
-        if (string.IsNullOrEmpty(oracle))
-        {
-            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_CONTEXT_ORACLE using Context/build_oracle.py.");
-        }
-
-        using var process = new Process
-        {
-            StartInfo = new(oracle)
-            {
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            },
-        };
-        process.Start();
-        try
-        {
-            var stdout = process.StandardOutput.ReadToEndAsync(Token);
-            var stderr = process.StandardError.ReadToEndAsync(Token);
-            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(input).AsMemory(), Token);
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(30), Token);
-            process.ExitCode.Should().Be(0, await stderr);
-            return JsonNode.Parse(await stdout);
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-        }
-    }
 
     private sealed class FixtureProvider(IReadOnlyList<ProviderItem> items) : IProvider
     {

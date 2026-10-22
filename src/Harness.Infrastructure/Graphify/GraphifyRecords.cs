@@ -5,7 +5,7 @@ using Harness.Infrastructure.Storage;
 
 namespace Harness.Infrastructure.Graphify;
 
-/// <summary>Cross-process read/modify/atomic-replace observations compatible with Go's records.</summary>
+/// <summary>Cross-process read/modify/atomic-replace session observations.</summary>
 internal sealed class GraphifyRecords(string path)
 {
     internal JsonObject Load()

@@ -34,7 +34,6 @@ public sealed class RetrievalTests
     [InlineData("test/Foo.cs", true)]
     [InlineData("src/foo.spec.ts", true)]
     [InlineData("src/test_foo.py", true)]
-    [InlineData("src/foo_test.go", true)]
     public void RecognizesTestFiles(string path, bool expected) => TaskParsing.IsTestFile(path).Should().Be(expected);
 
     [Fact]

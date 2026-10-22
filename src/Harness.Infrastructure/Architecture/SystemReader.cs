@@ -18,7 +18,7 @@ public sealed record SystemMember(
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
     "Globalization",
     "CA1308:Normalize strings to uppercase",
-    Justification = "Frozen system identities and matching use lowercase normalized tokens."
+    Justification = "System identities and matching use lowercase normalized tokens."
 )]
 public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 {

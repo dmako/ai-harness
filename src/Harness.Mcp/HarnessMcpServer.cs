@@ -370,7 +370,7 @@ public static class HarnessMcpServer
                 StructuredContent = document.RootElement.Clone(),
             };
         }
-        // Go's result adapter writes canonical key order in both representations.
+        // Use canonical key order in both result representations.
         var element = HarnessJson.SerializeToElement(value, JsonOptions);
         var ordered = Order(element);
         var json = HarnessJson.SerializeToElement(ordered, JsonOptions);

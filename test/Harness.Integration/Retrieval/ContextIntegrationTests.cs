@@ -222,35 +222,7 @@ public sealed class ContextIntegrationTests
             cancellationToken: Token
         );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
-        var tool = tools.Single(tool => tool.Name is "get_context").ProtocolTool;
-        using var baseline = JsonDocument.Parse(
-            await File.ReadAllTextAsync(
-                Path.Combine(
-                    ProviderFixture.RepositoryRoot,
-                    "test",
-                    "fixtures",
-                    "compatibility",
-                    "go-windows-amd64.json"
-                ),
-                Token
-            )
-        );
-        var schema = baseline
-            .RootElement.GetProperty("cases")
-            .GetProperty("mcp")
-            .EnumerateArray()
-            .Single(entry => entry.GetProperty("name").GetString() == "tools_list")
-            .GetProperty("response")
-            .GetProperty("result")
-            .GetProperty("tools")
-            .EnumerateArray()
-            .Single(entry => entry.GetProperty("name").GetString() == "get_context");
-        var actual = JsonSerializer.SerializeToElement(tool);
-        JsonElement.DeepEquals(actual.GetProperty("inputSchema"), schema.GetProperty("inputSchema")).Should().BeTrue();
-        JsonElement
-            .DeepEquals(actual.GetProperty("outputSchema"), schema.GetProperty("outputSchema"))
-            .Should()
-            .BeTrue();
+        ToolSchema.AssertMatches(tools.Single(tool => tool.Name == "get_context"));
         var result = await client.CallToolAsync(
             "get_context",
             new Dictionary<string, object?>

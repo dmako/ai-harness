@@ -268,7 +268,7 @@ internal static class TaskTools
                         .ToString("0", CultureInfo.InvariantCulture)
                     : formatted.Replace('E', 'e');
             throw new ArgumentException(
-                $"json: cannot unmarshal number {formatted}}} overflows into Go struct field server.{input}.{key} of type int"
+                $"json: cannot unmarshal number {formatted}}} overflows input field {input}.{key} of type int"
             );
         }
         return (long)number;

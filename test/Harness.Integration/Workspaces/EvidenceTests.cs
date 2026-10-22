@@ -20,80 +20,11 @@ public sealed class EvidenceTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    [Theory]
-    [InlineData("adoption", "dotnet")]
-    [InlineData("adoption", "empty")]
-    [InlineData("dependencies", "dotnet")]
-    [InlineData("adoption", "node")]
-    [InlineData("dependencies", "node")]
-    [InlineData("adoption", "go")]
-    [InlineData("dependencies", "go")]
-    [InlineData("concern", "dotnet")]
-    [InlineData("concern-empty", "dotnet")]
-    public async Task MultiRepositoryEvidenceMatchesFrozenGo(string mode, string language)
-    {
-        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_ECOSYSTEM_ORACLE");
-        if (string.IsNullOrEmpty(oracle))
-        {
-            throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_ECOSYSTEM_ORACLE using Ecosystem/build_oracle.py.");
-        }
-
-        using var fixture = await WorkspaceFixture.CreateAsync();
-        Seed(fixture, language);
-        var before = fixture.Hashes();
-        var reader = new WorkspaceEvidenceReader(fixture.Members);
-        var text = mode is "concern-empty" ? "the and" : "pdf invoice generation";
-        object actual;
-        if (mode is "adoption")
-        {
-            actual = await reader.AdoptionAsync("alpha", Token);
-        }
-        else if (mode is "dependencies")
-        {
-            actual = await reader.DependenciesAsync(Token);
-        }
-        else
-        {
-            await using var current = Registry();
-            await using var session = new WorkspaceSearchSession(
-                new(fixture.Members[0], fixture.Members),
-                current,
-                (_, _) => Registry()
-            );
-            actual = await session.ConcernAsync(text, false, Token);
-        }
-        var providers = fixture.Members.ToDictionary(
-            member => member.Root,
-            _ => new { ID = "names", Items = Items() },
-            StringComparer.Ordinal
-        );
-        var expected = await RunAsync(
-            oracle,
-            new
-            {
-                mode = mode.StartsWith("concern", StringComparison.Ordinal) ? "concern" : mode,
-                members = fixture.Members.Select(member => new
-                {
-                    project = member.Name,
-                    project_id = member.Id,
-                    root = member.Root,
-                }),
-                library = "alpha",
-                concern = text,
-                global = Path.Combine(fixture.Global, "go"),
-                providers,
-            }
-        );
-        var json = JsonSerializer.SerializeToNode(actual);
-        JsonNode.DeepEquals(json, expected).Should().BeTrue($"C#: {json}\nGo: {expected}");
-        fixture.Hashes().Should().Equal(before);
-    }
-
     [Fact]
     public async Task MissingProvidersAndUnreadableMembersRemainUnknownRatherThanNegativeFindings()
     {
         using var fixture = await WorkspaceFixture.CreateAsync();
-        Seed(fixture, "dotnet");
+        Seed(fixture);
         var missing = fixture.Members[2] with { Root = Path.Combine(fixture.Members[2].Root, "missing") };
         WorkspaceMember[] members = [fixture.Members[0], fixture.Members[1], missing];
         var built = 0;
@@ -136,7 +67,7 @@ public sealed class EvidenceTests
     public async Task StackComparisonsKeepPublishedVersionsSeparateFromVersionsMembersDependOn()
     {
         using var fixture = await WorkspaceFixture.CreateAsync();
-        Seed(fixture, "dotnet");
+        Seed(fixture);
         var reader = new WorkspaceEvidenceReader(fixture.Members);
         var summary = await reader.ProjectStackAsync(fixture.Members[1].Id, Token);
         summary
@@ -164,101 +95,37 @@ public sealed class EvidenceTests
         dependencies.Nodes.Single(node => node.Project is "beta").Library.Should().BeFalse();
     }
 
-    private static void Seed(WorkspaceFixture fixture, string language)
+    private static void Seed(WorkspaceFixture fixture)
     {
-        if (language is "empty")
-        {
-            return;
-        }
-
         var library = fixture.Repositories[0];
         var consumer = fixture.Repositories[1];
-        if (language is "dotnet")
-        {
-            library.Write(
-                "Core/Core.csproj",
-                "<Project><PropertyGroup><PackageId>Acme.Core</PackageId><Version>2.0</Version><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
-            );
-            library.Write(
-                "Core/PdfInvoiceGenerator.cs",
-                "namespace Acme.Core.Documents;\npublic class PdfInvoiceGenerator {}\npublic readonly record struct Revision(int N);\npublic static class Extensions {}\n"
-            );
-            library.Write(
-                "Core/Extensions.cs",
-                "namespace Microsoft.Extensions.DependencyInjection;\npublic static class FrameworkExtensions {}\n"
-            );
-            library.Write("test/Core.Tests.csproj", "<Project/>");
-            consumer.Write(
-                "Api/Api.csproj",
-                """
-                <Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup>
-                <PackageReference Include="Acme.Core" Version="1.0" />
-                <PackageReference Include="QuestPDF" Version="2024.1.0" />
-                </ItemGroup></Project>
-                """
-            );
-            consumer.Write(
-                "Api/Local.cs",
-                "using Acme.Core.Documents;\npublic class PdfInvoiceGenerator {}\npublic class Extensions {}\n"
-            );
-        }
-        else if (language is "node")
-        {
-            library.Write("package.json", """{"name":"@acme/core","version":"2"}""");
-            library.Write("src/core.ts", "export class PdfInvoiceGenerator {}\nexport interface IRevision {}\n");
-            consumer.Write(
-                "package.json",
-                """{"dependencies":{"@acme/core":"^1","pdfkit":"^0.15.0"},"devDependencies":{"typescript":"5"}}"""
-            );
-            consumer.Write(
-                "src/local.ts",
-                "import { PdfInvoiceGenerator } from '@acme/core';\nexport class PdfInvoiceGenerator {}\n"
-            );
-        }
-        else
-        {
-            library.Write("go.mod", "module example.com/core\ngo 1.27\n");
-            library.Write("core.go", "package core\ntype PdfInvoiceGenerator struct {}\nfunc GenerateInvoice() {}\n");
-            consumer.Write("go.mod", "module example.com/api\ngo 1.27\nrequire example.com/core v1.0.0\n");
-            consumer.Write("api.go", "package api\nimport \"example.com/core\"\ntype PdfInvoiceGenerator struct {}\n");
-        }
-    }
 
-    private static ProviderItem[] Items() =>
-        [
-            new()
-            {
-                Name = "InvoicePdfGenerator",
-                Path = "src/InvoicePdfGenerator.cs",
-                StartLine = 3,
-                Provider = "names",
-            },
-            new()
-            {
-                Name = "InvoicePdfGeneratorTests",
-                Path = "test/InvoicePdfGeneratorTests.cs",
-                StartLine = 2,
-                Provider = "names",
-            },
-            new()
-            {
-                Name = "Customer",
-                Path = "src/Customer.cs",
-                Provider = "names",
-            },
-        ];
-
-    private static ProviderRegistry Registry()
-    {
-        var registry = new ProviderRegistry();
-        registry.Register(
-            new Providers.ProviderRegistryTests.Fake(
-                "names",
-                [Capabilities.SymbolSearch],
-                execute: (_, _) => Task.FromResult(new ProviderResult { Items = Items() })
-            )
+        library.Write(
+            "Core/Core.csproj",
+            "<Project><PropertyGroup><PackageId>Acme.Core</PackageId><Version>2.0</Version><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
         );
-        return registry;
+        library.Write(
+            "Core/PdfInvoiceGenerator.cs",
+            "namespace Acme.Core.Documents;\npublic class PdfInvoiceGenerator {}\npublic readonly record struct Revision(int N);\npublic static class Extensions {}\n"
+        );
+        library.Write(
+            "Core/Extensions.cs",
+            "namespace Microsoft.Extensions.DependencyInjection;\npublic static class FrameworkExtensions {}\n"
+        );
+        library.Write("test/Core.Tests.csproj", "<Project/>");
+        consumer.Write(
+            "Api/Api.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup>
+            <PackageReference Include="Acme.Core" Version="1.0" />
+            <PackageReference Include="QuestPDF" Version="2024.1.0" />
+            </ItemGroup></Project>
+            """
+        );
+        consumer.Write(
+            "Api/Local.cs",
+            "using Acme.Core.Documents;\npublic class PdfInvoiceGenerator {}\npublic class Extensions {}\n"
+        );
     }
 
     private static ProviderRegistry EmptyRegistry()
@@ -266,44 +133,5 @@ public sealed class EvidenceTests
         var registry = new ProviderRegistry();
         registry.Register(new Providers.ProviderRegistryTests.Fake("healthy", [Capabilities.SymbolSearch]));
         return registry;
-    }
-
-    [SuppressMessage(
-        "Security",
-        "S4036:Searching OS commands in PATH is security-sensitive",
-        Justification = "Only the explicitly configured frozen test oracle runs directly without a shell."
-    )]
-    private static async Task<JsonNode?> RunAsync(string executable, object input)
-    {
-        using var process = new Process
-        {
-            StartInfo = new(executable)
-            {
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            },
-        };
-        process.Start();
-        var output = process.StandardOutput.ReadToEndAsync(Token);
-        var error = process.StandardError.ReadToEndAsync(Token);
-        try
-        {
-            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(input));
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(60), Token);
-            process.ExitCode.Should().Be(0, await error);
-            return JsonNode.Parse(await output);
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-        }
     }
 }

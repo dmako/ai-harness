@@ -299,7 +299,7 @@ internal static class MemoryTools
             }
 
             var number = value.GetDouble();
-            // The Go SDK decodes its argument map through float64, then the typed int field.
+            // Decode numeric arguments before applying the integer field range.
             if (number >= 9223372036854775808d || number <= -9223372036854775808d)
             {
                 var formatted = number.ToString("G", CultureInfo.InvariantCulture);
@@ -315,7 +315,7 @@ internal static class MemoryTools
 
                 var input = tool is "memory_search" ? "memorySearchInput" : "memoryProposalsInput";
                 throw new ArgumentException(
-                    $"json: cannot unmarshal number {formatted}}} overflows into Go struct field server.{input}.{name} of type int"
+                    $"json: cannot unmarshal number {formatted}}} overflows input field {input}.{name} of type int"
                 );
             }
             return (int)Math.Clamp(number, int.MinValue, int.MaxValue);

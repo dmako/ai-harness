@@ -108,7 +108,7 @@ internal sealed class McpCommand(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Interrupt and stdin EOF are ordinary stdio server shutdowns, as in Go.
+            // Interrupt and stdin EOF are ordinary stdio server shutdowns.
         }
 
         return 0;

@@ -214,46 +214,6 @@ public sealed class ProviderFacadeTests
     public async Task EmbeddedPacksMatchReviewedSourcesAndOverridesRouteCodeAndPackagesLazily()
     {
         using var fixture = new ProviderFixture();
-        using var baseline = JsonDocument.Parse(
-            await File.ReadAllTextAsync(
-                Path.Combine(ProviderFixture.RepositoryRoot, "doc", "port", "inventory", "providers.json"),
-                Token
-            )
-        );
-        foreach (var pack in ConfigurationLoader.Packs)
-        {
-            var current = Path.Combine(
-                ProviderFixture.RepositoryRoot,
-                "src",
-                "Harness.Infrastructure",
-                "Configuration",
-                "Packs",
-                pack + ".toml"
-            );
-            var expected = pack is "codebase-memory"
-                ? await File.ReadAllTextAsync(
-                    Path.Combine(
-                        ProviderFixture.RepositoryRoot,
-                        "test",
-                        "fixtures",
-                        "compatibility",
-                        "codebase-memory-01f8b47.toml"
-                    ),
-                    Token
-                )
-                : baseline
-                    .RootElement.GetProperty("packs")
-                    .EnumerateArray()
-                    .Single(entry =>
-                        entry.GetProperty("path").GetString()!.EndsWith("/" + pack + ".toml", StringComparison.Ordinal)
-                    )
-                    .GetProperty("toml")
-                    .GetString()!;
-            (await File.ReadAllTextAsync(current, Token))
-                .ReplaceLineEndings("\n")
-                .Should()
-                .Be(expected.ReplaceLineEndings("\n"));
-        }
         ConfigurationLoader.Packs.Should().Equal("codebase-memory", "graphify-csharp", "nuget", "rg-fd", "ripwire");
         var file = Path.Combine(fixture.Root, "config.toml");
         fixture.Write("App.csproj", "<Project />");

@@ -50,12 +50,11 @@ internal sealed class UiFixture : IAsyncDisposable
 
     public static async Task<UiFixture> StartAsync(
         SyncFixture fixture,
-        string? oracle = null,
         string? address = "127.0.0.1:0",
         IReadOnlyDictionary<string, string>? environment = null
     )
     {
-        var start = new ProcessStartInfo(oracle ?? "dotnet")
+        var start = new ProcessStartInfo("dotnet")
         {
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -63,10 +62,7 @@ internal sealed class UiFixture : IAsyncDisposable
             RedirectStandardError = true,
             WorkingDirectory = fixture.DirectoryRoot,
         };
-        if (oracle is null)
-        {
-            start.ArgumentList.Add(CliPath);
-        }
+        start.ArgumentList.Add(CliPath);
         start.ArgumentList.Add("ui");
         if (address is not null)
         {

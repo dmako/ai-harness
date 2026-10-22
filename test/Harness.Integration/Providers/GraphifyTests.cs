@@ -152,7 +152,7 @@ public sealed class GraphifyTests
         fixture.Ready("s1");
         fixture.Write(
             "callers-controller.json",
-            """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Api.cs","line":9},"origin":{"id":"api","label":"N.Api.Go()","declaration_kind":"method","location":{"file":"src/Api.cs","line":5}}}]}"""
+            """{"success":true,"items":[{"relation":"calls","location":{"file":"src/Api.cs","line":9},"origin":{"id":"api","label":"N.Api.Execute()","declaration_kind":"method","location":{"file":"src/Api.cs","line":5}}}]}"""
         );
         fixture.Write(
             "callers-api.json",
@@ -162,7 +162,7 @@ public sealed class GraphifyTests
         await using var provider = new GraphifyProvider(fixture.Options(), manager);
         var result = await provider.ExecuteAsync(new(Capabilities.Impact, "IService.Save"), Token);
         result.Error.Should().BeNull();
-        result.Items.Select(item => item.Name).Should().Equal("Run", "Go");
+        result.Items.Select(item => item.Name).Should().Equal("Run", "Execute");
         result.Items.Select(item => item.Depth).Should().Equal(1, 2);
         result.Items[1].StartLine.Should().Be(5);
         result.Truncated.Should().BeFalse();

@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Harness.Core.Memory;
 
-/// <summary>RFC3339 UTC time with Go's full nanosecond precision, including imported timestamps.</summary>
+/// <summary>RFC3339 UTC time with full nanosecond precision, including imported timestamps.</summary>
 public readonly record struct MemoryTimestamp : IComparable<MemoryTimestamp>
 {
     private readonly DateTimeOffset _second;

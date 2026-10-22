@@ -14,7 +14,7 @@ public sealed record UiSection(string Doc, string Slug, string Title, string? Bo
 [SuppressMessage(
     "Globalization",
     "CA1308:Normalize strings to uppercase",
-    Justification = "The frozen documentation URLs use lowercase ASCII slugs."
+    Justification = "The documentation URLs use lowercase ASCII slugs."
 )]
 public static partial class UiAssets
 {

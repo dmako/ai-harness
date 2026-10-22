@@ -7,7 +7,7 @@ namespace Harness.Unit.Tasks;
 public sealed class TaskWorkflowTests
 {
     [Fact]
-    public void TransitionMatrixMatchesFrozenWorkflowIncludingReviewAndDeferred()
+    public void TransitionMatrixIncludesReviewAndDeferredStates()
     {
         Dictionary<string, string[]> expected = new(StringComparer.Ordinal)
         {

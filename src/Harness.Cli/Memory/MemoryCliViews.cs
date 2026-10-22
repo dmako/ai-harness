@@ -3,7 +3,7 @@ using Harness.Core.Serialization;
 
 namespace Harness.Cli.Memory;
 
-// The Go proposals CLI serializes domain structs (PascalCase), unlike the MCP view DTOs.
+// The proposals CLI serializes domain models with PascalCase names; MCP uses view DTOs.
 internal static class MemoryCliViews
 {
     public static object Proposal(MemoryProposal proposal) =>

@@ -77,7 +77,7 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
     {
         cancellationToken.ThrowIfCancellationRequested();
         // Reftable repositories need Git's backend; ordinary refs are read directly,
-        // as in the frozen implementation, without spawning processes on MCP calls.
+        // without spawning processes on MCP calls.
         return Directory.Exists(Path.Combine(CommonDir, "reftable"))
             ? ReadHeadWithGitAsync(cancellationToken)
             : Task.FromResult(ReadHeadFiles(cancellationToken));

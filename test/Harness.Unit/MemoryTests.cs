@@ -17,7 +17,7 @@ public sealed class MemoryTests
     [InlineData("subsystem:auth", "subsystem:auth")]
     [InlineData("branch:feature/x", "branch:feature/x")]
     [InlineData("workspace:home", "workspace:home")]
-    public void ScopesNormalizeLikeGo(string input, string expected) =>
+    public void ScopesNormalizeConsistently(string input, string expected) =>
         MemoryScope.Parse(input).ToString().Should().Be(expected);
 
     [Theory]
@@ -175,7 +175,7 @@ public sealed class MemoryTests
 
     [Theory]
     [MemberData(nameof(RedactionFixtures))]
-    public void GoRedactionFixturesRejectCredentialsWithoutEchoingThem(string input, string expected)
+    public void RedactionRejectsCredentialsWithoutEchoingThem(string input, string expected)
     {
         CredentialRedactor.Redact(input).Should().Be(expected);
         var error = FluentActions
@@ -193,7 +193,7 @@ public sealed class MemoryTests
     [InlineData("https://gitlab.com/matus.zakarovsky/ai-harness/-/merge_requests/new")]
     [InlineData("get_context budget=6000 path=internal/retrieval")]
     [InlineData("sk-learn style model")]
-    public void OrdinaryGoRedactionFixturesRemainUsable(string input)
+    public void OrdinaryNonCredentialValuesRemainUsable(string input)
     {
         CredentialRedactor.Redact(input).Should().Be(input);
         MemoryText.Validate(new MemoryInput { Type = "fact", Content = input }).Content.Should().Be(input);

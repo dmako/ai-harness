@@ -182,9 +182,8 @@ public sealed class CompanionTests
     [InlineData("project prj_edda8bc866761dd9b196edcc6d73d1a7 is not readable", "project [id] is not readable")]
     [InlineData("context hits 26% (31/130 over 25 answers)", "context hits 26% (31/130 over 25 answers)")]
     [InlineData("provider failed: https://bot:pw@host/x and C:\\repo\\a.cs", "provider failed: [path] and [path]")]
-    [InlineData("token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0123 in internal/cli/x.go", "token [redacted] in [path]")]
-    public void GoRedactionScenarios(string input, string expected) =>
-        DeveloperExport.Clean(input).Should().Be(expected);
+    [InlineData("token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0123 in internal/cli/x.cs", "token [redacted] in [path]")]
+    public void RedactionScenarios(string input, string expected) => DeveloperExport.Clean(input).Should().Be(expected);
 
     [Fact]
     public async Task SharingServesOnlyStartupAllowlistReadOnlyWithChecksumsRangesAndPlatformHints()

@@ -38,7 +38,7 @@ public static class CredentialRedactor
 
     private static (Regex, string) Rule(string pattern, string replacement, bool ignoreCase = false)
     {
-        // Go's regexp word boundaries are ASCII, even when matching case-insensitively.
+        // Credential pattern word boundaries are ASCII, even when matching case-insensitively.
         // .NET's ECMAScript boundary also treats U+0130 as a word character.
         pattern = pattern.Replace(
             @"\b",

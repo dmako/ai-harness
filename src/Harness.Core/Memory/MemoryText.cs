@@ -207,7 +207,7 @@ public static class MemoryText
         var word = new StringBuilder();
         foreach (var rune in Lower(text).EnumerateRunes())
         {
-            if (GoUnicode.IsLetterOrDigit(rune))
+            if (UnicodeCharacters.IsLetterOrDigit(rune))
             {
                 word.Append(rune.ToString());
             }
@@ -250,7 +250,7 @@ public static class MemoryText
         var result = new StringBuilder(text.Length);
         foreach (var rune in text.EnumerateRunes())
         {
-            result.Append(GoUnicode.ToLower(rune).ToString());
+            result.Append(UnicodeCharacters.ToLower(rune).ToString());
         }
 
         return result.ToString();

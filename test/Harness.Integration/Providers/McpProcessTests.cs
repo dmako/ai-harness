@@ -364,10 +364,10 @@ internal sealed class ProviderFixture : IDisposable
         }
     }
 
-    public static async Task EventuallyAsync(Func<bool> condition)
+    public static async Task EventuallyAsync(Func<bool> condition, TimeSpan? wait = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        timeout.CancelAfter(wait ?? TimeSpan.FromSeconds(5));
         while (!condition())
         {
             await Task.Delay(10, timeout.Token);

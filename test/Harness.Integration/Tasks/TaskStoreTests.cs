@@ -288,15 +288,24 @@ public sealed class TaskStoreTests
     }
 
     [Theory]
-    [InlineData("schema-05.db")]
-    [InlineData("schema-13.db")]
-    [InlineData("schema-19.db")]
-    public void HistoricalDatabaseCopiesRetainTaskStateThroughExportImport(string fixture)
+    [InlineData(5)]
+    [InlineData(13)]
+    [InlineData(19)]
+    public void HistoricalSchemasRetainTaskStateThroughExportImport(int version)
     {
         using var s = new State();
-        var root = FindRoot();
         var path = Path.Combine(s.Directory, "copy.db");
-        File.Copy(Path.Combine(root, "test", "fixtures", "compatibility", "sqlite", fixture), path);
+        using (
+            var historical = HarnessDatabase.Open(
+                path,
+                new StorageOptions(),
+                MigrationCatalog.All.Take(version).ToArray(),
+                Token
+            )
+        )
+        {
+            historical.SchemaVersion().Should().Be(version);
+        }
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
         var store = new TaskStore(database);
         store.Import(
@@ -315,17 +324,6 @@ public sealed class TaskStoreTests
         store.ImportMilestones(exported.Milestones, "export", cancellationToken: Token).Should().Be(0);
         Snapshot(database).Should().Be(before);
         store.Get("T-42", Token).Status.Should().Be("ready");
-    }
-
-    private static string FindRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Harness.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName ?? throw new DirectoryNotFoundException();
     }
 
     private static void SeedExecution(HarnessDatabase database)

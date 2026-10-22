@@ -22,7 +22,7 @@ public sealed class BoundaryRules
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",
-        Justification = "Rule kinds use the frozen lowercase wire names."
+        Justification = "Rule kinds use the lowercase wire names."
     )]
     public void Add(string text, RuleReference reference)
     {

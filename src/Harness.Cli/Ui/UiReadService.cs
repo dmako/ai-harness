@@ -29,7 +29,7 @@ internal static class UiJson
             {
                 return;
             }
-            // These models retain Go zero values in storage; the HTTP views use omitempty.
+            // These models retain default values in storage; HTTP views omit empty optional strings.
             foreach (
                 var property in info.Properties.Where(p =>
                     p.PropertyType == typeof(string)

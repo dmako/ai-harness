@@ -15,7 +15,17 @@ public sealed class KnowledgeLevelTests
     {
         using var directory = new State();
         var path = Path.Combine(directory.Path, "legacy.db");
-        File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "schema-04.db"), path);
+        using (
+            var historical = HarnessDatabase.Open(
+                path,
+                new StorageOptions(),
+                MigrationCatalog.All.Take(4).ToArray(),
+                Token
+            )
+        )
+        {
+            historical.SchemaVersion().Should().Be(4);
+        }
         var before = File.ReadAllBytes(path);
         var results = KnowledgeLevels.Across(
             [new KnowledgeProject("p1", "legacy", directory.Path, path)],

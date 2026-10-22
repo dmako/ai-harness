@@ -223,7 +223,7 @@ internal static class McpMapping
     [SuppressMessage(
         "Major Bug",
         "S1244:Floating point numbers should not be tested for equality",
-        Justification = "The pinned Go where-filter compares decoded JSON numeric values exactly; an epsilon would change routing predicates."
+        Justification = "Routing predicates compare decoded JSON numeric values exactly; an epsilon would change their meaning."
     )]
     internal static bool Matches(Entry entry, IReadOnlyDictionary<string, JsonElement> where) =>
         where.All(pair =>

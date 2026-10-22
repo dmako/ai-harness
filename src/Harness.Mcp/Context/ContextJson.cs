@@ -5,7 +5,7 @@ using Harness.Core.Serialization;
 
 namespace Harness.Mcp.Context;
 
-/// <summary>The Go JSON string policy, including literal supplementary Unicode and HTML escaping.</summary>
+/// <summary>JSON string encoding with literal supplementary Unicode and HTML escaping.</summary>
 public static class ContextJson
 {
     public static string Serialize(object value)

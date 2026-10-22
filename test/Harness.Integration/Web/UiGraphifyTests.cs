@@ -85,7 +85,10 @@ public sealed class UiGraphifyTests
             .GetValue<int>()
             .Should()
             .Be(1);
-        await ProviderFixture.EventuallyAsync(() => SessionId(graphify) is { Length: > 0 } next && next != first);
+        await ProviderFixture.EventuallyAsync(
+            () => SessionId(graphify) is { Length: > 0 } next && next != first,
+            TimeSpan.FromSeconds(20)
+        );
         var next = SessionId(graphify);
         (
             await UiWriteTests.PostAsync(

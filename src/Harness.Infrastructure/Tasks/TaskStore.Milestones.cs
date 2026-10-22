@@ -105,7 +105,7 @@ public sealed partial class TaskStore
         );
     }
 
-    // Unlike task reads, milestone progress does not refresh leases/readiness in the Go contract.
+    // Unlike task reads, milestone progress does not refresh leases or readiness.
     public IReadOnlyList<MilestoneProgress> Milestones(CancellationToken cancellationToken = default) =>
         database.ReadTransaction(
             (c, t) =>

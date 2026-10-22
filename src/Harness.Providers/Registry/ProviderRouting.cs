@@ -101,7 +101,7 @@ public static class ProviderRouting
     {
         try
         {
-            // Go's filepath.Glob also matches directories bearing a marker's name.
+            // Marker matching includes directories bearing a marker's name.
             return Directory
                 .EnumerateFileSystemEntries(directory)
                 .Any(path =>

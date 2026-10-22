@@ -236,7 +236,7 @@ internal sealed partial class UiReadService
     [SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",
-        Justification = "SQLite lower() and the Go search query use lowercase text."
+        Justification = "SQLite lower() and the search query use lowercase text."
     )]
     [SuppressMessage(
         "Reliability",

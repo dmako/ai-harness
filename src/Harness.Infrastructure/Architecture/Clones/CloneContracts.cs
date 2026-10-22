@@ -175,7 +175,7 @@ public static class CloneContracts
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",
-        Justification = "Variant words are part of the frozen lowercase wire contract."
+        Justification = "Variant words are part of the lowercase wire contract."
     )]
     internal static IReadOnlyList<string> NameWords(string name)
     {

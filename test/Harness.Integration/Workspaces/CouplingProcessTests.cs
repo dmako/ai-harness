@@ -44,28 +44,7 @@ public sealed class CouplingProcessTests
         );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
         tools.Should().HaveCount(30);
-        var tool = JsonSerializer.SerializeToElement(tools.Single(tool => tool.Name == "change_coupling").ProtocolTool);
-        using var baseline = JsonDocument.Parse(
-            await File.ReadAllTextAsync(
-                Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"),
-                Token
-            )
-        );
-        var original = baseline
-            .RootElement.GetProperty("cases")
-            .GetProperty("mcp")
-            .EnumerateArray()
-            .Single(row => row.GetProperty("name").GetString() == "tools_list")
-            .GetProperty("response")
-            .GetProperty("result")
-            .GetProperty("tools")
-            .EnumerateArray()
-            .Single(tool => tool.GetProperty("name").GetString() == "change_coupling");
-        JsonElement.DeepEquals(tool.GetProperty("inputSchema"), original.GetProperty("inputSchema")).Should().BeTrue();
-        JsonElement
-            .DeepEquals(tool.GetProperty("outputSchema"), original.GetProperty("outputSchema"))
-            .Should()
-            .BeTrue();
+        ToolSchema.AssertMatches(tools.Single(tool => tool.Name == "change_coupling"));
         var file = await CallAsync(new() { ["file"] = "./a.cs", ["check"] = true });
         file.TryGetProperty("changed", out _).Should().BeFalse();
         file.GetProperty("note").GetString().Should().Contain("partners are unknown");

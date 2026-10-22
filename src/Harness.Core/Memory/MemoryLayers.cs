@@ -93,7 +93,7 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
                 return new LocatedMemory(project, null);
             }
             catch (KeyNotFoundException)
-            { /* Continue to the wider stores, as in Go Layers.Find. */
+            { /* Continue to the wider stores. */
             }
         }
 
@@ -106,7 +106,7 @@ public sealed class MemoryLayers(IMemoryStore? project, IReadOnlyList<MemoryLeve
                 return new LocatedMemory(level.Store, level.Scope);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
-            { /* Go treats any wider-store lookup failure as a miss. */
+            { /* Treat any wider-store lookup failure as a miss. */
             }
         }
 

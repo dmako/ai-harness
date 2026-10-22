@@ -34,9 +34,9 @@ The UI listens on `127.0.0.1:17477` by default.
 
 ## Platform prerequisites
 
-Keep the operating system updated before running the release. The earlier
-untrimmed single-file release was manually verified on Windows, Linux, and macOS.
-The Native AOT build has separate qualification evidence in the release guide.
+Keep the operating system updated before running the release. Native releases require
+the system libraries listed below. Validate the exact archive on its target host;
+see the release guide for the automated checks.
 
 ### Linux
 
@@ -77,6 +77,8 @@ the optional developer tools. Keep Gatekeeper enabled for the rest of the system
 
 ## Documentation
 
-- [Release packaging, verification, and native dependencies](doc/port/releases.md)
+- [Architecture and module documentation](doc/architecture/README.md)
+- [Documentation index and usage guides](doc/README.md)
+- [Build, test and benchmark instructions](doc/testing.md)
+- [Release packaging and native dependencies](doc/releases.md)
 - [C# formatting and development conventions](doc/csharp-formatting.md)
-- [Port compatibility policy](doc/port/compatibility-policy.md)

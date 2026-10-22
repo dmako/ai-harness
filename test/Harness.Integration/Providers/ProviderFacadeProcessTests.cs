@@ -11,7 +11,7 @@ namespace Harness.Integration.Providers;
 public sealed class ProviderFacadeProcessTests
 {
     [Fact]
-    public async Task CliAdvertisesFrozenSchemasAndRoutesAllFourFacadeToolsWithoutInitializingState()
+    public async Task CliAdvertisesSchemasAndRoutesFacadeToolsWithoutInitializingState()
     {
         var token = TestContext.Current.CancellationToken;
         using var fixture = new ProviderFixture();
@@ -50,40 +50,9 @@ public sealed class ProviderFacadeProcessTests
         )
         {
             var tools = await client.ListToolsAsync(cancellationToken: token);
-            using var baseline = JsonDocument.Parse(
-                await File.ReadAllTextAsync(
-                    Path.Combine(
-                        ProviderFixture.RepositoryRoot,
-                        "test",
-                        "fixtures",
-                        "compatibility",
-                        "go-windows-amd64.json"
-                    ),
-                    token
-                )
-            );
-            var expectedTools = baseline
-                .RootElement.GetProperty("cases")
-                .GetProperty("mcp")
-                .EnumerateArray()
-                .Single(entry => entry.GetProperty("name").GetString() == "tools_list")
-                .GetProperty("response")
-                .GetProperty("result")
-                .GetProperty("tools");
             foreach (var name in new[] { "search_project", "provider_status", "package_api", "project_overview" })
             {
-                var expected = expectedTools
-                    .EnumerateArray()
-                    .Single(tool => tool.GetProperty("name").GetString() == name);
-                var actual = JsonSerializer.SerializeToElement(tools.Single(tool => tool.Name == name).ProtocolTool);
-                JsonElement
-                    .DeepEquals(expected.GetProperty("inputSchema"), actual.GetProperty("inputSchema"))
-                    .Should()
-                    .BeTrue(name);
-                JsonElement
-                    .DeepEquals(expected.GetProperty("outputSchema"), actual.GetProperty("outputSchema"))
-                    .Should()
-                    .BeTrue(name);
+                ToolSchema.AssertMatches(tools.Single(tool => tool.Name == name));
             }
             var search = await client.CallToolAsync(
                 "search_project",

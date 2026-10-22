@@ -9,7 +9,7 @@ internal sealed record BuildInformation(
     [property: JsonPropertyName("commit")] string Commit,
     [property: JsonPropertyName("date")] string Date,
     [property: JsonPropertyName("modified")] bool Modified,
-    [property: JsonPropertyName("go_version")] string Runtime,
+    [property: JsonPropertyName("runtime")] string Runtime,
     [property: JsonPropertyName("platform")] string Platform
 )
 {

@@ -25,11 +25,9 @@ public sealed class ArchitectureReaderTests
         "group Domain = *.Models; forbid: Domain -> *.DAL; only: BL -> Models; layers: One; group = *.X"
     )]
     [InlineData("cycle", false, "")]
-    [InlineData("go", false, "")]
-    [InlineData("go", false, "forbid: internal/storage -> internal/gui*; only: internal/arch ->")]
     [InlineData("typescript", false, "")]
     [InlineData("typescript", false, "layers: pages > features/* > shared")]
-    public async Task ArchitectureAndBoundaryRulesMatchFrozenGo(string language, bool workspace, string knowledge)
+    public void ArchitectureAndBoundaryRulesDescribeProjectStructure(string language, bool workspace, string knowledge)
     {
         using var tree = new ReaderTree(Files(language));
         var repository = tree.Repository();
@@ -40,28 +38,11 @@ public sealed class ArchitectureReaderTests
         var reference = new RuleReference("mem_1", Scope: "project", Type: "constraint");
         rules.Add(knowledge, reference);
         architecture = architecture with { Findings = rules.Apply(architecture) };
-        var expected = await OracleAsync(
-            new
-            {
-                mode = "analyze",
-                root = tree.Root,
-                files = tree.Files,
-                used = workspace ? Array.Empty<string>() : null,
-                knowledge = new[] { new { text = knowledge, @ref = reference } },
-            }
-        );
-        Equivalent(architecture, expected);
         architecture
             .Findings.Should()
             .OnlyContain(finding =>
                 finding.Source.Provider == "harness" && finding.Measure > 0 && finding.Basis.Length > 0
             );
-        if (language is "go")
-        {
-            architecture
-                .Findings.Should()
-                .Contain(finding => finding.Kind == "internal-import" && finding.Basis == "fact");
-        }
 
         if (language is "typescript")
         {
@@ -74,7 +55,7 @@ public sealed class ArchitectureReaderTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task WorkspaceSystemMatchesFrozenContractsConfigurationAndEvidence(bool chatty)
+    public void WorkspaceSystemLinksConfigurationAndEvidence(bool chatty)
     {
         using var orders = new ReaderTree(
             new()
@@ -139,22 +120,6 @@ public sealed class ArchitectureReaderTests
         };
         var reader = new SystemReader(members);
         var actual = reader.Read();
-        var expected = await OracleAsync(
-            new
-            {
-                mode = "system",
-                members = members.Select(member => new
-                {
-                    member.Id,
-                    member.Name,
-                    @short = member.ShortName,
-                    root = member.Repository.Root,
-                    files = member.Repository.Files,
-                    member.Library,
-                }),
-            }
-        );
-        Equivalent(actual, expected);
         actual.Findings.Should().Contain(finding => finding.Kind == "sync-cycle" && finding.Basis == "fact");
         actual
             .Findings.Should()
@@ -172,42 +137,8 @@ public sealed class ArchitectureReaderTests
             .And.NotContain("synthetic")
             .And.NotContain("example.invalid");
         var reads = members.Sum(member => member.Repository.PhysicalReads);
-        Equivalent(reader.Read(), expected);
+        reader.Read();
         members.Sum(member => member.Repository.PhysicalReads).Should().Be(reads);
-    }
-
-    [Theory]
-    [InlineData("src/A.csproj:3", 0, 0)]
-    [InlineData("src/A.csproj:12", 3, 4)]
-    [InlineData("./src", 0, 2)]
-    [InlineData("src/Empty", 0, 0)]
-    public async Task EvidenceSitesAndBoundedSnippetsMatchGo(string evidence, int span, int max)
-    {
-        using var tree = new ReaderTree(
-            new()
-            {
-                ["src/A.csproj"] = string.Join('\n', Enumerable.Range(1, 30)),
-                ["src/z.txt"] = "x",
-                ["src/.hidden"] = "x",
-            }
-        );
-        Directory.CreateDirectory(Path.Combine(tree.Root, "src/Empty"));
-        var site = EvidenceSnippets.Parse(evidence);
-        site.Should().NotBeNull();
-        Equivalent(site, await OracleAsync(new { mode = "site", evidence }));
-        Equivalent(
-            EvidenceSnippets.Read(tree.Repository(), site, span, max),
-            await OracleAsync(
-                new
-                {
-                    mode = "snippet",
-                    root = tree.Root,
-                    evidence,
-                    span,
-                    max,
-                }
-            )
-        );
     }
 
     [Fact]
@@ -235,7 +166,7 @@ public sealed class ArchitectureReaderTests
     }
 
     [Fact]
-    public async Task ConfigCoverageMatchesFrozenSourceWithoutStartingProviders()
+    public async Task ConfigCoverageDoesNotStartProviders()
     {
         var configuration = new HarnessConfiguration
         {
@@ -257,38 +188,6 @@ public sealed class ArchitectureReaderTests
                 },
             },
         };
-        Equivalent(
-            ArchitectureProviders.Coverage(configuration),
-            await OracleAsync(
-                new
-                {
-                    mode = "coverage",
-                    config = new
-                    {
-                        providers = new
-                        {
-                            cycles = new
-                            {
-                                capabilities = new Dictionary<string, object>
-                                {
-                                    [Capabilities.ArchCycles] = new { },
-                                    [Capabilities.ArchDeadCode] = new { },
-                                },
-                                only = new[] { Capabilities.ArchCycles },
-                            },
-                            disabled = new
-                            {
-                                enabled = false,
-                                capabilities = new Dictionary<string, object>
-                                {
-                                    [Capabilities.ArchDependencies] = new { },
-                                },
-                            },
-                        },
-                    },
-                }
-            )
-        );
         var missing = await ArchitectureProviders.CyclesAsync(null, Token);
         missing.Answered.Should().BeFalse();
         missing.Notes.Should().NotBeEmpty();
@@ -333,16 +232,6 @@ public sealed class ArchitectureReaderTests
                 ["App.Tools/App.Tools.csproj"] = Project("<IsPackable>false</IsPackable>"),
                 ["App.Shared/App.Shared.csproj"] = Project(""),
             },
-            "go" => new()
-            {
-                ["go.mod"] = "module example.com/app\ngo 1.27.1\n",
-                ["internal/storage/store.go"] =
-                    "package storage\nimport \"example.com/app/internal/gui\"\nfunc Store(){}",
-                ["internal/gui/web.go"] = "package gui\nimport \"example.com/app/internal/storage\"\nfunc Web(){}",
-                ["internal/feature/internal/util/util.go"] = "package util\nfunc Run(){}",
-                ["cmd/app/main.go"] =
-                    "package main\nimport \"example.com/app/internal/feature/internal/util\"\nfunc main(){}",
-            },
             _ => new()
             {
                 ["package.json"] = """{"name":"web","private":true}""",
@@ -356,99 +245,5 @@ public sealed class ArchitectureReaderTests
                 ["src/shared/skip.test.ts"] = "import '../pages/home';",
             },
         };
-    }
-
-    private static void Equivalent(object? actual, JsonNode? expected)
-    {
-        var node = JsonSerializer.SerializeToNode(actual);
-        Canonical(node);
-        Canonical(expected);
-        JsonNode.DeepEquals(node, expected).Should().BeTrue($"C#: {node}\nGo: {expected}");
-    }
-
-    // Go maps do not define order for system links, finding groups and merged evidence.
-    private static void Canonical(JsonNode? node)
-    {
-        if (node is JsonObject obj)
-        {
-            foreach (var pair in obj.ToArray())
-            {
-                Canonical(pair.Value);
-                if (
-                    pair.Value is JsonArray array
-                    && pair.Key
-                        is "nodes"
-                            or "links"
-                            or "smells"
-                            or "evidence"
-                            or "what"
-                            or "contracts"
-                            or "servers"
-                            or "clients"
-                )
-                {
-                    var values = array
-                        .Select(value => value?.DeepClone())
-                        .OrderBy(value => value?.ToJsonString(), StringComparer.Ordinal)
-                        .ToArray();
-                    array.Clear();
-                    foreach (var value in values)
-                    {
-                        array.Add(value);
-                    }
-                }
-            }
-        }
-        else if (node is JsonArray array)
-        {
-            foreach (var value in array)
-            {
-                Canonical(value);
-            }
-        }
-    }
-
-    [SuppressMessage(
-        "Security",
-        "S4036:Searching OS commands in PATH is security-sensitive",
-        Justification = "Explicit test oracle path, no shell."
-    )]
-    private static async Task<JsonNode?> OracleAsync(object input)
-    {
-        var oracle =
-            Environment.GetEnvironmentVariable("HARNESS_GO_ARCHITECTURE_ORACLE")
-            ?? throw Xunit.Sdk.SkipException.ForSkip(
-                "Set HARNESS_GO_ARCHITECTURE_ORACLE with Architecture/build_oracle.py."
-            );
-        using var process = new Process
-        {
-            StartInfo = new(oracle)
-            {
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            },
-        };
-        process.Start();
-        var output = process.StandardOutput.ReadToEndAsync(Token);
-        var error = process.StandardError.ReadToEndAsync(Token);
-        try
-        {
-            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(input));
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(60), Token);
-            process.ExitCode.Should().Be(0, await error);
-            return JsonNode.Parse(await output);
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-        }
     }
 }

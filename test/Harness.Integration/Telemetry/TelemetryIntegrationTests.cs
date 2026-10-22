@@ -31,11 +31,8 @@ public sealed class TelemetryIntegrationTests
         "CA2000:Dispose objects before losing scope",
         Justification = "The awaited registry owns the fake provider."
     )]
-    public async Task ContextRecordsProvenanceAndSyncScoresExactlyLikeFrozenGo()
+    public async Task ContextRecordsProvenanceAndSyncScores()
     {
-        var oracle = Environment.GetEnvironmentVariable("HARNESS_GO_TELEMETRY_ORACLE") is { Length: > 0 } path
-            ? path
-            : throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_TELEMETRY_ORACLE.");
         using var fixture = await SyncFixture.CreateAsync();
         fixture.Write("a.cs", "class Caller\n{\n public void Run()\n {\n   Target();\n }\n}\n");
         fixture.Write("b.cs", "class Worker\n{\n public void Target()\n {\n   Old();\n }\n}\n");
@@ -110,30 +107,6 @@ public sealed class TelemetryIntegrationTests
         fixture.Write("a.cs", "class Caller\n{\n public void Run()\n {\n   Target();\n   Log();\n }\n}\n");
         fixture.Write("b.cs", "class Worker\n{\n public void Target()\n {\n   New();\n }\n}\n");
         await fixture.CommitAsync("change both");
-        var head = (await location.Repository!.ReadHeadAsync(Token)).Commit;
-        var copy = Path.Combine(fixture.DirectoryRoot, "oracle.db");
-        using (var source = database.OpenConnection())
-        using (
-            var destination = new SqliteConnection(
-                new SqliteConnectionStringBuilder { DataSource = copy, Pooling = false }.ToString()
-            )
-        )
-        {
-            await destination.OpenAsync(Token);
-            source.BackupDatabase(destination);
-        }
-        await OracleAsync(
-            oracle,
-            new
-            {
-                mode = "resolve",
-                db = copy,
-                root = fixture.Root,
-                worktree = fixture.Worktree,
-                head,
-                by = "sync",
-            }
-        );
         await fixture.RunAsync();
         var since = DateTimeOffset.UtcNow.AddDays(-1);
         var actual = store.ContextStats(since);
@@ -142,30 +115,8 @@ public sealed class TelemetryIntegrationTests
         actual.CalleeMisses.Should().Be(1);
         actual.AfterRead.Touched.Should().Be(2);
         actual.AfterRead.Hits.Should().Be(1);
-        var expected = await OracleAsync(
-            oracle,
-            new
-            {
-                mode = "stats",
-                db = copy,
-                since,
-            }
-        );
-        var json = JsonSerializer.SerializeToNode(actual, TelemetryJson.Options);
-        JsonNode.DeepEquals(json, expected).Should().BeTrue($"C#: {json}\nGo: {expected}");
         await fixture.RunAsync();
         store.ContextStats(since).Changed.Should().Be(2);
-        var activity = JsonSerializer.SerializeToNode(store.Activity(since, 20), TelemetryJson.Options);
-        var originalActivity = await OracleAsync(
-            oracle,
-            new
-            {
-                mode = "activity",
-                db = fixture.DatabasePath,
-                since,
-            }
-        );
-        JsonNode.DeepEquals(activity, originalActivity).Should().BeTrue($"C#: {activity}\nGo: {originalActivity}");
     }
 
     [Fact]
@@ -329,63 +280,10 @@ public sealed class TelemetryIntegrationTests
         activity
             .Should()
             .Contain(item => item.Kind == "task" && item.Title.StartsWith("OBS-0001 done:", StringComparison.Ordinal));
-        if (Environment.GetEnvironmentVariable("HARNESS_GO_TELEMETRY_ORACLE") is { Length: > 0 } original)
-        {
-            var expected = await OracleAsync(
-                original,
-                new
-                {
-                    mode = "activity",
-                    db = fixture.DatabasePath,
-                    since = DateTimeOffset.UtcNow.AddDays(-1),
-                }
-            );
-            var json = JsonSerializer.SerializeToNode(activity, TelemetryJson.Options);
-            JsonNode.DeepEquals(json, expected).Should().BeTrue($"C#: {json}\nGo: {expected}");
-        }
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
-    }
-
-    [SuppressMessage(
-        "Security",
-        "S4036:Searching OS commands in PATH is security-sensitive",
-        Justification = "The explicitly configured frozen oracle runs directly without a shell."
-    )]
-    private static async Task<JsonNode?> OracleAsync(string executable, object request)
-    {
-        using var process = new Process
-        {
-            StartInfo = new(executable)
-            {
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            },
-        };
-        process.Start();
-        var stdout = process.StandardOutput.ReadToEndAsync(Token);
-        var stderr = process.StandardError.ReadToEndAsync(Token);
-        try
-        {
-            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(request, TelemetryJson.Options));
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(60), Token);
-            process.ExitCode.Should().Be(0, await stderr);
-            return JsonNode.Parse(await stdout);
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-        }
     }
 }

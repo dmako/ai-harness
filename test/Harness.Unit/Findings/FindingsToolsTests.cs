@@ -67,7 +67,7 @@ public sealed class FindingsToolsTests
     }
 
     [Fact]
-    public async Task SnippetsStayWithinTheGoByteBudget()
+    public async Task SnippetsStayWithinTheUtf8ByteBudget()
     {
         var session = new Session { LargeSnippets = true };
         var output = JsonSerializer.SerializeToElement(

@@ -14,25 +14,6 @@ namespace Harness.Integration.Storage;
 public sealed class StorageTests
 {
     [Fact]
-    public void EmbeddedMigrationsMatchEveryFrozenByte()
-    {
-        using var inventory = JsonDocument.Parse(File.ReadAllText(Fixture("storage.json")));
-        var frozen = inventory.RootElement.GetProperty("migrations").EnumerateArray().ToArray();
-        MigrationCatalog.All.Count.Should().Be(19);
-        MigrationCatalog.All.Count.Should().Be(frozen.Length);
-        for (var index = 0; index < frozen.Length; index++)
-        {
-            var migration = MigrationCatalog.All[index];
-            migration.Version.Should().Be(index + 1);
-            migration.Name.Should().Be(Path.GetFileNameWithoutExtension(frozen[index].GetProperty("path").GetString()));
-            Convert
-                .ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(migration.Sql)))
-                .Should()
-                .Be(frozen[index].GetProperty("sha256").GetString());
-        }
-    }
-
-    [Fact]
     public void MigrationFilesMustHaveValidNamesAndContiguousUniqueVersions()
     {
         FluentActions
@@ -97,7 +78,7 @@ public sealed class StorageTests
     public void HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(int version)
     {
         using var directory = new TestDirectory();
-        File.Copy(Fixture($"schema-{version:00}.db"), directory.DatabasePath);
+        CreateHistoricalDatabase(directory.DatabasePath, version);
         using (var database = Open(directory.DatabasePath))
         {
             database.SchemaVersion().Should().Be(19);
@@ -284,7 +265,7 @@ public sealed class StorageTests
             .Should()
             .ThrowExactly<FileNotFoundException>();
         Directory.Exists(Path.GetDirectoryName(missing)).Should().BeFalse();
-        File.Copy(Fixture("schema-01.db"), directory.DatabasePath);
+        CreateHistoricalDatabase(directory.DatabasePath, 1);
         var before = SHA256.HashData(File.ReadAllBytes(directory.DatabasePath));
         using (var database = HarnessDatabase.OpenReadOnly(directory.DatabasePath))
         {
@@ -421,7 +402,7 @@ public sealed class StorageTests
         if (OperatingSystem.IsWindows())
         {
             throw Xunit.Sdk.SkipException.ForSkip(
-                "Unix mode bits do not apply on Windows; as in Go, Windows files inherit the containing directory ACL."
+                "Unix mode bits do not apply on Windows; Windows files inherit the containing directory ACL."
             );
         }
 
@@ -582,37 +563,10 @@ public sealed class StorageTests
         }
     }
 
-    [Fact]
-    public async Task GoThenCSharpThenGoPreservesSchemaAndUnicodeData()
+    private static void CreateHistoricalDatabase(string path, int version)
     {
-        var helper = Environment.GetEnvironmentVariable("HARNESS_GO_STORAGE_ORACLE");
-        if (string.IsNullOrEmpty(helper))
-        {
-            throw Xunit.Sdk.SkipException.ForSkip(
-                "Set HARNESS_GO_STORAGE_ORACLE to the helper built by Storage/Go/build-oracle.ps1."
-            );
-        }
-
-        using var directory = new TestDirectory();
-        using (var go = Start(helper, "put", directory.DatabasePath, "go", "Go → C# 🧪"))
-        {
-            await ExpectSuccess(go);
-        }
-
-        using (var database = Open(directory.DatabasePath))
-        {
-            database.GetDiagnostic("go").Should().Be("Go → C# 🧪");
-            database.PutDiagnostic("csharp", "C# → Go ž");
-        }
-
-        using (var go = Start(helper, "get", directory.DatabasePath, "csharp"))
-        {
-            (await ExpectSuccess(go)).Should().Contain("C# → Go ž");
-        }
-
-        using var final = HarnessDatabase.OpenReadOnly(directory.DatabasePath);
-        final.SchemaVersion().Should().Be(19);
-        final.GetDiagnostic("go").Should().Be("Go → C# 🧪");
+        using var database = Open(path, new StorageOptions(), MigrationCatalog.All.Take(version).ToArray());
+        database.PutDiagnostic("fixture", "žluťoučký 🧪");
     }
 
     private static HarnessDatabase Open(string path, StorageOptions? options = null) =>
@@ -636,8 +590,6 @@ public sealed class StorageTests
         HarnessDatabase database,
         Func<SqliteConnection, SqliteTransaction, T> action
     ) => database.ReadTransaction(action, TestContext.Current.CancellationToken);
-
-    private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 
     [SuppressMessage(
         "Security",

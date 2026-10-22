@@ -28,7 +28,7 @@ public sealed class CloneEvidenceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task WorkspaceCopiesAndSuggestedHomesMatchGoWithoutChangingDatabases(bool shared)
+    public async Task WorkspaceCopiesSuggestHomesWithoutChangingDatabases(bool shared)
     {
         using var fixture = await WorkspaceFixture.CreateAsync();
         var code =
@@ -72,11 +72,10 @@ public sealed class CloneEvidenceTests
         var before = fixture.Hashes();
         var evidence = new WorkspaceEvidenceReader(fixture.Members);
         var reader = new WorkspaceDuplicateReader(fixture.Members, evidence);
-        object actual;
         if (shared)
         {
             var result = await reader.SharedAsync("one", null, Token);
-            actual = new { report = result.Report, findings = result.Findings };
+            result.Report.Groups.Should().NotBeEmpty();
             result.Findings.Should().Contain(finding => finding.Kind == "shared-code" && finding.Confidence > 0.99);
             result
                 .Report.Groups.Where(group => group.Copied)
@@ -85,30 +84,8 @@ public sealed class CloneEvidenceTests
         }
         else
         {
-            actual = await reader.ReadAsync(Token);
+            (await reader.ReadAsync(Token)).Groups.Should().Contain(group => group.Copied);
         }
-
-        var expected = await OracleAsync(
-            new
-            {
-                mode = shared ? "shared" : "workspace",
-                members = fixture.Members.Select(member => new
-                {
-                    project = member.Name,
-                    project_id = member.Id,
-                    root = member.Root,
-                }),
-                global = fixture.Global,
-                workspace = "one",
-                library = new Dictionary<string, bool>
-                {
-                    [fixture.Members[0].Id] = true,
-                    [fixture.Members[1].Id] = false,
-                    [fixture.Members[2].Id] = true,
-                },
-            }
-        );
-        Equivalent(actual, expected);
         fixture.Hashes().Should().Equal(before);
         var repositories = await Task.WhenAll(
             fixture.Members.Select(async member => (await evidence.RepositoryAsync(member, Token)).Repository)
@@ -119,50 +96,39 @@ public sealed class CloneEvidenceTests
     }
 
     [Fact]
-    public async Task GitHotspotsPartnersAndMissingChecksMatchFrozenHistoryIncludingRenames()
+    public async Task GitHotspotsAndMissingPartnersFollowHistoryIncludingRenames()
     {
         using var fixture = await SyncFixture.CreateAsync(commit: false);
-        fixture.Write("old.go", "old");
+        fixture.Write("old.cs", "old");
         await CommitAsync(fixture, DateTimeOffset.UtcNow.AddDays(-190));
         for (var index = 0; index < 5; index++)
         {
-            fixture.Write("api.go", "api " + index.ToString(CultureInfo.InvariantCulture));
+            fixture.Write("api.cs", "api " + index.ToString(CultureInfo.InvariantCulture));
             if (index < 3)
             {
-                fixture.Write("handler.go", "handler " + index.ToString(CultureInfo.InvariantCulture));
+                fixture.Write("handler.cs", "handler " + index.ToString(CultureInfo.InvariantCulture));
             }
 
             fixture.Write("README.md", "docs " + index.ToString(CultureInfo.InvariantCulture));
             fixture.Write("models.g.cs", "generated " + index.ToString(CultureInfo.InvariantCulture));
-            fixture.Write("api_test.go", "tests " + index.ToString(CultureInfo.InvariantCulture));
+            fixture.Write("test/ApiTests.cs", "tests " + index.ToString(CultureInfo.InvariantCulture));
             await CommitAsync(fixture, DateTimeOffset.UtcNow.AddDays(-10 + index));
         }
-        await fixture.GitAsync("mv", "handler.go", "renamed.go");
+        await fixture.GitAsync("mv", "handler.cs", "renamed.cs");
         await CommitAsync(fixture, DateTimeOffset.UtcNow.AddDays(-2));
-        fixture.Write("renamed.go", "new handler");
+        fixture.Write("renamed.cs", "new handler");
         await CommitAsync(fixture, DateTimeOffset.UtcNow.AddDays(-1));
         var repo = await GitRepository.DiscoverAsync(fixture.Root, Token);
         var since = DateTimeOffset.UtcNow.AddDays(-180);
         var churn = await repo.ChurnAsync(since, Token);
-        Equivalent(
-            new { counts = churn.Counts, commits = churn.Commits },
-            await OracleAsync(
-                new
-                {
-                    mode = "churn",
-                    root = fixture.Root,
-                    since,
-                }
-            )
-        );
-        churn.Counts.Should().NotContainKey("old.go");
+        churn.Counts.Should().NotContainKey("old.cs");
         var tables = new Dictionary<string, ProviderItem[]>(StringComparer.Ordinal)
         {
-            ["api.go"] =
+            ["api.cs"] =
             [
                 new()
                 {
-                    Path = "renamed.go",
+                    Path = "renamed.cs",
                     Count = 3,
                     Confidence = 0.6,
                 },
@@ -174,22 +140,22 @@ public sealed class CloneEvidenceTests
                 },
                 new()
                 {
-                    Path = "gone.go",
+                    Path = "gone.cs",
                     Count = 4,
                     Confidence = 0.8,
                 },
                 new()
                 {
-                    Path = "api.go",
+                    Path = "api.cs",
                     Count = 9,
                     Confidence = 1,
                 },
             ],
-            ["renamed.go"] =
+            ["renamed.cs"] =
             [
                 new()
                 {
-                    Path = "api.go",
+                    Path = "api.cs",
                     Count = 3,
                     Confidence = 1,
                 },
@@ -209,11 +175,11 @@ public sealed class CloneEvidenceTests
                 capability = Capabilities.ArchChangeCoupling,
                 table = new Dictionary<string, ProviderItem[]>
                 {
-                    ["api.go"] =
+                    ["api.cs"] =
                     [
                         new()
                         {
-                            Path = "renamed.go",
+                            Path = "renamed.cs",
                             Count = 2,
                             Confidence = 0.5,
                         },
@@ -242,70 +208,26 @@ public sealed class CloneEvidenceTests
             );
         }
 
-        var partners = await ChangeCoupling.PartnersAsync(registry, "api.go", 10, Token);
-        Equivalent(
-            new { partners = partners.Partners, errors = partners.Errors },
-            await OracleAsync(
-                new
-                {
-                    mode = "partners",
-                    root = fixture.Root,
-                    file = "api.go",
-                    limit = 10,
-                    providers,
-                }
-            )
+        var partners = await ChangeCoupling.PartnersAsync(registry, "api.cs", 10, Token);
+        partners.Partners.Should().Contain(partner => partner.Path == "renamed.cs");
+        var missing = await ChangeCoupling.CheckAsync(registry, fixture.Root, ["api.cs"], Token);
+        missing.Missing.Should().Contain(item => item.Partner.Path == "renamed.cs");
+        var complete = await ChangeCoupling.CheckAsync(
+            registry,
+            fixture.Root,
+            ["api.cs", "renamed.cs", "README.md"],
+            Token
         );
+        complete.Missing.Should().BeEmpty();
         var hotspots = await ChangeCoupling.HotspotsAsync(repo, registry, 10, 2, Token);
-        Equivalent(
-            new
-            {
-                hotspots = hotspots.Hotspots,
-                commits = hotspots.Commits,
-                errors = hotspots.Errors,
-            },
-            await OracleAsync(
-                new
-                {
-                    mode = "hotspots",
-                    root = fixture.Root,
-                    limit = 10,
-                    partners = 2,
-                    providers,
-                }
-            )
-        );
         hotspots
             .Hotspots.Should()
             .NotContain(hotspot =>
-                new[] { "old.go", "handler.go", "models.g.cs", "api_test.go", "README.md" }.Contains(
+                new[] { "old.cs", "handler.cs", "models.g.cs", "test/ApiTests.cs", "README.md" }.Contains(
                     hotspot.Path,
                     StringComparer.Ordinal
                 )
             );
-        foreach (
-            var changed in new[]
-            {
-                new[] { "api.go", "README.md" },
-                new[] { "api.go", "renamed.go", "README.md" },
-                new[] { "renamed.go" },
-            }
-        )
-        {
-            var check = await ChangeCoupling.CheckAsync(registry, fixture.Root, changed, Token);
-            Equivalent(
-                new { missing = check.Missing, errors = check.Errors },
-                await OracleAsync(
-                    new
-                    {
-                        mode = "check",
-                        root = fixture.Root,
-                        changed,
-                        providers,
-                    }
-                )
-            );
-        }
         ChangeCoupling.Usual(new("x", 3, 1, "", "")).Should().BeFalse();
         ChangeCoupling.Usual(new("x", 3, 0.6, "", "")).Should().BeTrue();
     }
@@ -428,15 +350,8 @@ public sealed class CloneEvidenceTests
         var files = (await AnalysisRepository.OpenAsync(fixture.Root, Token)).Files;
         files.Should().NotContain("src/ignored.cs");
         CloneExtractor.Reads("src/a.g.cs").Should().BeFalse();
-        CloneExtractor.Reads("src/a_test.go").Should().BeFalse();
         var snippets = EvidenceSnippets.Read(new(repository.Root, ["src/b.cs"]), new("src/b.cs", 1));
         snippets.Function.Should().Be("Read");
-    }
-
-    private static void Equivalent(object actual, JsonNode? expected)
-    {
-        var node = JsonSerializer.SerializeToNode(actual);
-        JsonNode.DeepEquals(node, expected).Should().BeTrue($"C#: {node}\nGo: {expected}");
     }
 
     [SuppressMessage(
@@ -471,47 +386,5 @@ public sealed class CloneEvidenceTests
         await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(30), Token);
         process.ExitCode.Should().Be(0, await error);
         await output;
-    }
-
-    [SuppressMessage(
-        "Security",
-        "S4036:Searching OS commands in PATH is security-sensitive",
-        Justification = "Explicit frozen oracle fixture path; no shell."
-    )]
-    private static async Task<JsonNode?> OracleAsync(object input)
-    {
-        var oracle =
-            Environment.GetEnvironmentVariable("HARNESS_GO_CLONES_ORACLE")
-            ?? throw Xunit.Sdk.SkipException.ForSkip("Set HARNESS_GO_CLONES_ORACLE with Clones/build_oracle.py.");
-        using var process = new Process
-        {
-            StartInfo = new(oracle)
-            {
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            },
-        };
-        process.Start();
-        var output = process.StandardOutput.ReadToEndAsync(Token);
-        var error = process.StandardError.ReadToEndAsync(Token);
-        try
-        {
-            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(input));
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(Token).WaitAsync(TimeSpan.FromSeconds(60), Token);
-            process.ExitCode.Should().Be(0, await error);
-            return JsonNode.Parse(await output);
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-            }
-        }
     }
 }

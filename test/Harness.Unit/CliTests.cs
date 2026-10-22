@@ -72,7 +72,7 @@ public sealed class CliTests
         json.RootElement.EnumerateObject().Count().Should().Be(6);
         json.RootElement.GetProperty("version").GetString().Should().Be("test");
         json.RootElement.GetProperty("modified").GetBoolean().Should().BeTrue();
-        json.RootElement.GetProperty("go_version").GetString().Should().Be(".NET test");
+        json.RootElement.GetProperty("runtime").GetString().Should().Be(".NET test");
         json.RootElement.GetProperty("date").GetString().Should().Be(info.Date);
         error.ToString().Should().BeEmpty();
     }

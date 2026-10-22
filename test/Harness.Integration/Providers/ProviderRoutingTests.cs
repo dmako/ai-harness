@@ -137,10 +137,9 @@ public sealed class ProviderRoutingTests
         using var root = new Root();
         root.Write("App.slnx", "");
         root.Write("src/package.json", "");
-        root.Write("src/go.mod", "");
         root.Write("src/pyproject.toml", "");
         root.Write("src/build.gradle.kts", "");
-        ProviderRouting.DetectLanguages(root.Path).Should().Equal("csharp", "go", "java", "python", "typescript");
+        ProviderRouting.DetectLanguages(root.Path).Should().Equal("csharp", "java", "python", "typescript");
         using var deep = new Root();
         deep.Write("src/Api/Api.csproj", "");
         deep.Write("Wrong.CSPROJ", "");

@@ -6,7 +6,7 @@ using Harness.Core.Architecture;
 
 namespace Harness.Infrastructure.Architecture;
 
-/// <summary>The frozen reader's bounded property/item evaluation; never loads MSBuild or executes project code.</summary>
+/// <summary>Bounded property/item evaluation; never loads MSBuild or executes project code.</summary>
 public sealed partial class StaticMsBuild(AnalysisRepository repository)
 {
     private static readonly Regex Property = Rx(@"\$\(([A-Za-z_][\w.]*)\)");

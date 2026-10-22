@@ -22,7 +22,7 @@ public sealed class ConfigurationTests
     [InlineData("windows", "APPDATA", "harness")]
     [InlineData("linux", "XDG_CONFIG_HOME", "harness")]
     [InlineData("darwin", "HOME", "Library/Application Support/harness")]
-    public void GlobalPathUsesGoOperatingSystemConventions(string platform, string variable, string suffix)
+    public void GlobalPathUsesOperatingSystemConventions(string platform, string variable, string suffix)
     {
         var folder = Path.Combine(Path.GetTempPath(), "config-home");
         ConfigurationPaths
@@ -122,7 +122,7 @@ public sealed class ConfigurationTests
     }
 
     [Fact]
-    public void EveryFrozenPackLoadsAndMalformedUtf8IsRejected()
+    public void EveryEmbeddedPackLoadsAndMalformedUtf8IsRejected()
     {
         using var directory = new ConfigurationDirectory();
         ConfigurationLoader.Packs.Count.Should().Be(5);

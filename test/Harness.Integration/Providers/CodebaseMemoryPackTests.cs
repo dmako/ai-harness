@@ -107,11 +107,11 @@ public sealed class CodebaseMemoryPackTests
             legacy
                 ? """
                 {"results":[{"name":"WriteAtomic","qualified_name":"proj.internal.fsutil.WriteAtomic",
-                "label":"Function","file_path":"internal/fsutil/fsutil.go","start_line":23,"end_line":60,"rank":-49.5}],"has_more":true}
+                "label":"Function","file_path":"internal/fsutil/fsutil.cs","start_line":23,"end_line":60,"rank":-49.5}],"has_more":true}
                 """
                 : """
                 {"cols":["qn","label","file","lines","rank"],
-                "rows":[["proj.internal.fsutil.WriteAtomic","Function","internal/fsutil/fsutil.go","23-60",-49.5]],"has_more":true}
+                "rows":[["proj.internal.fsutil.WriteAtomic","Function","internal/fsutil/fsutil.cs","23-60",-49.5]],"has_more":true}
                 """
         );
         fixture.Write(
@@ -119,16 +119,16 @@ public sealed class CodebaseMemoryPackTests
             legacy
                 ? """
                 {"results":[{"node":"WriteAtomic","qualified_name":"proj.internal.fsutil.WriteAtomic",
-                "label":"Function","file":"internal/fsutil/fsutil.go","match_lines":[34,40],"start_line":23}]}
+                "label":"Function","file":"internal/fsutil/fsutil.cs","match_lines":[34,40],"start_line":23}]}
                 """
                 : """
-                {"rows":[["proj.internal.fsutil.WriteAtomic","Function","internal/fsutil/fsutil.go","23-60",[34,40]]]}
+                {"rows":[["proj.internal.fsutil.WriteAtomic","Function","internal/fsutil/fsutil.cs","23-60",[34,40]]]}
                 """
         );
         fixture.Write("get_architecture.json", """{"modules":2}""");
         fixture.Write(
             "query_graph.json",
-            """{"rows":[["WriteAtomic","proj.WriteAtomic","file.go",23,60,"Other","other.go",0.9]]}"""
+            """{"rows":[["WriteAtomic","proj.WriteAtomic","file.cs",23,60,"Other","other.cs",0.9]]}"""
         );
         await using var provider = GenericMcpProvider.Build(
             "codebase-memory",
@@ -156,7 +156,7 @@ public sealed class CodebaseMemoryPackTests
                     Name = "WriteAtomic",
                     QualifiedName = "proj.internal.fsutil.WriteAtomic",
                     Label = "Function",
-                    Path = "internal/fsutil/fsutil.go",
+                    Path = "internal/fsutil/fsutil.cs",
                     StartLine = 23,
                     EndLine = 60,
                     Score = -49.5,

@@ -25,7 +25,7 @@ public sealed class FindingsProcessTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task PublicToolsMatchFrozenSchemasAndKeepProposalsPendingUntilAuthorApproval()
+    public async Task PublicToolsFollowSchemasAndRequireProposalApproval()
     {
         using var fixture = await SyncFixture.CreateAsync();
         fixture.Write(
@@ -76,33 +76,9 @@ public sealed class FindingsProcessTests
         );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
         tools.Should().HaveCount(30);
-        using var baseline = JsonDocument.Parse(
-            await File.ReadAllTextAsync(
-                Path.Combine(ProviderFixture.RepositoryRoot, "test/fixtures/compatibility/go-windows-amd64.json"),
-                Token
-            )
-        );
         foreach (var name in new[] { "architecture_findings", "architecture_propose" })
         {
-            var actual = JsonSerializer.SerializeToElement(tools.Single(t => t.Name == name).ProtocolTool);
-            var expected = baseline
-                .RootElement.GetProperty("cases")
-                .GetProperty("mcp")
-                .EnumerateArray()
-                .Single(row => row.GetProperty("name").GetString() == "tools_list")
-                .GetProperty("response")
-                .GetProperty("result")
-                .GetProperty("tools")
-                .EnumerateArray()
-                .Single(t => t.GetProperty("name").GetString() == name);
-            JsonElement
-                .DeepEquals(actual.GetProperty("inputSchema"), expected.GetProperty("inputSchema"))
-                .Should()
-                .BeTrue();
-            JsonElement
-                .DeepEquals(actual.GetProperty("outputSchema"), expected.GetProperty("outputSchema"))
-                .Should()
-                .BeTrue();
+            ToolSchema.AssertMatches(tools.Single(tool => tool.Name == name));
         }
         var full = await CallAsync("architecture_findings", new() { ["kind"] = "boundary", ["snippets"] = true });
         var boundary = full.GetProperty("groups")[0].GetProperty("findings").EnumerateArray().Single();
@@ -122,35 +98,6 @@ public sealed class FindingsProcessTests
         proposed.GetProperty("proposal").TryGetProperty("decided_by", out _).Should().BeFalse();
         new TaskStore(db).List(cancellationToken: Token).Should().BeEmpty();
         new FindingStore(db).MarkOf(key, Token).Should().BeNull();
-        var goServer = Environment.GetEnvironmentVariable("HARNESS_GO_FINDINGS_SERVER");
-        await using var original = !string.IsNullOrEmpty(goServer)
-            ? await McpClient.CreateAsync(
-                new StdioClientTransport(
-                    new()
-                    {
-                        Command = goServer,
-                        Arguments = ["mcp", "--project", fixture.Root],
-                        WorkingDirectory = fixture.Root,
-                        EnvironmentVariables = environment,
-                        InheritEnvironmentVariables = false,
-                    }
-                ),
-                cancellationToken: Token
-            )
-            : null;
-        foreach (
-            var args in new Dictionary<string, object?>[]
-            {
-                [],
-                new() { ["full"] = true },
-                new() { ["kind"] = "boundary", ["snippets"] = true },
-                new() { ["area"] = "src/Domain" },
-                new() { ["key"] = key },
-            }
-        )
-        {
-            await CompareGoAsync(args);
-        }
 
         var duplicate = await CallAsync(
             "architecture_propose",
@@ -174,7 +121,6 @@ public sealed class FindingsProcessTests
         var hidden = await CallAsync("architecture_findings", new() { ["kind"] = "boundary", ["hide_marked"] = true });
         hidden.GetProperty("groups")[0].GetProperty("marked_hidden").GetInt32().Should().Be(1);
         hidden.GetProperty("groups")[0].TryGetProperty("findings", out _).Should().BeFalse();
-        await CompareGoAsync(new() { ["kind"] = "boundary", ["hide_marked"] = true });
         var brief = await CallAsync("architecture_findings", []);
         brief
             .GetProperty("groups")[0]
@@ -214,26 +160,8 @@ public sealed class FindingsProcessTests
         await fixture.RunAsync();
         var gone = await CallAsync("architecture_findings", new() { ["key"] = key, ["gone"] = true });
         gone.GetProperty("groups")[0].GetProperty("findings")[0].GetProperty("status").GetString().Should().Be("gone");
-        await CompareGoAsync(new() { ["key"] = key, ["gone"] = true });
         var suppressed = await CallAsync("architecture_findings", new() { ["key"] = key });
         suppressed.GetProperty("groups")[0].TryGetProperty("findings", out _).Should().BeFalse();
-        async Task CompareGoAsync(Dictionary<string, object?> args)
-        {
-            if (original is null)
-            {
-                return;
-            }
-
-            var expected = await original.CallToolAsync("architecture_findings", args, cancellationToken: Token);
-            expected
-                .IsError.Should()
-                .BeNull(string.Join("; ", expected.Content.OfType<TextContentBlock>().Select(c => c.Text)));
-            var actual = await CallAsync("architecture_findings", args);
-            JsonElement
-                .DeepEquals(actual, expected.StructuredContent!.Value)
-                .Should()
-                .BeTrue($"C#: {actual}\nGo: {expected.StructuredContent}");
-        }
         async Task<JsonElement> CallAsync(string tool, Dictionary<string, object?> args)
         {
             var response = await client.CallToolAsync(tool, args, cancellationToken: Token);

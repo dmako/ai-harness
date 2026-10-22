@@ -76,7 +76,7 @@
       <_HarnessUnexpectedReference Remove="@(_HarnessAllowedReference)" />
     </ItemGroup>
     <Error Condition=" '@(_HarnessUnexpectedReference)' != '' "
-           Text="$(MSBuildProjectName) has forbidden project references: @(_HarnessUnexpectedReference, ', '). See doc/port/solution-and-packages.md for the allowed dependency graph." />
+           Text="$(MSBuildProjectName) has forbidden project references: @(_HarnessUnexpectedReference, ', '). See doc/architecture/README.md for the allowed dependency graph." />
   </Target>
 
 </Project>

@@ -182,7 +182,7 @@ public sealed partial class WorkspaceSearchSession
     [SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",
-        Justification = "Frozen concern parsing exposes lowercase words and stems."
+        Justification = "Concern parsing exposes lowercase words and stems."
     )]
     private static string Lower(string value) => value.ToLowerInvariant();
 

@@ -108,7 +108,7 @@ public sealed class ProposalStoreTests
             .Proposal!;
         var approved = state.Store.Approve(next.Id, new MemoryApprovalInput { By = "human" }, Token);
         state.Store.Get(keep.Memory.Id, Token).SupersededBy.Should().Be(approved.Memory!.Id);
-        // An explicit list still supersedes even when KeepBoth is set, matching Go's input precedence.
+        // An explicit list still supersedes even when KeepBoth is set, following explicit input precedence.
         var explicitProposal = state
             .Store.Propose(Input("Always persist enum values as readable names"), Token)
             .Proposal!;

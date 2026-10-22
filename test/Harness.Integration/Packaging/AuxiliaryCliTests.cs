@@ -14,7 +14,7 @@ public sealed class AuxiliaryCliTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task EmbeddedDocsAndRootCommandTreeRetainAllFrozenEntryPoints()
+    public async Task EmbeddedDocsAndRootCommandTreeExposeSupportedEntryPoints()
     {
         using var fixture = new GraphifyFixture();
         var help = await RunAsync(fixture, "--help");

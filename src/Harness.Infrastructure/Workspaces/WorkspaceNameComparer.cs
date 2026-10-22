@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Harness.Infrastructure.Workspaces;
 
-// Go orders UTF-8 strings by bytes; UTF-16 ordinal order differs for supplementary runes.
+// Order UTF-8 strings by bytes; UTF-16 ordinal order differs for supplementary runes.
 internal sealed class WorkspaceNameComparer : IComparer<string>
 {
     internal static WorkspaceNameComparer Instance { get; } = new();

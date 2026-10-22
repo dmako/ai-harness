@@ -1676,7 +1676,7 @@ async function renderMachine(main) {
       ["Theme", themeSel],
     ]))),
     section("harness", null, h("div", { class: "card pad" }, kv([
-      ["Version", b.version], ["Commit", b.commit && h("code", {}, b.commit.slice(0, 12))], ["Built", b.date], ["Platform", b.platform], ["Go", b.go_version],
+      ["Version", b.version], ["Commit", b.commit && h("code", {}, b.commit.slice(0, 12))], ["Built", b.date], ["Platform", b.platform], ["Runtime", b.runtime],
     ]))),
     section("C# sessions (graphify-csharp)", "Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone.",
       graphifySessions(null)),

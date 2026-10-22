@@ -87,7 +87,7 @@ public static class KnowledgeDrift
         void Add(MemoryRecord m, string what, string why, string basis, double confidence)
         {
             var content = string.Join(" ", m.Content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-            // Go clips UTF-8 bytes; preserve a valid scalar boundary in the diagnostic excerpt.
+            // Clip UTF-8 bytes at a valid scalar boundary in diagnostic excerpts.
             if (Encoding.UTF8.GetByteCount(content) > 160)
             {
                 var clipped = new StringBuilder();

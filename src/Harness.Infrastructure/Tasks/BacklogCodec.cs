@@ -18,7 +18,7 @@ public static class BacklogCodec
         ArgumentNullException.ThrowIfNull(text);
         try
         {
-            // Decode the first document, as Go's single yaml.Decoder.Decode does.
+            // Decode the first YAML document.
             var parser = new Parser(new StringReader(text.TrimStart('\uFEFF')));
             var stream = new YamlStream();
             // YamlStream validates the whole stream. Selecting the first document preserves

@@ -17,7 +17,7 @@ public sealed class UiBrowserTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task FrozenFrontendRequiresMemoryConflictChoiceAndTaskConfirmationInARealBrowser()
+    public async Task FrontendRequiresMemoryConflictChoiceAndTaskConfirmationInARealBrowser()
     {
         var executable = Environment.GetEnvironmentVariable("HARNESS_UI_BROWSER");
         if (string.IsNullOrEmpty(executable) || !File.Exists(executable))

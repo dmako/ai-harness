@@ -63,7 +63,7 @@ public sealed partial class HarnessStateSession(
         {
             ["version"] = runtime.Version,
             ["commit"] = runtime.Commit,
-            ["go_version"] = runtime.Runtime,
+            ["runtime"] = runtime.Runtime,
             ["platform"] = runtime.Platform,
             ["project_root"] = location.Root,
             ["state_root"] = location.StateRoot,

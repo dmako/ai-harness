@@ -15,7 +15,7 @@ public sealed class EvidenceProcessTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task PublicToolsKeepFrozenSchemasLocalMemoryProvenanceAndPartialProviderEvidence()
+    public async Task PublicToolsKeepLocalMemoryProvenanceAndPartialProviderEvidence()
     {
         using var fixture = await WorkspaceFixture.CreateAsync();
         fixture
@@ -91,38 +91,9 @@ public sealed class EvidenceProcessTests
             cancellationToken: Token
         );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
-        using var baseline = JsonDocument.Parse(
-            await File.ReadAllTextAsync(
-                Path.Combine(
-                    ProviderFixture.RepositoryRoot,
-                    "test",
-                    "fixtures",
-                    "compatibility",
-                    "go-windows-amd64.json"
-                ),
-                Token
-            )
-        );
-        var original = baseline
-            .RootElement.GetProperty("cases")
-            .GetProperty("mcp")
-            .EnumerateArray()
-            .Single(row => row.GetProperty("name").GetString() == "tools_list")
-            .GetProperty("response")
-            .GetProperty("result")
-            .GetProperty("tools");
         foreach (var name in new[] { "library_adoption", "similar_concerns" })
         {
-            var actual = JsonSerializer.SerializeToElement(tools.Single(tool => tool.Name == name).ProtocolTool);
-            var expected = original.EnumerateArray().Single(tool => tool.GetProperty("name").GetString() == name);
-            JsonElement
-                .DeepEquals(actual.GetProperty("inputSchema"), expected.GetProperty("inputSchema"))
-                .Should()
-                .BeTrue();
-            JsonElement
-                .DeepEquals(actual.GetProperty("outputSchema"), expected.GetProperty("outputSchema"))
-                .Should()
-                .BeTrue();
+            ToolSchema.AssertMatches(tools.Single(tool => tool.Name == name));
         }
         var adoption = await client.CallToolAsync(
             "library_adoption",

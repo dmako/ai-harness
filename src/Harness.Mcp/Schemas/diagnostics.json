@@ -14,7 +14,7 @@
       "commit": {
         "type": "string"
       },
-      "go_version": {
+      "runtime": {
         "type": "string"
       },
       "platform": {
@@ -179,7 +179,7 @@
     "required": [
       "version",
       "commit",
-      "go_version",
+      "runtime",
       "platform",
       "project_root",
       "state_root",

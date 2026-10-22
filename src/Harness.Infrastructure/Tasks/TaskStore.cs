@@ -412,7 +412,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
 
     private static string? Null(string value) => value.Length is 0 ? null : value;
 
-    // Go compares milestone exit JSON byte-for-byte on reimport. Preserve encoding/json's
+    // Milestone exit JSON is compared byte-for-byte on reimport. Preserve canonical
     // UTF-8 strings, HTML escaping and supplementary runes rather than STJ's ASCII escaping.
     private static string Json(IReadOnlyList<string>? values)
     {

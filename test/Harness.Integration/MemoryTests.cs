@@ -62,7 +62,7 @@ public sealed class MemoryTests
     }
 
     [Fact]
-    public void DuplicatesExpiryAndFutureSimilarityPreserveGoQuirks()
+    public void DuplicatesExpiryAndFutureSimilarityRemainDeterministic()
     {
         using var state = new State();
         using var database = HarnessDatabase.Open(state.Path, cancellationToken: TestContext.Current.CancellationToken);

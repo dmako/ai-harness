@@ -245,7 +245,7 @@ public static class FindingsTools
         });
     }
 
-    // Go's omitempty omits empty optional strings as well as null pointers.
+    // Omit empty optional strings as well as null values.
     private static JsonNode Clean<T>(T value)
     {
         var node = HarnessJson.SerializeToNode(value)!;

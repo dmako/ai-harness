@@ -160,7 +160,7 @@ public sealed class MemoryService(
         var store = (MemoryStore)located.Store;
         store.Retire(id, by, reason, cancellationToken);
         var detail = store.Details(id, history: true, cancellationToken);
-        // The Go CLI relabels the selected memory only; its history keeps the stored project scopes.
+        // Relabel the selected memory only; its history keeps the stored project scopes.
         return located.Scope is null ? detail : detail with { Memory = detail.Memory with { Scope = located.Scope } };
     }
 
