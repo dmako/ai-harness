@@ -55,6 +55,7 @@ public static class CliApplication
         builder.Services.AddSingleton<WorkspaceCommandRunner>();
         builder.Services.AddSingleton<ReportCommandRunner>();
         builder.Services.AddSingleton<ExportCommandRunner>();
+        builder.Services.AddSingleton<SessionCommandRunner>();
         builder.Services.AddSingleton(new SetupInvocation(args));
         builder.Services.AddSingleton<SetupTerminal>();
         builder.Services.AddSingleton<SetupCommandRunner>();
@@ -118,6 +119,14 @@ public static class CliApplication
                 telemetry.AddCommand<ExportPreviewCommand>("preview");
                 telemetry.AddCommand<ExportSendCommand>("send");
             });
+            configuration.AddCommand<DocsCommand>("docs").WithDescription("Read embedded documentation by section");
+            configuration.AddBranch("providers", providers => providers.AddBranch("sessions", sessions =>
+            {
+                sessions.AddCommand<SessionsListCommand>("list");
+                sessions.AddCommand<SessionStartCommand>("start");
+                sessions.AddCommand<SessionRestartCommand>("restart");
+                sessions.AddCommand<SessionStopCommand>("stop");
+            }));
             configuration.AddCommand<MetricsCommand>("metrics");
             configuration.AddCommand<ReportCommand>("report");
             configuration.AddBranch("context", context => context.AddCommand<ContextStatsCommand>("stats"));
@@ -214,6 +223,14 @@ public static class CliApplication
         if (normalized[0] is "workspace" or "workspaces" or "projects" or "telemetry" && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h")))
         {
             normalized = [normalized[0], normalized[0] is "telemetry" ? "status" : "list", .. normalized[1..]];
+        }
+
+        if (normalized[0] is "providers")
+        {
+            if (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
+            { normalized = [normalized[0], "sessions", .. normalized[1..]]; }
+            if (normalized.Length >= 2 && normalized[1] is "sessions" && (normalized.Length is 2 || normalized[2].StartsWith('-') && normalized[2] is not ("--help" or "-h")))
+            { normalized = [normalized[0], normalized[1], "list", .. normalized[2..]]; }
         }
 
         return normalized[0] switch

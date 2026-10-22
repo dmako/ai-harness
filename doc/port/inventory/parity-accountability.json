@@ -615,7 +615,8 @@
         "implementation_receipts": [
           "doc/port/inventory/bootstrap-validation.json",
           "doc/port/inventory/clients-validation.json",
-          "doc/port/inventory/mcp-validation.json"
+          "doc/port/inventory/mcp-validation.json",
+          "doc/port/inventory/release-validation.json"
         ]
       }
     ],
@@ -894,7 +895,8 @@
         "implementation_receipts": [
           "doc/port/inventory/bootstrap-validation.json",
           "doc/port/inventory/clients-validation.json",
-          "doc/port/inventory/mcp-validation.json"
+          "doc/port/inventory/mcp-validation.json",
+          "doc/port/inventory/release-validation.json"
         ]
       },
       {

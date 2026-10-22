@@ -1,0 +1,90 @@
+name: Self-contained release qualification
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Safe preview version (artifacts only; no publication)
+        required: true
+        type: string
+      go_source_url:
+        description: Authorized source URL containing the frozen Go baseline
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: windows-2025, rid: win-x64, goos: windows, goarch: amd64, suffix: .exe }
+          - { host: ubuntu-24.04, rid: linux-x64, goos: linux, goarch: amd64, suffix: '' }
+          - { host: ubuntu-24.04-arm, rid: linux-arm64, goos: linux, goarch: arm64, suffix: '' }
+          - { host: macos-15-intel, rid: osx-x64, goos: darwin, goarch: amd64, suffix: '' }
+          - { host: macos-15, rid: osx-arm64, goos: darwin, goarch: arm64, suffix: '' }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+      DOTNET_CLI_HOME: ${{ github.workspace }}/artifacts/cli-home
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/packages
+      RELEASE_VERSION: ${{ inputs.version }}
+      GO_SOURCE_URL: ${{ inputs.go_source_url }}
+      RID: ${{ matrix.rid }}
+      PROBE_OS: ${{ matrix.goos }}
+      PROBE_ARCH: ${{ matrix.goarch }}
+      PROBE_SUFFIX: ${{ matrix.suffix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.402'
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Verify pinned source and build all native test drivers
+        run: |
+          python test/Harness.Compatibility/snapshot_source.py --repository "$env:GO_SOURCE_URL" --output artifacts/pinned-source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:GOMODCACHE = Join-Path $PWD artifacts/go-modules
+          Push-Location artifacts/pinned-source
+          try { go mod download; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } } finally { Pop-Location }
+          python test/Harness.Compatibility/prepare_oracles.py --source artifacts/pinned-source --go (Get-Command go).Source --modules artifacts/go-modules --output artifacts/oracles
+      - name: Locked restore and full native tests
+        run: |
+          dotnet restore Harness.slnx --locked-mode "-bl:artifacts/restore-$([guid]::NewGuid().ToString('N')).binlog"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python test/Harness.Compatibility/regression.py --oracle-map artifacts/oracles/oracle-map.json --output artifacts/parity
+      - name: Publish and verify repeat binary hashes
+        run: python scripts/publish_release.py --version "$env:RELEASE_VERSION" --rids "$env:RID" --output artifacts/package --verify-repeat
+      - name: Build runtime-free instrumented probe
+        run: python test/Harness.Compatibility/Packaging/build_probe.py --source artifacts/pinned-source --go (Get-Command go).Source --output "artifacts/probe$env:PROBE_SUFFIX" --os "$env:PROBE_OS" --arch "$env:PROBE_ARCH"
+      - name: Native runtime isolation smoke test
+        run: |
+          $archive = Get-ChildItem artifacts/package/harness-* | Where-Object { $_.Name -match '\.(zip|tar.gz)$' } | Select-Object -First 1
+          python test/Harness.Compatibility/Packaging/run_probe.py --probe "artifacts/probe$env:PROBE_SUFFIX" --archive $archive.FullName --developer-archive (Join-Path $PWD "artifacts/package/developer-tools/$($archive.Name)") --output artifacts/native-smoke.json
+      - name: Clean Linux runtime-dependencies-only container
+        if: runner.os == 'Linux'
+        run: |
+          $archive = Get-ChildItem artifacts/package/harness-*.tar.gz | Select-Object -First 1
+          docker run --rm --network none --user 65532:65532 --tmpfs /tmp:rw,exec,mode=1777 --mount "type=bind,source=$PWD/artifacts/package,target=/releases,readonly" --mount "type=bind,source=$PWD/artifacts,target=/probe,readonly" mcr.microsoft.com/dotnet/runtime-deps:10.0-noble /probe/probe --archive "/releases/$($archive.Name)" --developer-archive "/releases/developer-tools/$($archive.Name)" | Tee-Object artifacts/container-smoke.log
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-${{ matrix.rid }}
+          path: |
+            artifacts/package
+            artifacts/native-smoke.*
+            artifacts/container-smoke.log
+            artifacts/parity
+            artifacts/**/*.binlog

@@ -431,3 +431,9 @@ FodyWeavers.xsd
 # app specific
 
 artifacts/
+
+dist/
+!configuration/Release.pubxml
+!src/Harness.Cli/Properties/PublishProfiles/Release.pubxml
+!src/Harness.Collect/Properties/PublishProfiles/Release.pubxml
+!src/Harness.Share/Properties/PublishProfiles/Release.pubxml
