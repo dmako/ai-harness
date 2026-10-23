@@ -28,7 +28,7 @@ jobs:
       - name: Locked restore
         run: dotnet restore Harness.slnx --locked-mode "-bl:artifacts/restore-$([guid]::NewGuid().ToString('N')).binlog"
       - name: Unit and integration tests
-        run: dotnet test --solution Harness.slnx --no-restore -m "-bl:artifacts/test-$([guid]::NewGuid().ToString('N')).binlog" --report-trx --results-directory "$PWD/artifacts/tests"
+        run: dotnet test --solution Harness.slnx --no-restore "-bl:artifacts/test-$([guid]::NewGuid().ToString('N')).binlog" --report-trx --results-directory "$PWD/artifacts/tests"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

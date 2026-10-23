@@ -49,7 +49,7 @@ jobs:
         run: |
           dotnet restore Harness.slnx --locked-mode "-bl:artifacts/restore-$([guid]::NewGuid().ToString('N')).binlog"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet test --solution Harness.slnx --no-restore -m "-bl:artifacts/test-$([guid]::NewGuid().ToString('N')).binlog" --report-trx --results-directory "$PWD/artifacts/tests"
+          dotnet test --solution Harness.slnx --no-restore "-bl:artifacts/test-$([guid]::NewGuid().ToString('N')).binlog" --report-trx --results-directory "$PWD/artifacts/tests"
       - name: Publish and verify repeat binary hashes
         run: python scripts/publish_release.py --version "$env:RELEASE_VERSION" --rids "$env:RID" --output artifacts/package --verify-repeat
       - name: Native runtime isolation smoke test

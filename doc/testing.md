@@ -6,9 +6,15 @@ scripts in `benchmarks`, and documentation in `doc`.
 
 ```powershell
 dotnet restore Harness.slnx --locked-mode '-bl:artifacts/restore-{}.binlog'
-dotnet test --solution Harness.slnx --no-restore -m '-bl:artifacts/test-{}.binlog' --report-trx --results-directory artifacts/tests
+dotnet test --solution Harness.slnx --no-restore '-bl:artifacts/test-{}.binlog' --report-trx --results-directory artifacts/tests
 python scripts/format_csharp.py --check
 ```
+
+The .NET 10 Microsoft Testing Platform runner forwards unrecognized options to
+the test applications. Do not pass the MSBuild `-m` flag to `dotnet test`: it
+causes exit code 5 during the test-host handshake, reported as zero tests run.
+Use `--max-parallel-test-modules` when test-module concurrency needs a limit;
+see the [Microsoft Testing Platform command reference](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-test-mtp).
 
 Each MSBuild invocation should retain its own uniquely named binlog. Format C#
 with the pinned local CSharpier tool through `scripts/format_csharp.py`. Respect
