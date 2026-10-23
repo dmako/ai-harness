@@ -52,7 +52,7 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
         throw new NotRepositoryException(root);
     }
 
-    private static string PhysicalDirectory(string path)
+    internal static string PhysicalDirectory(string path, int remainingLinks = 40)
     {
         if (!Directory.Exists(path))
         {
@@ -65,10 +65,20 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
         )
         {
             var directory = new DirectoryInfo(Path.Combine(resolved, part));
-            resolved = directory.LinkTarget is null
-                ? directory.FullName
-                : directory.ResolveLinkTarget(true)?.FullName
-                    ?? throw new IOException("Cannot resolve Git directory link.");
+            if (directory.LinkTarget is null)
+            {
+                resolved = directory.FullName;
+                continue;
+            }
+            if (remainingLinks is 0)
+            {
+                throw new IOException("Too many Git directory symbolic links.");
+            }
+            var target =
+                directory.ResolveLinkTarget(true)?.FullName
+                ?? throw new IOException("Cannot resolve Git directory link.");
+            // A link target may itself contain a symlinked parent, such as macOS /var.
+            resolved = PhysicalDirectory(target, remainingLinks - 1);
         }
         return resolved;
     }

@@ -80,6 +80,9 @@ public sealed class UiGraphifyTests
             .GetValue<int>()
             .Should()
             .Be(0);
+        (await File.ReadAllTextAsync(Path.Combine(fixture.Global, "graphify-sessions.json"), Token))
+            .Should()
+            .Contain("harness ui (by hand)");
         var first = SessionId(graphify);
         (await UiWriteTests.PostAsync(server.Client, "/api/graphify/sessions/restart", project))["changed"]!
             .GetValue<int>()
@@ -105,8 +108,11 @@ public sealed class UiGraphifyTests
             .Should()
             .Be(0);
         graphify.Calls().Where(c => c[0] is "stop").Select(c => c[1]).Should().Equal(first, next);
-        var records = await File.ReadAllTextAsync(Path.Combine(fixture.Global, "graphify-sessions.json"), Token);
-        records.Should().Contain("harness ui (by hand)");
+        var records = JsonNode.Parse(
+            await File.ReadAllTextAsync(Path.Combine(fixture.Global, "graphify-sessions.json"), Token)
+        )!;
+        records["sessions"]!.AsObject().Should().BeEmpty();
+        records["starting"]!.AsObject().Should().BeEmpty();
     }
 
     private static string SessionId(GraphifyFixture fixture)

@@ -269,15 +269,41 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
 
     public async Task StopAsync(string id, CancellationToken cancellationToken)
     {
+        int pid;
+        lock (_observations)
+        {
+            pid = _pids.GetValueOrDefault(id);
+        }
+        var stopped = false;
         try
         {
             await RunAsync(["stop", id, "--json"], cancellationToken).ConfigureAwait(false);
+            stopped = true;
         }
         finally
         {
             await ChangedAsync().ConfigureAwait(false);
             await _records
-                .UpdateAsync(records => records["sessions"]!.AsObject().Remove(id), CancellationToken.None)
+                .UpdateAsync(
+                    records =>
+                    {
+                        records["sessions"]!.AsObject().Remove(id);
+                        if (stopped && pid > 0)
+                        {
+                            var starting = records["starting"]!.AsObject();
+                            foreach (
+                                var root in starting
+                                    .Where(row => row.Value?["pid"]?.GetValue<int>() == pid)
+                                    .Select(row => row.Key)
+                                    .ToArray()
+                            )
+                            {
+                                starting.Remove(root);
+                            }
+                        }
+                    },
+                    CancellationToken.None
+                )
                 .ConfigureAwait(false);
         }
     }

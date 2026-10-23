@@ -3,6 +3,7 @@ namespace Harness.Providers.Registry;
 /// <summary>Short-lived directory cache; checks ancestors only, never scans the working tree.</summary>
 public sealed class NestedWorktreeFilter(string root, TimeProvider? timeProvider = null)
 {
+    private readonly string _inputRoot = Path.GetFullPath(root);
     private readonly string _root = ResolveRoot(root);
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
     private readonly object _gate = new();
@@ -13,7 +14,14 @@ public sealed class NestedWorktreeFilter(string root, TimeProvider? timeProvider
         var relative = path;
         if (Path.IsPathFullyQualified(path))
         {
-            relative = Path.GetRelativePath(_root, path);
+            relative = Path.GetRelativePath(_inputRoot, path);
+            if (
+                Path.IsPathRooted(relative)
+                || relative.Split(Path.DirectorySeparatorChar).Contains("..", StringComparer.Ordinal)
+            )
+            {
+                relative = Path.GetRelativePath(_root, path);
+            }
         }
         relative = relative.Replace(Path.DirectorySeparatorChar, '/');
         // Do not inspect ancestors outside this project, including provider-supplied traversal.
@@ -58,9 +66,13 @@ public sealed class NestedWorktreeFilter(string root, TimeProvider? timeProvider
         }
     }
 
-    private static string ResolveRoot(string root)
+    private static string ResolveRoot(string root, int remainingLinks = 40)
     {
         var full = Path.GetFullPath(root);
+        if (remainingLinks is 0)
+        {
+            return full;
+        }
         var current = Path.GetPathRoot(full)!;
         try
         {
@@ -70,7 +82,11 @@ public sealed class NestedWorktreeFilter(string root, TimeProvider? timeProvider
             )
             {
                 current = Path.Combine(current, component);
-                current = new DirectoryInfo(current).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? current;
+                var target = new DirectoryInfo(current).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+                if (target is not null)
+                {
+                    current = ResolveRoot(target, remainingLinks - 1);
+                }
             }
             return current;
         }

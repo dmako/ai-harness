@@ -47,7 +47,10 @@ public sealed class McpProcessTests
         var body = Body(result);
         body.GetProperty("arguments").GetProperty("literal").GetString().Should().Be(literal);
         body.GetProperty("arguments").GetProperty("count").GetInt32().Should().Be(7);
-        body.GetProperty("cwd").GetString().Should().Be(fixture.Root);
+        body.GetProperty("cwd")
+            .GetString()
+            .Should()
+            .Be(Harness.Infrastructure.Graphify.GraphifyDiscovery.Canonical(fixture.Root));
         body.GetProperty("environment").GetString().Should().Be(literal);
         body.GetProperty("process_arguments")[2].GetString().Should().Be(literal);
         var tail = client.StderrTail();
@@ -374,5 +377,5 @@ internal sealed class ProviderFixture : IDisposable
         }
     }
 
-    public void Dispose() => Directory.Delete(Root, recursive: true);
+    public void Dispose() => TestDirectory.Delete(Root);
 }

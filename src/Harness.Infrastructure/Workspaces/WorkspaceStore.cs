@@ -265,7 +265,7 @@ public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegist
         directory = Path.GetFullPath(directory);
         if (Directory.Exists(directory))
         {
-            directory = new DirectoryInfo(directory).ResolveLinkTarget(true)?.FullName ?? directory;
+            directory = Git.GitRepository.PhysicalDirectory(directory);
         }
 
         return registry.Load()["projects"]!

@@ -185,7 +185,7 @@ public static class GraphifyDiscovery
         var full = System.IO.Path.GetFullPath(path);
         try
         {
-            return new DirectoryInfo(full).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? full;
+            return Git.GitRepository.PhysicalDirectory(full);
         }
         catch (IOException)
         {

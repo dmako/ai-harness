@@ -192,6 +192,46 @@ public sealed class GraphifyTests
     }
 
     [Fact]
+    public async Task AcknowledgedStopClearsOnlyTheMatchingPendingLaunchBeforeTheProcessExits()
+    {
+        using var fixture = new GraphifyFixture();
+        fixture.Ready("stopping");
+        Directory.CreateDirectory(Path.GetDirectoryName(fixture.RecordsPath)!);
+        var root = GraphifyDiscovery.Canonical(fixture.Root);
+        var other = Path.Combine(root, "other");
+        await File.WriteAllTextAsync(
+            fixture.RecordsPath,
+            new JsonObject
+            {
+                ["sessions"] = new JsonObject(),
+                ["starting"] = new JsonObject
+                {
+                    [root] = new JsonObject { ["pid"] = Environment.ProcessId, ["by"] = "fixture owner" },
+                    [other] = new JsonObject { ["pid"] = -1, ["by"] = "other owner" },
+                },
+            }.ToJsonString(),
+            Token
+        );
+        await using var manager = fixture.Manager();
+        (await manager.ListAsync(false, Token)).Should().ContainSingle();
+        await manager.StopAsync("stopping", Token);
+        fixture.Records()["starting"]!.AsObject().ContainsKey(root).Should().BeFalse();
+        fixture.Records()["starting"]!.AsObject().ContainsKey(other).Should().BeTrue();
+        // The old PID is deliberately still alive: restart must not treat it as a launch in progress.
+        var watch = await manager.StartAsync(Token);
+        watch.Should().NotBeNull();
+        try
+        {
+            await ProviderFixture.EventuallyAsync(() => fixture.Calls().Any(call => call[0] is "watch"));
+        }
+        finally
+        {
+            watch.Kill();
+            await ProviderFixture.GoneAsync(watch.Id);
+        }
+    }
+
+    [Fact]
     public async Task StartsOnlyOneWatchSharesItAndStopsOnlyItsOwnProcess()
     {
         using var fixture = new GraphifyFixture();
@@ -300,7 +340,8 @@ public sealed class GraphifyTests
 
 internal sealed class GraphifyFixture : IDisposable
 {
-    public string DirectoryRoot { get; } = Directory.CreateTempSubdirectory("harness-graphify-test-").FullName;
+    public string DirectoryRoot { get; } =
+        GraphifyDiscovery.Canonical(Directory.CreateTempSubdirectory("harness-graphify-test-").FullName);
     public string Root => Path.Combine(DirectoryRoot, "repository");
     public string Data => Path.Combine(DirectoryRoot, "fake");
     public string Descriptors => Path.Combine(Data, "descriptors");
@@ -406,7 +447,12 @@ internal sealed class GraphifyFixture : IDisposable
             }
         }
 
-        Path.GetFullPath(DirectoryRoot).Should().StartWith(Path.GetFullPath(Path.GetTempPath()));
+        Path.GetFullPath(DirectoryRoot)
+            .Should()
+            .StartWith(
+                Path.TrimEndingDirectorySeparator(GraphifyDiscovery.Canonical(Path.GetTempPath()))
+                    + Path.DirectorySeparatorChar
+            );
         Directory.Delete(DirectoryRoot, recursive: true);
     }
 }

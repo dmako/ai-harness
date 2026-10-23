@@ -167,7 +167,7 @@ public sealed class ProjectLifecycleTests
             TestContext.Current.CancellationToken
         );
         var child = await fixture.Lifecycle.InitAsync(linked, cancellationToken: TestContext.Current.CancellationToken);
-        child.Location.StateRoot.Should().Be(root);
+        child.Location.StateRoot.Should().Be(main.Location.Root);
         child.Location.Configuration.Value.Log.Level.Should().Be("debug");
         child.Registration!.Project.Id.Should().Be(main.Registration!.Project.Id);
         child.Registration.Worktree.Id.Should().NotBe(main.Registration.Worktree.Id);

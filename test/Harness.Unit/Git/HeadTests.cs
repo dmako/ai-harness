@@ -9,7 +9,9 @@ public sealed class HeadTests
     [Fact]
     public async Task DiscoveryResolvesGitFilesAndSharedDirectoriesUsingOnlyMetadata()
     {
-        var directory = Directory.CreateTempSubdirectory("harness-gitfile-").FullName;
+        var directory = Harness.Infrastructure.Graphify.GraphifyDiscovery.Canonical(
+            Directory.CreateTempSubdirectory("harness-gitfile-").FullName
+        );
         try
         {
             var common = Path.GetFullPath(Path.Combine(directory, "main/.git"));

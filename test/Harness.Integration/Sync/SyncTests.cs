@@ -626,6 +626,6 @@ internal sealed class SyncFixture : IDisposable
             File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
         }
 
-        Directory.Delete(DirectoryRoot, recursive: true);
+        TestDirectory.Delete(DirectoryRoot);
     }
 }
