@@ -26,11 +26,12 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
     public async Task<IReadOnlyList<ArchitectureFinding>> ComplexityAsync(
         WorkspaceMember member,
         IReadOnlyDictionary<string, ComplexityThresholds> languages,
+        IReadOnlyList<MeasuredMember>? exact,
         CancellationToken token
     )
     {
         var reader = await RepeatedReaderAsync(member, token).ConfigureAwait(false);
-        return new Complexity.ComplexityReader(reader.Extractor).Read(languages);
+        return new Complexity.ComplexityReader(reader.Extractor).Read(languages, exact);
     }
 
     private async Task<Clones.RepeatedCodeReader> RepeatedReaderAsync(WorkspaceMember member, CancellationToken token)

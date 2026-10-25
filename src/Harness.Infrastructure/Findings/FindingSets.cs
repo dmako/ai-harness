@@ -5,7 +5,10 @@ using Harness.Core.Providers;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Architecture.Clones;
+using Harness.Infrastructure.Architecture.Complexity;
+using Harness.Infrastructure.Architecture.Metrics;
 using Harness.Infrastructure.Configuration;
+using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Workspaces;
@@ -60,7 +63,7 @@ public sealed class FindingSets(
             found.AddRange(
                 stored.Where(f =>
                     f.Source.Provider is not ("" or "harness")
-                    || f.Source.Tool is "internal/clones" or "internal/complexity"
+                    || f.Source.Tool is "internal/clones" or "internal/complexity" or ComplexityReader.Measured
                     || f.Kind is "stale-knowledge"
                     || f.Kind is "unused" && published.Contains(f.Project ?? "") && !have.Contains(f.Key)
                 )
@@ -95,23 +98,51 @@ public sealed class FindingSets(
                 )
             );
             found.AddRange(await reader.RepeatedAsync(Current, fresh, token).ConfigureAwait(false));
-            found.AddRange(await reader.ComplexityAsync(Current, Thresholds(), token).ConfigureAwait(false));
+            var complexity = Complexity();
+            var exact = await ExactAsync(complexity, token).ConfigureAwait(false);
+            found.AddRange(
+                await reader.ComplexityAsync(Current, complexity.Thresholds(), exact, token).ConfigureAwait(false)
+            );
         }
         return (FindingStore.Merge(found), read.Architecture is not null);
     }
 
-    private IReadOnlyDictionary<string, ComplexityThresholds> Thresholds()
+    private ComplexityConfiguration Complexity()
     {
         try
         {
             var project = root.Length is 0 ? "" : ConfigurationPaths.ProjectPath(root);
-            return ConfigurationLoader
-                .LoadFiles(globalConfigurationPath, project)
-                .Value.Architecture.Complexity.Thresholds();
+            return ConfigurationLoader.LoadFiles(globalConfigurationPath, project).Value.Architecture.Complexity;
         }
         catch (InvalidDataException)
         { /* The commands that load configuration report its errors; findings keep the default thresholds. */
-            return new ComplexityConfiguration().Thresholds();
+            return new();
+        }
+    }
+
+    /// <summary>Exact .NET values measured for HEAD, if the worker is enabled and its run for HEAD is done.</summary>
+    private async Task<IReadOnlyList<MeasuredMember>?> ExactAsync(
+        ComplexityConfiguration complexity,
+        CancellationToken token
+    )
+    {
+        if (!complexity.Metrics.Enabled || projectId.Length is 0 || root.Length is 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var head = await (await GitRepository.DiscoverAsync(root, token).ConfigureAwait(false))
+                .ReadHeadAsync(token)
+                .ConfigureAwait(false);
+            return MetricsStore.For(globalConfigurationPath, projectId).Load(head.Commit) is { State: "done" } run
+                ? run.Members
+                : null;
+        }
+        catch (Exception error) when (error is IOException or InvalidDataException)
+        { /* Without HEAD the count from source stands. */
+            return null;
         }
     }
 

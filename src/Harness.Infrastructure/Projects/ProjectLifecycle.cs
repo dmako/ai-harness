@@ -228,6 +228,25 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
                     Project = ProjectStore.Load(database),
                     Worktrees = ProjectStore.Worktrees(database),
                 };
+                if (
+                    loaded.Value.Architecture.Complexity.Metrics.Enabled
+                    && inspection.Project is { } project
+                    && head is not null
+                )
+                {
+                    var status = Architecture
+                        .Metrics.MetricsStore.For(GlobalConfigurationPath, project.Id)
+                        .Status(head.Commit);
+                    inspection = inspection with
+                    {
+                        Metrics = new(
+                            "metrics",
+                            status.State is "failed" or "unsupported" ? "warn" : "ok",
+                            status.State + ": " + status.Detail,
+                            status.Fix
+                        ),
+                    };
+                }
             }
         }
         catch (Exception exception)

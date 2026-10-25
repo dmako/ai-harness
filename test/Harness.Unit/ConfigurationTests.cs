@@ -120,6 +120,8 @@ public sealed class ConfigurationTests
     [InlineData("[architecture.complexity]\nlimit = 10")]
     [InlineData("[architecture.complexity]\nlanguages = ['csharp', 'python']")]
     [InlineData("[architecture.complexity.typescript]\nwarn = 5")]
+    [InlineData("[architecture.complexity.metrics]\ntimeout_ms = 0")]
+    [InlineData("[architecture.complexity.metrics]\nenabled = 'yes'")]
     public void InvalidLayerIdentifiesItsFileAndCannotBeMasked(string content)
     {
         using var directory = new ConfigurationDirectory();

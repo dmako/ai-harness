@@ -26,6 +26,7 @@ internal static class ConfigurationValidation
         "arch.change_coupling",
         "arch.duplicates",
         "arch.dead_code",
+        "arch.complexity",
     ];
     private static readonly string[] Fields =
     [
@@ -63,6 +64,7 @@ internal static class ConfigurationValidation
                 "architecture.complexity.languages: unknown language (csharp, go or typescript)"
             );
         }
+        Require(complexity.Metrics.TimeoutMs > 0, "architecture.complexity.metrics.timeout_ms must be > 0");
         foreach (var language in ComplexityConfiguration.Known)
         {
             var levels = complexity.For(language);

@@ -389,11 +389,19 @@ public sealed class ProviderTools(
                 })
             )
             .ConfigureAwait(false);
+        var metrics = project is null ? null : await project.ReadComplexityMetricsAsync(token).ConfigureAwait(false);
         var output = new Dictionary<string, object?>
         {
             ["providers"] = entries,
-            ["architecture"] = ArchitectureCoverage(),
+            ["architecture"] = ArchitectureCoverage(metrics is not null),
         };
+        if (metrics is not null)
+        {
+            var worker = new Dictionary<string, object?> { ["state"] = metrics.State, ["detail"] = metrics.Detail };
+            Add(worker, "fix", metrics.Fix);
+            Add(worker, "commit", metrics.Commit);
+            output["complexity_metrics"] = worker;
+        }
         if (providers.Count is 0)
         {
             output["note"] =
@@ -403,7 +411,7 @@ public sealed class ProviderTools(
         return output;
     }
 
-    private object[] ArchitectureCoverage()
+    private object[] ArchitectureCoverage(bool metricsWorker)
     {
         var offered = CapabilitiesOf();
         return Capabilities
@@ -412,23 +420,13 @@ public sealed class ProviderTools(
                 var providers = offered
                     .Where(cap => cap.Capability == capability)
                     .Select(cap => cap.Provider)
+                    .Concat(metricsWorker && capability is Capabilities.ArchComplexity ? ["metrics-worker"] : [])
                     .Order(StringComparer.Ordinal)
                     .ToArray();
                 var entry = new Dictionary<string, object?> { ["capability"] = capability, ["providers"] = providers };
                 if (providers.Length is 0)
                 {
-                    entry["without"] = capability switch
-                    {
-                        Capabilities.ArchDependencies =>
-                            "harness reads dependencies itself from build files and imports; nothing is missing",
-                        Capabilities.ArchCycles => "harness finds circles in what it reads itself; nothing is missing",
-                        Capabilities.ArchChangeCoupling =>
-                            "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)",
-                        Capabilities.ArchDuplicates =>
-                            "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)",
-                        _ =>
-                            "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet",
-                    };
+                    entry["without"] = Capabilities.Without(capability);
                 }
 
                 return (object)entry;

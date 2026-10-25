@@ -138,6 +138,19 @@ internal static class CliCommands
                     .CreateInstance<Harness.Cli.Hooks.HooksStatusCommand>(services)
                     .ExecuteAsync(settings, token)
         );
+        // Started detached by 'harness sync' when [architecture.complexity.metrics] is enabled; not for people.
+        var complexity = Group(root, groups, "complexity");
+        complexity.Hidden = true;
+        Add(
+            complexity,
+            "measure",
+            "Measure one commit's .NET projects with Microsoft.CodeAnalysis.Metrics",
+            CommandBindings.BindComplexityMeasureSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.ComplexityMeasureCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
         Add(
             Group(root, groups, "completion"),
             "status",

@@ -291,6 +291,21 @@ internal static class CommandBindings
         };
     }
 
+    internal static Func<ParseResult, Harness.Cli.ComplexityMeasureSettings> BindComplexityMeasureSettings(
+        Command command
+    )
+    {
+        var projectOption = new Option<string>("--project") { DefaultValueFactory = _ => ".", Description = null };
+        command.Options.Add(projectOption);
+        var commitOption = new Option<string>("--commit") { DefaultValueFactory = _ => "", Description = null };
+        command.Options.Add(commitOption);
+        return result => new Harness.Cli.ComplexityMeasureSettings
+        {
+            Project = result.GetValue(projectOption) ?? "",
+            Commit = result.GetValue(commitOption) ?? "",
+        };
+    }
+
     internal static Func<ParseResult, Harness.Cli.EmptySettings> BindCommandSettings(Command _)
     {
         return _ => new Harness.Cli.EmptySettings();

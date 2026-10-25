@@ -46,7 +46,8 @@ public sealed class ProviderModelTests
                 Capabilities.ArchCycles,
                 Capabilities.ArchChangeCoupling,
                 Capabilities.ArchDuplicates,
-                Capabilities.ArchDeadCode
+                Capabilities.ArchDeadCode,
+                Capabilities.ArchComplexity
             );
         var request = new ProviderRequest(
             Capabilities.PackageTypeDefinition,

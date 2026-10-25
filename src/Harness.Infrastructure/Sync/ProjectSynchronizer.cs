@@ -16,12 +16,16 @@ public sealed record ProjectSyncResult(
 )
 {
     public IReadOnlyList<Harness.Infrastructure.Findings.FindingSync> Findings { get; init; } = [];
+
+    /// <summary>What the exact-complexity worker does for HEAD, if enabled: started, measuring, ready, ...</summary>
+    public string Metrics { get; init; } = "";
 }
 
 public sealed class ProjectSynchronizer(
     ProjectLifecycle lifecycle,
     TimeProvider? clock = null,
-    Harness.Core.Providers.IProviderRegistry? providers = null
+    Harness.Core.Providers.IProviderRegistry? providers = null,
+    Architecture.Metrics.IMetricsLauncher? metricsLauncher = null
 )
 {
     public async Task<ProjectSyncResult> RunAsync(
@@ -115,7 +119,39 @@ public sealed class ProjectSynchronizer(
         )
             .SyncAsync(head.Commit, providers, token)
             .ConfigureAwait(false);
-        return new(location, registration, previous, removed, covered, run, state) { Findings = findings };
+        var metrics = "";
+        if (metricsLauncher is not null)
+        {
+            try
+            {
+                metrics = await Architecture
+                    .Metrics.MetricsScheduler.ScheduleAsync(
+                        location,
+                        registration.Project.Id,
+                        head.Commit,
+                        lifecycle.GlobalConfigurationPath,
+                        metricsLauncher,
+                        token
+                    )
+                    .ConfigureAwait(false);
+            }
+            catch (Exception error)
+                when (error
+                        is IOException
+                            or UnauthorizedAccessException
+                            or InvalidOperationException
+                            or System.ComponentModel.Win32Exception
+                )
+            { /* The exact-value worker is optional; sync keeps its lexical findings. */
+                metrics = "not started: " + error.Message.Split('\n')[0];
+            }
+        }
+
+        return new(location, registration, previous, removed, covered, run, state)
+        {
+            Findings = findings,
+            Metrics = metrics,
+        };
     }
 
     private static WorktreeIdentity[] RemoveGoneWorktrees(
