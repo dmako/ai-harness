@@ -34,6 +34,18 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         return new Complexity.ComplexityReader(reader.Extractor).Read(languages, exact);
     }
 
+    /// <summary>Every member's complexity in the enabled languages, from the same extracted functions.</summary>
+    public async Task<IReadOnlyList<(ComplexityMember Member, bool Measured)>> ComplexityValuesAsync(
+        WorkspaceMember member,
+        IReadOnlyDictionary<string, ComplexityThresholds> languages,
+        IReadOnlyList<MeasuredMember>? exact,
+        CancellationToken token
+    )
+    {
+        var reader = await RepeatedReaderAsync(member, token).ConfigureAwait(false);
+        return new Complexity.ComplexityReader(reader.Extractor).Values(languages, exact);
+    }
+
     private async Task<Clones.RepeatedCodeReader> RepeatedReaderAsync(WorkspaceMember member, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

@@ -19,13 +19,7 @@ public sealed class UiBrowserTests
     [Fact]
     public async Task FrontendRequiresMemoryConflictChoiceAndTaskConfirmationInARealBrowser()
     {
-        var executable = Environment.GetEnvironmentVariable("HARNESS_UI_BROWSER");
-        if (string.IsNullOrEmpty(executable) || !File.Exists(executable))
-        {
-            throw Xunit.Sdk.SkipException.ForSkip(
-                "Set HARNESS_UI_BROWSER to a Chrome or Edge executable for headless browser review checks."
-            );
-        }
+        var executable = Browser();
         using var fixture = await SyncFixture.CreateAsync();
         using var database = fixture.Database();
         var memories = new MemoryStore(database);
@@ -43,6 +37,240 @@ public sealed class UiBrowserTests
             "agent:test",
             Token
         );
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/knowledge/inbox" }
+                );
+                await page.WaitAsync("[...document.querySelectorAll('button')].some(b => b.textContent === 'Approve')");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Approve').click()"
+                );
+                await page.WaitAsync(
+                    "document.body.textContent.includes('Replace one of them with it, or keep both:')"
+                );
+                memories
+                    .GetProposal(proposal.Id, Token)
+                    .Proposal.Status.Should()
+                    .Be("pending", "the conflict choice must precede approval");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Keep both').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    memories.GetProposal(proposal.Id, Token).Proposal.Status is "approved"
+                );
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/inbox'");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the task…')"
+                );
+                await page.EvaluateAsync(
+                    """
+                    window.originalReviewFetch = window.fetch;
+                    window.holdTaskRefresh = true;
+                    window.holdReviewRead = true;
+                    window.fetch = async (...args) => {
+                      const response = await window.originalReviewFetch(...args);
+                      const url = String(args[0]);
+                      if (window.holdTaskRefresh && url.includes('/task-proposals?')) {
+                        window.holdTaskRefresh = false;
+                        window.taskRefreshWaiting = true;
+                        await new Promise(resolve => { window.releaseTaskRefresh = resolve; });
+                      }
+                      if (window.holdReviewRead && url.includes('/milestones')) {
+                        window.holdReviewRead = false;
+                        window.reviewReadWaiting = true;
+                        await new Promise(resolve => { window.releaseReviewRead = resolve; });
+                      }
+                      return response;
+                    };
+                    """
+                );
+                tasks.Propose(
+                    new TaskDefinition
+                    {
+                        Title = "Concurrent refresh proposal",
+                        Goal = "A pending refresh must preserve the review being opened",
+                        Acceptance = ["Form stays connected"],
+                    },
+                    "Review race",
+                    "agent:test",
+                    Token
+                );
+                await page.WaitAsync("window.taskRefreshWaiting === true");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task…').click()"
+                );
+                await page.WaitAsync("window.reviewReadWaiting === true");
+                await page.EvaluateAsync("window.releaseTaskRefresh(); window.releaseReviewRead();");
+                await page.WaitAsync("!!document.querySelector('input[aria-label=Title]')");
+                tasks
+                    .GetProposal(taskProposal.Id, Token)
+                    .Status.Should()
+                    .Be("pending", "opening the review form must not create the task");
+                await page.EvaluateAsync(
+                    "document.querySelector('input[aria-label=Title]').value = 'Browser reviewed task'"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.GetProposal(taskProposal.Id, Token).Status is "approved"
+                );
+                tasks
+                    .List(cancellationToken: Token)
+                    .Should()
+                    .ContainSingle()
+                    .Which.Definition.Title.Should()
+                    .Be("Browser reviewed task");
+                await page.WaitAsync("!!document.querySelector('.live.on')");
+                tasks.Propose(
+                    new TaskDefinition
+                    {
+                        Title = "Live update proposal",
+                        Goal = "Show independent writes without reload",
+                        Acceptance = ["Visible live"],
+                    },
+                    "SSE check",
+                    "agent:test",
+                    Token
+                );
+                await page.WaitAsync("document.body.textContent.includes('Live update proposal')");
+                await page.CommandAsync("Network.enable", new { });
+                await page.CommandAsync("Network.setBlockedURLs", new { urls = new[] { "*/api/events" } });
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync(
+                    "!!document.querySelector('.live.off') && !document.getElementById('refresh').hidden"
+                );
+                tasks.Propose(
+                    new TaskDefinition
+                    {
+                        Title = "Fallback polling proposal",
+                        Goal = "Show independent writes while SSE is unavailable",
+                        Acceptance = ["Visible through polling"],
+                    },
+                    "Polling check",
+                    "agent:test",
+                    Token
+                );
+                await page.WaitAsync("document.body.textContent.includes('Fallback polling proposal')");
+                await page.CommandAsync("Network.setBlockedURLs", new { urls = Array.Empty<string>() });
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync("!!document.querySelector('.live.on')");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task ComplexityGroupShowsItsWorstLevelFiltersByLevelAndDrawsTheDistribution()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "example.csproj",
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"""
+        );
+        // One problem, one warning and eight notes: ten findings, more than the eight shown at first.
+        fixture.Write(
+            "Router.cs",
+            "namespace Example;\npublic class Router\n{\n"
+                + string.Concat(
+                    new[] { ("Huge", 60), ("Large", 30) }
+                        .Concat(Enumerable.Range(11, 8).Select(value => ($"Note{value}", value)))
+                        .Select(method =>
+                            $"    public int {method.Item1}(int a)\n    {{\n"
+                            + string.Concat(Enumerable.Repeat("        if (a > 0) { a--; }\n", method.Item2 - 1))
+                            + "        return a;\n    }\n"
+                        )
+                )
+                + "}\n"
+        );
+        await fixture.CommitAsync("complex methods");
+        await fixture.RunAsync();
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                const string Group =
+                    "[...document.querySelectorAll('li.smell > details')].find(d => d.querySelector('summary').textContent.includes('paths through them'))";
+                const string List = Group + ".querySelector('.smellsub')";
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/architecture" }
+                );
+                await page.WaitAsync($"!!({Group})");
+                (await ValueAsync(page, $"{Group}.querySelector('summary .pill').textContent"))
+                    .Should()
+                    .Be("✕problem", "the pill shows the worst level in the group");
+                (await ValueAsync(page, $"{Group}.querySelector('summary').textContent")).Should().Contain("10 × ");
+                await page.EvaluateAsync($"{Group}.querySelector('summary').click()");
+                (await ValueAsync(page, $"{List}.querySelectorAll(':scope > li > details > summary').length"))
+                    .Should()
+                    .Be("9", "eight findings and the fold of the rest");
+                (await ValueAsync(page, $"{List}.textContent")).Should().Contain("2 more, worth less");
+                (await ValueAsync(page, $"{List}.querySelector('li summary').textContent"))
+                    .Should()
+                    .StartWith("Router.Huge has cyclomatic complexity 60");
+                (
+                    await ValueAsync(
+                        page,
+                        $"[...{Group}.querySelectorAll('.lvfilter .chip')].map(c => c.dataset.level + ':' + c.querySelector('.count').textContent).join()"
+                    )
+                )
+                    .Should()
+                    .Be("problem:1,warn:1,info:8");
+
+                await page.EvaluateAsync($"{Group}.querySelector('.lvfilter .chip[data-level=info]').click()");
+                (await ValueAsync(page, $"{List}.querySelectorAll(':scope > li').length")).Should().Be("2");
+                (await ValueAsync(page, $"{Group}.open")).Should().Be("True", "filtering redraws only the list");
+
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync($"!!({Group})");
+                await page.EvaluateAsync($"{Group}.querySelector('summary').click()");
+                (
+                    await ValueAsync(
+                        page,
+                        $"{Group}.querySelector('.chip[data-level=info]').getAttribute('aria-pressed')"
+                    )
+                )
+                    .Should()
+                    .Be("false", "the viewer's choice is kept");
+                (await ValueAsync(page, $"{List}.querySelectorAll(':scope > li').length")).Should().Be("2");
+
+                await page.WaitAsync("!!document.querySelector('.cxchart')");
+                (await ValueAsync(page, "document.querySelectorAll('.cxchart .cxth').length")).Should().Be("3");
+                (await ValueAsync(page, "document.querySelector('.cxlang').textContent"))
+                    .Should()
+                    .Contain("10 functions; at these thresholds 10 reported");
+            }
+        );
+    }
+
+    private static async Task<string> ValueAsync(BrowserPage page, string expression) =>
+        (await page.EvaluateAsync(expression)).GetProperty("result").GetProperty("value").ToString();
+
+    private static string Browser()
+    {
+        var executable = Environment.GetEnvironmentVariable("HARNESS_UI_BROWSER");
+        return string.IsNullOrEmpty(executable) || !File.Exists(executable)
+            ? throw Xunit.Sdk.SkipException.ForSkip(
+                "Set HARNESS_UI_BROWSER to a Chrome or Edge executable for headless browser review checks."
+            )
+            : executable;
+    }
+
+    /// <summary>Serves the fixture's UI, opens it in a headless browser and runs the checks on its page.</summary>
+    private static async Task BrowseAsync(
+        string executable,
+        SyncFixture fixture,
+        Func<BrowserPage, UiFixture, Task> checks
+    )
+    {
         await using var server = await UiFixture.StartAsync(fixture);
         var profile = Path.Combine(fixture.DirectoryRoot, "browser");
         Directory.CreateDirectory(profile);
@@ -88,120 +316,7 @@ public sealed class UiBrowserTests
             var target = targets.RootElement.EnumerateArray().First(t => t.GetProperty("type").GetString() is "page");
             using var socket = new ClientWebSocket();
             await socket.ConnectAsync(new(target.GetProperty("webSocketDebuggerUrl").GetString()!), Token);
-            var page = new BrowserPage(socket);
-            var id = UiWriteTests.ProjectId(fixture);
-            await page.CommandAsync(
-                "Page.navigate",
-                new { url = server.Client.BaseAddress + "#/p/" + id + "/knowledge/inbox" }
-            );
-            await page.WaitAsync("[...document.querySelectorAll('button')].some(b => b.textContent === 'Approve')");
-            await page.EvaluateAsync(
-                "[...document.querySelectorAll('button')].find(b => b.textContent === 'Approve').click()"
-            );
-            await page.WaitAsync("document.body.textContent.includes('Replace one of them with it, or keep both:')");
-            memories
-                .GetProposal(proposal.Id, Token)
-                .Proposal.Status.Should()
-                .Be("pending", "the conflict choice must precede approval");
-            await page.EvaluateAsync(
-                "[...document.querySelectorAll('button')].find(b => b.textContent === 'Keep both').click()"
-            );
-            await ProviderFixture.EventuallyAsync(() =>
-                memories.GetProposal(proposal.Id, Token).Proposal.Status is "approved"
-            );
-            await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/inbox'");
-            await page.WaitAsync(
-                "[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the task…')"
-            );
-            await page.EvaluateAsync(
-                """
-                window.originalReviewFetch = window.fetch;
-                window.holdTaskRefresh = true;
-                window.holdReviewRead = true;
-                window.fetch = async (...args) => {
-                  const response = await window.originalReviewFetch(...args);
-                  const url = String(args[0]);
-                  if (window.holdTaskRefresh && url.includes('/task-proposals?')) {
-                    window.holdTaskRefresh = false;
-                    window.taskRefreshWaiting = true;
-                    await new Promise(resolve => { window.releaseTaskRefresh = resolve; });
-                  }
-                  if (window.holdReviewRead && url.includes('/milestones')) {
-                    window.holdReviewRead = false;
-                    window.reviewReadWaiting = true;
-                    await new Promise(resolve => { window.releaseReviewRead = resolve; });
-                  }
-                  return response;
-                };
-                """
-            );
-            tasks.Propose(
-                new TaskDefinition
-                {
-                    Title = "Concurrent refresh proposal",
-                    Goal = "A pending refresh must preserve the review being opened",
-                    Acceptance = ["Form stays connected"],
-                },
-                "Review race",
-                "agent:test",
-                Token
-            );
-            await page.WaitAsync("window.taskRefreshWaiting === true");
-            await page.EvaluateAsync(
-                "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task…').click()"
-            );
-            await page.WaitAsync("window.reviewReadWaiting === true");
-            await page.EvaluateAsync("window.releaseTaskRefresh(); window.releaseReviewRead();");
-            await page.WaitAsync("!!document.querySelector('input[aria-label=Title]')");
-            tasks
-                .GetProposal(taskProposal.Id, Token)
-                .Status.Should()
-                .Be("pending", "opening the review form must not create the task");
-            await page.EvaluateAsync(
-                "document.querySelector('input[aria-label=Title]').value = 'Browser reviewed task'"
-            );
-            await page.EvaluateAsync(
-                "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task').click()"
-            );
-            await ProviderFixture.EventuallyAsync(() => tasks.GetProposal(taskProposal.Id, Token).Status is "approved");
-            tasks
-                .List(cancellationToken: Token)
-                .Should()
-                .ContainSingle()
-                .Which.Definition.Title.Should()
-                .Be("Browser reviewed task");
-            await page.WaitAsync("!!document.querySelector('.live.on')");
-            tasks.Propose(
-                new TaskDefinition
-                {
-                    Title = "Live update proposal",
-                    Goal = "Show independent writes without reload",
-                    Acceptance = ["Visible live"],
-                },
-                "SSE check",
-                "agent:test",
-                Token
-            );
-            await page.WaitAsync("document.body.textContent.includes('Live update proposal')");
-            await page.CommandAsync("Network.enable", new { });
-            await page.CommandAsync("Network.setBlockedURLs", new { urls = new[] { "*/api/events" } });
-            await page.CommandAsync("Page.reload", new { ignoreCache = true });
-            await page.WaitAsync("!!document.querySelector('.live.off') && !document.getElementById('refresh').hidden");
-            tasks.Propose(
-                new TaskDefinition
-                {
-                    Title = "Fallback polling proposal",
-                    Goal = "Show independent writes while SSE is unavailable",
-                    Acceptance = ["Visible through polling"],
-                },
-                "Polling check",
-                "agent:test",
-                Token
-            );
-            await page.WaitAsync("document.body.textContent.includes('Fallback polling proposal')");
-            await page.CommandAsync("Network.setBlockedURLs", new { urls = Array.Empty<string>() });
-            await page.CommandAsync("Page.reload", new { ignoreCache = true });
-            await page.WaitAsync("!!document.querySelector('.live.on')");
+            await checks(new BrowserPage(socket), server);
         }
         finally
         {

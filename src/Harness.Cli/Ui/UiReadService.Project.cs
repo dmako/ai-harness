@@ -25,6 +25,7 @@ internal sealed partial class UiReadService
             "coupling" => await CouplingAsync(project, request, token),
             "snippet" => await SnippetAsync(project, request, token),
             "structure" => await StructureAsync(project, token),
+            "complexity" => await ComplexityAsync(project, token),
             "stack" => await ProjectStackAsync(project, token),
             _ => await ProjectDatabaseAsync(project, endpoint, request, token),
         };

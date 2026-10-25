@@ -62,6 +62,8 @@ function ago(iso) {
   return `${Math.floor(s / 86400)} days ago`;
 }
 function ms(n) { return n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${n} ms`; }
+// compact writes an axis count: 950, 1.2K, 12K
+function compact(n) { return n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0).replace(/\.0$/, "")}K`; }
 function bytes(n) { return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} K`; }
 
 // A Go pseudo-version (v0.0.0-20260929194539-761645d87556+dirty) reads
@@ -134,9 +136,9 @@ function latencyCell(n) {
 function statusPill(status) {
   return h("span", { class: `pill st-${status}` }, h("span", { class: "ico", "aria-hidden": "true" }, STATUS_ICON[status] || "•"), status.replace("_", " "));
 }
+const LEVEL_ICON = { ok: "✓", warn: "▲", fail: "✕", problem: "✕", info: "ⓘ" };
 function levelPill(level) {
-  const icon = { ok: "✓", warn: "▲", fail: "✕", problem: "✕", info: "ⓘ" }[level] || "•";
-  return h("span", { class: `pill lv-${level}` }, h("span", { class: "ico", "aria-hidden": "true" }, icon), level);
+  return h("span", { class: `pill lv-${level}` }, h("span", { class: "ico", "aria-hidden": "true" }, LEVEL_ICON[level] || "•"), level);
 }
 // taskBar shows how a project's tasks divide over their states, one
 // stacked bar; with legend, each part is named with its icon and count.
@@ -2235,7 +2237,8 @@ function cmpVer(a, b) {
 const SMELL_KIND = { layering: "lower layers referencing higher ones", "deep-import": "reaching into a feature's internals", unused: "not used",
   duplicate: "functions written more than once", template: "functions following one template", "interface-candidate": "contracts written once per variant", "repeated-sequence": "statements written out in several functions", "shared-code": "code repeated across members",
   boundary: "dependencies your rules forbid", "rule-unclear": "rules not understood", "stale-knowledge": "knowledge naming code that is gone",
-  "no-solution": "in no solution", "test-reference": "production code referencing tests", "missing-project": "references to what is not there", cycle: "circles" };
+  "no-solution": "in no solution", "test-reference": "production code referencing tests", "missing-project": "references to what is not there", cycle: "circles",
+  complexity: "functions with many paths through them" };
 const SMELL_WHY = {
   layering: "A lower layer depends on a higher one, so the lower one cannot be used or changed without it. Roles are read from the names (a heuristic).",
   "deep-import": "Files inside a feature are imported instead of its entry file (index), so a change inside the feature breaks its importers. Export what is needed from the index.",
@@ -2246,6 +2249,7 @@ const SMELL_WHY = {
   "repeated-sequence": "The same run of statements written out in several functions, even when each statement calls a shared function: a change to the steps is made in each. One call, however often repeated, is usage and not listed; error checks and cleanup are not counted.",
   "shared-code": "The same code lives in several members: a fix in one copy misses the others. Each says where it could live once.",
   boundary: "References that break the boundary rules recorded as knowledge (layers, forbid, only); each names its rule.",
+  complexity: "Cyclomatic complexity counts the independent paths through a function (its branches, loops, cases, short-circuits and null checks): each path wants its own test, and the more there are, the harder a change is to get right. The level follows the thresholds in [architecture.complexity]; the highest come first. Exact .NET values replace harness's count once the Metrics worker has measured HEAD.",
 };
 // smellsSection lists smells, each one line opening to why and where;
 // three or more of a kind are one line opening to the list. With t (the
@@ -2457,12 +2461,15 @@ function smellsSection(list, intro, okay, t) {
         // one "could help" for the group when it is the same for all;
         // otherwise each says its own (a shared-code group's home)
         const sameFix = xs.every((x) => x.fix === xs[0].fix);
+        const item = (x) => h("li", { class: quiet(x) ? "quiet" : "" }, h("details", {}, h("summary", {}, x.title, chips(x)), body(x, sameFix)));
+        // the pill shows the group's worst level, whatever comes first (TASK-0039)
+        const levels = SMELL_LEVELS.map(([lv]) => lv).filter((lv) => xs.some((x) => x.level === lv));
         return h("li", { class: "smell" }, h("details", {},
-          h("summary", {}, levelPill(xs[0].level), h("span", { class: "stitle" }, h("b", {}, `${xs.length} × `), SMELL_KIND[kind] || kind),
+          h("summary", {}, levelPill(levels[0] || xs[0].level), h("span", { class: "stitle" }, h("b", {}, `${xs.length} × `), SMELL_KIND[kind] || kind),
             fresh > 0 && h("span", { class: "tag fstat new" }, `${fresh} new or changed`)),
           h("div", { class: "sbody" }, sameFix && xs[0].fix && h("p", { class: "sfix" }, h("b", {}, "Could help: "), xs[0].fix),
             h("p", { class: "muted small swhy" }, SMELL_WHY[kind] || xs[0].why),
-            smellList(xs, (x) => h("li", { class: quiet(x) ? "quiet" : "" }, h("details", {}, h("summary", {}, x.title, chips(x)), body(x, sameFix)))))));
+            levels.length > 1 ? levelFilter(kind, xs, item) : smellList(xs, item))));
       })) : h("p", { class: "okay" }, marked.length ? `✓ Nothing open: ${marked.length} marked by design.` : okay),
       gone.length > 0 && h("details", { class: "evfold gonefold" }, h("summary", {}, `Gone (${gone.length})`),
         h("ul", { class: "evlist" }, gone.map((x) => h("li", {}, x.title,
@@ -2470,6 +2477,32 @@ function smellsSection(list, intro, okay, t) {
   };
   draw();
   return section("Smells", intro, box);
+}
+
+// levelFilter shows a group spanning levels (complexity: notes up to
+// problems) with a chip per level and its count; a chip hides or shows its
+// level, the choice kept per kind for this viewer. Only the list is drawn
+// again, so the open group stays open (TASK-0039).
+const SMELL_LEVELS = [["problem", "problem", "problems"], ["warn", "warning", "warnings"], ["info", "note", "notes"]];
+function levelFilter(kind, xs, item) {
+  const key = "smells.levels." + kind;
+  const hidden = new Set(store.get(key, "").split(",").filter(Boolean));
+  const chips = h("div", { class: "dupfilter lvfilter", role: "group", "aria-label": "Levels shown" });
+  const list = h("div", {});
+  function draw() {
+    fill(chips, SMELL_LEVELS.filter(([lv]) => xs.some((x) => x.level === lv)).map(([lv, one, many]) => {
+      const n = xs.filter((x) => x.level === lv).length;
+      return h("button", {
+        type: "button", class: "chip", "aria-pressed": String(!hidden.has(lv)), "data-level": lv,
+        onclick: () => { hidden.has(lv) ? hidden.delete(lv) : hidden.add(lv); store.set(key, [...hidden].join(",")); draw(); },
+      }, h("span", { class: `pill lv-${lv}` }, h("span", { class: "ico", "aria-hidden": "true" }, LEVEL_ICON[lv])), n === 1 ? one : many,
+      h("span", { class: "count" }, n));
+    }));
+    const shown = xs.filter((x) => !hidden.has(x.level));
+    fill(list, shown.length ? smellList(shown, item) : h("p", { class: "muted small" }, "Every level is hidden: choose one above."));
+  }
+  draw();
+  return [chips, list];
 }
 
 // smellList lists a kind's findings in the server's order (most worth
@@ -2632,7 +2665,7 @@ async function viewArchitecture(p) {
   const layout = h("div", { class: "deplayout archlayout" }, h("div", { class: "depwrap archwrap" }, map), side);
   requestAnimationFrame(draw);
   if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(map);
-  return h("div", {}, builtOn, head, smells,
+  return h("div", {}, builtOn, head, smells, complexitySection(p),
     section("Layers", `${noun[0].toUpperCase() + nouns.slice(1)} by what they ${ts ? "import" : "reference"}: layer 0 ${ts ? "imports" : "references"} no other ${noun} here, each layer above ${ts ? "imports" : "references"} the ones below; ${nouns} in a circle share a layer. Tests sit on top.`, layout),
     couplingSection(p));
 }
@@ -2669,6 +2702,91 @@ function couplingSection(p) {
       (c.errors || []).length > 0 && h("p", { class: "muted small" }, c.errors.join("; ")));
   }).catch((e) => fill(body, h("p", { class: "error" }, e.message)));
   return section("Change coupling", "Code files changed most in the last 180 days (hotspots: harness's count from Git) and the files that change with them (co-change, from providers offering it; the percentage is the share of the file's commits). A partner that usually changes but was not touched may have been forgotten.", body);
+}
+
+// complexitySection shows how many functions have each cyclomatic
+// complexity, per language, with the thresholds that make a note, a warning
+// or a problem: the data to choose thresholds from. It loads on its own
+// (counting reads every function), the rest of the page does not wait.
+const LANGUAGE_NAME = { csharp: "C#", go: "Go", typescript: "TypeScript/JavaScript" };
+function complexitySection(p) {
+  const body = h("div", {}, h("div", { class: "loadbar", role: "progressbar", "aria-label": "Loading" }));
+  api(projectAPI(p, "complexity")).then((c) => {
+    const langs = c.languages || [];
+    fill(body, langs.length ? langs.map((l) => complexityChart(l, langs.length > 1))
+      : h("p", { class: "empty" }, "No functions in the languages [architecture.complexity] lists."));
+  }).catch((e) => fill(body, h("p", { class: "error" }, e.message)));
+  return section("Complexity distribution", "Functions by cyclomatic complexity, with the thresholds from [architecture.complexity] marked: where the tail starts shows where a threshold pays off. Lambdas and nested functions count toward the function around them.", body);
+}
+
+// complexityChart is one language's histogram: bins of five on a value
+// axis, each bar shaded by the level its values start at, the thresholds
+// as lines; counts label only the reported bars (the tail is the story),
+// every bar has its tooltip, and the table holds every number.
+const CX_LEVEL = { ok: "below the note threshold", info: "note", warn: "warning", problem: "problem" };
+function complexityChart(l, titled) {
+  const t = l.thresholds;
+  const level = (v) => (v >= t.problem ? "problem" : v >= t.warn ? "warn" : v >= t.note ? "info" : "ok");
+  const size = 5;
+  const max = Math.max(...l.counts.map(([v]) => v), t.problem);
+  const top = Math.min(Math.ceil(max / size) * size, 150); // longer tails fold into the last bin
+  const bins = [];
+  for (let lo = 1; lo <= top; lo += size) bins.push({ lo, hi: lo + size - 1, n: 0 });
+  for (const [v, n] of l.counts) bins[Math.min(Math.floor((v - 1) / size), bins.length - 1)].n += n;
+  const open = max > top;
+  const count = (lv) => l.counts.filter(([v]) => level(v) === lv).reduce((s, [, n]) => s + n, 0);
+  const range = (b, i) => (open && i === bins.length - 1 ? `${b.lo}+` : `${b.lo}–${b.hi}`);
+  // geometry: one value axis, one count axis from zero
+  const W = 720, H = 190, L = 44, R = 12, T = 34, B = 26;
+  const pw = W - L - R, ph = H - T - B, base = T + ph;
+  const x = (v) => L + ((v - 1) / top) * pw;
+  const peak = Math.max(1, ...bins.map((b) => b.n));
+  const top4 = (x0, w, y0) => {
+    const r = Math.min(4, w / 2, base - y0);
+    return `M${x0},${base}V${y0 + r}Q${x0},${y0} ${x0 + r},${y0}H${x0 + w - r}Q${x0 + w},${y0} ${x0 + w},${y0 + r}V${base}Z`;
+  };
+  const bars = bins.map((b, i) => {
+    if (!b.n) return null;
+    const x0 = x(b.lo) + 1, w = Math.min(24, x(b.hi + 1) - x(b.lo) - 2);
+    const y0 = base - Math.max(2, (b.n / peak) * ph);
+    const lv = level(b.lo);
+    return sv("g", { class: "cxbar" },
+      sv("path", { class: `cx-${lv}`, d: top4(x0, w, y0) }),
+      sv("rect", { class: "cxhit", x: x0 - 1, y: T, width: w + 2, height: ph }), // hover target taller than the bar
+      sv("title", {}, `complexity ${range(b, i)}: ${b.n} function${b.n === 1 ? "" : "s"} (${CX_LEVEL[lv]})`),
+      lv !== "ok" && sv("text", { class: "cxn", x: x0 + w / 2, y: y0 - 4, "text-anchor": "middle" }, b.n));
+  });
+  // thresholds: a line each, labels lifted a row when they would collide
+  let lastX = -Infinity, row = 0;
+  const marks = [["info", t.note], ["warn", t.warn], ["problem", t.problem]].filter(([, v]) => v <= top).map(([lv, v]) => {
+    const xv = x(v);
+    row = xv - lastX < 90 ? 1 - row : 0;
+    lastX = xv;
+    return sv("g", { class: `cxth cxth-${lv}` },
+      sv("line", { x1: xv, x2: xv, y1: T - 4, y2: base }),
+      sv("text", { x: xv + 4, y: T - 18 + row * 12 }, `${LEVEL_ICON[lv]} ${CX_LEVEL[lv]} ≥ ${v}`));
+  });
+  const ticks = [1];
+  for (let v = 11; v <= top; v += 10) ticks.push(v);
+  const svg = sv("svg", { class: "cxchart", viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `${l.members} functions by cyclomatic complexity: ${count("info")} notes, ${count("warn")} warnings, ${count("problem")} problems` },
+  sv("line", { class: "cxgrid", x1: L, x2: W - R, y1: T, y2: T }),
+  sv("line", { class: "cxaxis", x1: L, x2: W - R, y1: base, y2: base }),
+  sv("text", { class: "cxtick", x: L - 6, y: T + 4, "text-anchor": "end" }, compact(peak)),
+  sv("text", { class: "cxtick", x: L - 6, y: base, "text-anchor": "end" }, "0"),
+  ticks.map((v) => sv("text", { class: "cxtick", x: x(v), y: base + 16, "text-anchor": "middle" }, v)),
+  bars, marks);
+  const reported = count("info") + count("warn") + count("problem");
+  return h("div", { class: "cxlang" },
+    titled && h("h4", {}, LANGUAGE_NAME[l.language] || l.language),
+    h("p", { class: "small" }, `${l.members} function${l.members === 1 ? "" : "s"}; at these thresholds ${reported} reported: `,
+      [["problem", "problem"], ["warn", "warning"], ["info", "note"]].map(([lv, word], i) =>
+        [i ? ", " : "", h("span", { class: `pill lv-${lv}` }, h("span", { class: "ico", "aria-hidden": "true" }, LEVEL_ICON[lv])), `${count(lv)} ${word}${count(lv) === 1 ? "" : "s"}`]),
+      l.measured > 0 && h("span", { class: "muted" }, ` · ${l.measured} measured by Microsoft.CodeAnalysis.Metrics`)),
+    svg,
+    h("details", { class: "cut" }, h("summary", { class: "muted small" }, "Table"),
+      h("table", { class: "cxtable" }, h("thead", {}, h("tr", {}, h("th", {}, "complexity"), h("th", { class: "n" }, "functions"), h("th", {}, "level"))),
+        h("tbody", {}, bins.map((b, i) => h("tr", {}, h("td", {}, range(b, i)), h("td", { class: "n" }, b.n), h("td", {}, CX_LEVEL[level(b.lo)])))))));
 }
 
 // indexedSection shows what a provider offering project.overview (as MCP

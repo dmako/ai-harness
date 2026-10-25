@@ -44,6 +44,23 @@ public sealed class ComplexityReader(CloneExtractor extractor)
             .ToArray();
     }
 
+    /// <summary>Every member of the enabled languages with its value, reported or not: the distribution to read.</summary>
+    public IReadOnlyList<(ComplexityMember Member, bool Measured)> Values(
+        IReadOnlyDictionary<string, ComplexityThresholds> languages,
+        IReadOnlyList<MeasuredMember>? exact = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(languages);
+        var counted = extractor.Complexity().Where(member => languages.ContainsKey(member.Language)).ToArray();
+        return (
+            languages.ContainsKey("csharp") && exact is { Count: > 0 }
+                ? WithExact(counted, exact)
+                : counted.Select(member => (Member: member, Measured: (MeasuredMember?)null)).ToArray()
+        )
+            .Select(pair => (pair.Member, pair.Measured is not null))
+            .ToArray();
+    }
+
     private static (ComplexityMember Member, MeasuredMember? Measured)[] WithExact(
         IReadOnlyList<ComplexityMember> counted,
         IReadOnlyList<MeasuredMember> exact
