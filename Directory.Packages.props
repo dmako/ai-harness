@@ -1,40 +1,41 @@
 <Project>
   <PropertyGroup>
-    <Net100SdkVersion>10.0.14</Net100SdkVersion>
+    <NetSdkVersion>10.0.14</NetSdkVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Collections.Immutable" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.IO.Pipelines" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Resources.Extensions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.ServiceProcess.ServiceController" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Text.Json" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Reflection.Metadata" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.DirectoryServices.AccountManagement" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Linq.AsyncEnumerable" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Management" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Security.Permissions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="System.CodeDom" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(Net100SdkVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="$(Net100SdkVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Collections.Immutable" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.IO.Pipelines" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Resources.Extensions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.ServiceProcess.ServiceController" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Text.Json" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Reflection.Metadata" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.DirectoryServices.AccountManagement" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Linq.AsyncEnumerable" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Management" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Security.Permissions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="System.CodeDom" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="$(NetSdkVersion)" />
     <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.5.0" />
     <PackageVersion Include="AutoFixture" Version="4.18.1" />
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="5.9.0" />
@@ -102,7 +103,6 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="5.9.0" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
     <PackageVersion Include="Tomlyn" Version="2.10.1" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
