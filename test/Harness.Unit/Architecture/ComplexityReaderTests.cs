@@ -152,7 +152,7 @@ public sealed class ComplexityReaderTests
         );
         var reader = new ComplexityReader(new CloneExtractor(tree.Repository()));
 
-        var findings = reader.Read(new());
+        var findings = reader.Read(Languages(new(), "csharp"));
 
         findings
             .Select(finding => (finding.Title, finding.Level))
@@ -174,6 +174,7 @@ public sealed class ComplexityReaderTests
         large.Evidence.Should().Equal($"src/Router.cs:{LineOf(code, "Large")} (Router.Large)");
         large.Fix.Should().Contain("guard clauses");
         large.Why.Should().Contain("Microsoft's code metrics");
+        large.Language.Should().Be("csharp");
         findings
             .Single(finding => finding.Title.StartsWith("Router.Map", StringComparison.Ordinal))
             .Fix.Should()
@@ -183,12 +184,228 @@ public sealed class ComplexityReaderTests
             .Key.Should()
             .Be("complexity:src/Router.cs#Router.Twice/1");
 
-        var stricter = reader.Read(new(Note: 5, Warn: 10, Problem: 25));
+        var stricter = reader.Read(Languages(new(Note: 5, Warn: 10, Problem: 25), "csharp"));
         var moved = stricter.Single(finding => finding.Key == large.Key);
         moved.Level.Should().Be("problem");
         FindingStore.Hash(moved).Should().NotBe(FindingStore.Hash(large));
         stricter.Should().HaveCount(5);
     }
+
+    // Expected values are what gocyclo's rules give: closures count toward their function.
+    private const string GoSamples = """
+        package sample
+
+        func One() int { return 1 }
+
+        func Branches(a, b bool) int {
+        	if a && b || !a {
+        		return 1
+        	}
+        	for i := 0; i < 3; i++ {
+        	}
+        	return 0
+        }
+
+        func Choose(day int, ch chan int) string {
+        	switch day {
+        	case 0, 1:
+        		return "a"
+        	case 2:
+        		return "b"
+        	default:
+        	}
+        	select {
+        	case v := <-ch:
+        		_ = v
+        	default:
+        	}
+        	return "c"
+        }
+
+        func (s *Server[T]) Handle(r Request) (int, error) {
+        	run := func(x int) bool {
+        		if x > 0 {
+        			return true
+        		}
+        		return false
+        	}
+        	if run(1) {
+        		return 1, nil
+        	}
+        	return 0, nil
+        }
+
+        func Typed() interface{} {
+        	if true {
+        		return nil
+        	}
+        	return struct{}{}
+        }
+        """;
+
+    // Expected values are what ESLint 9.39 reports with its complexity rule for the same functions.
+    private const string ScriptSamples = """
+        export function one() { return 1; }
+
+        export function branches(a, b) {
+          if (a) { return 1; } else if (b) { return 2; }
+          return a && b || !a;
+        }
+
+        export function loops(xs) {
+          for (const x of xs) { }
+          for (const k in xs) { }
+          for (let i = 0; i < 3; i++) { }
+          while (false) { }
+          do { } while (false);
+        }
+
+        export function choose(day) {
+          switch (day) {
+            case 0: return "a";
+            case 1: return "b";
+            case 2: return "c";
+            default: return "d";
+          }
+        }
+
+        export function guard(fn) {
+          try { fn(); } catch (error) { return error; } finally { fn(); }
+          return null;
+        }
+
+        export function nulls(a, b) {
+          const x = a?.b?.c ?? b;
+          return x ? x : b;
+        }
+
+        export function assigns(o) {
+          o.a ||= 1;
+          o.b &&= 2;
+          o.c ??= 3;
+          return o;
+        }
+
+        export function template(a, b) {
+          return `${a ? "yes" : "no"} ${b ?? "-"}`;
+        }
+
+        export class Widget {
+          render(state) {
+            if (state.open && state.items) { return state.items.length; }
+            return 0;
+          }
+
+          get label() { return this.name ?? "none"; }
+        }
+
+        export const arrow = (a) => a > 0 ? a : -a;
+
+        export const block = async (a) => {
+          if (a) { return await a; }
+          return null;
+        };
+
+        const obj = {
+          method(a) { return a || 0; },
+        };
+        """;
+
+    // Nested arrows and function expressions count toward their function, as lambdas do in C#.
+    private const string TypedSamples = """
+        export function outer(items: string[], strict?: boolean): number {
+          const check = (x: string) => x.length > 0 && !!strict;
+          const visit = function (x: string) { if (x) { return 1; } return 0; };
+          return items.filter(check).map(visit).length;
+        }
+
+        export async function load(url: string): Promise<string | null> {
+          const res = await fetch(url).catch(() => null);
+          return res?.ok ? "ok" : null;
+        }
+        """;
+
+    [Theory]
+    [InlineData("One", 1)]
+    [InlineData("Branches", 5)]
+    [InlineData("Choose", 4)]
+    [InlineData("Server.Handle", 3)]
+    [InlineData("Typed", 2)]
+    public void GoFunctionsCountAsGocycloDoes(string name, int complexity)
+    {
+        using var tree = new ReaderTree(new() { ["server/sample.go"] = GoSamples });
+        var members = new CloneExtractor(tree.Repository()).Complexity();
+        members.Should().OnlyContain(member => member.Language == "go");
+        members.Should().ContainSingle(member => member.Name == name).Which.Complexity.Should().Be(complexity);
+        members.Single(member => member.Name == "Choose").Cases.Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData("web/sample.js", "one", 1)]
+    [InlineData("web/sample.js", "branches", 5)]
+    [InlineData("web/sample.js", "loops", 6)]
+    [InlineData("web/sample.js", "choose", 4)]
+    [InlineData("web/sample.js", "guard", 2)]
+    [InlineData("web/sample.js", "nulls", 5)]
+    [InlineData("web/sample.js", "assigns", 4)]
+    [InlineData("web/sample.js", "template", 3)]
+    [InlineData("web/sample.js", "Widget.render", 3)]
+    [InlineData("web/sample.js", "Widget.label", 2)]
+    [InlineData("web/sample.js", "arrow", 2)]
+    [InlineData("web/sample.js", "block", 2)]
+    [InlineData("web/sample.js", "method", 2)]
+    [InlineData("web/typed.ts", "outer", 3)]
+    [InlineData("web/typed.ts", "load", 3)]
+    public void ScriptFunctionsCountAsEslintDoes(string path, string name, int complexity)
+    {
+        using var tree = new ReaderTree(new() { ["web/sample.js"] = ScriptSamples, ["web/typed.ts"] = TypedSamples });
+        var members = new CloneExtractor(tree.Repository()).Complexity().Where(member => member.Path == path);
+        members.Should().OnlyContain(member => member.Language == "typescript");
+        members.Should().ContainSingle(member => member.Name == name).Which.Complexity.Should().Be(complexity);
+        members.Should().NotContain(member => member.Name == "check" || member.Name == "visit");
+    }
+
+    [Fact]
+    public void OnlyEnabledLanguagesAreReportedWithTheirOwnThresholds()
+    {
+        var go =
+            "package sample\n\nfunc Busy(a int) int {\n"
+            + string.Concat(Enumerable.Repeat("\tif a > 0 {\n\t\ta--\n\t}\n", 13))
+            + "\treturn a\n}\n";
+        var script =
+            "export function busy(a) {\n"
+            + string.Concat(Enumerable.Repeat("  if (a > 0) { a--; }\n", 13))
+            + "  return a;\n}\n";
+        using var tree = new ReaderTree(new() { ["server/busy.go"] = go, ["web/busy.ts"] = script });
+        var reader = new ComplexityReader(new CloneExtractor(tree.Repository()));
+
+        var defaults = reader.Read(new Dictionary<string, ComplexityThresholds> { ["csharp"] = new(), ["go"] = new() });
+        var busy = defaults.Should().ContainSingle().Which;
+        busy.Key.Should().Be("complexity:server/busy.go#Busy");
+        busy.Language.Should().Be("go");
+        busy.Level.Should().Be("info");
+        busy.Measure.Should().Be(14);
+        busy.Why.Should().Contain("gocyclo");
+
+        var all = reader.Read(
+            new Dictionary<string, ComplexityThresholds> { ["go"] = new(Warn: 12), ["typescript"] = new() }
+        );
+        all.Select(finding => (finding.Key, finding.Level, finding.Language))
+            .Should()
+            .BeEquivalentTo(
+                new[]
+                {
+                    ("complexity:server/busy.go#Busy", "warn", "go"),
+                    ("complexity:web/busy.ts#busy", "info", "typescript"),
+                }
+            );
+        all.Single(finding => finding.Language == "typescript").Why.Should().Contain("ESLint");
+    }
+
+    private static Dictionary<string, ComplexityThresholds> Languages(
+        ComplexityThresholds thresholds,
+        params string[] languages
+    ) => languages.ToDictionary(language => language, _ => thresholds, StringComparer.Ordinal);
 
     private static string Method(string name, int complexity, string parameters = "int a") =>
         $"    public int {name}({parameters})\n    {{\n"

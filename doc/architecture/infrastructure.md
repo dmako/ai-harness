@@ -68,14 +68,27 @@ Change coupling combines history and provider evidence to suggest missing usual
 partners. Layering, service and database guesses remain labeled heuristics.
 Coverage gaps do not become negative findings.
 
-The complexity reader counts each C# method's and constructor's cyclomatic
-complexity from the tokens the clone extractor already holds. It reads no file a
-second time and skips the same test, generated and vendor files. Lambdas and
-local functions count toward the member that contains them. The thresholds in
-`[architecture.complexity]` turn each member's value into a level. By default,
-11–20 is a note, 21–50 a warning and 51 or more a problem; below the note
-threshold nothing is reported. A finding's key names its member and not its
-level, so a changed threshold or value shows the same finding as changed.
+The complexity reader counts each function's cyclomatic complexity from the
+tokens the clone extractor already holds. It reads no file a second time and
+skips the same test, generated and vendor files. A function nested in another
+(a lambda, closure, local function, arrow or function expression) counts toward
+the one around it. Each language follows its usual tool:
+
+| Language | Follows | One plus each |
+| --- | --- | --- |
+| C# methods and constructors | Microsoft.CodeAnalysis.Metrics | `if`, `case` label, `for`/`foreach`/`while` (do-while once), `?:`, `?.`/`?[]`, `??`, `&&`, `\|\|`; not switch-expression arms, `catch`, `when`, patterns or `??=` |
+| Go functions and methods | gocyclo | `if`, `for`, `case` clause of a `switch` or `select` (not `default`), `&&`, `\|\|` |
+| TypeScript/JavaScript functions, methods and named arrows | ESLint `complexity` | `if`, `for`/`for-in`/`for-of`, `while` (do-while once), `case`, `catch`, `?:`, `&&`, `\|\|`, `??`, `?.`, `&&=`/`\|\|=`/`??=` |
+
+Branches inside C# interpolated strings and JavaScript template literals count
+too. `[architecture.complexity]` turns each value into a level for the languages
+it lists (`languages`, by default C# and Go; add `typescript` to include
+TypeScript and JavaScript). By default, 11–20 is a note, 21–50 a warning and 51
+or more a problem; below the note threshold nothing is reported. A language's
+own table, such as `[architecture.complexity.typescript]`, overrides any of the
+three thresholds. A finding names its language. Its key names the member and
+not the level, so a changed threshold or value shows the same finding as
+changed.
 [Code metrics](code-metrics.md) records the counting rules, their accuracy
 against `Microsoft.CodeAnalysis.Metrics`, and the planned exact-value worker.
 

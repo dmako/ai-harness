@@ -100,7 +100,7 @@ public sealed class FindingSets(
         return (FindingStore.Merge(found), read.Architecture is not null);
     }
 
-    private ComplexityThresholds Thresholds()
+    private IReadOnlyDictionary<string, ComplexityThresholds> Thresholds()
     {
         try
         {
@@ -111,7 +111,7 @@ public sealed class FindingSets(
         }
         catch (InvalidDataException)
         { /* The commands that load configuration report its errors; findings keep the default thresholds. */
-            return new();
+            return new ComplexityConfiguration().Thresholds();
         }
     }
 

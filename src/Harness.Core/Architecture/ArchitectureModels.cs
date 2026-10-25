@@ -37,6 +37,9 @@ public record ArchitectureFinding
     [JsonPropertyName("project"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Project { get; init; }
 
+    [JsonPropertyName("language"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Language { get; init; }
+
     [JsonPropertyName("evidence"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? Evidence { get; init; }
 

@@ -1,7 +1,15 @@
 namespace Harness.Core.Architecture;
 
-/// <summary>One member's lexical cyclomatic complexity; lambdas and local functions count toward it.</summary>
-public sealed record ComplexityMember(string Path, string Name, int Line, int Parameters, int Complexity, int Cases)
+/// <summary>One member's lexical cyclomatic complexity; nested lambdas, closures and functions count toward it.</summary>
+public sealed record ComplexityMember(
+    string Path,
+    string Name,
+    int Line,
+    int Parameters,
+    int Complexity,
+    int Cases,
+    string Language = "csharp"
+)
 {
     public string Id => Path + "#" + Name;
 }

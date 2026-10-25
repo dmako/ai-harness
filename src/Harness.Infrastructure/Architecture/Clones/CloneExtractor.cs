@@ -52,10 +52,9 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             else
             {
                 functions.AddRange(CFunctions(file, language, tokens));
-                if (language is "cs")
-                {
-                    _complexity.AddRange(ComplexityCounter.Members(file, tokens));
-                }
+                _complexity.AddRange(
+                    language is "cs" ? ComplexityCounter.CSharp(file, tokens) : ComplexityCounter.Script(file, tokens)
+                );
             }
         }
         foreach (var file in go)
@@ -65,6 +64,7 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
                 .ToArray();
             functions.AddRange(GoFunctions(file.Path, file.Tokens, peers));
             _branches.AddRange(GoBranches(file.Path, file.Tokens));
+            _complexity.AddRange(ComplexityCounter.Go(file.Path, file.Tokens));
         }
         return _functions = functions;
     }

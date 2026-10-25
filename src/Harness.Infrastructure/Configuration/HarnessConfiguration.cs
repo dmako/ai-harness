@@ -35,14 +35,43 @@ public sealed record ArchitectureConfiguration
     public ComplexityConfiguration Complexity { get; set; } = new();
 }
 
-/// <summary>The lowest cyclomatic complexity reported as a note, a warning and a problem.</summary>
+/// <summary>
+/// The lowest cyclomatic complexity reported as a note, a warning and a problem, for the languages listed;
+/// a language's own table overrides any of them.
+/// </summary>
 public sealed record ComplexityConfiguration
 {
+    public static IReadOnlyList<string> Known { get; } = ["csharp", "go", "typescript"];
+
+    public string[] Languages { get; set; } = ["csharp", "go"];
     public int Note { get; set; } = 11;
     public int Warn { get; set; } = 21;
     public int Problem { get; set; } = 51;
+    public ComplexityLevels? Csharp { get; set; }
+    public ComplexityLevels? Go { get; set; }
+    public ComplexityLevels? Typescript { get; set; }
 
-    public ComplexityThresholds Thresholds() => new(Note, Warn, Problem);
+    public IReadOnlyDictionary<string, ComplexityThresholds> Thresholds() =>
+        Languages.Distinct(StringComparer.Ordinal).ToDictionary(language => language, For, StringComparer.Ordinal);
+
+    public ComplexityThresholds For(string language)
+    {
+        var own = language switch
+        {
+            "csharp" => Csharp,
+            "go" => Go,
+            "typescript" => Typescript,
+            _ => null,
+        };
+        return new(own?.Note ?? Note, own?.Warn ?? Warn, own?.Problem ?? Problem);
+    }
+}
+
+public sealed record ComplexityLevels
+{
+    public int? Note { get; set; }
+    public int? Warn { get; set; }
+    public int? Problem { get; set; }
 }
 
 public sealed record ConfigurationSources(string Global, string Project);
