@@ -120,19 +120,22 @@ public static class CloneComparison
                 .SelectMany(Names)
                 .GroupBy(name => name, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-            var differs = members.ToDictionary(
-                function => function.Id,
-                function =>
-                {
-                    var own = Names(function)
-                        .Where(name => 2 * uses[name] <= members.Length)
-                        .Order(StringComparer.Ordinal)
-                        .Take(4)
-                        .ToArray();
-                    return (IReadOnlyList<string>?)(own.Length is 0 ? null : own);
-                },
-                StringComparer.Ordinal
-            );
+            // Same-named nested functions of one file share an id (app.js#label twice): the first speaks for both.
+            var differs = members
+                .DistinctBy(function => function.Id, StringComparer.Ordinal)
+                .ToDictionary(
+                    function => function.Id,
+                    function =>
+                    {
+                        var own = Names(function)
+                            .Where(name => 2 * uses[name] <= members.Length)
+                            .Order(StringComparer.Ordinal)
+                            .Take(4)
+                            .ToArray();
+                        return (IReadOnlyList<string>?)(own.Length is 0 ? null : own);
+                    },
+                    StringComparer.Ordinal
+                );
             output.Add(new(members, differs, groups.Low(indices[0]), members.Min(function => function.Tokens)));
         }
         return output
