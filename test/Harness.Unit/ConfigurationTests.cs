@@ -15,7 +15,12 @@ public sealed class ConfigurationTests
         loaded.Value.Storage.DbPath.Should().Be(Path.Combine(".harness", "harness.db"));
         loaded.Value.Storage.BusyTimeoutMs.Should().Be(5000);
         loaded.Value.Log.Level.Should().Be("info");
-        loaded.Value.Architecture.Complexity.Thresholds().Should().Be(new ComplexityThresholds(11, 21, 51));
+        loaded
+            .Value.Architecture.Complexity.Thresholds()
+            .Should()
+            .BeEquivalentTo(
+                new Dictionary<string, ComplexityThresholds> { ["csharp"] = new(11, 21, 51), ["go"] = new(11, 21, 51) }
+            );
         loaded.Sources.Global.Should().BeEmpty();
         Directory.Exists(path).Should().BeFalse();
     }
@@ -113,6 +118,8 @@ public sealed class ConfigurationTests
     [InlineData("[architecture.complexity]\nnote = 0")]
     [InlineData("[architecture.complexity]\nnote = 30\nwarn = 21")]
     [InlineData("[architecture.complexity]\nlimit = 10")]
+    [InlineData("[architecture.complexity]\nlanguages = ['csharp', 'python']")]
+    [InlineData("[architecture.complexity.typescript]\nwarn = 5")]
     public void InvalidLayerIdentifiesItsFileAndCannotBeMasked(string content)
     {
         using var directory = new ConfigurationDirectory();
@@ -135,9 +142,27 @@ public sealed class ConfigurationTests
         // A project table replaces the global one, as provider tables do.
         ConfigurationLoader
             .LoadFiles(directory.Global, directory.Project)
-            .Value.Architecture.Complexity.Thresholds()
+            .Value.Architecture.Complexity.For("csharp")
             .Should()
             .Be(new ComplexityThresholds(11, 15, 30));
+
+        File.WriteAllText(
+            directory.Project,
+            "[architecture.complexity]\nlanguages = ['csharp', 'go', 'typescript']\nwarn = 15\n"
+                + "[architecture.complexity.typescript]\nnote = 16\nwarn = 31\n"
+        );
+        ConfigurationLoader
+            .LoadFiles("", directory.Project)
+            .Value.Architecture.Complexity.Thresholds()
+            .Should()
+            .BeEquivalentTo(
+                new Dictionary<string, ComplexityThresholds>
+                {
+                    ["csharp"] = new(11, 15, 51),
+                    ["go"] = new(11, 15, 51),
+                    ["typescript"] = new(16, 31, 51),
+                }
+            );
     }
 
     [Fact]

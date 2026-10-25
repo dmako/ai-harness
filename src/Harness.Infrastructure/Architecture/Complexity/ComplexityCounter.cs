@@ -4,23 +4,36 @@ using Harness.Infrastructure.Architecture.Clones;
 namespace Harness.Infrastructure.Architecture.Complexity;
 
 /// <summary>
-/// Lexical cyclomatic complexity of C# members, counted as Microsoft.CodeAnalysis.Metrics counts it:
-/// one plus each if, case label, loop, conditional (?:), conditional access (?. ?[]), ?? and short-circuit
-/// operator. Switch-expression arms, catch, exception filters, patterns and ??= add nothing.
+/// Lexical cyclomatic complexity per member, counted from the clone extractor's tokens. C# follows
+/// Microsoft.CodeAnalysis.Metrics: one plus each if, case label, loop, conditional (?:), conditional access
+/// (?. ?[]), ?? and short-circuit operator; switch-expression arms, catch, exception filters, patterns and ??=
+/// add nothing. Go follows gocyclo and TypeScript/JavaScript ESLint's complexity rule (see their partial files).
+/// Lambdas, closures and nested functions count toward the member around them.
 /// </summary>
-internal static class ComplexityCounter
+internal static partial class ComplexityCounter
 {
     private const int SignatureReach = 400;
 
     private sealed record Span(string Name, int Start, int End);
 
-    public static List<ComplexityMember> Members(string path, List<CodeToken> tokens)
+    /// <summary>A declared member: its name token, parameter list, the range counted, and an owner if not its type.</summary>
+    private sealed record Declared(int Name, int Open, int Close, int End, string? Owner = null);
+
+    public static List<ComplexityMember> CSharp(string path, List<CodeToken> tokens) =>
+        Members(path, tokens, "csharp", CSharpDeclaration);
+
+    private static List<ComplexityMember> Members(
+        string path,
+        List<CodeToken> tokens,
+        string language,
+        Func<List<CodeToken>, int, Declared?> declaration
+    )
     {
         var types = Types(tokens);
-        List<(int Name, int Parameters, int Close, int End)> declared = [];
+        List<Declared> declared = [];
         for (var index = 0; index + 1 < tokens.Count; index++)
         {
-            if (Declaration(tokens, index) is { } member)
+            if (declaration(tokens, index) is { } member)
             {
                 declared.Add(member);
             }
@@ -28,32 +41,44 @@ internal static class ComplexityCounter
         List<ComplexityMember> output = [];
         foreach (var member in declared)
         {
-            // A local function belongs to the member around it, as lambdas do.
-            if (declared.Any(outer => outer.Close < member.Name && member.End <= outer.End))
+            // A nested function belongs to the member around it, as lambdas and closures do.
+            if (declared.Any(outer => outer.Open < member.Name && member.End <= outer.End && outer != member))
             {
                 continue;
             }
 
-            var type = types
-                .Where(span => span.Start < member.Name && member.Name < span.End)
-                .MaxBy(span => span.Start);
-            var (complexity, cases) = Count(tokens, member.Close + 1, member.End);
+            var owner =
+                member.Owner
+                ?? types
+                    .Where(span => span.Start < member.Name && member.Name < span.End)
+                    .MaxBy(span => span.Start)
+                    ?.Name;
+            var (complexity, cases) = Count(tokens, member.Close + 1, member.End, language);
             output.Add(
                 new(
                     path,
-                    (type is null ? "" : type.Name + ".") + tokens[member.Name].Text,
+                    (owner is { Length: > 0 } ? owner + "." : "") + tokens[member.Name].Text,
                     tokens[member.Name].Line,
-                    Parameters(tokens, member.Parameters, member.Close),
+                    Parameters(tokens, member.Open, member.Close),
                     complexity,
-                    cases
+                    cases,
+                    language
                 )
             );
         }
         return output;
     }
 
+    private static (int Complexity, int Cases) Count(List<CodeToken> tokens, int start, int end, string language) =>
+        language switch
+        {
+            "go" => CountGo(tokens, start, end),
+            "typescript" => CountScript(tokens, start, end),
+            _ => CountCSharp(tokens, start, end),
+        };
+
     /// <summary>A method, constructor or local function declared at index: its name, parameter list and body end.</summary>
-    private static (int Name, int Parameters, int Close, int End)? Declaration(List<CodeToken> tokens, int index)
+    private static Declared? CSharpDeclaration(List<CodeToken> tokens, int index)
     {
         var token = tokens[index];
         if (
@@ -98,10 +123,10 @@ internal static class ComplexityCounter
                     break;
                 case "{" when depth is 0:
                     var block = CloneLexer.Match(tokens, cursor);
-                    return block < 0 ? null : (index, parameters, end, block);
+                    return block < 0 ? null : new(index, parameters, end, block);
                 case "=>" when depth is 0:
                     var expression = ExpressionEnd(tokens, cursor + 1);
-                    return expression < 0 ? null : (index, parameters, end, expression);
+                    return expression < 0 ? null : new(index, parameters, end, expression);
                 case ";" or "}" or "=" or "," when depth is 0:
                     return null;
             }
@@ -113,7 +138,7 @@ internal static class ComplexityCounter
         return null;
     }
 
-    private static (int Complexity, int Cases) Count(List<CodeToken> tokens, int start, int end)
+    private static (int Complexity, int Cases) CountCSharp(List<CodeToken> tokens, int start, int end)
     {
         var complexity = 1;
         var cases = 0;
@@ -131,7 +156,7 @@ internal static class ComplexityCounter
                     cases++;
                     break;
                 case ('s', _):
-                    complexity += Interpolated(token.Text);
+                    complexity += Interpolated(token.Text, "csharp");
                     break;
                 case ('p', "?") when Previous(tokens, index) is "?":
                     break;
@@ -214,28 +239,45 @@ internal static class ComplexityCounter
         return false;
     }
 
-    /// <summary>Branches inside an interpolated string's holes, counted like code.</summary>
-    private static int Interpolated(string text)
+    /// <summary>Branches inside the holes of a C# interpolated string or a JavaScript template, counted like code.</summary>
+    private static int Interpolated(string text, string language)
     {
-        var quote = text.IndexOf('"', StringComparison.Ordinal);
-        var dollars = quote < 0 ? 0 : text.AsSpan(0, quote).Count('$');
-        if (dollars is 0)
+        string open;
+        int index;
+        if (language is "typescript")
         {
-            return 0;
+            if (!text.StartsWith('`'))
+            {
+                return 0;
+            }
+
+            (open, index) = ("${", 1);
+        }
+        else
+        {
+            var quote = text.IndexOf('"', StringComparison.Ordinal);
+            var dollars = quote < 0 ? 0 : text.AsSpan(0, quote).Count('$');
+            if (dollars is 0)
+            {
+                return 0;
+            }
+
+            (open, index) = (new string('{', dollars), quote);
         }
 
-        var open = new string('{', dollars);
         var added = 0;
-        var index = quote;
         while ((index = text.IndexOf(open, index, StringComparison.Ordinal)) >= 0)
         {
-            if (dollars is 1 && index + 1 < text.Length && text[index + 1] is '{')
+            var escaped = language is "typescript"
+                ? index > 0 && text[index - 1] is '\\'
+                : open.Length is 1 && index + 1 < text.Length && text[index + 1] is '{';
+            if (escaped)
             {
                 index += 2;
                 continue;
             }
 
-            var start = index + dollars;
+            var start = index + open.Length;
             var end = start;
             for (var depth = 0; end < text.Length; end++)
             {
@@ -253,8 +295,8 @@ internal static class ComplexityCounter
                 break;
             }
 
-            var hole = CloneLexer.Tokenize(text[start..end], "cs");
-            added += Count(hole, 0, hole.Count - 1).Complexity - 1;
+            var hole = CloneLexer.Tokenize(text[start..end], language is "typescript" ? "ts" : "cs");
+            added += Count(hole, 0, hole.Count - 1, language).Complexity - 1;
             index = end + 1;
         }
         return added;
@@ -335,7 +377,7 @@ internal static class ComplexityCounter
         return count;
     }
 
-    /// <summary>Class, struct, record and interface bodies, to qualify member names with their type.</summary>
+    /// <summary>Class, struct, record and interface bodies (C# and TypeScript), to qualify member names.</summary>
     private static List<Span> Types(List<CodeToken> tokens)
     {
         List<Span> output = [];

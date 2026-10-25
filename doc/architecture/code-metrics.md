@@ -93,3 +93,17 @@ exceeds 10.
 
 On this repository's 2206 methods, the default thresholds give 140 notes
 (11–20), 45 warnings (21–50) and 6 problems (above 50).
+
+## Go and TypeScript
+
+Go and TypeScript/JavaScript (TASK-0038) use the same reader with gocyclo's
+rules and ESLint's `complexity` rules. ESLint 9.39 agreed exactly on all 13
+functions of a JavaScript fixture covering each rule. On this repository's
+`app.js`, ESLint's values with nested functions folded in matched 155 of 161
+functions exactly and 160 in band, and all 57 above 10 were found. The six
+mismatches all count too low, because a template literal nested inside another
+template's `${}` hole ends the outer string early: the same lexer limitation as
+quotes inside C# holes. An anonymous function that is neither named nor inside
+a named one (`addEventListener("load", () => …)` at the top of a file) is not
+reported. Go was checked against gocyclo's documented rules with fixtures; no Go
+toolchain was available to run gocyclo itself.

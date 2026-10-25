@@ -197,10 +197,14 @@ level = "info"                    # debug | info | warn | error
 [sync]
 ignore = ["vendor/", "*.min.js"]  # on top of .gitignore
 
-[architecture.complexity]         # cyclomatic complexity of C# members
+[architecture.complexity]         # cyclomatic complexity of functions
+languages = ["csharp", "go"]      # add "typescript" for TypeScript/JavaScript
 note = 11                         # lowest value reported as a note
 warn = 21                         # ... as a warning
 problem = 51                      # ... as a problem
+
+[architecture.complexity.typescript]  # optional: one language's own thresholds
+warn = 31
 
 [providers.<name>]                # see Providers
 ```
