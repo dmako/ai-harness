@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Net100SdkVersion>10.0.13</Net100SdkVersion>
+    <Net100SdkVersion>10.0.14</Net100SdkVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.Authorization" Version="$(Net100SdkVersion)" />
@@ -102,7 +102,7 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="5.9.0" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
     <PackageVersion Include="Tomlyn" Version="2.10.1" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
