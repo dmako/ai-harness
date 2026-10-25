@@ -176,6 +176,7 @@ public sealed class UiTests
                 "applies",
                 "stack",
                 "structure",
+                "complexity",
                 "snippet?at=a.cs:1",
             }
         )
@@ -287,6 +288,45 @@ public sealed class UiTests
             .ToInt32(await command.ExecuteScalarAsync(Token), System.Globalization.CultureInfo.InvariantCulture)
             .Should()
             .Be(18);
+    }
+
+    [Fact]
+    public async Task ComplexityDistributionCountsEveryFunctionWithItsLanguagesThresholds()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "example.csproj",
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"""
+        );
+        fixture.Write(
+            "Router.cs",
+            "namespace Example;\npublic class Router\n{\n    public int Route(int a)\n    {\n"
+                + string.Concat(Enumerable.Repeat("        if (a > 0) { a--; }\n", 13))
+                + "        return a;\n    }\n\n    public int One(int a) => a;\n\n    public int Two(int a) => a;\n}\n"
+        );
+        fixture.Write(
+            "web/app.ts",
+            "export function busy(a: number) {\n  if (a > 0 && a < 9) { return 1; }\n  return 0;\n}\n"
+        );
+        fixture.Write(
+            ".harness/config.toml",
+            "[architecture.complexity]\nlanguages = ['csharp', 'typescript']\n[architecture.complexity.typescript]\nwarn = 31\n"
+        );
+        await fixture.CommitAsync("complexity");
+        await using var server = await UiFixture.StartAsync(fixture);
+        var id = (await ReadAsync(server.Client, "/api/projects"))["projects"]![0]!["id"]!.GetValue<string>();
+
+        var languages = (await ReadAsync(server.Client, $"/api/projects/{id}/complexity"))["languages"]!.AsArray();
+
+        languages.Select(language => language!["language"]!.GetValue<string>()).Should().Equal("csharp", "typescript");
+        var csharp = languages[0]!;
+        csharp["thresholds"]!.ToJsonString().Should().Be("""{"note":11,"warn":21,"problem":51}""");
+        csharp["members"]!.GetValue<int>().Should().Be(3);
+        csharp["measured"]!.GetValue<int>().Should().Be(0);
+        csharp["counts"]!.ToJsonString().Should().Be("[[1,2],[14,1]]");
+        var script = languages[1]!;
+        script["thresholds"]!["warn"]!.GetValue<int>().Should().Be(31);
+        script["counts"]!.ToJsonString().Should().Be("[[3,1]]");
     }
 
     [Fact]

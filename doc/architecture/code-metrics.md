@@ -54,6 +54,17 @@ other package. Runs live in `metrics/<project id>/runs/<commit>.json` beside
 them; the newest 20 are kept. On a one-project fixture, the first run, restore
 included, took about 18 s.
 
+## On the board
+
+The architecture page groups complexity findings like other smells (TASK-0039).
+The group shows its worst level and opens to the highest values first, with the
+rest folded. Chips for problems, warnings and notes, with their counts, filter
+the list; each viewer's choice is kept in the browser. A distribution section
+loads on its own from `/api/projects/{id}/complexity`. It draws one histogram
+per enabled language: bins of five, the thresholds as lines, and a table of
+every bin. It counts every function, reported or not, using exact .NET values
+where the worker measured HEAD.
+
 ## Platforms
 
 `Metrics.exe` targets .NET Framework 4.7.2 (PE32, `supportedRuntime v4.0`), and
