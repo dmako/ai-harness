@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Tomlyn" />
+    <PackageReference Include="YamlDotNet" />
+    <InternalsVisibleTo Include="Harness.Integration" />
+    <EmbeddedResource Include="Storage/Migrations/*.sql" LogicalName="Harness.Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Configuration/Packs/*.toml" LogicalName="Harness.Packs.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

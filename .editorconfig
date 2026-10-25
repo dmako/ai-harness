@@ -1,0 +1,55 @@
+# top-most EditorConfig file
+root = true
+
+# Don't use tabs for indentation.
+[*]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+insert_final_newline = true
+# (Please don't specify an indent_size here; that has too many unintended consequences.)
+spelling_languages = en-us
+spelling_checkable_types = strings,identifiers,comments
+spelling_error_severity = warning
+spelling_exclusion_path = exclusion.dic
+
+# Code files
+[*.{cs,csx,vb,vbx}]
+indent_size = 4
+tab_width = 4
+# Soft wrapping target; indivisible literals and other content may exceed it.
+max_line_length = 120
+
+# XML project files
+[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj}]
+indent_size = 2
+tab_width = 2
+
+# XML config files
+[*.{props,targets,ruleset,config,nuspec,resx,vsixmanifest,vsct}]
+indent_size = 2
+tab_width = 2
+
+# JSON files
+[*.json]
+indent_size = 2
+tab_width = 2
+
+# YAML files
+[*.sls, *.yaml, *.yml]
+indent_size = 2
+tab_width = 2
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+
+# Python files
+[*.{py,pyx,pxd,pxi}]
+indent_size = 4
+tab_width = 4
+
+# Script files
+[*.{ps1,bat}]
+indent_size = 4
+tab_width = 4

@@ -1,0 +1,333 @@
+{
+  "description": "Get one task by id (optionally with its audit events).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "events": {
+        "type": "boolean",
+        "description": "include the audit trail"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "name": "task_get",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "task": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "milestone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "scope": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "depends_on": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "acceptance": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "criterion": {
+                  "type": "string"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "criterion",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "validation": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "blocked_reason": {
+            "type": "string"
+          },
+          "claim": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "claimant": {
+                "type": "string"
+              },
+              "claimed_at": {
+                "type": "string"
+              },
+              "lease_until": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claimant"
+            ],
+            "additionalProperties": false
+          },
+          "completion": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "checks": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "command": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "string"
+                    },
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "command",
+                    "result"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "completed_by": {
+                "type": "string"
+              },
+              "completed_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "completed_by",
+              "completed_at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "claim_token": {
+        "type": "string"
+      },
+      "unlocked": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "events": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "actor",
+            "at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "proposals": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "proposed_by": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "supersedes": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "decided_by": {
+              "type": "string"
+            },
+            "decision_note": {
+              "type": "string"
+            },
+            "memory_id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_ref",
+            "proposed_by",
+            "status",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "proposal_errors": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "task"
+    ],
+    "additionalProperties": false
+  }
+}

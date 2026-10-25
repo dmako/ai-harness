@@ -1,0 +1,147 @@
+{
+  "description": "Look up external packages (e.g. NuGet) through harness providers, to see the real API of a dependency instead of guessing it. action: 'search' (packages by name or functionality; query), 'info' (metadata and dependencies; package, optional version), 'types' (public types; package, optional version, optional query as a name filter such as *Result*), 'definition' (public API of one type; package, type, optional version).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "description": "search, info, types or definition"
+      },
+      "query": {
+        "type": "string",
+        "description": "search text (search) or type name filter (types)"
+      },
+      "package": {
+        "type": "string",
+        "description": "package id, e.g. FluentValidation"
+      },
+      "version": {
+        "type": "string",
+        "description": "package version (default: latest); use the version the project references"
+      },
+      "type": {
+        "type": "string",
+        "description": "type name for definition, short or full (e.g. ValidationResult)"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "max results per provider (default 10, max 50)"
+      }
+    },
+    "required": [
+      "action"
+    ],
+    "additionalProperties": false
+  },
+  "name": "package_api",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string"
+      },
+      "results": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "qualified_name": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "start_line": {
+              "type": "integer"
+            },
+            "end_line": {
+              "type": "integer"
+            },
+            "snippet": {
+              "type": "string"
+            },
+            "depth": {
+              "type": "integer"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "tool": {
+              "type": "string"
+            },
+            "score": {
+              "type": "number"
+            },
+            "via": {
+              "type": "string"
+            },
+            "evidence": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "provider"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "answers": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "text"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "errors": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "action"
+    ],
+    "additionalProperties": false
+  }
+}

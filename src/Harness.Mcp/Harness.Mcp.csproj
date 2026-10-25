@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
+    <PackageReference Include="ModelContextProtocol.Core" />
+    <EmbeddedResource Include="Schemas/*.json" LogicalName="Harness.Mcp.Schemas.%(Filename)%(Extension)" />
+    <InternalsVisibleTo Include="Harness.Unit" />
+  </ItemGroup>
+</Project>

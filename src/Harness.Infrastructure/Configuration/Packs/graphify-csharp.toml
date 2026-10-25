@@ -1,0 +1,12 @@
+# graphify-csharp (Roslyn-based C# facts) through harness-graphify, which
+# speaks the harness provider protocol (installed with harness). Compiler-
+# resolved callers and references; its symbol search matches names only,
+# so it is limited to callers/references in C# projects.
+type = "harness"
+command = "harness-graphify"
+dir = "project"
+only = ["code.callers", "code.references", "code.impact"]
+# In get_context its callers/impact surfaced 1-2% of the changed files at a
+# p95 of 20 s (alpha evaluation 2026-10-10): search_project only.
+context = false
+languages = ["csharp"]

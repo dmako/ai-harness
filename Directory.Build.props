@@ -1,0 +1,82 @@
+<Project>
+
+  <PropertyGroup Label="Configurations">
+    <Configurations>Debug;Release</Configurations>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU;x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(MSBuildThisFileDirectory)src'))">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Documentation and localization resources">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1573;CS1591</NoWarn><!-- Remove warning for undocumented members -->
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+    <EmbeddedResourceUseDependentUponConvention>true</EmbeddedResourceUseDependentUponConvention>
+    <!-- specify to only have en localization, shrinks the published content -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Code standards and quality">
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <Features>strict</Features>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CA1014;NU5124;NU5039;NU5104</NoWarn>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build settings">
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
+    <!-- Disabling static graph restore due to a bug related to NuGetAuditSuppress. See: https://github.com/NuGet/Home/issues/14300 -->
+    <RestoreUseStaticGraphEvaluation>false</RestoreUseStaticGraphEvaluation>
+    <RestoreSerializeGlobalProperties>true</RestoreSerializeGlobalProperties>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet dependencies management and auditing">
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled> <!-- allow override version in specific cases -->
+    <RestoreEnablePackagePruning>true</RestoreEnablePackagePruning>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1900;NU1901;NU1902;NU1903;NU1904;NU1905;NU1510;NU1603;NU5124;NU5039;NU5104</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Label="File and Assembly metadata">
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>0.1.0-localbuild</Version>
+    <Version Condition=" $(VERSION_LABEL) != '' ">$(VERSION_LABEL)</Version>
+    <Company>Zaki+Maki</Company>
+    <Copyright>Copyright © 2026 Zaki+Maki</Copyright>
+    <Authors>Zaki+Maki</Authors>
+  </PropertyGroup>
+
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Label="CI Build detection or simulation">
+    <ContinuousIntegrationBuild Condition=" '$(ContinuousIntegrationBuild)' == '' ">false</ContinuousIntegrationBuild>
+    <ContinuousIntegrationBuild Condition=" '$(CI)' != '' ">true</ContinuousIntegrationBuild>
+    <RestoreLockedMode Condition=" '$(ContinuousIntegrationBuild)' == 'true' AND '$(RestoreLockedMode)' == '' ">true</RestoreLockedMode>
+  </PropertyGroup>
+
+  <ItemGroup Label="EditorConfig files">
+    <EditorConfigFiles Include="$(MSBuildThisFileDirectory)\configuration\*.editorconfig" />
+  </ItemGroup>
+
+
+</Project>

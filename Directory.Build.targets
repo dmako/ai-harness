@@ -1,0 +1,82 @@
+<Project>
+
+  <!-- Use SDK-bundled SourceLink providers selected from the actual repository host. -->
+  <PropertyGroup Condition=" '$(ContinuousIntegrationBuild)' == 'true' ">
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType Condition=" '$(DebugType)' == '' ">portable</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Label="SAST Values">
+    <ProductionOutput Condition=" '$(ProductionOutput)' == ''" >true</ProductionOutput>
+    <DisableSastOnProject Condition=" '$(DisableSastOnProject)' == ''">false</DisableSastOnProject>
+    <_SarifOutputDirPath>$(OutDir)</_SarifOutputDirPath>
+    <_SarifOutputDirPath Condition=" Exists('$(MSBuildThisFileDirectory)\artifacts\sarif\') ">$(MSBuildThisFileDirectory)\artifacts\sarif\</_SarifOutputDirPath>
+    <CodeAnalysisIgnoreGeneratedCode>true</CodeAnalysisIgnoreGeneratedCode>
+    <ErrorLog Condition=" '$(DisableSastOnProject)' != 'true' AND '$(ProductionOutput)' == 'true' ">$(_SarifOutputDirPath)$(TargetName).$(TargetFramework).sarif,version=2.1</ErrorLog>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnableNETAnalyzers Condition=" '$(DisableSastOnProject)' != 'true' ">true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup Label="Test Projects" Condition=" '$(IsTestProject)' == 'true' ">
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" PrivateAssets="All" />
+  </ItemGroup>
+  
+  <ItemGroup Label="SAST Anlyzers" Condition=" '$(DisableSastOnProject)' != 'true' ">
+
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)\configuration\BannedSymbols.Corlib.txt" Visible="false" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)\configuration\BannedSymbols.NewtonsoftJson.txt" Visible="false" />
+
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+  </ItemGroup>
+
+  <Target Name="EmbedBannedSymbolsInBinLog" AfterTargets="CoreCompile">
+    <ItemGroup>
+      <EmbedInBinlog Include="@(AdditionalFiles)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)%(Extension)', '^BannedSymbols(\..+)?\.txt$'))" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="EmbedEditorConfigInBinLog" AfterTargets="CoreCompile">
+    <ItemGroup>
+      <EmbedInBinlog Include="@(EditorConfigFiles)" />
+    </ItemGroup>
+  </Target>
+
+
+  <!-- Stable metadata only; release builds can supply timestamp and dirty state explicitly. -->
+  <Target Name="AddHarnessBuildMetadata" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="InitializeSourceControlInformation"
+          Condition=" '$(MSBuildProjectName)' == 'Harness.Cli' ">
+    <ItemGroup>
+      <AssemblyMetadata Include="CommitHash" Value="$(SourceRevisionId)" />
+      <AssemblyMetadata Include="BuildTimestamp" Value="$(BuildTimestamp)" />
+      <AssemblyMetadata Include="Modified" Value="$(RepositoryModified)" />
+    </ItemGroup>
+  </Target>
+  <!-- The six port assemblies form a DAG; tests and optional companion hosts are outside this rule. -->
+  <Target Name="ValidateHarnessProjectReferences" BeforeTargets="PrepareProjectReferences;_GenerateRestoreProjectPathWalk"
+          Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' ">
+    <ItemGroup>
+      <_HarnessAllowedReference Include="Harness.Core" Condition=" '$(MSBuildProjectName)' != 'Harness.Core' " />
+      <_HarnessAllowedReference Include="Harness.Infrastructure;Harness.Providers;Harness.Mcp;Harness.Web" Condition=" '$(MSBuildProjectName)' == 'Harness.Cli' " />
+      <_HarnessUnexpectedReference Include="@(ProjectReference->'%(Filename)')" />
+      <_HarnessUnexpectedReference Remove="@(_HarnessAllowedReference)" />
+    </ItemGroup>
+    <Error Condition=" '@(_HarnessUnexpectedReference)' != '' "
+           Text="$(MSBuildProjectName) has forbidden project references: @(_HarnessUnexpectedReference, ', '). See doc/architecture/README.md for the allowed dependency graph." />
+  </Target>
+
+</Project>

@@ -1,0 +1,24 @@
+# global_level must be higher than the NET Analyzer files
+is_global = true
+global_level = 0
+
+# AwesomeAssertions0801: Code Smell
+# Enabled: True, Severity: warning
+dotnet_diagnostic.AwesomeAssertions0801.severity = warning
+
+# FAA0001: Simplify Assertion
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.FAA0001.severity = suggestion
+
+# FAA0002: Replace Xunit assertion with Fluent Assertions equivalent
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.FAA0002.severity = suggestion
+
+# FAA0003: Replace MSTests assertion with Fluent Assertions equivalent
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.FAA0003.severity = suggestion
+
+# FAA0004: Replace NUnit assertion with Fluent Assertions equivalent
+# Enabled: True, Severity: suggestion
+dotnet_diagnostic.FAA0004.severity = suggestion
+

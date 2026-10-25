@@ -1,0 +1,205 @@
+{
+  "description": "Get one memory by id; with history=true also its supersession chain and audit events.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "history": {
+        "type": "boolean",
+        "description": "include the supersession chain and audit events"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "name": "memory_get",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "memory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "recorded_by": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "superseded_by": {
+            "type": "string"
+          },
+          "supersede_reason": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string"
+          },
+          "valid_until": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "overrides": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "scope",
+          "source_type",
+          "source_ref",
+          "recorded_by",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "current": {
+        "type": "boolean"
+      },
+      "history": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_type": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "recorded_by": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "superseded_by": {
+              "type": "string"
+            },
+            "supersede_reason": {
+              "type": "string"
+            },
+            "valid_from": {
+              "type": "string"
+            },
+            "valid_until": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "overrides": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_type",
+            "source_ref",
+            "recorded_by",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "events": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string"
+            },
+            "related_id": {
+              "type": "string"
+            },
+            "actor": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "actor",
+            "at"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "memory",
+      "current"
+    ],
+    "additionalProperties": false
+  }
+}

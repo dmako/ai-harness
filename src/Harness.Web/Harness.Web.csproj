@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Remove="packages*.lock.json" />
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/*" LogicalName="Harness.Web.Assets/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Documentation/*.md" LogicalName="Harness.Web.Documentation/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

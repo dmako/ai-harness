@@ -1,0 +1,54 @@
+# ripwire (https://github.com/redhat-et/ripwire), verified with 0.6.4.
+# Task-ranked symbol search, text search, name-based callers/references.
+type = "mcp"
+command = "ripwire"
+args = ["--mcp"]
+dir = "project"          # indexes its working directory
+freshness = "indexed"
+
+[capabilities."code.symbol_search"]
+tool = "for"
+args = { task = "{query}", limit = "{limit}" }
+truncated = 'capped="1"' 
+pattern = '<f p="(?P<path>[^"]+)" score="(?P<score>\d+)"[^>]*sym="(?P<name>[^"]*)"'
+
+[capabilities."code.text_search"]
+tool = "grep"
+args = { pattern = "{query}", limit = "{limit}" }
+items = "hits"
+fields = { path = "file", start_line = "line", name = "in" }
+
+[capabilities."code.callers"]
+tool = "find_referencing_symbols"
+args = { symbol = "{query_name}" }   # ripwire takes plain names, not Type.Member
+miss = "symbol not found"            # an unknown name: no callers, not a failure
+items = "calledBy"
+fields = { name = "name", label = "kind", path = "file", start_line = "line" }
+
+[capabilities."code.references"]
+tool = "uses"
+args = { symbol = "{query_name}", limit = "{limit}" }
+miss = "symbol not found"
+truncated = 'has_more="1"'        # ripwire's own "more rows exist" flag
+pattern = '<u role="(?P<label>[^"]+)" p="(?P<path>[^":]+):(?P<start_line>\d+)"(?: in_id="(?P<name>[^"]*)")?'
+
+# Transitive blast radius (callers of callers, tests included); no hop
+# counts in the response, so depth stays 0.
+[capabilities."code.impact"]
+tool = "impact"
+args = { symbol = "{query_name}", limit = "{limit}" }
+miss = "symbol not found"
+pattern = '<s t="(?P<label>[^"]+)" n="(?P<name>[^"]+)" p="(?P<path>[^":]+):(?P<start_line>\d+)"'
+truncated = 'capped="1"'
+
+# Change coupling from the Git history (HAR-0141): the files that changed
+# in the same commits as the queried file; deg is the share of its commits
+# (ripwire mines an 18-month window). No hotspot list over MCP (its churn
+# ranking is CLI-only), so a query naming the file is needed.
+[capabilities."arch.change_coupling"]
+tool = "cochange"
+args = { file = "{query}", limit = "{limit}" }
+items = "rows"
+fields = { path = "file", count = "together", confidence = "deg" }
+truncated = "has_more"
+evidence = "exact"

@@ -1,0 +1,25 @@
+# rg-fd MCP (ripgrep + fd): live text and file search in the working tree,
+# which becomes its allowed root.
+type = "mcp"
+command = "rg-fd-mcp"
+dir = "project"
+
+# Queries are plain text; rg and fd take regular expressions. Matches come
+# per file ({"matches": {"<file>": {"lines": [...]}}}); problems come back
+# as a {"code", "message"} body.
+[capabilities."code.text_search"]
+tool = "rg_search"
+args = { pattern = "{query_regex}", context_lines = 0, max_results = "{limit}", path = "{abs_path}" }
+items = "matches.*.lines"
+where = { is_match = true }
+fields = { path = "$key", start_line = "line_num", snippet = "content" }
+truncated = "_truncated"
+error = "message"
+
+[capabilities."code.file_search"]
+tool = "fd_find"
+args = { pattern = "{query_regex}", max_results = "{limit}", path = "{abs_path}" }
+items = "files"
+fields = { path = "file" }
+truncated = "_truncated"
+error = "message"

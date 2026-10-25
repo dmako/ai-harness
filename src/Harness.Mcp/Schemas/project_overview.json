@@ -1,0 +1,136 @@
+{
+  "description": "Summarize the project: harness identity, Git state, provider-reported structure and which search capabilities are available.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false
+  },
+  "name": "project_overview",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string"
+      },
+      "project_root": {
+        "type": "string"
+      },
+      "git_branch": {
+        "type": "string"
+      },
+      "git_commit": {
+        "type": "string"
+      },
+      "capabilities": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "structure": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "stack": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "major": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "frameworks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "major": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "badge": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "frameworks",
+          "badge"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "stale": {
+        "type": "string"
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_root",
+      "capabilities",
+      "hint"
+    ],
+    "additionalProperties": false
+  }
+}

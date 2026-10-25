@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Harness.Core/Harness.Core.csproj" />
+    <Project Path="src/Harness.Infrastructure/Harness.Infrastructure.csproj" />
+    <Project Path="src/Harness.Providers/Harness.Providers.csproj" />
+    <Project Path="src/Harness.Mcp/Harness.Mcp.csproj" />
+    <Project Path="src/Harness.Web/Harness.Web.csproj" />
+    <Project Path="src/Harness.Cli/Harness.Cli.csproj" />
+    <Project Path="src/Harness.Graphify/Harness.Graphify.csproj" />
+    <Project Path="src/Harness.Collect/Harness.Collect.csproj" />
+    <Project Path="src/Harness.Share/Harness.Share.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Harness.Unit/Harness.Unit.csproj" />
+    <Project Path="test/Harness.Integration/Harness.Integration.csproj" />
+    <Project Path="test/Harness.Integration/Storage/Worker/Harness.StorageWorker.csproj" />
+    <Project Path="test/Harness.ProviderWorker/Harness.ProviderWorker.csproj" />
+  </Folder>
+</Solution>

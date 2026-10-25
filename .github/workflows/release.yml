@@ -1,0 +1,79 @@
+name: Self-contained release qualification
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Safe preview version (artifacts only; no publication)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: windows-2025, rid: win-x64 }
+          - { host: ubuntu-24.04, rid: linux-x64 }
+          - { host: ubuntu-24.04-arm, rid: linux-arm64 }
+          - { host: macos-15, rid: osx-arm64 }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+      DOTNET_CLI_HOME: ${{ github.workspace }}/artifacts/cli-home
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/packages
+      RELEASE_VERSION: ${{ inputs.version }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.402'
+      - name: Install Linux Native AOT compiler prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          sudo apt-get install -y clang zlib1g-dev
+          exit $LASTEXITCODE
+      - name: Locked restore and standalone tests
+        run: |
+          dotnet restore Harness.slnx --locked-mode "-bl:artifacts/restore-$([guid]::NewGuid().ToString('N')).binlog"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test --solution Harness.slnx --no-restore "-bl:artifacts/test-$([guid]::NewGuid().ToString('N')).binlog" --report-trx --results-directory "$PWD/artifacts/tests"
+      - name: Publish and verify repeat binary hashes
+        run: python scripts/publish_release.py --version "$env:RELEASE_VERSION" --rids "$env:RID" --output artifacts/package --verify-repeat
+      - name: Native runtime isolation smoke test
+        run: |
+          $archive = Get-ChildItem artifacts/package/harness-* | Where-Object { $_.Name -match '\.(zip|tar.gz)$' } | Select-Object -First 1
+          python test/Harness.Packaging/run_probe.py --archive $archive.FullName --developer-archive (Join-Path $PWD "artifacts/package/developer-tools/$($archive.Name)") --output artifacts/native-smoke.json
+      - name: Verify Native AOT inventory and runtime receipts
+        run: python test/Harness.Packaging/verify_aot.py --release artifacts/package --smoke artifacts/native-smoke.json --output artifacts/native-aot-verification.json
+      - name: Clean Linux runtime-dependencies-only container
+        if: runner.os == 'Linux'
+        run: |
+          $archive = Get-ChildItem artifacts/package/harness-*.tar.gz | Select-Object -First 1
+          python -c "import sys; from pathlib import Path; sys.path.insert(0, 'test/Harness.Packaging'); from run_probe import extract; extract(Path(sys.argv[1]), Path('artifacts/container-package').resolve())" $archive.FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          docker run --rm --network none --user 65532:65532 --tmpfs /tmp:rw,exec,mode=1777 --mount "type=bind,source=$PWD/artifacts/container-package,target=/release,readonly" --env HOME=/tmp --env DOTNET_ROOT=/nonexistent mcr.microsoft.com/dotnet/runtime-deps:10.0-noble /release/harness version --json | Tee-Object artifacts/container-smoke.log
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-${{ matrix.rid }}
+          path: |
+            artifacts/package
+            artifacts/native-smoke.*
+            artifacts/native-aot-verification.json
+            artifacts/container-smoke.log
+            artifacts/tests
+            artifacts/**/*.binlog

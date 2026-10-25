@@ -1,0 +1,552 @@
+{
+  "description": "Get the context for a task in one call, within a size budget: the relevant code grouped by file, with the areas (top-level directories) it spans (definitions with bodies while they fit, otherwise drill-down references; callers and impact), the decisions, conventions, constraints and warnings that apply to it, the architecture findings touching that code (as of the last sync, with the author's marks: explain and suggest, never act on one until it is a task), and recent changes. Describe the task in words and name the symbols you know. Read or search further only for what is still missing.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "task": {
+        "type": "string",
+        "description": "the task in words, naming symbols you already know (e.g. TimetableOps.Copy)"
+      },
+      "path": {
+        "type": "string",
+        "description": "optional path prefix to stay within"
+      },
+      "budget": {
+        "type": "integer",
+        "description": "answer size in bytes (default 8000, at least 1000)"
+      },
+      "tokens": {
+        "type": "integer",
+        "description": "answer size in estimated tokens (instead of budget)"
+      },
+      "debug": {
+        "type": "boolean",
+        "description": "explain each unit's score and list sources"
+      },
+      "scope": {
+        "type": "string",
+        "description": "project (default) or workspace: also show matches from the other repositories in this project's workspaces"
+      },
+      "depth": {
+        "type": "string",
+        "description": "light (default; always start here) or deep. Use deep only when the user explicitly asks for deeper or compiler-exact cross-project answers: it starts heavy providers (graphify) in every member and can take up to 60 s"
+      }
+    },
+    "required": [
+      "task"
+    ],
+    "additionalProperties": false
+  },
+  "name": "get_context",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "task": {
+        "type": "string"
+      },
+      "symbols": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "code": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "units": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "start_line": {
+                    "type": "integer"
+                  },
+                  "end_line": {
+                    "type": "integer"
+                  },
+                  "depth": {
+                    "type": "integer"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "clipped": {
+                    "type": "boolean"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "providers": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "why": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "role",
+                  "evidence",
+                  "providers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "path",
+            "units"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "areas": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer"
+        }
+      },
+      "memory": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "see": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "overrides": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "why": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "findings": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "level": {
+              "type": "string"
+            },
+            "basis": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "source": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "where": {
+              "type": "string"
+            },
+            "see": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "mark": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "kind",
+            "level",
+            "basis",
+            "source",
+            "title",
+            "see"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "findings_rule": {
+        "type": "string"
+      },
+      "changes": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "commit": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "when": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "commit",
+            "subject",
+            "path",
+            "when"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "used_bytes": {
+        "type": "integer"
+      },
+      "budget_bytes": {
+        "type": "integer"
+      },
+      "omitted": {
+        "type": "integer"
+      },
+      "note": {
+        "type": "string"
+      },
+      "errors": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "stale": {
+        "type": "string"
+      },
+      "workspace": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string"
+            },
+            "code": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "qualified_name": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "start_line": {
+                    "type": "integer"
+                  },
+                  "end_line": {
+                    "type": "integer"
+                  },
+                  "snippet": {
+                    "type": "string"
+                  },
+                  "depth": {
+                    "type": "integer"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "score": {
+                    "type": "number"
+                  },
+                  "via": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "provider"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "memory": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "see": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "overrides": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "why": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "project",
+            "code"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "debug": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "calls": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "capability": {
+                  "type": "string"
+                },
+                "query": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "integer"
+                },
+                "latency_ms": {
+                  "type": "integer"
+                },
+                "bytes": {
+                  "type": "integer"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "provider",
+                "capability",
+                "query",
+                "items",
+                "latency_ms",
+                "bytes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "candidates": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "size": {
+                  "type": "integer"
+                },
+                "evidence": {
+                  "type": "string"
+                },
+                "providers": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "fate": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "why": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "source",
+                "role",
+                "tier",
+                "score",
+                "size",
+                "evidence",
+                "providers",
+                "fate"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "calls",
+          "candidates"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "task",
+      "code",
+      "used_bytes",
+      "budget_bytes"
+    ],
+    "additionalProperties": false
+  }
+}

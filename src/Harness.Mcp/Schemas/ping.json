@@ -1,0 +1,28 @@
+{
+  "description": "Check that the harness MCP server is reachable. Returns a fixed response.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false
+  },
+  "name": "ping",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string"
+      },
+      "server": {
+        "type": "string"
+      },
+      "version": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "message",
+      "server",
+      "version"
+    ],
+    "additionalProperties": false
+  }
+}

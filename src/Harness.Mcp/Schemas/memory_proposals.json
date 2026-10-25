@@ -1,0 +1,88 @@
+{
+  "description": "List memory proposals (default: pending), to review them with the user.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "description": "pending (default), approved, rejected or all"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "max proposals (default 50)"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "memory_proposals",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "proposals": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "source_ref": {
+              "type": "string"
+            },
+            "proposed_by": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "supersedes": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "decided_by": {
+              "type": "string"
+            },
+            "decision_note": {
+              "type": "string"
+            },
+            "memory_id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "content",
+            "scope",
+            "source_ref",
+            "proposed_by",
+            "status",
+            "created_at"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "proposals"
+    ],
+    "additionalProperties": false
+  }
+}

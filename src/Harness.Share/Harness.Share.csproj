@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+    <AssemblyName>harness-share</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Remove="packages*.lock.json" />
+    <ProjectReference Include="../Harness.Web/Harness.Web.csproj" />
+    <ProjectReference Include="../Harness.Infrastructure/Harness.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

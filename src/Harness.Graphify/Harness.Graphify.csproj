@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>harness-graphify</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
+    <ProjectReference Include="../Harness.Infrastructure/Harness.Infrastructure.csproj" />
+    <ProjectReference Include="../Harness.Providers/Harness.Providers.csproj" />
+  </ItemGroup>
+</Project>

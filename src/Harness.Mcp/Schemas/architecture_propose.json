@@ -1,0 +1,128 @@
+{
+  "description": "Propose an architectural task or a by-design mark for the user to approve; nothing changes until they do (harness ui, Work › Inbox), so tell them. kind 'task': from a finding (finding = its key from architecture_findings) or from your own observation (no finding; title, reason = what should change and why, evidence = the places that show it; it is recorded as your interpretation, apart from harness's findings). kind 'by_design': a finding (key) and reason = why it is intended. scope workspace for a finding between services. Never add architectural tasks to a backlog file or create them yourself: this rule is steered by the tools and instructions, not enforced. Other tasks keep the usual flow.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "kind": {
+        "type": "string",
+        "description": "task or by_design"
+      },
+      "finding": {
+        "type": "string",
+        "description": "the finding's key (from architecture_findings); required for by_design, empty for a task from your own observation"
+      },
+      "scope": {
+        "type": "string",
+        "description": "project (default) or workspace: a finding between the services of this project's workspaces"
+      },
+      "title": {
+        "type": "string",
+        "description": "the task's title (default: the finding's)"
+      },
+      "reason": {
+        "type": "string",
+        "description": "task: what should change and why; by_design: why it is intended"
+      },
+      "evidence": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "own observation: the places that show it (path:line)"
+      }
+    },
+    "required": [
+      "kind"
+    ],
+    "additionalProperties": false
+  },
+  "name": "architecture_propose",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "proposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "finding_key": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "proposed_by": {
+            "type": "string"
+          },
+          "proposed_at": {
+            "type": "string"
+          },
+          "decided_by": {
+            "type": "string"
+          },
+          "decided_at": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "scope",
+          "basis",
+          "title",
+          "evidence",
+          "status",
+          "proposed_by",
+          "proposed_at"
+        ],
+        "additionalProperties": false
+      },
+      "status": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "proposal",
+      "status",
+      "note"
+    ],
+    "additionalProperties": false
+  }
+}

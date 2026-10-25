@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Harness.Cli/Harness.Cli.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Harness.Infrastructure/Harness.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Harness.Mcp/Harness.Mcp.csproj" />
+    <ProjectReference Include="../../src/Harness.Graphify/Harness.Graphify.csproj" />
+    <ProjectReference Include="../../src/Harness.Providers/Harness.Providers.csproj" />
+    <ProjectReference Include="../../src/Harness.Web/Harness.Web.csproj" />
+    <ProjectReference Include="../../src/Harness.Collect/Harness.Collect.csproj" />
+    <ProjectReference Include="../../src/Harness.Share/Harness.Share.csproj" />
+    <ProjectReference Include="Storage/Worker/Harness.StorageWorker.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Harness.ProviderWorker/Harness.ProviderWorker.csproj" ReferenceOutputAssembly="false" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="AwesomeAssertions" />
+    <Compile Remove="Storage/Worker/**/*.cs" />
+  </ItemGroup>
+</Project>

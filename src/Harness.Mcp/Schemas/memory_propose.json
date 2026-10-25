@@ -1,0 +1,267 @@
+{
+  "description": "Propose a durable goal, constraint, decision, convention, warning or fact that seems settled but was not explicitly confirmed. It is stored for the user to approve, not as active memory. One short statement; never transcripts.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "one of: goal, constraint, decision, fact, open_question, warning, convention"
+      },
+      "content": {
+        "type": "string",
+        "description": "one short, self-contained statement"
+      },
+      "scope": {
+        "type": "string",
+        "description": "project (default), path:<dir or file>, subsystem:<name> or branch:<name>"
+      },
+      "source_ref": {
+        "type": "string",
+        "description": "where it came from: task id, commit, document, conversation topic"
+      },
+      "rationale": {
+        "type": "string",
+        "description": "why this looks settled, one line"
+      },
+      "supersedes": {
+        "type": "string",
+        "description": "id of a current memory this would replace"
+      }
+    },
+    "required": [
+      "type",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "name": "memory_propose",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string"
+      },
+      "proposal": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "proposed_by": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "supersedes": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "decided_by": {
+            "type": "string"
+          },
+          "decision_note": {
+            "type": "string"
+          },
+          "memory_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "scope",
+          "source_ref",
+          "proposed_by",
+          "status",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "memory": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "recorded_by": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "superseded_by": {
+            "type": "string"
+          },
+          "supersede_reason": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string"
+          },
+          "valid_until": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "overrides": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "content",
+          "scope",
+          "source_type",
+          "source_ref",
+          "recorded_by",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "related": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "memory": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "source_ref": {
+                  "type": "string"
+                },
+                "recorded_by": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "superseded_by": {
+                  "type": "string"
+                },
+                "supersede_reason": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string"
+                },
+                "valid_until": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "overrides": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "content",
+                "scope",
+                "source_type",
+                "source_ref",
+                "recorded_by",
+                "created_at"
+              ],
+              "additionalProperties": false
+            },
+            "similarity": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "memory",
+            "similarity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "additionalProperties": false
+  }
+}

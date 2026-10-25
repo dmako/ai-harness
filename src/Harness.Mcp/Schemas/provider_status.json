@@ -1,0 +1,146 @@
+{
+  "description": "Show each configured provider's health, capabilities, suggested fix and recent call statistics, and which architecture capabilities (arch.*) have a provider and what is missing without one.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false
+  },
+  "name": "provider_status",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "providers": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "fix": {
+              "type": "string"
+            },
+            "capabilities": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "freshness": {
+              "type": "string"
+            },
+            "recent_24h": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "calls": {
+                  "type": "integer"
+                },
+                "errors": {
+                  "type": "integer"
+                },
+                "avg_ms": {
+                  "type": "number"
+                },
+                "avg_bytes": {
+                  "type": "number"
+                },
+                "last_call_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "calls",
+                "errors",
+                "avg_ms",
+                "avg_bytes"
+              ],
+              "additionalProperties": false
+            },
+            "context_30d": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "hits": {
+                  "type": "integer"
+                },
+                "changed": {
+                  "type": "integer"
+                },
+                "hit_rate": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hits",
+                "changed",
+                "hit_rate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "name",
+            "state",
+            "capabilities"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "architecture": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "capability": {
+              "type": "string"
+            },
+            "providers": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "without": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "capability",
+            "providers"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "providers",
+      "architecture"
+    ],
+    "additionalProperties": false
+  }
+}

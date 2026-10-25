@@ -1,0 +1,190 @@
+{
+  "description": "Propose a task the user has not planned yet (work you found, a follow-up): title, goal (the outcome and why), acceptance criteria that can be checked, and optionally type, priority, milestone, depends_on and scope. Agents propose tasks, never create them (not in the backlog file either): it waits for the user in harness ui, Work › Inbox, who approves it (the task is made) or rejects it.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "goal": {
+        "type": "string",
+        "description": "the outcome and why"
+      },
+      "acceptance": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "criteria that can be checked, one per entry"
+      },
+      "type": {
+        "type": "string",
+        "description": "feature (default), bug, chore, spike, docs, test or process"
+      },
+      "priority": {
+        "type": "string",
+        "description": "low, medium (default), high or critical"
+      },
+      "milestone": {
+        "type": "string"
+      },
+      "depends_on": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "ids of tasks it waits for"
+      },
+      "scope": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "paths it may touch"
+      },
+      "reason": {
+        "type": "string",
+        "description": "why you propose it: what you saw, where"
+      }
+    },
+    "required": [
+      "title",
+      "goal",
+      "acceptance"
+    ],
+    "additionalProperties": false
+  },
+  "name": "task_propose",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "proposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "milestone": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "scope": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "depends_on": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "acceptance": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "validation": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "notes": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "proposed_by": {
+            "type": "string"
+          },
+          "proposed_at": {
+            "type": "string"
+          },
+          "decided_by": {
+            "type": "string"
+          },
+          "decided_at": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "task",
+          "status",
+          "proposed_by",
+          "proposed_at"
+        ],
+        "additionalProperties": false
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "proposal",
+      "note"
+    ],
+    "additionalProperties": false
+  }
+}
