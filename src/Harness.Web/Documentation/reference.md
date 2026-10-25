@@ -197,6 +197,11 @@ level = "info"                    # debug | info | warn | error
 [sync]
 ignore = ["vendor/", "*.min.js"]  # on top of .gitignore
 
+[architecture.complexity]         # cyclomatic complexity of C# members
+note = 11                         # lowest value reported as a note
+warn = 21                         # ... as a warning
+problem = 51                      # ... as a problem
+
 [providers.<name>]                # see Providers
 ```
 

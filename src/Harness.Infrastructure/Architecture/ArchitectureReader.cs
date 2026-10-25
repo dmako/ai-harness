@@ -20,7 +20,20 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         WorkspaceMember member,
         IReadOnlyList<ArchitectureFinding>? provided,
         CancellationToken token
+    ) => (await RepeatedReaderAsync(member, token).ConfigureAwait(false)).Read(provided);
+
+    /// <summary>Complexity findings from the functions the repeated-code reader already extracted.</summary>
+    public async Task<IReadOnlyList<ArchitectureFinding>> ComplexityAsync(
+        WorkspaceMember member,
+        ComplexityThresholds thresholds,
+        CancellationToken token
     )
+    {
+        var reader = await RepeatedReaderAsync(member, token).ConfigureAwait(false);
+        return new Complexity.ComplexityReader(reader.Extractor).Read(thresholds);
+    }
+
+    private async Task<Clones.RepeatedCodeReader> RepeatedReaderAsync(WorkspaceMember member, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (!_repeated.TryGetValue(member.Id, out var reader))
@@ -29,7 +42,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
             reader = new(repository);
             _repeated.Add(member.Id, reader);
         }
-        return reader.Read(provided);
+        return reader;
     }
 
     public async Task<ArchitectureRead> ProjectAsync(

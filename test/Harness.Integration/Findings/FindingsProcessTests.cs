@@ -282,6 +282,50 @@ public sealed class FindingsProcessTests
     }
 
     [Fact]
+    public async Task SyncRecordsComplexityAndThresholdChangesKeepTheFinding()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "App.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
+        fixture.Write(
+            "Router.cs",
+            "namespace App;\npublic class Router\n{\n    public int Route(int a)\n    {\n"
+                + string.Concat(Enumerable.Repeat("        if (a > 0) { a--; }\n", 13))
+                + "        return a;\n    }\n}\n"
+        );
+        using var db = fixture.Database();
+        var synced = await fixture.RunAsync();
+        var sets = new FindingSets(
+            fixture.Root,
+            synced.Registration.Project.Id,
+            db,
+            fixture.Lifecycle.GlobalConfigurationPath,
+            fixture.Lifecycle.Registry
+        );
+        var first = (await sets.ReadAsync("project", Token))
+            .Groups.Single()
+            .Findings.Should()
+            .ContainSingle(f => f.Kind == "complexity")
+            .Which;
+        first.Key.Should().Be("complexity:Router.cs#Router.Route");
+        first.Level.Should().Be("info");
+        first.Measure.Should().Be(14);
+
+        fixture.Write(".harness/config.toml", "[architecture.complexity]\nnote = 5\nwarn = 10\nproblem = 30\n");
+        await fixture.RunAsync();
+        var second = (await sets.ReadAsync("project", Token))
+            .Groups.Single()
+            .Findings.Should()
+            .ContainSingle(f => f.Kind == "complexity")
+            .Which;
+        second.Key.Should().Be(first.Key);
+        second.Level.Should().Be("warn");
+        second.Status.Should().Be("changed");
+    }
+
+    [Fact]
     public async Task WorkspaceProposalsKeepMarksInWorkspaceAndTasksInCurrentProject()
     {
         using var fixture = await WorkspaceFixture.CreateAsync();

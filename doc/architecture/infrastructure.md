@@ -68,6 +68,17 @@ Change coupling combines history and provider evidence to suggest missing usual
 partners. Layering, service and database guesses remain labeled heuristics.
 Coverage gaps do not become negative findings.
 
+The complexity reader counts each C# method's and constructor's cyclomatic
+complexity from the tokens the clone extractor already holds. It reads no file a
+second time and skips the same test, generated and vendor files. Lambdas and
+local functions count toward the member that contains them. The thresholds in
+`[architecture.complexity]` turn each member's value into a level. By default,
+11–20 is a note, 21–50 a warning and 51 or more a problem; below the note
+threshold nothing is reported. A finding's key names its member and not its
+level, so a changed threshold or value shows the same finding as changed.
+[Code metrics](code-metrics.md) records the counting rules, their accuracy
+against `Microsoft.CodeAnalysis.Metrics`, and the planned exact-value worker.
+
 Findings retain snapshots, evidence, drift and marks. Agent proposals remain
 pending; approval can create tasks or deliberate-design marks. Task generation
 is explicit and preserves the author and source finding.
