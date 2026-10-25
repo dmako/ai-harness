@@ -1135,7 +1135,7 @@ table.dups td:first-child { white-space: normal; }
 .cxth line { stroke-width: 1; stroke: var(--axis); }
 .cxth-warn line { stroke: var(--warning); }
 .cxth-problem line { stroke: var(--critical); }
-.cxth text { fill: var(--ink-2); }
+.cxth text { fill: var(--ink-2); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
 .cxtable { border-collapse: collapse; font-size: var(--text-sm); margin-top: 4px; }
 .cxtable th, .cxtable td { text-align: left; padding: 2px 10px 2px 0; border-bottom: 1px solid var(--border); }
 .cxtable .n { text-align: right; font-variant-numeric: tabular-nums; }
