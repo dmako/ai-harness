@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Harness.Core.Architecture;
 using Harness.Core.Retrieval;
+using Harness.Infrastructure.Architecture.Complexity;
 
 namespace Harness.Infrastructure.Architecture.Clones;
 
@@ -10,11 +11,19 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
 {
     private IReadOnlyList<CloneFunction>? _functions;
     private readonly List<CloneBranch> _branches = [];
+    private readonly List<ComplexityMember> _complexity = [];
 
     public IReadOnlyList<CloneBranch> Branches()
     {
         Extract();
         return _branches;
+    }
+
+    /// <summary>C# members' cyclomatic complexity, counted from the same tokens as the functions.</summary>
+    public IReadOnlyList<ComplexityMember> Complexity()
+    {
+        Extract();
+        return _complexity;
     }
 
     public IReadOnlyList<CloneFunction> Extract()
@@ -43,6 +52,10 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             else
             {
                 functions.AddRange(CFunctions(file, language, tokens));
+                if (language is "cs")
+                {
+                    _complexity.AddRange(ComplexityCounter.Members(file, tokens));
+                }
             }
         }
         foreach (var file in go)

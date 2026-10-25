@@ -55,6 +55,11 @@ internal static class ConfigurationValidation
             configuration.Log.Level is "debug" or "info" or "warn" or "error",
             "log.level must be debug, info, warn or error"
         );
+        var complexity = configuration.Architecture.Complexity;
+        Require(
+            complexity.Note >= 1 && complexity.Note <= complexity.Warn && complexity.Warn <= complexity.Problem,
+            "architecture.complexity must satisfy 1 <= note <= warn <= problem"
+        );
         foreach (var (name, provider) in configuration.Providers.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             var key = $"providers.{name}";

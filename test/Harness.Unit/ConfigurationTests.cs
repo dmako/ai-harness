@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Harness.Core.Architecture;
 using Harness.Infrastructure.Configuration;
 using Xunit;
 
@@ -14,6 +15,7 @@ public sealed class ConfigurationTests
         loaded.Value.Storage.DbPath.Should().Be(Path.Combine(".harness", "harness.db"));
         loaded.Value.Storage.BusyTimeoutMs.Should().Be(5000);
         loaded.Value.Log.Level.Should().Be("info");
+        loaded.Value.Architecture.Complexity.Thresholds().Should().Be(new ComplexityThresholds(11, 21, 51));
         loaded.Sources.Global.Should().BeEmpty();
         Directory.Exists(path).Should().BeFalse();
     }
@@ -108,6 +110,9 @@ public sealed class ConfigurationTests
         "[providers.x]\ntype = 'mcp'\ncommand = 'x'\n[providers.x.capabilities.'code.text_search']\ntool = 'x'\nunknown = true"
     )]
     [InlineData("[storage")]
+    [InlineData("[architecture.complexity]\nnote = 0")]
+    [InlineData("[architecture.complexity]\nnote = 30\nwarn = 21")]
+    [InlineData("[architecture.complexity]\nlimit = 10")]
     public void InvalidLayerIdentifiesItsFileAndCannotBeMasked(string content)
     {
         using var directory = new ConfigurationDirectory();
@@ -119,6 +124,20 @@ public sealed class ConfigurationTests
             .ThrowExactly<InvalidDataException>()
             .Which;
         error.Message.Should().Contain(directory.Global);
+    }
+
+    [Fact]
+    public void ProjectChoosesComplexityThresholds()
+    {
+        using var directory = new ConfigurationDirectory();
+        File.WriteAllText(directory.Global, "[architecture.complexity]\nnote = 8");
+        File.WriteAllText(directory.Project, "[architecture.complexity]\nwarn = 15\nproblem = 30");
+        // A project table replaces the global one, as provider tables do.
+        ConfigurationLoader
+            .LoadFiles(directory.Global, directory.Project)
+            .Value.Architecture.Complexity.Thresholds()
+            .Should()
+            .Be(new ComplexityThresholds(11, 15, 30));
     }
 
     [Fact]
