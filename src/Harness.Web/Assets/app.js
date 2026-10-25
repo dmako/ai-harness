@@ -2737,7 +2737,8 @@ function complexityChart(l, titled) {
   const count = (lv) => l.counts.filter(([v]) => level(v) === lv).reduce((s, [, n]) => s + n, 0);
   const range = (b, i) => (open && i === bins.length - 1 ? `${b.lo}+` : `${b.lo}–${b.hi}`);
   // geometry: one value axis, one count axis from zero
-  const W = 720, H = 190, L = 44, R = 12, T = 34, B = 26;
+  // the top band (T) holds two rows of threshold labels above the counts on the tallest bars
+  const W = 720, H = 204, L = 44, R = 12, T = 48, B = 26;
   const pw = W - L - R, ph = H - T - B, base = T + ph;
   const x = (v) => L + ((v - 1) / top) * pw;
   const peak = Math.max(1, ...bins.map((b) => b.n));
@@ -2756,15 +2757,17 @@ function complexityChart(l, titled) {
       sv("title", {}, `complexity ${range(b, i)}: ${b.n} function${b.n === 1 ? "" : "s"} (${CX_LEVEL[lv]})`),
       lv !== "ok" && sv("text", { class: "cxn", x: x0 + w / 2, y: y0 - 4, "text-anchor": "middle" }, b.n));
   });
-  // thresholds: a line each, labels lifted a row when they would collide
-  let lastX = -Infinity, row = 0;
+  // thresholds: a line each, their labels on one baseline; a label goes to a
+  // second row only when it would run into the one before it (11px text is
+  // about 6.5px a character)
+  const ends = [-Infinity, -Infinity];
   const marks = [["info", t.note], ["warn", t.warn], ["problem", t.problem]].filter(([, v]) => v <= top).map(([lv, v]) => {
-    const xv = x(v);
-    row = xv - lastX < 90 ? 1 - row : 0;
-    lastX = xv;
+    const xv = x(v), label = `${LEVEL_ICON[lv]} ${CX_LEVEL[lv]} ≥ ${v}`;
+    const row = xv + 4 >= ends[0] + 6 ? 0 : 1;
+    ends[row] = xv + 4 + label.length * 6.5;
     return sv("g", { class: `cxth cxth-${lv}` },
-      sv("line", { x1: xv, x2: xv, y1: T - 4, y2: base }),
-      sv("text", { x: xv + 4, y: T - 18 + row * 12 }, `${LEVEL_ICON[lv]} ${CX_LEVEL[lv]} ≥ ${v}`));
+      sv("line", { x1: xv, x2: xv, y1: T - 18 - row * 12, y2: base }),
+      sv("text", { x: xv + 4, y: T - 22 - row * 12 }, label));
   });
   const ticks = [1];
   for (let v = 11; v <= top; v += 10) ticks.push(v);
