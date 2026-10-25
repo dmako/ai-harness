@@ -206,6 +206,10 @@ problem = 51                      # ... as a problem
 [architecture.complexity.typescript]  # optional: one language's own thresholds
 warn = 31
 
+[architecture.complexity.metrics]     # exact .NET values (Windows, .NET SDK)
+enabled = false                       # true: sync starts a background run per HEAD
+timeout_ms = 600000                   # a longer run fails and keeps the counted values
+
 [providers.<name>]                # see Providers
 ```
 

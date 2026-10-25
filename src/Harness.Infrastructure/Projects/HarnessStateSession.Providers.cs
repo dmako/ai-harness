@@ -131,4 +131,24 @@ public sealed partial class HarnessStateSession
         }
         return result;
     }
+
+    public async Task<Core.Architecture.ComplexityMetricsStatus?> ReadComplexityMetricsAsync(
+        CancellationToken cancellationToken
+    )
+    {
+        if (!location.Configuration.Value.Architecture.Complexity.Metrics.Enabled)
+        {
+            return null;
+        }
+
+        var snapshot = await ReadProviderProjectAsync(cancellationToken).ConfigureAwait(false);
+        return snapshot.ProjectId.Length is 0
+            ? new("idle", "the project is not registered yet; run 'harness init'")
+            : Architecture
+                .Metrics.MetricsStore.For(
+                    globalConfigurationPath ?? Configuration.ConfigurationPaths.GlobalPath(),
+                    snapshot.ProjectId
+                )
+                .Status(snapshot.Commit);
+    }
 }

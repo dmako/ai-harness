@@ -32,8 +32,16 @@ public static class ArchitectureProviders
                         )
                         .Select(capability => new CapabilityInfo(capability, pair.Key))
                 )
+                .Concat(
+                    configuration.Architecture.Complexity.Metrics.Enabled
+                        ? [new CapabilityInfo(Capabilities.ArchComplexity, MetricsWorker)]
+                        : []
+                )
                 .ToArray()
         );
+
+    /// <summary>The name architecture coverage gives the background Microsoft.CodeAnalysis.Metrics run.</summary>
+    public const string MetricsWorker = "metrics-worker";
 
     private static ArchitectureCoverage[] CoverageOf(IReadOnlyList<CapabilityInfo> capabilities) =>
         Capabilities
@@ -44,19 +52,11 @@ public static class ArchitectureProviders
                     .Select(item => item.Provider)
                     .Order(StringComparer.Ordinal)
                     .ToArray();
-                var without = capability switch
-                {
-                    Capabilities.ArchDependencies =>
-                        "harness reads dependencies itself from build files and imports; nothing is missing",
-                    Capabilities.ArchCycles => "harness finds circles in what it reads itself; nothing is missing",
-                    Capabilities.ArchChangeCoupling =>
-                        "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)",
-                    Capabilities.ArchDuplicates =>
-                        "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)",
-                    _ =>
-                        "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet",
-                };
-                return new ArchitectureCoverage(capability, providers, providers.Length is 0 ? without : null);
+                return new ArchitectureCoverage(
+                    capability,
+                    providers,
+                    providers.Length is 0 ? Capabilities.Without(capability) : null
+                );
             })
             .ToArray();
 

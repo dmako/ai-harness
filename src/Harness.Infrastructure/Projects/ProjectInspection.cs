@@ -20,6 +20,9 @@ public sealed record ProjectInspection(
     public int SchemaLatest { get; init; }
     public string? DatabaseError { get; init; }
 
+    /// <summary>The exact-complexity worker, when [architecture.complexity.metrics] enables it.</summary>
+    public HealthCheck? Metrics { get; init; }
+
     public object Status() =>
         new JsonObjectMap
         {
@@ -109,6 +112,11 @@ public sealed record ProjectInspection(
                     : null
             ),
         ];
+        if (Metrics is not null)
+        {
+            checks.Add(Metrics);
+        }
+
         return checks;
     }
 

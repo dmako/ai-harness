@@ -50,6 +50,7 @@ public sealed record ComplexityConfiguration
     public ComplexityLevels? Csharp { get; set; }
     public ComplexityLevels? Go { get; set; }
     public ComplexityLevels? Typescript { get; set; }
+    public MetricsConfiguration Metrics { get; set; } = new();
 
     public IReadOnlyDictionary<string, ComplexityThresholds> Thresholds() =>
         Languages.Distinct(StringComparer.Ordinal).ToDictionary(language => language, For, StringComparer.Ordinal);
@@ -65,6 +66,13 @@ public sealed record ComplexityConfiguration
         };
         return new(own?.Note ?? Note, own?.Warn ?? Warn, own?.Problem ?? Problem);
     }
+}
+
+/// <summary>The background Microsoft.CodeAnalysis.Metrics run that gives .NET members exact values (Windows).</summary>
+public sealed record MetricsConfiguration
+{
+    public bool Enabled { get; set; }
+    public int TimeoutMs { get; set; } = 600_000;
 }
 
 public sealed record ComplexityLevels

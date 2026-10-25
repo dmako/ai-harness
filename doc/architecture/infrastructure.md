@@ -89,6 +89,29 @@ own table, such as `[architecture.complexity.typescript]`, overrides any of the
 three thresholds. A finding names its language. Its key names the member and
 not the level, so a changed threshold or value shows the same finding as
 changed.
+
+With `[architecture.complexity.metrics] enabled = true`, .NET members can get
+exact values. When a sync (run by the git hooks) finds no finished run for HEAD,
+it starts `harness complexity measure` detached and does not wait for it. On
+other platforms it reports the worker as unsupported. The worker:
+
+1. holds a per-project lock, so one run per project at a time (a newer sync
+   stops a worker that is still measuring an older commit);
+2. runs Microsoft.CodeAnalysis.Metrics from a cache next to the global
+   configuration, on the non-test C# and Visual Basic projects that changed
+   since the last finished run, lowest dependency first, and keeps the other
+   projects' members;
+3. stores the members (complexity and maintainability index) in one file per
+   commit in that machine directory, never in the repository or the database;
+4. refreshes the findings snapshot if HEAD is still that commit.
+
+A run whose commit is no longer HEAD is dropped. Findings for HEAD use the
+measured values for the C# members at the same path and line (source tool
+`Microsoft.CodeAnalysis.Metrics`) and add members only the run reports, such as
+properties. Any other commit keeps harness's own count. A failed run (no SDK,
+NuGet unreachable, projects that do not load, timeout) keeps the counted
+findings. `doctor` and `provider_status` report the worker's state and its fix,
+and architecture coverage names it under `arch.complexity`.
 [Code metrics](code-metrics.md) records the counting rules, their accuracy
 against `Microsoft.CodeAnalysis.Metrics`, and the planned exact-value worker.
 

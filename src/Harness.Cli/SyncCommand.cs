@@ -40,7 +40,11 @@ internal sealed class SyncCommand(
             (_, true) => "since",
             _ => "incremental",
         };
-        var result = await new ProjectSynchronizer(lifecycle, providers: registry).RunAsync(
+        // The exact-complexity worker is this executable, started detached by 'harness complexity measure'.
+        var launcher = Environment.ProcessPath is { Length: > 0 } self
+            ? new Harness.Infrastructure.Architecture.Metrics.ProcessMetricsLauncher(self)
+            : null;
+        var result = await new ProjectSynchronizer(lifecycle, providers: registry, metricsLauncher: launcher).RunAsync(
             settings.Project,
             new SyncOptions
             {
@@ -105,6 +109,11 @@ internal sealed class SyncCommand(
         foreach (var finding in result.Findings)
         {
             await PrintFindingsAsync(finding);
+        }
+
+        if (result.Metrics.Length > 0)
+        {
+            await output.WriteLineAsync($"Metrics   exact complexity {result.Metrics}");
         }
 
         await output.WriteLineAsync("\nSynced.");

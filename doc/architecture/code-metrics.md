@@ -11,8 +11,7 @@ records how that worker runs the tool (spike TASK-0040, 2026-10-25).
 Harness runs the package's `Metrics.exe` directly from a cache it owns. It
 passes each project explicitly with `/project:` and writes `/out:` under harness
 state. Nothing is added to the analysed repository, and its working tree stays
-unchanged. Only restore output, which is normally ignored, is created, and only
-when a project was never restored.
+unchanged; the worker never restores the analysed projects.
 
 - The cache holds the package's `Metrics/` folder plus the `BuildHost-net472`
   and `BuildHost-netcore` folders from `Microsoft.CodeAnalysis.Workspaces.MSBuild`.
@@ -42,6 +41,18 @@ once per project, and each run loads all of that project's references again.
 A method's complexity depends only on its own project's source. After a sync,
 the worker reruns only the projects that own changed files, in one process. The
 fixed cost is about 4 s per run.
+
+## The worker
+
+The worker (TASK-0041) restores the tool once, into `tools/metrics-5.6.0` next to
+the global configuration. It writes a small project there with `PackageDownload`
+items for both pinned packages and runs `dotnet restore`, so NuGet verifies the
+package signatures and the user's sources and proxies apply. That project's own
+`nuget.config` clears inherited package source mappings, which would otherwise
+hide the two packages. It targets the SDK's bundled framework, so it needs no
+other package. Runs live in `metrics/<project id>/runs/<commit>.json` beside
+them; the newest 20 are kept. On a one-project fixture, the first run, restore
+included, took about 18 s.
 
 ## Platforms
 

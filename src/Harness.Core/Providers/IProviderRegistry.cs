@@ -45,4 +45,8 @@ public interface IProviderProjectSession
         string provider,
         CancellationToken cancellationToken
     );
+
+    /// <summary>The exact-complexity worker's state for HEAD, or null when it is not enabled.</summary>
+    Task<Architecture.ComplexityMetricsStatus?> ReadComplexityMetricsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<Architecture.ComplexityMetricsStatus?>(null);
 }
