@@ -186,167 +186,210 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
         );
     }
 
+    /// <summary>
+    /// The module's packages being read: one unit per directory, its external modules, and the internal
+    /// imports that do not build.
+    /// </summary>
+    private sealed record GoModule(string Name, Dictionary<string, string> Required)
+    {
+        public Dictionary<string, BuildUnit> Units { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, HashSet<string>> External { get; } = new(StringComparer.Ordinal);
+        public List<ArchitectureFinding> Internals { get; } = [];
+
+        public BuildUnit UnitFor(string dir)
+        {
+            if (!Units.TryGetValue(dir, out var unit))
+            {
+                unit = new() { Name = dir is "." ? Path.GetFileName(Name) : dir, Path = dir };
+                Units.Add(dir, unit);
+                External.Add(dir, new(StringComparer.Ordinal));
+            }
+            return unit;
+        }
+    }
+
     public ProjectBuild Go()
     {
-        var module = ecosystem.Package("go.mod").Name;
-        var required = ecosystem
-            .Dependencies("go.mod")
-            .GroupBy(dependency => dependency.Name, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Last().Version, StringComparer.Ordinal);
+        var module = new GoModule(
+            ecosystem.Package("go.mod").Name,
+            ecosystem
+                .Dependencies("go.mod")
+                .GroupBy(dependency => dependency.Name, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Last().Version, StringComparer.Ordinal)
+        );
         var nested = repository
             .Files.Where(file => file != "go.mod" && Path.GetFileName(file) is "go.mod")
             .Select(file => Directory(file) + "/")
             .ToArray();
-        Dictionary<string, BuildUnit> units = new(StringComparer.Ordinal);
-        Dictionary<string, HashSet<string>> external = new(StringComparer.Ordinal);
-        List<ArchitectureFinding> internals = [];
-        foreach (
-            var file in repository.Files.Where(file =>
-                Path.GetExtension(file) is ".go"
-                && !file.EndsWith("_test.go", StringComparison.Ordinal)
-                && !nested.Any(prefix => file.StartsWith(prefix, StringComparison.Ordinal))
-                && !Directory(file)
-                    .Split('/')
-                    .Any(part => part is "vendor" or "testdata" || part.StartsWith('.') || part.StartsWith('_'))
-            )
-        )
+        foreach (var file in repository.Files.Where(file => GoSource(file, nested)))
         {
-            var dir = Directory(file);
-            if (!units.TryGetValue(dir, out var unit))
-            {
-                unit = new() { Name = dir is "." ? Path.GetFileName(module) : dir, Path = dir };
-                units.Add(dir, unit);
-                external.Add(dir, new(StringComparer.Ordinal));
-            }
-            var block = false;
-            var package = "";
-            var lines = AnalysisRepository.Lines(repository.Read(file));
-            for (var index = 0; index < lines.Length; index++)
-            {
-                var line = lines[index].Trim();
-                if (package.Length is 0 && line.StartsWith("package ", StringComparison.Ordinal))
-                {
-                    package =
-                        line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(1) ?? "";
-                    if (package is "main")
-                    {
-                        unit.Kind = "entry";
-                    }
-
-                    continue;
-                }
-                if (line.StartsWith("import (", StringComparison.Ordinal))
-                {
-                    block = true;
-                    continue;
-                }
-                if (block && line is ")")
-                {
-                    break;
-                }
-
-                if (block || line.StartsWith("import ", StringComparison.Ordinal))
-                {
-                    var import = GoImport.Match(line);
-                    if (!import.Success)
-                    {
-                        continue;
-                    }
-
-                    var path = import.Groups[1].Value;
-                    if (
-                        module.Length > 0
-                        && (path == module || path.StartsWith(module + "/", StringComparison.Ordinal))
-                    )
-                    {
-                        var target = path[module.Length..].TrimStart('/');
-                        if (target.Length is 0)
-                        {
-                            target = ".";
-                        }
-
-                        if (target != dir && !unit.References.Contains(target, StringComparer.Ordinal))
-                        {
-                            unit.References.Add(target);
-                            (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[target] =
-                                file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture);
-                        }
-                        var internalAt = ("/" + target + "/").LastIndexOf("/internal/", StringComparison.Ordinal);
-                        var parent = internalAt < 0 ? "" : ("/" + target + "/")[..internalAt].Trim('/');
-                        if (
-                            target != dir
-                            && parent.Length > 0
-                            && dir != parent
-                            && !dir.StartsWith(parent + "/", StringComparison.Ordinal)
-                        )
-                        {
-                            internals.Add(
-                                new()
-                                {
-                                    Kind = "internal-import",
-                                    Level = "problem",
-                                    Title = dir + " imports " + target + " from outside its tree",
-                                    Why =
-                                        "Go allows an internal package to be imported only from below the folder that holds internal/; this does not build.",
-                                    Fix =
-                                        "Move the importing package below the internal package's parent, or move the package out of internal/.",
-                                    Project = dir,
-                                    Evidence = [file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture)],
-                                    Key = ArchitectureAnalyzer.Key("internal-import", dir, target),
-                                }
-                            );
-                        }
-                    }
-                    else if (path.Split('/')[0].Contains('.', StringComparison.Ordinal))
-                    {
-                        var best =
-                            required
-                                .Keys.Where(name =>
-                                    path == name || path.StartsWith(name + "/", StringComparison.Ordinal)
-                                )
-                                .OrderByDescending(name => name.Length)
-                                .FirstOrDefault()
-                            ?? path;
-                        external[dir].Add(best);
-                    }
-                }
-                else if (
-                    package.Length > 0
-                    && new[] { "func ", "type ", "var ", "const " }.Any(prefix =>
-                        line.StartsWith(prefix, StringComparison.Ordinal)
-                    )
-                )
-                {
-                    break;
-                }
-            }
+            ReadGoFile(module, file);
         }
-        foreach (var unit in units.Values)
+        foreach (var unit in module.Units.Values)
         {
-            unit.Packages.AddRange(
-                external[unit.Path]
-                    .Order(WorkspaceNameComparer.Instance)
-                    .Select(name => new BuildPackage(name, Empty(required.GetValueOrDefault(name, ""))))
-            );
-            unit.References.Sort(WorkspaceNameComparer.Instance);
-            var name = Path.GetFileName(unit.Path);
-            if (
-                unit.Kind is "library"
-                && (name.EndsWith("test", StringComparison.Ordinal) || name is "testutil" or "testhelpers")
-            )
-            {
-                unit.Kind = "test";
-            }
+            FinishGoUnit(unit, module);
         }
         return new(
             "go",
             "package",
             [],
-            units.Values.OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray()
+            module.Units.Values.OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray()
         )
         {
-            Extra = internals,
+            Extra = module.Internals,
         };
+    }
+
+    /// <summary>A non-test .go file of this module, outside nested modules, vendor, testdata and hidden folders.</summary>
+    private static bool GoSource(string file, string[] nested) =>
+        Path.GetExtension(file) is ".go"
+        && !file.EndsWith("_test.go", StringComparison.Ordinal)
+        && !nested.Any(prefix => file.StartsWith(prefix, StringComparison.Ordinal))
+        && !Directory(file)
+            .Split('/')
+            .Any(part => part is "vendor" or "testdata" || part.StartsWith('.') || part.StartsWith('_'));
+
+    /// <summary>Reads a file's package clause and imports, stopping at its first declaration.</summary>
+    private void ReadGoFile(GoModule module, string file)
+    {
+        var dir = Directory(file);
+        var unit = module.UnitFor(dir);
+        var block = false;
+        var package = "";
+        var lines = AnalysisRepository.Lines(repository.Read(file));
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index].Trim();
+            if (package.Length is 0 && line.StartsWith("package ", StringComparison.Ordinal))
+            {
+                package = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(1) ?? "";
+                if (package is "main")
+                {
+                    unit.Kind = "entry";
+                }
+
+                continue;
+            }
+            if (line.StartsWith("import (", StringComparison.Ordinal))
+            {
+                block = true;
+                continue;
+            }
+            if (block && line is ")")
+            {
+                break;
+            }
+
+            if (block || line.StartsWith("import ", StringComparison.Ordinal))
+            {
+                GoImportLine(module, unit, line, file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture));
+            }
+            else if (package.Length > 0 && GoDeclaration(line))
+            {
+                break;
+            }
+        }
+    }
+
+    private static bool GoDeclaration(string line) =>
+        new[] { "func ", "type ", "var ", "const " }.Any(prefix => line.StartsWith(prefix, StringComparison.Ordinal));
+
+    /// <summary>
+    /// An import of this module becomes a reference (and maybe an internal-import finding); a
+    /// domain-qualified one, the required module it belongs to.
+    /// </summary>
+    private static void GoImportLine(GoModule module, BuildUnit unit, string line, string at)
+    {
+        var import = GoImport.Match(line);
+        if (!import.Success)
+        {
+            return;
+        }
+
+        var path = import.Groups[1].Value;
+        if (
+            module.Name.Length > 0
+            && (path == module.Name || path.StartsWith(module.Name + "/", StringComparison.Ordinal))
+        )
+        {
+            var target = path[module.Name.Length..].TrimStart('/');
+            GoModuleImport(module, unit, target.Length is 0 ? "." : target, at);
+        }
+        else if (path.Split('/')[0].Contains('.', StringComparison.Ordinal))
+        {
+            module.External[unit.Path].Add(RequiredModule(module.Required, path));
+        }
+    }
+
+    private static void GoModuleImport(GoModule module, BuildUnit unit, string target, string at)
+    {
+        var dir = unit.Path;
+        if (target != dir && !unit.References.Contains(target, StringComparer.Ordinal))
+        {
+            unit.References.Add(target);
+            (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[target] = at;
+        }
+
+        var parent = InternalParent(target);
+        if (
+            target != dir
+            && parent.Length > 0
+            && dir != parent
+            && !dir.StartsWith(parent + "/", StringComparison.Ordinal)
+        )
+        {
+            module.Internals.Add(
+                new()
+                {
+                    Kind = "internal-import",
+                    Level = "problem",
+                    Title = dir + " imports " + target + " from outside its tree",
+                    Why =
+                        "Go allows an internal package to be imported only from below the folder that holds internal/; this does not build.",
+                    Fix =
+                        "Move the importing package below the internal package's parent, or move the package out of internal/.",
+                    Project = dir,
+                    Evidence = [at],
+                    Key = ArchitectureAnalyzer.Key("internal-import", dir, target),
+                }
+            );
+        }
+    }
+
+    /// <summary>The folder holding the last internal/ in a package path; "" when it has none.</summary>
+    private static string InternalParent(string target)
+    {
+        var wrapped = "/" + target + "/";
+        var internalAt = wrapped.LastIndexOf("/internal/", StringComparison.Ordinal);
+        return internalAt < 0 ? "" : wrapped[..internalAt].Trim('/');
+    }
+
+    /// <summary>The longest required module the import path belongs to, else the path itself.</summary>
+    private static string RequiredModule(Dictionary<string, string> required, string path) =>
+        required
+            .Keys.Where(name => path == name || path.StartsWith(name + "/", StringComparison.Ordinal))
+            .OrderByDescending(name => name.Length)
+            .FirstOrDefault()
+        ?? path;
+
+    /// <summary>Adds the unit's external modules with their required versions, and marks test helper packages.</summary>
+    private static void FinishGoUnit(BuildUnit unit, GoModule module)
+    {
+        unit.Packages.AddRange(
+            module
+                .External[unit.Path]
+                .Order(WorkspaceNameComparer.Instance)
+                .Select(name => new BuildPackage(name, Empty(module.Required.GetValueOrDefault(name, ""))))
+        );
+        unit.References.Sort(WorkspaceNameComparer.Instance);
+        var name = Path.GetFileName(unit.Path);
+        if (
+            unit.Kind is "library"
+            && (name.EndsWith("test", StringComparison.Ordinal) || name is "testutil" or "testhelpers")
+        )
+        {
+            unit.Kind = "test";
+        }
     }
 
     private string Join(string dir, string path) =>
