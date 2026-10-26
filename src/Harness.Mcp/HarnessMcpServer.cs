@@ -176,143 +176,156 @@ public static class HarnessMcpServer
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (parameters.Name == "ping")
+        return parameters.Name switch
         {
-            return Success(
+            "ping" => Success(
                 new SortedDictionary<string, object?>(StringComparer.Ordinal)
                 {
                     ["message"] = "pong",
                     ["server"] = "harness",
                     ["version"] = runtime.Version,
                 }
-            );
-        }
+            ),
+            "diagnostics" => Success(await session.DiagnosticsAsync(cancellationToken)),
+            "state_put_test" or "state_get_test" => await StateTestAsync(parameters, session, cancellationToken),
+            _ => await ToolAsync(
+                new(parameters, session, caller, cancellationToken),
+                new(providerTools, contextTools, workspaceTools, couplingTools)
+            ),
+        };
+    }
 
-        if (parameters.Name == "diagnostics")
+    /// <summary>One tool call: its parameters, the session, who calls and the cancellation token.</summary>
+    private sealed record ToolCall(
+        CallToolRequestParams Parameters,
+        IHarnessStateSession Session,
+        string Caller,
+        CancellationToken Token
+    )
+    {
+        public string Name => Parameters.Name;
+        public IDictionary<string, JsonElement>? Arguments => Parameters.Arguments;
+    }
+
+    /// <summary>The tool handlers the server was started with; each falls back to one over the session.</summary>
+    private sealed record ToolSet(
+        ProviderTools? Providers,
+        ContextTools? Context,
+        WorkspaceTools? Workspace,
+        CouplingTools? Coupling
+    );
+
+    /// <summary>Runs a tool; a regex timeout or an expected failure becomes a tool error.</summary>
+    private static async Task<CallToolResult> ToolAsync(ToolCall call, ToolSet tools)
+    {
+        try
         {
-            return Success(await session.DiagnosticsAsync(cancellationToken));
+            return await DispatchAsync(call, tools);
         }
-
-        if (parameters.Name is not ("state_put_test" or "state_get_test"))
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
         {
-            try
-            {
-                if (parameters.Name is "architecture_findings" or "architecture_propose")
-                {
-                    return session is Harness.Core.Findings.IFindingSession findings
-                        ? Success(
-                            await FindingsTools.CallAsync(
-                                parameters.Name,
-                                parameters.Arguments,
-                                findings,
-                                caller,
-                                cancellationToken
-                            )
-                        )
-                        : Error("finding session unavailable");
-                }
+            return Error(TimeoutMessage(call.Name));
+        }
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or InvalidDataException
+                        or JsonException
+                        or ArgumentException
+                        or KeyNotFoundException
+                        or InvalidOperationException
+                        or FormatException
+                        or OverflowException
+                        or UnauthorizedAccessException
+            )
+        {
+            return Error(exception.Message);
+        }
+    }
 
-                if (parameters.Name is "library_adoption" or "similar_concerns")
-                {
-                    return workspaceTools is null
-                        ? Error("this project is not in a workspace; use 'harness workspace create' to add it")
-                        : Success(
-                            await workspaceTools.EvidenceAsync(parameters.Name, parameters.Arguments, cancellationToken)
-                        );
-                }
+    private static string TimeoutMessage(string name) =>
+        name switch
+        {
+            "architecture_findings" or "architecture_propose" =>
+                "architecture analysis timed out while matching source evidence",
+            "library_adoption" or "similar_concerns" => "workspace analysis timed out while matching source evidence",
+            _ => (name.StartsWith("task_", StringComparison.Ordinal) ? "task" : "memory")
+                + " content rejected: credential validation timed out",
+        };
 
-                if (parameters.Name is "change_coupling")
-                {
-                    return Success(
-                        await (couplingTools ?? new CouplingTools(null, session as IChangeCouplingSession)).CallAsync(
-                            parameters.Arguments,
-                            cancellationToken
-                        )
-                    );
-                }
+    private static Task<CallToolResult> DispatchAsync(ToolCall call, ToolSet tools) =>
+        call.Name switch
+        {
+            "architecture_findings" or "architecture_propose" => FindingsAsync(call),
+            "library_adoption" or "similar_concerns" => EvidenceAsync(call, tools.Workspace),
+            "change_coupling" => CouplingAsync(call, tools.Coupling),
+            "get_context" => ContextAsync(call, tools.Context),
+            _ when ProviderTools.Handles(call.Name) => ProvidersAsync(call, tools.Providers),
+            _ when call.Name.StartsWith("task_", StringComparison.Ordinal) => TasksAsync(call),
+            _ => MemoryAsync(call),
+        };
 
-                if (parameters.Name is "get_context")
-                {
-                    return Success(
-                        await (contextTools ?? new ContextTools(project: session as IContextProjectSession)).CallAsync(
-                            parameters.Arguments,
-                            cancellationToken
-                        )
-                    );
-                }
+    private static async Task<CallToolResult> FindingsAsync(ToolCall call) =>
+        call.Session is Harness.Core.Findings.IFindingSession findings
+            ? Success(await FindingsTools.CallAsync(call.Name, call.Arguments, findings, call.Caller, call.Token))
+            : Error("finding session unavailable");
 
-                if (ProviderTools.Handles(parameters.Name))
-                {
-                    return Success(
-                        await (
-                            providerTools ?? new ProviderTools(project: session as IProviderProjectSession)
-                        ).CallAsync(parameters.Name, parameters.Arguments, cancellationToken)
-                    );
-                }
+    private static async Task<CallToolResult> EvidenceAsync(ToolCall call, WorkspaceTools? workspace) =>
+        workspace is null
+            ? Error("this project is not in a workspace; use 'harness workspace create' to add it")
+            : Success(await workspace.EvidenceAsync(call.Name, call.Arguments, call.Token));
 
-                if (parameters.Name.StartsWith("task_", StringComparison.Ordinal))
-                {
-                    return session is ITaskSession tasks
-                        ? Success(
-                            await TaskTools.CallAsync(
-                                parameters.Name,
-                                parameters.Arguments,
-                                tasks,
-                                session as IMemorySession,
-                                caller,
-                                cancellationToken
-                            )
-                        )
-                        : Error("task session unavailable");
-                }
+    private static async Task<CallToolResult> CouplingAsync(ToolCall call, CouplingTools? coupling) =>
+        Success(
+            await (coupling ?? new CouplingTools(null, call.Session as IChangeCouplingSession)).CallAsync(
+                call.Arguments,
+                call.Token
+            )
+        );
 
-                if (session is not IMemorySession memory)
-                {
-                    return Error("memory session unavailable");
-                }
+    private static async Task<CallToolResult> ContextAsync(ToolCall call, ContextTools? context) =>
+        Success(
+            await (context ?? new ContextTools(project: call.Session as IContextProjectSession)).CallAsync(
+                call.Arguments,
+                call.Token
+            )
+        );
 
-                return Success(
-                    await MemoryTools.CallAsync(
-                        parameters.Name,
-                        parameters.Arguments,
-                        memory,
-                        caller,
-                        cancellationToken
-                    )
-                );
-            }
-            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
-            {
-                if (parameters.Name is "architecture_findings" or "architecture_propose")
-                {
-                    return Error("architecture analysis timed out while matching source evidence");
-                }
+    private static async Task<CallToolResult> ProvidersAsync(ToolCall call, ProviderTools? providers) =>
+        Success(
+            await (providers ?? new ProviderTools(project: call.Session as IProviderProjectSession)).CallAsync(
+                call.Name,
+                call.Arguments,
+                call.Token
+            )
+        );
 
-                if (parameters.Name is "library_adoption" or "similar_concerns")
-                {
-                    return Error("workspace analysis timed out while matching source evidence");
-                }
-
-                var kind = parameters.Name.StartsWith("task_", StringComparison.Ordinal) ? "task" : "memory";
-                return Error(kind + " content rejected: credential validation timed out");
-            }
-            catch (Exception exception)
-                when (exception
-                        is IOException
-                            or InvalidDataException
-                            or JsonException
-                            or ArgumentException
-                            or KeyNotFoundException
-                            or InvalidOperationException
-                            or FormatException
-                            or OverflowException
-                            or UnauthorizedAccessException
+    private static async Task<CallToolResult> TasksAsync(ToolCall call) =>
+        call.Session is ITaskSession tasks
+            ? Success(
+                await TaskTools.CallAsync(
+                    call.Name,
+                    call.Arguments,
+                    tasks,
+                    call.Session as IMemorySession,
+                    call.Caller,
+                    call.Token
                 )
-            {
-                return Error(exception.Message);
-            }
-        }
+            )
+            : Error("task session unavailable");
 
+    private static async Task<CallToolResult> MemoryAsync(ToolCall call) =>
+        call.Session is IMemorySession memory
+            ? Success(await MemoryTools.CallAsync(call.Name, call.Arguments, memory, call.Caller, call.Token))
+            : Error("memory session unavailable");
+
+    /// <summary>The state_put_test and state_get_test tools: bounded keys and values in the state store.</summary>
+    private static async Task<CallToolResult> StateTestAsync(
+        CallToolRequestParams parameters,
+        IHarnessStateSession session,
+        CancellationToken cancellationToken
+    )
+    {
         var key = parameters.Arguments!["key"].GetString()!;
         if (key.Length == 0)
         {
@@ -332,31 +345,47 @@ public static class HarnessMcpServer
 
         try
         {
-            if (value is not null)
-            {
-                await session.PutAsync(key, value, cancellationToken);
-                return Success(
-                    new SortedDictionary<string, object?>(StringComparer.Ordinal) { ["key"] = key, ["value"] = value }
-                );
-            }
-
-            var stored = await session.GetAsync(key, cancellationToken);
-            SortedDictionary<string, object?> result = new(StringComparer.Ordinal)
-            {
-                ["key"] = key,
-                ["found"] = stored is not null,
-            };
-            if (!string.IsNullOrEmpty(stored))
-            {
-                result["value"] = stored;
-            }
-
-            return Success(result);
+            return value is null
+                ? await StateGetAsync(session, key, cancellationToken)
+                : await StatePutAsync(session, key, value, cancellationToken);
         }
         catch (IOException exception)
         {
             return Error(exception.Message);
         }
+    }
+
+    private static async Task<CallToolResult> StatePutAsync(
+        IHarnessStateSession session,
+        string key,
+        string value,
+        CancellationToken cancellationToken
+    )
+    {
+        await session.PutAsync(key, value, cancellationToken);
+        return Success(
+            new SortedDictionary<string, object?>(StringComparer.Ordinal) { ["key"] = key, ["value"] = value }
+        );
+    }
+
+    private static async Task<CallToolResult> StateGetAsync(
+        IHarnessStateSession session,
+        string key,
+        CancellationToken cancellationToken
+    )
+    {
+        var stored = await session.GetAsync(key, cancellationToken);
+        SortedDictionary<string, object?> result = new(StringComparer.Ordinal)
+        {
+            ["key"] = key,
+            ["found"] = stored is not null,
+        };
+        if (!string.IsNullOrEmpty(stored))
+        {
+            result["value"] = stored;
+        }
+
+        return Success(result);
     }
 
     private static CallToolResult Success(object value)
