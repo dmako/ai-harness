@@ -17,83 +17,9 @@ public static class ReportAnalyzer
     )
     {
         List<ReportFinding> result = [];
-        void Add(string level, string area, string action, FormattableString message) =>
-            result.Add(new(level, area, FormattableString.Invariant(message), action));
-        var st = report.Context;
-        if (st.Calls < 5)
-        {
-            Add(
-                "info",
-                "context",
-                "keep using get_context; answers are scored when HEAD moves on (harness sync)",
-                $"only {st.Calls} get_context answer(s) scored in {report.Days} days: too few to judge relevance"
-            );
-        }
-        else if (st.HitRate < .25)
-        {
-            Add(
-                "warn",
-                "context",
-                "look at the never-surfaced files in harness context stats and improve gathering for them",
-                $"get_context hit rate {Percent(st.HitRate)} per answer ({st.Hits} of {st.Changed} changed code files, tests apart) over {st.Calls} answers"
-            );
-        }
-
-        foreach (var (language, pair) in st.Language.OrderBy(p => p.Key, StringComparer.Ordinal))
-        {
-            if (language is not "other" && pair[1] >= 10 && (double)pair[0] / pair[1] < .10)
-            {
-                Add(
-                    "warn",
-                    "context",
-                    "check which provider serves " + language + " (routing) or add a language-specific one",
-                    $"{language} files are rarely in get_context: {pair[0]} of {pair[1]} changed ({Percent((double)pair[0] / pair[1])})"
-                );
-            }
-        }
-
-        var misses = st.Changed - st.Hits;
-        if (misses >= 20)
-        {
-            var share = (double)st.CalleeMisses / misses;
-            if (share >= .15)
-            {
-                Add(
-                    "warn",
-                    "context",
-                    "build code.callees (HAR-0145): expanding context to callees would find these",
-                    $"{st.CalleeMisses} of {misses} misses ({Percent(share)}) changed a function the returned code calls"
-                );
-            }
-            else
-            {
-                Add(
-                    "info",
-                    "context",
-                    "keep HAR-0145 (code.callees) waiting",
-                    $"callee misses are {Percent(share)} of misses ({st.CalleeMisses} of {misses}), below the {Percent(.15)} that would justify code.callees"
-                );
-            }
-        }
-        if (report.Metrics.Hooks.Events is 0)
-        {
-            Add(
-                "info",
-                "hooks",
-                "harness hooks install --kind claude-code,codex (or run 'harness hooks')",
-                $"no client hook events: read-after-context relevance and provider bypasses are not measured"
-            );
-        }
-        else if (st.AfterRead is { Touched: >= 10, HitRate: < .30 } ar)
-        {
-            Add(
-                "warn",
-                "context",
-                "compare what agents read after get_context with what it returned (harness context stats)",
-                $"read after context {Percent(ar.HitRate)}: of {ar.Touched} files agents read or edited after an answer, {ar.Hits} were in it"
-            );
-        }
-
+        ContextFindings(result, report);
+        CalleeFindings(result, report.Context);
+        HookFindings(result, report);
         foreach (var provider in report.Metrics.Providers.Where(p => p.Calls >= MinCalls))
         {
             ProviderFindings(
@@ -106,88 +32,10 @@ public static class ReportAnalyzer
         }
 
         var total = report.Metrics.Tools.Sum(t => t.Calls);
-        var workspace = report
-            .Metrics.Tools.Where(t =>
-                (t.Kind ?? "").Contains("[workspace light]", StringComparison.Ordinal)
-                || (t.Kind ?? "").Contains("[workspace deep]", StringComparison.Ordinal)
-            )
-            .Sum(t => t.Calls);
-        var deep = report
-            .Metrics.Tools.Where(t => (t.Kind ?? "").Contains("[workspace deep]", StringComparison.Ordinal))
-            .Sum(t => t.Calls);
-        foreach (var tool in report.Metrics.Tools.Where(t => t.Calls >= MinCalls && t.ErrorRate >= .10))
-        {
-            Add(
-                "warn",
-                "tools",
-                "look at the tool's errors in harness metrics (bad arguments or a failing provider)",
-                $"{tool.Tool} fails {Percent(tool.ErrorRate)} of {tool.Calls} calls"
-            );
-        }
-
-        if (workspace >= MinCalls && (double)deep / workspace >= .5)
-        {
-            Add(
-                "warn",
-                "tools",
-                "regenerate the agent instructions (harness instructions): deep is for when the user asks for compiler-exact cross-project answers",
-                $"agents asked for depth deep in {deep} of {workspace} workspace calls: deep starts heavy providers in every member"
-            );
-        }
-
-        if (total >= 20)
-        {
-            var used = report.Metrics.Tools.Select(t => t.Tool).ToHashSet(StringComparer.Ordinal);
-            var unused = toolNames
-                .Where(n =>
-                    !used.Contains(n) && n is not ("ping" or "diagnostics" or "state_get_test" or "state_put_test")
-                )
-                .ToArray();
-            if (unused.Length > 0)
-            {
-                Add(
-                    "info",
-                    "tools",
-                    "check the agent instructions mention them, or drop tools nobody needs",
-                    $"unused for {report.Days} days while agents made {total} tool calls: {string.Join(", ", unused)}"
-                );
-            }
-        }
-        foreach (var bypass in report.Metrics.Bypasses ?? [])
-        {
-            Add(
-                bypass.Calls >= 5 ? "warn" : "info",
-                "bypass",
-                "candidate capability: map "
-                    + bypass.Tool
-                    + " into harness or tell agents which harness tool covers it",
-                $"{bypass.Calls} direct {bypass.Tool} call(s) to {bypass.Server} bypassed harness (provider {bypass.Provider})"
-            );
-        }
-
-        if (total >= 20 && report.KnowledgeReads is 0)
-        {
-            Add(
-                "warn",
-                "knowledge",
-                "check that agent instructions ask for decisions_for before changing an area",
-                $"agents made {total} tool calls but never read harness knowledge (decisions_for, goals_current, memory_search...)"
-            );
-        }
-
-        if (report.Knowledge is { Pending: > 0 } knowledge)
-        {
-            var days = knowledge.OldestPending is { } oldest ? (int)(now - oldest).TotalDays : 0;
-            var age = knowledge.OldestPending is null
-                ? ""
-                : ", oldest " + days.ToString(CultureInfo.InvariantCulture) + " days";
-            Add(
-                knowledge.OldestPending is not null && days > 7 ? "warn" : "info",
-                "knowledge",
-                "review them: harness proposals list, or the GUI's Proposals tab",
-                $"{knowledge.Pending} memory proposal(s) waiting for review{age}"
-            );
-        }
+        ToolFindings(result, report.Metrics.Tools);
+        UnusedToolFindings(result, report, toolNames, total);
+        BypassFindings(result, report.Metrics.Bypasses ?? []);
+        KnowledgeFindings(result, report, now, total);
         return result.Count is 0
             ? null
             : result
@@ -200,6 +48,219 @@ public static class ReportAnalyzer
                     }
                 )
                 .ToArray();
+    }
+
+    private static void Add(
+        List<ReportFinding> result,
+        string level,
+        string area,
+        string action,
+        FormattableString message
+    ) => result.Add(new(level, area, FormattableString.Invariant(message), action));
+
+    /// <summary>Too few scored get_context answers or a low hit rate, and languages it rarely surfaces.</summary>
+    private static void ContextFindings(List<ReportFinding> result, LocalReport report)
+    {
+        var st = report.Context;
+        if (st.Calls < 5)
+        {
+            Add(
+                result,
+                "info",
+                "context",
+                "keep using get_context; answers are scored when HEAD moves on (harness sync)",
+                $"only {st.Calls} get_context answer(s) scored in {report.Days} days: too few to judge relevance"
+            );
+        }
+        else if (st.HitRate < .25)
+        {
+            Add(
+                result,
+                "warn",
+                "context",
+                "look at the never-surfaced files in harness context stats and improve gathering for them",
+                $"get_context hit rate {Percent(st.HitRate)} per answer ({st.Hits} of {st.Changed} changed code files, tests apart) over {st.Calls} answers"
+            );
+        }
+
+        foreach (var (language, pair) in st.Language.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            if (language is not "other" && pair[1] >= 10 && (double)pair[0] / pair[1] < .10)
+            {
+                Add(
+                    result,
+                    "warn",
+                    "context",
+                    "check which provider serves " + language + " (routing) or add a language-specific one",
+                    $"{language} files are rarely in get_context: {pair[0]} of {pair[1]} changed ({Percent((double)pair[0] / pair[1])})"
+                );
+            }
+        }
+    }
+
+    /// <summary>With 20 misses or more, whether enough of them were callees to justify code.callees.</summary>
+    private static void CalleeFindings(List<ReportFinding> result, ContextStatistics st)
+    {
+        var misses = st.Changed - st.Hits;
+        if (misses < 20)
+        {
+            return;
+        }
+
+        var share = (double)st.CalleeMisses / misses;
+        if (share >= .15)
+        {
+            Add(
+                result,
+                "warn",
+                "context",
+                "build code.callees (HAR-0145): expanding context to callees would find these",
+                $"{st.CalleeMisses} of {misses} misses ({Percent(share)}) changed a function the returned code calls"
+            );
+        }
+        else
+        {
+            Add(
+                result,
+                "info",
+                "context",
+                "keep HAR-0145 (code.callees) waiting",
+                $"callee misses are {Percent(share)} of misses ({st.CalleeMisses} of {misses}), below the {Percent(.15)} that would justify code.callees"
+            );
+        }
+    }
+
+    /// <summary>No client hooks, or (with hooks) a low share of read-after-context files the answer held.</summary>
+    private static void HookFindings(List<ReportFinding> result, LocalReport report)
+    {
+        if (report.Metrics.Hooks.Events is 0)
+        {
+            Add(
+                result,
+                "info",
+                "hooks",
+                "harness hooks install --kind claude-code,codex (or run 'harness hooks')",
+                $"no client hook events: read-after-context relevance and provider bypasses are not measured"
+            );
+        }
+        else if (report.Context.AfterRead is { Touched: >= 10, HitRate: < .30 } ar)
+        {
+            Add(
+                result,
+                "warn",
+                "context",
+                "compare what agents read after get_context with what it returned (harness context stats)",
+                $"read after context {Percent(ar.HitRate)}: of {ar.Touched} files agents read or edited after an answer, {ar.Hits} were in it"
+            );
+        }
+    }
+
+    /// <summary>Tools that fail often, and agents asking for deep workspace searches too often.</summary>
+    private static void ToolFindings(List<ReportFinding> result, IReadOnlyList<ToolMetrics> tools)
+    {
+        var workspace = tools.Where(t => Workspace(t, "light") || Workspace(t, "deep")).Sum(t => t.Calls);
+        var deep = tools.Where(t => Workspace(t, "deep")).Sum(t => t.Calls);
+        foreach (var tool in tools.Where(t => t.Calls >= MinCalls && t.ErrorRate >= .10))
+        {
+            Add(
+                result,
+                "warn",
+                "tools",
+                "look at the tool's errors in harness metrics (bad arguments or a failing provider)",
+                $"{tool.Tool} fails {Percent(tool.ErrorRate)} of {tool.Calls} calls"
+            );
+        }
+
+        if (workspace >= MinCalls && (double)deep / workspace >= .5)
+        {
+            Add(
+                result,
+                "warn",
+                "tools",
+                "regenerate the agent instructions (harness instructions): deep is for when the user asks for compiler-exact cross-project answers",
+                $"agents asked for depth deep in {deep} of {workspace} workspace calls: deep starts heavy providers in every member"
+            );
+        }
+    }
+
+    private static bool Workspace(ToolMetrics tool, string depth) =>
+        (tool.Kind ?? "").Contains("[workspace " + depth + "]", StringComparison.Ordinal);
+
+    /// <summary>With 20 tool calls or more, the tools (other than diagnostics) no agent called.</summary>
+    private static void UnusedToolFindings(
+        List<ReportFinding> result,
+        LocalReport report,
+        IReadOnlyList<string> toolNames,
+        int total
+    )
+    {
+        if (total < 20)
+        {
+            return;
+        }
+
+        var used = report.Metrics.Tools.Select(t => t.Tool).ToHashSet(StringComparer.Ordinal);
+        var unused = toolNames
+            .Where(n => !used.Contains(n) && n is not ("ping" or "diagnostics" or "state_get_test" or "state_put_test"))
+            .ToArray();
+        if (unused.Length > 0)
+        {
+            Add(
+                result,
+                "info",
+                "tools",
+                "check the agent instructions mention them, or drop tools nobody needs",
+                $"unused for {report.Days} days while agents made {total} tool calls: {string.Join(", ", unused)}"
+            );
+        }
+    }
+
+    private static void BypassFindings(List<ReportFinding> result, IReadOnlyList<ProviderBypass> bypasses)
+    {
+        foreach (var bypass in bypasses)
+        {
+            Add(
+                result,
+                bypass.Calls >= 5 ? "warn" : "info",
+                "bypass",
+                "candidate capability: map "
+                    + bypass.Tool
+                    + " into harness or tell agents which harness tool covers it",
+                $"{bypass.Calls} direct {bypass.Tool} call(s) to {bypass.Server} bypassed harness (provider {bypass.Provider})"
+            );
+        }
+    }
+
+    /// <summary>Busy agents that never read harness knowledge, and memory proposals waiting for review.</summary>
+    private static void KnowledgeFindings(List<ReportFinding> result, LocalReport report, DateTimeOffset now, int total)
+    {
+        if (total >= 20 && report.KnowledgeReads is 0)
+        {
+            Add(
+                result,
+                "warn",
+                "knowledge",
+                "check that agent instructions ask for decisions_for before changing an area",
+                $"agents made {total} tool calls but never read harness knowledge (decisions_for, goals_current, memory_search...)"
+            );
+        }
+
+        if (report.Knowledge is not { Pending: > 0 } knowledge)
+        {
+            return;
+        }
+
+        var days = knowledge.OldestPending is { } oldest ? (int)(now - oldest).TotalDays : 0;
+        var age = knowledge.OldestPending is null
+            ? ""
+            : ", oldest " + days.ToString(CultureInfo.InvariantCulture) + " days";
+        Add(
+            result,
+            knowledge.OldestPending is not null && days > 7 ? "warn" : "info",
+            "knowledge",
+            "review them: harness proposals list, or the GUI's Proposals tab",
+            $"{knowledge.Pending} memory proposal(s) waiting for review{age}"
+        );
     }
 
     private static void ProviderFindings(List<ReportFinding> result, ProviderMetrics p, ProviderTrend? trend)
