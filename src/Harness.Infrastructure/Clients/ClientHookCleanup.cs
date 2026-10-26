@@ -87,14 +87,7 @@ public static class ClientHookCleanup
         {
             return "";
         }
-        return groups
-                .OfType<JsonObject>()
-                .SelectMany(g => g["hooks"] is JsonArray items ? items : [])
-                .OfType<JsonObject>()
-                .Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand))
-                .Select(h => Text(h["command"]))
-                .FirstOrDefault()
-            ?? "";
+        return HarnessCommand(groups, subcommand);
     }
 
     public static string CommandProblem(string command)
@@ -236,26 +229,8 @@ public static class ClientHookCleanup
     private static TextEdit EditEvent(string source, string client, string eventName, string subcommand, string wanted)
     {
         var root = JsonConfigurationEditor.ParseObject(source);
-        var node = root["hooks"];
-        if (root.ContainsKey("hooks") && node is not JsonObject)
-        {
-            throw new InvalidDataException("hooks is not an object");
-        }
-        var raw = (node as JsonObject)?[eventName];
-        if (raw is not null && raw is not JsonArray)
-        {
-            throw new InvalidDataException("hooks." + eventName + " is not an array");
-        }
-        var groups = raw as JsonArray ?? [];
-        var current =
-            groups
-                .OfType<JsonObject>()
-                .SelectMany(g => g["hooks"] is JsonArray items ? items : [])
-                .OfType<JsonObject>()
-                .Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand))
-                .Select(h => Text(h["command"]))
-                .FirstOrDefault()
-            ?? "";
+        var groups = EventGroups(root, eventName);
+        var current = HarnessCommand(groups, subcommand);
         var rest = WithoutHarness(groups, subcommand);
         if (wanted.Length is 0 && current.Length is 0)
         {
@@ -267,28 +242,67 @@ public static class ClientHookCleanup
         }
         if (wanted.Length > 0)
         {
-            JsonObject item = new()
-            {
-                ["type"] = "command",
-                ["command"] = wanted,
-                ["timeout"] = 10,
-            };
-            if (client is "codex")
-            {
-                item["async"] = true;
-            }
-            rest.Add(
-                (System.Text.Json.Nodes.JsonNode?)new JsonObject { ["matcher"] = "", ["hooks"] = new JsonArray(item) }
-            );
+            rest.Add((JsonNode?)HookGroup(client, wanted));
         }
+        var output = WithGroups(source, root["hooks"] is null, eventName, rest);
+        EnsureOnlyHarnessChanged(root, output, eventName, subcommand);
+        var action = wanted.Length is 0 ? "remove" : "add";
+        return new(output, current.Length > 0 && wanted.Length > 0 ? "update" : action);
+    }
+
+    /// <summary>The event's hook groups; hooks must be an object and the event an array.</summary>
+    private static JsonArray EventGroups(JsonObject root, string eventName)
+    {
+        var node = root["hooks"];
+        if (root.ContainsKey("hooks") && node is not JsonObject)
+        {
+            throw new InvalidDataException("hooks is not an object");
+        }
+        var raw = (node as JsonObject)?[eventName];
+        if (raw is not null && raw is not JsonArray)
+        {
+            throw new InvalidDataException("hooks." + eventName + " is not an array");
+        }
+        return raw as JsonArray ?? [];
+    }
+
+    /// <summary>The first harness command hook of the subcommand in the groups; empty when there is none.</summary>
+    private static string HarnessCommand(JsonArray groups, string subcommand) =>
+        groups
+            .OfType<JsonObject>()
+            .SelectMany(g => g["hooks"] is JsonArray items ? items : [])
+            .OfType<JsonObject>()
+            .Where(h => Text(h["type"]) is "command" && IsHarness(Text(h["command"]), subcommand))
+            .Select(h => Text(h["command"]))
+            .FirstOrDefault()
+        ?? "";
+
+    private static JsonObject HookGroup(string client, string command)
+    {
+        JsonObject item = new()
+        {
+            ["type"] = "command",
+            ["command"] = command,
+            ["timeout"] = 10,
+        };
+        if (client is "codex")
+        {
+            item["async"] = true;
+        }
+        return new JsonObject { ["matcher"] = "", ["hooks"] = new JsonArray(item) };
+    }
+
+    /// <summary>The source with the event set to the groups, or removed when none are left; no empty hooks.</summary>
+    private static string WithGroups(string source, bool noHooks, string eventName, JsonArray groups)
+    {
         string output;
-        if (node is null)
+        if (noHooks)
         {
-            output = JsonConfigurationEditor.Set(source, [], "hooks", new JsonObject { [eventName] = rest }).Text;
+            output = JsonConfigurationEditor.Set(source, [], "hooks", new JsonObject { [eventName] = groups }).Text;
         }
-        else if (rest.Count > 0)
+        else if (groups.Count > 0)
         {
-            output = JsonConfigurationEditor.Set(source, ["hooks"], eventName, rest).Text;
+            output = JsonConfigurationEditor.Set(source, ["hooks"], eventName, groups).Text;
         }
         else
         {
@@ -298,6 +312,11 @@ public static class ClientHookCleanup
         {
             output = JsonConfigurationEditor.Delete(output, [], "hooks").Text;
         }
+        return output;
+    }
+
+    private static void EnsureOnlyHarnessChanged(JsonObject root, string output, string eventName, string subcommand)
+    {
         if (
             !JsonNode.DeepEquals(
                 Strip(root, eventName, subcommand),
@@ -307,8 +326,6 @@ public static class ClientHookCleanup
         {
             throw new InvalidDataException("hook edit would change unrelated configuration; nothing written");
         }
-        var action = wanted.Length is 0 ? "remove" : "add";
-        return new(output, current.Length > 0 && wanted.Length > 0 ? "update" : action);
     }
 
     private static JsonObject Strip(JsonObject root, string eventName, string subcommand)
