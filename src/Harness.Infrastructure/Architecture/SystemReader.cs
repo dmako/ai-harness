@@ -151,7 +151,78 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         );
     }
 
+    /// <summary>
+    /// The declared contracts, and per contract where members implement it and where each member uses it.
+    /// </summary>
+    private sealed class ContractUsage(Dictionary<string, (string Owner, string At)> declarations)
+    {
+        public Dictionary<string, (string Owner, string At)> Declarations { get; } = declarations;
+
+        public Regex Word { get; } =
+            Rx(
+                @"\b("
+                    + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape))
+                    + @")\b"
+            );
+
+        public Dictionary<string, List<(string Member, string At)>> Implementations { get; } =
+            new(StringComparer.Ordinal);
+
+        public Dictionary<string, Dictionary<string, List<string>>> Uses { get; } = new(StringComparer.Ordinal);
+
+        public void Implement(string name, string member, string at)
+        {
+            if (!Implementations.TryGetValue(name, out var places))
+            {
+                places = [];
+                Implementations.Add(name, places);
+            }
+            places.Add((member, at));
+        }
+
+        public void Use(string name, string member, string at)
+        {
+            if (!Uses.TryGetValue(name, out var byMember))
+            {
+                byMember = new(StringComparer.Ordinal);
+                Uses.Add(name, byMember);
+            }
+            if (!byMember.TryGetValue(member, out var places))
+            {
+                places = [];
+                byMember.Add(member, places);
+            }
+            places.Add(at);
+        }
+    }
+
     private void ReadContracts()
+    {
+        var declarations = ReadDeclarations();
+        if (declarations.Count is 0)
+        {
+            return; // Source only inspects DbContexts during its contract pass.
+        }
+
+        var usage = new ContractUsage(declarations);
+        foreach (var member in members)
+        {
+            foreach (
+                var file in member.Repository.Files.Where(file => !TestPath(file) && Path.GetExtension(file) is ".cs")
+            )
+            {
+                ReadContractUses(member, file, usage);
+            }
+        }
+
+        foreach (var name in declarations.Keys.Order(StringComparer.Ordinal))
+        {
+            AddContract(name, usage);
+        }
+    }
+
+    /// <summary>The gRPC services of .proto files and the [ServiceContract] interfaces of C# files.</summary>
+    private Dictionary<string, (string Owner, string At)> ReadDeclarations()
     {
         Dictionary<string, (string Owner, string At)> declarations = new(StringComparer.Ordinal);
         foreach (var member in members)
@@ -162,173 +233,183 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
                 )
             )
             {
-                var pending = 0;
-                Each(
-                    member,
-                    file,
-                    (line, text) =>
-                    {
-                        if (Path.GetExtension(file) is ".proto")
-                        {
-                            var proto = Proto.Match(text);
-                            if (proto.Success)
-                            {
-                                declarations[proto.Groups[1].Value] = (member.Id, At(file, line));
-                            }
-
-                            return;
-                        }
-                        if (text.Contains("[ServiceContract", StringComparison.Ordinal))
-                        {
-                            pending = 6;
-                        }
-
-                        if (pending-- > 0 && Interface.Match(text) is { Success: true } match)
-                        {
-                            declarations[match.Groups[1].Value] = (member.Id, At(file, line));
-                            pending = 0;
-                        }
-                    }
-                );
+                if (Path.GetExtension(file) is ".proto")
+                {
+                    ProtoDeclarations(member, file, declarations);
+                }
+                else
+                {
+                    ServiceContractDeclarations(member, file, declarations);
+                }
             }
         }
+        return declarations;
+    }
 
-        if (declarations.Count is 0)
-        {
-            return; // Source only inspects DbContexts during its contract pass.
-        }
-
-        Dictionary<string, List<(string Member, string At)>> implementations = new(StringComparer.Ordinal);
-        Dictionary<string, Dictionary<string, List<string>>> uses = new(StringComparer.Ordinal);
-        var word = Rx(
-            @"\b(" + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape)) + @")\b"
+    private static void ProtoDeclarations(
+        SystemMember member,
+        string file,
+        Dictionary<string, (string Owner, string At)> declarations
+    ) =>
+        Each(
+            member,
+            file,
+            (line, text) =>
+            {
+                if (Proto.Match(text) is { Success: true } proto)
+                {
+                    declarations[proto.Groups[1].Value] = (member.Id, At(file, line));
+                }
+            }
         );
-        foreach (var member in members)
-        {
-            foreach (
-                var file in member.Repository.Files.Where(file => !TestPath(file) && Path.GetExtension(file) is ".cs")
-            )
+
+    /// <summary>An interface within six lines after a [ServiceContract] attribute.</summary>
+    private static void ServiceContractDeclarations(
+        SystemMember member,
+        string file,
+        Dictionary<string, (string Owner, string At)> declarations
+    )
+    {
+        var pending = 0;
+        Each(
+            member,
+            file,
+            (line, text) =>
             {
-                var pending = "";
-                var pendingAt = 0;
-                Each(
-                    member,
-                    file,
-                    (line, original) =>
+                if (text.Contains("[ServiceContract", StringComparison.Ordinal))
+                {
+                    pending = 6;
+                }
+
+                if (pending-- > 0 && Interface.Match(text) is { Success: true } match)
+                {
+                    declarations[match.Groups[1].Value] = (member.Id, At(file, line));
+                    pending = 0;
+                }
+            }
+        );
+    }
+
+    /// <summary>
+    /// Reads a C# file statement by statement, joining class declarations that span lines (up to 2000
+    /// characters), and records the contracts each one implements or uses.
+    /// </summary>
+    private void ReadContractUses(SystemMember member, string file, ContractUsage usage)
+    {
+        var pending = "";
+        var pendingAt = 0;
+        Each(
+            member,
+            file,
+            (line, original) =>
+            {
+                var text = original.Trim();
+                if (
+                    text.StartsWith("//", StringComparison.Ordinal)
+                    || text.StartsWith('*')
+                    || text.StartsWith("using ", StringComparison.Ordinal)
+                )
+                {
+                    return;
+                }
+
+                if (pending.Length is 0 && ClassWord.IsMatch(original) && original.IndexOfAny(['{', ';']) < 0)
+                {
+                    pending = original;
+                    pendingAt = line;
+                    return;
+                }
+                if (pending.Length is 0)
+                {
+                    ContractUses(member, file, line, original, usage);
+                    return;
+                }
+
+                pending += " " + text;
+                if (text.IndexOfAny(['{', ';']) < 0 && pending.Length < 2000)
+                {
+                    return;
+                }
+
+                ContractUses(member, file, pendingAt, pending, usage);
+                pending = "";
+            }
+        );
+    }
+
+    /// <summary>
+    /// A class declaration registers its DbContext and the contracts it implements, and only its
+    /// constructor parameters count as uses; any other non-interface text counts whole.
+    /// </summary>
+    private void ContractUses(SystemMember member, string file, int line, string declaration, ContractUsage usage)
+    {
+        var match = Class.Match(Parentheses(declaration, false));
+        var usedText = declaration;
+        if (match.Success)
+        {
+            DbContext(member, file, line, match.Groups[1].Value, match.Groups[2].Value, declaration);
+            foreach (var baseType in match.Groups[2].Value.Split(','))
+            {
+                var name = baseType.Trim().Split(new char[] { '<', ' ' }, StringSplitOptions.None)[0];
+                if (usage.Declarations.ContainsKey(name))
+                {
+                    usage.Implement(name, member.Id, At(file, line));
+                }
+            }
+            usedText = Parentheses(declaration, true);
+        }
+        if (Interface.IsMatch(usedText))
+        {
+            return;
+        }
+
+        foreach (var use in usage.Word.Matches(usedText).Select(match => match.Value))
+        {
+            usage.Use(use, member.Id, At(file, line));
+        }
+    }
+
+    /// <summary>
+    /// Links every member that uses the contract (other than its owner and its servers) to each server,
+    /// and records the contract.
+    /// </summary>
+    private void AddContract(string name, ContractUsage usage)
+    {
+        var declaration = usage.Declarations[name];
+        var servers = (usage.Implementations.GetValueOrDefault(name) ?? [])
+            .DistinctBy(place => place.Member, StringComparer.Ordinal)
+            .ToDictionary(place => place.Member, place => place.At, StringComparer.Ordinal);
+        List<string> clients = [];
+        foreach (var (client, places) in usage.Uses.GetValueOrDefault(name) ?? [])
+        {
+            if (servers.ContainsKey(client) || client == declaration.Owner)
+            {
+                continue;
+            }
+
+            clients.Add(client);
+            foreach (var (server, at) in servers)
+            {
+                Link(
+                    new(client, server, "grpc")
                     {
-                        var text = original.Trim();
-                        if (
-                            text.StartsWith("//", StringComparison.Ordinal)
-                            || text.StartsWith('*')
-                            || text.StartsWith("using ", StringComparison.Ordinal)
-                        )
-                        {
-                            return;
-                        }
-
-                        if (pending.Length is 0 && ClassWord.IsMatch(original) && original.IndexOfAny(['{', ';']) < 0)
-                        {
-                            pending = original;
-                            pendingAt = line;
-                            return;
-                        }
-                        var declaration = original;
-                        if (pending.Length > 0)
-                        {
-                            pending += " " + text;
-                            if (text.IndexOfAny(['{', ';']) < 0 && pending.Length < 2000)
-                            {
-                                return;
-                            }
-
-                            declaration = pending;
-                            line = pendingAt;
-                            pending = "";
-                        }
-                        var match = Class.Match(Parentheses(declaration, false));
-                        var usedText = declaration;
-                        if (match.Success)
-                        {
-                            DbContext(member, file, line, match.Groups[1].Value, match.Groups[2].Value, declaration);
-                            foreach (var baseType in match.Groups[2].Value.Split(','))
-                            {
-                                var name = baseType.Trim().Split(new char[] { '<', ' ' }, StringSplitOptions.None)[0];
-                                if (!declarations.ContainsKey(name))
-                                {
-                                    continue;
-                                }
-
-                                if (!implementations.TryGetValue(name, out var places))
-                                {
-                                    places = [];
-                                    implementations.Add(name, places);
-                                }
-                                places.Add((member.Id, At(file, line)));
-                            }
-                            usedText = Parentheses(declaration, true);
-                        }
-                        if (Interface.IsMatch(usedText))
-                        {
-                            return;
-                        }
-
-                        foreach (var use in word.Matches(usedText).Select(match => match.Value))
-                        {
-                            if (!uses.TryGetValue(use, out var byMember))
-                            {
-                                byMember = new(StringComparer.Ordinal);
-                                uses.Add(use, byMember);
-                            }
-                            if (!byMember.TryGetValue(member.Id, out var places))
-                            {
-                                places = [];
-                                byMember.Add(member.Id, places);
-                            }
-                            places.Add(At(file, line));
-                        }
+                        What = [name],
+                        Contracts = [name],
+                        Uses = places.Count,
+                        Evidence = [Place(client, places[0]) + " → " + Place(server, at) + " (" + name + ")"],
                     }
                 );
             }
         }
-
-        foreach (var name in declarations.Keys.Order(StringComparer.Ordinal))
-        {
-            var declaration = declarations[name];
-            var servers = (implementations.GetValueOrDefault(name) ?? [])
-                .DistinctBy(place => place.Member, StringComparer.Ordinal)
-                .ToDictionary(place => place.Member, place => place.At, StringComparer.Ordinal);
-            List<string> clients = [];
-            foreach (var (client, places) in uses.GetValueOrDefault(name) ?? [])
-            {
-                if (servers.ContainsKey(client) || client == declaration.Owner)
-                {
-                    continue;
-                }
-
-                clients.Add(client);
-                foreach (var (server, at) in servers)
-                {
-                    Link(
-                        new(client, server, "grpc")
-                        {
-                            What = [name],
-                            Contracts = [name],
-                            Uses = places.Count,
-                            Evidence = [Place(client, places[0]) + " → " + Place(server, at) + " (" + name + ")"],
-                        }
-                    );
-                }
-            }
-            _contracts.Add(
-                new(
-                    name,
-                    declaration.Owner,
-                    declaration.At,
-                    servers.Keys.Order(StringComparer.Ordinal).ToArray(),
-                    clients.Order(StringComparer.Ordinal).ToArray()
-                )
-            );
-        }
+        _contracts.Add(
+            new(
+                name,
+                declaration.Owner,
+                declaration.At,
+                servers.Keys.Order(StringComparer.Ordinal).ToArray(),
+                clients.Order(StringComparer.Ordinal).ToArray()
+            )
+        );
     }
 
     private void DbContext(SystemMember member, string file, int line, string name, string bases, string declaration)
