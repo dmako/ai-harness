@@ -59,60 +59,7 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             )
         )
         {
-            List<string> projects = [],
-                missing = [];
-            IEnumerable<string> paths;
-            if (Path.GetExtension(file).Equals(".slnx", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    using var xml = XmlReader.Create(
-                        new StringReader(repository.Read(file).TrimStart('\uFEFF')),
-                        new() { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }
-                    );
-                    paths = XDocument
-                        .Load(xml)
-                        .Descendants()
-                        .Where(element => element.Name.LocalName is "Project")
-                        .Select(element => element.Attribute("Path")?.Value ?? "")
-                        .Where(path => Path.GetExtension(path).Equals(".csproj", StringComparison.OrdinalIgnoreCase))
-                        .ToArray();
-                }
-                catch (XmlException)
-                {
-                    paths = [];
-                }
-            }
-            else
-            {
-                paths = AnalysisRepository
-                    .Lines(repository.Read(file))
-                    .Select(line => SolutionProject.Match(line.Trim()))
-                    .Where(match =>
-                        match.Success
-                        && Path.GetExtension(match.Groups[1].Value)
-                            .Equals(".csproj", StringComparison.OrdinalIgnoreCase)
-                    )
-                    .Select(match => match.Groups[1].Value);
-            }
-
-            foreach (var path in paths)
-            {
-                var relative = Join(Directory(file), path.Replace('\\', '/'));
-                if (!repository.Exists(relative))
-                {
-                    missing.Add(relative);
-                    continue;
-                }
-                projects.Add(relative);
-                if (!included.TryGetValue(relative, out var solutions))
-                {
-                    solutions = [];
-                    included.Add(relative, solutions);
-                }
-                solutions.Add(file);
-            }
-            groups.Add(new(file, projects, missing.Count is 0 ? null : missing));
+            groups.Add(ReadSolution(file, included));
         }
         List<BuildUnit> units = [];
         foreach (
@@ -121,62 +68,7 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             )
         )
         {
-            var name = Path.GetFileNameWithoutExtension(file);
-            var xml = ecosystem.Build.Parse(file);
-            var evaluated = ecosystem.Build.Evaluate(file);
-            string Prop(string key) =>
-                evaluated.Properties.GetValueOrDefault(key, "").Trim() is var value
-                && !value.Contains("$(", StringComparison.Ordinal)
-                    ? value
-                    : "";
-            var sdk = xml?.Attribute("Sdk")?.Value ?? "";
-            var executable =
-                Prop("OutputType").Equals("exe", StringComparison.OrdinalIgnoreCase)
-                || sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase)
-                || sdk.Equals("Microsoft.NET.Sdk.Worker", StringComparison.OrdinalIgnoreCase);
-            var kind = (ecosystem.DotnetTest(file), executable) switch
-            {
-                (true, _) => "test",
-                (_, true) => "entry",
-                _ => "library",
-            };
-            var offered = ecosystem.DotnetPackage(file);
-            var version = Prop("PackageVersion");
-            if (version.Length is 0)
-            {
-                version = Prop("Version");
-            }
-
-            var unit = new BuildUnit
-            {
-                Name = name,
-                Path = file,
-                Kind = xml is null ? "library" : kind,
-                Package = xml is not null && offered.Published ? offered.Name : null,
-                Version = xml is not null && offered.Published ? Empty(version) : null,
-            };
-            if (included.TryGetValue(file, out var solutionPaths))
-            {
-                unit.Solutions.AddRange(solutionPaths);
-            }
-
-            foreach (
-                var reference in evaluated.References.DistinctBy(reference => reference.Path, StringComparer.Ordinal)
-            )
-            {
-                unit.References.Add(reference.Path);
-                (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[reference.Path] = reference.At;
-            }
-            unit.Packages.AddRange(
-                evaluated.Packages.Select(package => new BuildPackage(
-                    package.Name,
-                    Empty(package.Version),
-                    package.Frameworks.Count is 0 ? null : package.Frameworks,
-                    package.Conditional,
-                    package.Unresolved
-                ))
-            );
-            units.Add(unit);
+            units.Add(DotnetUnit(file, included));
         }
         return new(
             "dotnet",
@@ -185,6 +77,140 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             units.OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray()
         );
     }
+
+    /// <summary>
+    /// The solution's projects that exist and those that are missing; records which solutions include
+    /// each project.
+    /// </summary>
+    private BuildGroup ReadSolution(string file, Dictionary<string, List<string>> included)
+    {
+        List<string> projects = [],
+            missing = [];
+        foreach (var path in SolutionPaths(file))
+        {
+            var relative = Join(Directory(file), path.Replace('\\', '/'));
+            if (!repository.Exists(relative))
+            {
+                missing.Add(relative);
+                continue;
+            }
+            projects.Add(relative);
+            if (!included.TryGetValue(relative, out var solutions))
+            {
+                solutions = [];
+                included.Add(relative, solutions);
+            }
+            solutions.Add(file);
+        }
+        return new(file, projects, missing.Count is 0 ? null : missing);
+    }
+
+    /// <summary>The .csproj paths a .sln or .slnx names, as written in it.</summary>
+    private IEnumerable<string> SolutionPaths(string file)
+    {
+        if (!Path.GetExtension(file).Equals(".slnx", StringComparison.OrdinalIgnoreCase))
+        {
+            return AnalysisRepository
+                .Lines(repository.Read(file))
+                .Select(line => SolutionProject.Match(line.Trim()))
+                .Where(match =>
+                    match.Success
+                    && Path.GetExtension(match.Groups[1].Value).Equals(".csproj", StringComparison.OrdinalIgnoreCase)
+                )
+                .Select(match => match.Groups[1].Value);
+        }
+
+        try
+        {
+            using var xml = XmlReader.Create(
+                new StringReader(repository.Read(file).TrimStart('\uFEFF')),
+                new() { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }
+            );
+            return XDocument
+                .Load(xml)
+                .Descendants()
+                .Where(element => element.Name.LocalName is "Project")
+                .Select(element => element.Attribute("Path")?.Value ?? "")
+                .Where(path => Path.GetExtension(path).Equals(".csproj", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+        catch (XmlException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// A project with its kind, published package and version, solutions, references and packages; an
+    /// unreadable project file is a plain library.
+    /// </summary>
+    private BuildUnit DotnetUnit(string file, Dictionary<string, List<string>> included)
+    {
+        var xml = ecosystem.Build.Parse(file);
+        var evaluated = ecosystem.Build.Evaluate(file);
+        var kind = DotnetKind(file, xml?.Attribute("Sdk")?.Value ?? "", evaluated);
+        var offered = ecosystem.DotnetPackage(file);
+        var version = Property(evaluated, "PackageVersion") is { Length: > 0 } packageVersion
+            ? packageVersion
+            : Property(evaluated, "Version");
+        var published = xml is not null && offered.Published;
+        var unit = new BuildUnit
+        {
+            Name = Path.GetFileNameWithoutExtension(file),
+            Path = file,
+            Kind = xml is null ? "library" : kind,
+            Package = published ? offered.Name : null,
+            Version = published ? Empty(version) : null,
+        };
+        if (included.TryGetValue(file, out var solutionPaths))
+        {
+            unit.Solutions.AddRange(solutionPaths);
+        }
+
+        AddDependencies(unit, evaluated);
+        return unit;
+    }
+
+    /// <summary>The project's distinct references with where each is declared, and its packages.</summary>
+    private static void AddDependencies(BuildUnit unit, EvaluatedProject evaluated)
+    {
+        foreach (var reference in evaluated.References.DistinctBy(reference => reference.Path, StringComparer.Ordinal))
+        {
+            unit.References.Add(reference.Path);
+            (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[reference.Path] = reference.At;
+        }
+        unit.Packages.AddRange(
+            evaluated.Packages.Select(package => new BuildPackage(
+                package.Name,
+                Empty(package.Version),
+                package.Frameworks.Count is 0 ? null : package.Frameworks,
+                package.Conditional,
+                package.Unresolved
+            ))
+        );
+    }
+
+    /// <summary>A test project, an entry (an exe, web or worker project), or a library.</summary>
+    private string DotnetKind(string file, string sdk, EvaluatedProject evaluated)
+    {
+        var executable =
+            Property(evaluated, "OutputType").Equals("exe", StringComparison.OrdinalIgnoreCase)
+            || sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase)
+            || sdk.Equals("Microsoft.NET.Sdk.Worker", StringComparison.OrdinalIgnoreCase);
+        return (ecosystem.DotnetTest(file), executable) switch
+        {
+            (true, _) => "test",
+            (_, true) => "entry",
+            _ => "library",
+        };
+    }
+
+    /// <summary>The trimmed property value, or "" while it still refers to another property.</summary>
+    private static string Property(EvaluatedProject evaluated, string key) =>
+        evaluated.Properties.GetValueOrDefault(key, "").Trim() is var value
+        && !value.Contains("$(", StringComparison.Ordinal)
+            ? value
+            : "";
 
     /// <summary>
     /// The module's packages being read: one unit per directory, its external modules, and the internal
