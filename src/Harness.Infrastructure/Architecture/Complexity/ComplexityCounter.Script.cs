@@ -118,6 +118,32 @@ internal static partial class ComplexityCounter
     /// <summary>The parameters at cursor (after any type parameters), a return type, and a block or arrow body.</summary>
     private static Declared? ScriptFunction(List<CodeToken> tokens, int name, int cursor, bool arrow, bool expression)
     {
+        if (ScriptParameters(tokens, cursor, arrow) is not var (parameters, close))
+        {
+            return null;
+        }
+
+        var at = ScriptBodyStart(tokens, close, arrow);
+        if (at < 0)
+        {
+            return null;
+        }
+
+        if (tokens[at].Text is "{")
+        {
+            var block = CloneLexer.Match(tokens, at);
+            return block < 0 ? null : new(name, parameters, close, block);
+        }
+
+        return arrow && expression ? new(name, parameters, close, ScriptExpressionEnd(tokens, at)) : null;
+    }
+
+    /// <summary>
+    /// The parameter list at cursor, after any type parameters: its ( and matching ), or an arrow's single
+    /// parameter as both; null when there is none.
+    /// </summary>
+    private static (int Open, int Close)? ScriptParameters(List<CodeToken> tokens, int cursor, bool arrow)
+    {
         if (cursor < tokens.Count && tokens[cursor].Text is "<")
         {
             cursor = GenericEnd(tokens, cursor) + 1;
@@ -128,21 +154,17 @@ internal static partial class ComplexityCounter
             return null;
         }
 
-        int parameters;
-        int close;
         if (tokens[cursor].Text is "(")
         {
-            (parameters, close) = (cursor, CloneLexer.Match(tokens, cursor));
-        }
-        else if (arrow && tokens[cursor].Kind is 'i' && Next(tokens, cursor) is "=>")
-        {
-            (parameters, close) = (cursor, cursor);
-        }
-        else
-        {
-            return null;
+            return (cursor, CloneLexer.Match(tokens, cursor));
         }
 
+        return arrow && tokens[cursor].Kind is 'i' && Next(tokens, cursor) is "=>" ? (cursor, cursor) : null;
+    }
+
+    /// <summary>The body's first token after the parameters' close, a return type and an arrow's =>; or -1.</summary>
+    private static int ScriptBodyStart(List<CodeToken> tokens, int close, bool arrow)
+    {
         var at = close + 1;
         if (close > 0 && at < tokens.Count && tokens[at].Text is ":")
         {
@@ -151,24 +173,10 @@ internal static partial class ComplexityCounter
 
         if (close < 0 || at <= 0 || at >= tokens.Count)
         {
-            return null;
+            return -1;
         }
 
-        if (arrow)
-        {
-            if (tokens[at].Text is not "=>" || ++at >= tokens.Count)
-            {
-                return null;
-            }
-        }
-
-        if (tokens[at].Text is "{")
-        {
-            var block = CloneLexer.Match(tokens, at);
-            return block < 0 ? null : new(name, parameters, close, block);
-        }
-
-        return arrow && expression ? new(name, parameters, close, ScriptExpressionEnd(tokens, at)) : null;
+        return arrow && (tokens[at].Text is not "=>" || ++at >= tokens.Count) ? -1 : at;
     }
 
     /// <summary>The body ({ or =>) after a return type annotation that starts at index, or -1.</summary>
