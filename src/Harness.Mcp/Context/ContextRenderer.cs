@@ -32,6 +32,48 @@ public static class ContextRenderer
     )
     {
         var full = BudgetBytes(request);
+        var (candidates, stale) = Visible(gathered.Candidates, project);
+        var rendering = new Rendering(request, gathered, project, workspace, full, stale)
+        {
+            Merged = RetrievalMerger.Merge(candidates),
+            Notes = StartingNotes(request, gathered, project, workspace),
+        };
+        var budget = new ContextBudget(Math.Max(full - rendering.FitEnvelope(), 1))
+        {
+            Cost = (unit, packed) => ContextWire.UnitCost(unit, packed, request.Debug),
+        };
+        rendering.Pack(
+            await ContextPacker
+                .PackAsync(
+                    RetrievalRanker.Rank(rendering.Merged.Candidates),
+                    budget,
+                    project?.ReadBody,
+                    cancellationToken
+                )
+                .ConfigureAwait(false)
+        );
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var json = Measured(rendering.Build());
+            if (System.Text.Encoding.UTF8.GetByteCount(json) <= full)
+            {
+                RecordContext(project, request.Task, rendering.Packed);
+                return new(json);
+            }
+
+            rendering.Shrink();
+        }
+    }
+
+    /// <summary>Project, gathering and workspace notes, and whether the requested budget was raised.</summary>
+    private static List<string> StartingNotes(
+        ContextRequest request,
+        Gathered gathered,
+        ContextProject? project,
+        ContextWorkspace? workspace
+    )
+    {
         var notes = (project?.Notes ?? []).Concat(gathered.Notes).Concat(workspace?.Notes ?? []).ToList();
         var specified = request.Tokens > 0 ? ContextBudget.FromTokens(request.Tokens).Bytes : request.Budget;
         if (specified is > 0 and < 1000)
@@ -39,8 +81,19 @@ public static class ContextRenderer
             notes.Add("budget raised to the minimum, 1000 bytes");
         }
 
+        return notes;
+    }
+
+    /// <summary>
+    /// The candidates the project can serve: indexed code is withheld on another branch (and the stale
+    /// note says so), and directories are not code files.
+    /// </summary>
+    private static (IReadOnlyList<Candidate> Candidates, string Stale) Visible(
+        IReadOnlyList<Candidate> candidates,
+        ContextProject? project
+    )
+    {
         var stale = project?.Stale ?? "";
-        var candidates = gathered.Candidates;
         if (project?.CrossBranch is true)
         {
             var kept = candidates
@@ -61,152 +114,252 @@ public static class ContextRenderer
                 )
                 .ToArray();
         }
+        return (candidates, stale);
+    }
 
-        var merged = RetrievalMerger.Merge(candidates);
-        var errors = gathered.Errors.ToList();
-        var diagnosticsTruncated = false;
-        var empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
-        while (ContextJson.Size(empty) + 100 > full && errors.Count > 0)
+    /// <summary>One answer being fitted to the budget: what it holds, and what was cut to make it fit.</summary>
+    private sealed class Rendering(
+        ContextRequest request,
+        Gathered gathered,
+        ContextProject? project,
+        ContextWorkspace? workspace,
+        int full,
+        string stale
+    )
+    {
+        private const string TooLarge =
+            "task metadata exceeds the context budget; raise the budget or shorten the task";
+
+        private readonly List<string> _errors = gathered.Errors.ToList();
+        private bool _diagnosticsTruncated;
+        private bool _debugTruncated;
+        private int _calls;
+        private int _debugEntries;
+
+        public required Merged Merged { get; init; }
+        public required List<string> Notes { get; init; }
+        public PackedContext Packed { get; private set; } = null!;
+
+        private Dictionary<string, object?> Empty() =>
+            Base(request.Task, gathered.Symbols, _errors, stale, workspace?.Projects);
+
+        /// <summary>
+        /// Drops errors, then notes, until the answer without context fits; returns the bytes that
+        /// envelope takes.
+        /// </summary>
+        public int FitEnvelope()
         {
-            diagnosticsTruncated = true;
-            errors.RemoveAt(errors.Count - 1);
-            empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
-        }
-        if (ContextJson.Size(empty) + 100 > full)
-        {
-            throw new ArgumentException(
-                "task metadata exceeds the context budget; raise the budget or shorten the task"
-            );
+            var empty = Empty();
+            while (ContextJson.Size(empty) + 100 > full && _errors.Count > 0)
+            {
+                DropDiagnostic();
+                empty = Empty();
+            }
+            if (ContextJson.Size(empty) + 100 > full)
+            {
+                throw new ArgumentException(TooLarge);
+            }
+
+            var envelope = EnvelopeSize(empty, Notes);
+            while (envelope + 200 > full && (_errors.Count > 0 || Notes.Count > 0))
+            {
+                DropDiagnostic();
+                envelope = EnvelopeSize(Empty(), Notes);
+            }
+            return envelope;
         }
 
-        var envelope = EnvelopeSize(empty, notes);
-        while (envelope + 200 > full && (errors.Count > 0 || notes.Count > 0))
+        public void Pack(PackedContext packed)
         {
-            diagnosticsTruncated = true;
-            if (errors.Count > 0)
-            {
-                errors.RemoveAt(errors.Count - 1);
-            }
-            else
-            {
-                notes.RemoveAt(notes.Count - 1);
-            }
-
-            empty = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
-            envelope = EnvelopeSize(empty, notes);
+            Packed = packed;
+            _calls = request.Debug ? gathered.Calls.Count : 0;
+            _debugEntries = packed.Units.Count + packed.Rejected.Count + Merged.Folded.Count;
         }
-        var budget = new ContextBudget(Math.Max(full - envelope, 1))
+
+        /// <summary>
+        /// Makes the next answer smaller: debug details first, then diagnostics, then the last packed
+        /// unit.
+        /// </summary>
+        public void Shrink()
         {
-            Cost = (unit, packed) => ContextWire.UnitCost(unit, packed, request.Debug),
-        };
-        var packed = await ContextPacker
-            .PackAsync(RetrievalRanker.Rank(merged.Candidates), budget, project?.ReadBody, cancellationToken)
-            .ConfigureAwait(false);
-        var calls = request.Debug ? gathered.Calls.Count : 0;
-        var debugEntries = packed.Units.Count + packed.Rejected.Count + merged.Folded.Count;
-        var debugTruncated = false;
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var output = Build();
-            var json = Measured(output);
-            if (System.Text.Encoding.UTF8.GetByteCount(json) <= full)
-            {
-                RecordContext(project, request.Task, packed);
-                return new(json);
-            }
             // The original adds debug after measuring. Keep useful context and bound diagnostics first.
-            if (request.Debug && (debugEntries > 0 || calls > 0))
+            if (request.Debug && (_debugEntries > 0 || _calls > 0))
             {
-                debugTruncated = true;
-                if (debugEntries > 0)
+                _debugTruncated = true;
+                if (_debugEntries > 0)
                 {
-                    debugEntries -= Math.Max(1, debugEntries / 4);
+                    _debugEntries -= Math.Max(1, _debugEntries / 4);
                 }
                 else
                 {
-                    calls -= Math.Max(1, calls / 4);
+                    _calls -= Math.Max(1, _calls / 4);
                 }
 
-                continue;
+                return;
             }
-            if (errors.Count > 0 || notes.Count > 0)
+            if (_errors.Count > 0 || Notes.Count > 0)
             {
-                diagnosticsTruncated = true;
-                if (errors.Count > 0)
-                {
-                    errors.RemoveAt(errors.Count - 1);
-                }
-                else
-                {
-                    notes.RemoveAt(notes.Count - 1);
-                }
-
-                continue;
+                DropDiagnostic();
+                return;
             }
-            if (packed.Units.Count is 0)
+            if (Packed.Units.Count is 0)
             {
-                throw new ArgumentException(
-                    "task metadata exceeds the context budget; raise the budget or shorten the task"
-                );
+                throw new ArgumentException(TooLarge);
             }
 
-            var rejected = packed.Rejected.Prepend(packed.Units[^1].Ranked).ToArray();
-            packed = packed with
+            Packed = Packed with
             {
-                Units = packed.Units.Take(packed.Units.Count - 1).ToArray(),
-                Omitted = packed.Omitted + 1,
-                Rejected = rejected,
+                Units = Packed.Units.Take(Packed.Units.Count - 1).ToArray(),
+                Omitted = Packed.Omitted + 1,
+                Rejected = Packed.Rejected.Prepend(Packed.Units[^1].Ranked).ToArray(),
             };
         }
 
-        Dictionary<string, object?> Build()
+        /// <summary>Drops the last error, or the last note when no error is left.</summary>
+        private void DropDiagnostic()
         {
-            var output = Base(request.Task, gathered.Symbols, errors, stale, workspace?.Projects);
+            _diagnosticsTruncated = true;
+            if (_errors.Count > 0)
+            {
+                _errors.RemoveAt(_errors.Count - 1);
+            }
+            else
+            {
+                Notes.RemoveAt(Notes.Count - 1);
+            }
+        }
+
+        public Dictionary<string, object?> Build()
+        {
+            var output = Empty();
             output["budget_bytes"] = full;
-            foreach (var unit in packed.Units)
+            foreach (var unit in Packed.Units)
             {
-                if (unit.Ranked.Candidate.Source is "code")
-                {
-                    ContextWire.AddCode(output, unit, request.Debug);
-                }
-                else
-                {
-                    var key = unit.Ranked.Candidate.Source is "memory" ? "memory" : "changes";
-                    if (!output.TryGetValue(key, out var entries))
-                    {
-                        entries = new List<object>();
-                        output[key] = entries;
-                    }
-                    ((List<object>)entries!).Add(
-                        key is "memory" ? ContextWire.Memory(unit, request.Debug) : ContextWire.Change(unit)
-                    );
-                }
+                AddUnit(output, unit);
             }
-            var messages = notes.ToList();
-            if (packed.Omitted > 0)
+            if (Packed.Omitted > 0)
             {
-                output["omitted"] = packed.Omitted;
-                messages.Add(ContextPacker.OmissionNote(packed.Omitted, full));
-            }
-            if (debugTruncated)
-            {
-                messages.Add("debug details truncated to fit the budget");
+                output["omitted"] = Packed.Omitted;
             }
 
-            if (diagnosticsTruncated)
-            {
-                messages.Add("additional diagnostics omitted to fit the budget");
-            }
-
-            ContextWire.Add(output, "note", string.Join("; ", messages));
+            ContextWire.Add(output, "note", string.Join("; ", Messages()));
             if (request.Debug)
             {
-                output["debug"] = ContextWire.Debug(gathered, merged.Folded, packed, calls, debugEntries);
+                output["debug"] = ContextWire.Debug(gathered, Merged.Folded, Packed, _calls, _debugEntries);
             }
 
             ContextFindings.Add(output, project?.Findings ?? [], full);
             return output;
+        }
+
+        private void AddUnit(Dictionary<string, object?> output, ContextUnit unit)
+        {
+            if (unit.Ranked.Candidate.Source is "code")
+            {
+                ContextWire.AddCode(output, unit, request.Debug);
+                return;
+            }
+
+            var key = unit.Ranked.Candidate.Source is "memory" ? "memory" : "changes";
+            if (!output.TryGetValue(key, out var entries))
+            {
+                entries = new List<object>();
+                output[key] = entries;
+            }
+            ((List<object>)entries!).Add(
+                key is "memory" ? ContextWire.Memory(unit, request.Debug) : ContextWire.Change(unit)
+            );
+        }
+
+        /// <summary>The notes, then what was left out or truncated to fit the budget.</summary>
+        private List<string> Messages()
+        {
+            var messages = Notes.ToList();
+            if (Packed.Omitted > 0)
+            {
+                messages.Add(ContextPacker.OmissionNote(Packed.Omitted, full));
+            }
+            if (_debugTruncated)
+            {
+                messages.Add("debug details truncated to fit the budget");
+            }
+            if (_diagnosticsTruncated)
+            {
+                messages.Add("additional diagnostics omitted to fit the budget");
+            }
+            return messages;
+        }
+
+        private static Dictionary<string, object?> Base(
+            string task,
+            IReadOnlyList<string> symbols,
+            List<string> errors,
+            string stale,
+            IReadOnlyList<object>? workspace
+        )
+        {
+            var output = new Dictionary<string, object?>
+            {
+                ["task"] = task,
+                ["code"] = new List<Dictionary<string, object?>>(),
+                ["used_bytes"] = 0,
+                ["budget_bytes"] = 0,
+            };
+            if (workspace is { Count: > 0 })
+            {
+                output["workspace"] = workspace;
+            }
+
+            if (symbols.Count > 0)
+            {
+                output["symbols"] = symbols;
+            }
+
+            if (errors.Count > 0)
+            {
+                output["errors"] = errors;
+            }
+
+            ContextWire.Add(output, "stale", stale);
+            return output;
+        }
+
+        private static int EnvelopeSize(Dictionary<string, object?> original, IReadOnlyList<string> notes)
+        {
+            var output = new Dictionary<string, object?>(original)
+            {
+                ["used_bytes"] = 999999,
+                ["budget_bytes"] = 999999,
+                ["omitted"] = 9999,
+                ["memory"] = new[]
+                {
+                    new JsonObjectMap { ["id"] = "", ["type"] = "" },
+                },
+                ["changes"] = new[]
+                {
+                    new JsonObjectMap
+                    {
+                        ["commit"] = "",
+                        ["subject"] = "",
+                        ["path"] = "",
+                        ["when"] = "",
+                    },
+                },
+                ["areas"] = new Dictionary<string, int> { [""] = 0 },
+                ["note"] = string.Join("; ", notes.Append(new string('x', 140))),
+            };
+            return ContextJson.Size(output)
+                - ContextJson.Size(new JsonObjectMap { ["id"] = "", ["type"] = "" })
+                - ContextJson.Size(
+                    new JsonObjectMap
+                    {
+                        ["commit"] = "",
+                        ["subject"] = "",
+                        ["path"] = "",
+                        ["when"] = "",
+                    }
+                )
+                - ContextJson.Size("");
         }
     }
 
@@ -246,78 +399,6 @@ public static class ContextRenderer
         catch (Exception)
         { /* Measurements cannot change the result. */
         }
-    }
-
-    private static Dictionary<string, object?> Base(
-        string task,
-        IReadOnlyList<string> symbols,
-        List<string> errors,
-        string stale,
-        IReadOnlyList<object>? workspace
-    )
-    {
-        var output = new Dictionary<string, object?>
-        {
-            ["task"] = task,
-            ["code"] = new List<Dictionary<string, object?>>(),
-            ["used_bytes"] = 0,
-            ["budget_bytes"] = 0,
-        };
-        if (workspace is { Count: > 0 })
-        {
-            output["workspace"] = workspace;
-        }
-
-        if (symbols.Count > 0)
-        {
-            output["symbols"] = symbols;
-        }
-
-        if (errors.Count > 0)
-        {
-            output["errors"] = errors;
-        }
-
-        ContextWire.Add(output, "stale", stale);
-        return output;
-    }
-
-    private static int EnvelopeSize(Dictionary<string, object?> original, IReadOnlyList<string> notes)
-    {
-        var output = new Dictionary<string, object?>(original)
-        {
-            ["used_bytes"] = 999999,
-            ["budget_bytes"] = 999999,
-            ["omitted"] = 9999,
-            ["memory"] = new[]
-            {
-                new JsonObjectMap { ["id"] = "", ["type"] = "" },
-            },
-            ["changes"] = new[]
-            {
-                new JsonObjectMap
-                {
-                    ["commit"] = "",
-                    ["subject"] = "",
-                    ["path"] = "",
-                    ["when"] = "",
-                },
-            },
-            ["areas"] = new Dictionary<string, int> { [""] = 0 },
-            ["note"] = string.Join("; ", notes.Append(new string('x', 140))),
-        };
-        return ContextJson.Size(output)
-            - ContextJson.Size(new JsonObjectMap { ["id"] = "", ["type"] = "" })
-            - ContextJson.Size(
-                new JsonObjectMap
-                {
-                    ["commit"] = "",
-                    ["subject"] = "",
-                    ["path"] = "",
-                    ["when"] = "",
-                }
-            )
-            - ContextJson.Size("");
     }
 
     private static string Measured(Dictionary<string, object?> output)
