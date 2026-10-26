@@ -221,9 +221,7 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         Context context
     )
     {
-        List<EvaluatedPackage> packages = [];
-        List<EvaluatedReference> references = [];
-        Dictionary<string, string> central = new(StringComparer.OrdinalIgnoreCase);
+        var items = new ItemLists();
         foreach (var (file, xml) in context.Order)
         {
             var directory = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
@@ -237,104 +235,138 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
 
                 foreach (var item in group.Elements())
                 {
-                    var childCondition = Condition(context, Attr(item, "Condition"), directory);
-                    if (!childCondition.Value && childCondition.Known)
-                    {
-                        continue;
-                    }
-
-                    var conditional = !condition.Known || !childCondition.Known;
-                    var at = file + ":" + ((IXmlLineInfo)item).LineNumber.ToString(CultureInfo.InvariantCulture);
-                    var include = Expand(context, Attr(item, "Include"), directory);
-                    var update = Expand(context, Attr(item, "Update"), directory);
-                    var remove = Expand(context, Attr(item, "Remove"), directory);
-                    var version = Version();
-                    switch (item.Name.LocalName)
-                    {
-                        case "PackageVersion":
-                            if (include.Length > 0 || update.Length > 0)
-                            {
-                                central[include.Length > 0 ? include : update] = version;
-                            }
-
-                            break;
-                        case "PackageReference":
-                            if (update.Length > 0)
-                            {
-                                for (var i = 0; i < packages.Count; i++)
-                                {
-                                    if (
-                                        packages[i].Name.Equals(update, StringComparison.OrdinalIgnoreCase)
-                                        && version.Length > 0
-                                    )
-                                    {
-                                        packages[i] = packages[i] with { Version = version };
-                                    }
-                                }
-                            }
-                            else if (remove.Length > 0)
-                            {
-                                packages.RemoveAll(package =>
-                                    package.Name.Equals(remove, StringComparison.OrdinalIgnoreCase)
-                                );
-                            }
-                            else
-                            {
-                                packages.AddRange(
-                                    Split(include)
-                                        .Select(name => new EvaluatedPackage(name, version, at, [], conditional))
-                                );
-                            }
-
-                            break;
-                        case "ProjectReference":
-                            foreach (var path in Split(include.Replace('\\', '/')))
-                            {
-                                var absolute = Path.GetFullPath(
-                                    path,
-                                    Path.GetDirectoryName(Path.Combine(repository.Root, project))!
-                                );
-                                references.Add(new(repository.Relative(absolute), at, [], conditional));
-                            }
-                            break;
-                    }
-                    string Version()
-                    {
-                        var value = Attr(item, "Version");
-                        if (value.Length is 0)
-                        {
-                            value = Attr(item, "VersionOverride");
-                        }
-
-                        foreach (
-                            var element in item.Elements()
-                                .Where(e => e.Name.LocalName is "Version" or "VersionOverride")
-                        )
-                        {
-                            value = element.Value.Trim();
-                        }
-
-                        return Expand(context, value, directory);
-                    }
+                    Item(project, context, items, file, item, condition.Known);
                 }
             }
         }
-        return (
-            packages
-                .Select(package =>
+        return (items.Packages.Select(package => Centrally(package, items.Central)).ToList(), items.References);
+    }
+
+    private sealed class ItemLists
+    {
+        internal List<EvaluatedPackage> Packages { get; } = [];
+        internal List<EvaluatedReference> References { get; } = [];
+        internal Dictionary<string, string> Central { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>One item of a group whose condition is true or unknown (then the item is conditional).</summary>
+    private void Item(string project, Context context, ItemLists items, string file, XElement item, bool known)
+    {
+        var directory = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
+        var childCondition = Condition(context, Attr(item, "Condition"), directory);
+        if (!childCondition.Value && childCondition.Known)
+        {
+            return;
+        }
+
+        var conditional = !known || !childCondition.Known;
+        var at = file + ":" + ((IXmlLineInfo)item).LineNumber.ToString(CultureInfo.InvariantCulture);
+        var include = Expand(context, Attr(item, "Include"), directory);
+        var update = Expand(context, Attr(item, "Update"), directory);
+        var remove = Expand(context, Attr(item, "Remove"), directory);
+        var version = ItemVersion(context, item, directory);
+        switch (item.Name.LocalName)
+        {
+            case "PackageVersion":
+                PackageVersion(items.Central, include, update, version);
+                break;
+            case "PackageReference":
+                PackageReference(items.Packages, include, update, remove, new(include, version, at, [], conditional));
+                break;
+            case "ProjectReference":
+                items.References.AddRange(ProjectReferences(project, include, at, conditional));
+                break;
+        }
+    }
+
+    /// <summary>The Version (or VersionOverride) attribute, overridden by a Version child element.</summary>
+    private static string ItemVersion(Context context, XElement item, string directory)
+    {
+        var value = Attr(item, "Version");
+        if (value.Length is 0)
+        {
+            value = Attr(item, "VersionOverride");
+        }
+
+        foreach (var element in item.Elements().Where(e => e.Name.LocalName is "Version" or "VersionOverride"))
+        {
+            value = element.Value.Trim();
+        }
+
+        return Expand(context, value, directory);
+    }
+
+    private static void PackageVersion(
+        Dictionary<string, string> central,
+        string include,
+        string update,
+        string version
+    )
+    {
+        if (include.Length > 0 || update.Length > 0)
+        {
+            central[include.Length > 0 ? include : update] = version;
+        }
+    }
+
+    /// <summary>Updates the version of, removes, or adds the packages; added is the item as read.</summary>
+    private static void PackageReference(
+        List<EvaluatedPackage> packages,
+        string include,
+        string update,
+        string remove,
+        EvaluatedPackage added
+    )
+    {
+        if (update.Length > 0)
+        {
+            for (var i = 0; i < packages.Count; i++)
+            {
+                if (packages[i].Name.Equals(update, StringComparison.OrdinalIgnoreCase) && added.Version.Length > 0)
                 {
-                    var version = (
-                        package.Version.Length is 0 ? central.GetValueOrDefault(package.Name, "") : package.Version
-                    ).Trim();
-                    return package with
-                    {
-                        Version = version,
-                        Unresolved = version.Contains("$(", StringComparison.Ordinal),
-                    };
-                })
-                .ToList(),
-            references
-        );
+                    packages[i] = packages[i] with { Version = added.Version };
+                }
+            }
+        }
+        else if (remove.Length > 0)
+        {
+            packages.RemoveAll(package => package.Name.Equals(remove, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            packages.AddRange(Split(include).Select(name => added with { Name = name }));
+        }
+    }
+
+    private IEnumerable<EvaluatedReference> ProjectReferences(
+        string project,
+        string include,
+        string at,
+        bool conditional
+    ) =>
+        Split(include.Replace('\\', '/'))
+            .Select(path =>
+                new EvaluatedReference(
+                    repository.Relative(
+                        Path.GetFullPath(path, Path.GetDirectoryName(Path.Combine(repository.Root, project))!)
+                    ),
+                    at,
+                    [],
+                    conditional
+                )
+            );
+
+    /// <summary>A package without a version takes the central one; a version still holding $( is unresolved.</summary>
+    private static EvaluatedPackage Centrally(EvaluatedPackage package, Dictionary<string, string> central)
+    {
+        var version = (
+            package.Version.Length is 0 ? central.GetValueOrDefault(package.Name, "") : package.Version
+        ).Trim();
+        return package with
+        {
+            Version = version,
+            Unresolved = version.Contains("$(", StringComparison.Ordinal),
+        };
     }
 
     internal XElement? Parse(string file)
