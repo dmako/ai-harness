@@ -86,16 +86,8 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
             _uncertain = true;
             return;
         }
-        var text = await reader
-            .ReadBodyAsync(Path.GetRelativePath(root, file), 1, int.MaxValue, token)
-            .ConfigureAwait(false);
-        using var xml = XmlReader.Create(
-            new StringReader(text),
-            new() { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }
-        );
-        var document = XDocument.Load(xml);
         var directory = Path.GetDirectoryName(file)!;
-        foreach (var element in document.Root?.Elements() ?? [])
+        foreach (var element in await ElementsAsync(file, token).ConfigureAwait(false))
         {
             var allowed = Condition(element, directory);
             if (allowed is false)
@@ -106,50 +98,76 @@ internal sealed class PackageIdentityReader(string root, RetrievalFileReader rea
             switch (element.Name.LocalName)
             {
                 case "PropertyGroup":
-                    foreach (var property in element.Elements())
-                    {
-                        var set = Condition(property, directory);
-                        if (set is false)
-                        {
-                            continue;
-                        }
-
-                        if (allowed is null || set is null)
-                        {
-                            _uncertain = true;
-                            continue;
-                        }
-                        _properties[property.Name.LocalName] = Expand(property.Value.Trim(), directory);
-                    }
+                    Properties(element, allowed, directory);
                     break;
                 case "Import":
-                    if (allowed is null)
-                    {
-                        _uncertain = true;
-                        break;
-                    }
-                    var path = Expand(element.Attribute("Project")?.Value ?? "", directory)
-                        .Replace('\\', Path.DirectorySeparatorChar);
-                    if (
-                        path.Length is 0
-                        || path.Contains("$(", StringComparison.Ordinal)
-                        || path.IndexOfAny(['*', '?']) >= 0
-                    )
-                    {
-                        _uncertain = true;
-                        break;
-                    }
-                    path = Path.GetFullPath(path, directory);
-                    if (File.Exists(path))
-                    {
-                        await WalkAsync(path, depth + 1, token).ConfigureAwait(false);
-                    }
-
+                    await ImportAsync(element, allowed, directory, depth, token).ConfigureAwait(false);
                     break;
                 case "ImportGroup" or "Choose":
                     _uncertain = true;
                     break;
             }
+        }
+    }
+
+    /// <summary>The project file's top-level elements.</summary>
+    private async Task<IEnumerable<XElement>> ElementsAsync(string file, CancellationToken token)
+    {
+        var text = await reader
+            .ReadBodyAsync(Path.GetRelativePath(root, file), 1, int.MaxValue, token)
+            .ConfigureAwait(false);
+        using var xml = XmlReader.Create(
+            new StringReader(text),
+            new() { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null }
+        );
+        return XDocument.Load(xml).Root?.Elements() ?? [];
+    }
+
+    /// <summary>Sets the group's properties; one under an unknown condition makes the identity uncertain.</summary>
+    private void Properties(XElement group, bool? allowed, string directory)
+    {
+        foreach (var property in group.Elements())
+        {
+            var set = Condition(property, directory);
+            if (set is false)
+            {
+                continue;
+            }
+
+            if (allowed is null || set is null)
+            {
+                _uncertain = true;
+                continue;
+            }
+            _properties[property.Name.LocalName] = Expand(property.Value.Trim(), directory);
+        }
+    }
+
+    /// <summary>Walks an imported file; an unknown condition, computed path or wildcard is uncertain.</summary>
+    private async Task ImportAsync(
+        XElement element,
+        bool? allowed,
+        string directory,
+        int depth,
+        CancellationToken token
+    )
+    {
+        if (allowed is null)
+        {
+            _uncertain = true;
+            return;
+        }
+        var path = Expand(element.Attribute("Project")?.Value ?? "", directory)
+            .Replace('\\', Path.DirectorySeparatorChar);
+        if (path.Length is 0 || path.Contains("$(", StringComparison.Ordinal) || path.IndexOfAny(['*', '?']) >= 0)
+        {
+            _uncertain = true;
+            return;
+        }
+        path = Path.GetFullPath(path, directory);
+        if (File.Exists(path))
+        {
+            await WalkAsync(path, depth + 1, token).ConfigureAwait(false);
         }
     }
 
