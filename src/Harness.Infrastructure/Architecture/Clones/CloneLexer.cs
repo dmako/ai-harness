@@ -59,223 +59,267 @@ internal static class CloneLexer
         return -1;
     }
 
+    private static readonly string[] GoOperators =
+    [
+        "...",
+        "<<=",
+        ">>=",
+        "&^=",
+        ":=",
+        "++",
+        "--",
+        "<<",
+        ">>",
+        "&^",
+        "<-",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "%=",
+        "&=",
+        "|=",
+        "^=",
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+    ];
+
+    private static readonly string[] CLikeOperators = ["=>", "?.", "===", "!==", "==", "!=", "<=", ">=", "&&", "||"];
+
     internal static List<CodeToken> Tokenize(string source, string language)
     {
-        List<CodeToken> tokens = [];
-        var line = 1;
-        var index = 0;
-        var js = language is "ts";
-        var go = language is "go";
-        var operators = go
-            ? new[]
-            {
-                "...",
-                "<<=",
-                ">>=",
-                "&^=",
-                ":=",
-                "++",
-                "--",
-                "<<",
-                ">>",
-                "&^",
-                "<-",
-                "+=",
-                "-=",
-                "*=",
-                "/=",
-                "%=",
-                "&=",
-                "|=",
-                "^=",
-                "==",
-                "!=",
-                "<=",
-                ">=",
-                "&&",
-                "||",
-            }
-            : ["=>", "?.", "===", "!==", "==", "!=", "<=", ">=", "&&", "||"];
-        while (index < source.Length)
+        var scanner = new Scanner(source, language);
+        while (!scanner.Done)
         {
-            var character = source[index];
-            if (char.IsWhiteSpace(character))
-            {
-                if (character is '\n')
-                {
-                    line++;
-                }
-                index++;
-                continue;
-            }
-            if (character is '/' && index + 1 < source.Length && source[index + 1] is '/')
-            {
-                while (index < source.Length && source[index] is not '\n')
-                {
-                    index++;
-                }
-                continue;
-            }
-            if (character is '/' && index + 1 < source.Length && source[index + 1] is '*')
-            {
-                index += 2;
-                while (index + 1 < source.Length && !(source[index] is '*' && source[index + 1] is '/'))
-                {
-                    if (source[index++] is '\n')
-                    {
-                        line++;
-                    }
-                }
-                index = Math.Min(source.Length, index + 2);
-                continue;
-            }
-            if (
-                character is '#'
-                && !js
-                && !go
-                && (
-                    tokens.Count is 0
-                    || source[(source.LastIndexOf('\n', Math.Max(0, index - 1)) + 1)..index]
-                        .All(item => item is ' ' or '\t')
-                )
-            )
-            {
-                while (index < source.Length && source[index] is not '\n')
-                {
-                    index++;
-                }
-                continue;
-            }
-            var start = index;
-            var firstLine = line;
-            if (
-                character is '"' or '\'' or '`'
-                || character is '@' or '$'
-                    && index + 1 < source.Length
-                    && (
-                        source[index + 1] is '"'
-                        || source[index + 1] is '@' or '$' && index + 2 < source.Length && source[index + 2] is '"'
-                    )
-            )
-            {
-                var verbatim = false;
-                while (index < source.Length && source[index] is '@' or '$')
-                {
-                    verbatim |= source[index++] is '@';
-                }
-                var quote = source[index];
-                if (quote is '"' && index + 2 < source.Length && source.AsSpan(index, 3).SequenceEqual("\"\"\""))
-                {
-                    index += 3;
-                    while (index + 2 < source.Length && !source.AsSpan(index, 3).SequenceEqual("\"\"\""))
-                    {
-                        if (source[index++] is '\n')
-                        {
-                            line++;
-                        }
-                    }
-                    index = Math.Min(source.Length, index + 3);
-                }
-                else
-                {
-                    index++;
-                    while (index < source.Length)
-                    {
-                        if (source[index] is '\n')
-                        {
-                            line++;
-                            if (quote is not '`' && !verbatim)
-                            {
-                                break;
-                            }
-                        }
-                        if (source[index] is '\\' && !verbatim && quote is not '`')
-                        {
-                            index = Math.Min(source.Length, index + 2);
-                            continue;
-                        }
-                        if (source[index] == quote)
-                        {
-                            if (verbatim && index + 1 < source.Length && source[index + 1] == quote)
-                            {
-                                index += 2;
-                                continue;
-                            }
-                            index++;
-                            break;
-                        }
-                        index++;
-                    }
-                }
-                tokens.Add(new(go && quote is '\'' ? 'n' : 's', source[start..index], firstLine));
-                continue;
-            }
-            if (character is '/' && js && RegexAfter(tokens.LastOrDefault()))
-            {
-                var inClass = false;
-                index++;
-                while (index < source.Length && source[index] is not '\n')
-                {
-                    if (source[index] is '\\')
-                    {
-                        index = Math.Min(source.Length, index + 2);
-                        continue;
-                    }
-                    if (source[index] is '[')
-                    {
-                        inClass = true;
-                    }
-                    else if (source[index] is ']')
-                    {
-                        inClass = false;
-                    }
-                    else if (source[index] is '/' && !inClass)
-                    {
-                        index++;
-                        break;
-                    }
-                    index++;
-                }
-                while (index < source.Length && Identifier(source[index]))
-                {
-                    index++;
-                }
-
-                tokens.Add(new('s', source[start..index], firstLine));
-                continue;
-            }
-            if (char.IsAsciiDigit(character))
-            {
-                while (index < source.Length && (Identifier(source[index]) || source[index] is '.'))
-                {
-                    index++;
-                }
-
-                tokens.Add(new('n', source[start..index], line));
-                continue;
-            }
-            if (IdentifierStart(character))
-            {
-                index++;
-                while (index < source.Length && Identifier(source[index]))
-                {
-                    index++;
-                }
-
-                tokens.Add(new('i', source[start..index].TrimStart('@'), line));
-                continue;
-            }
-            var op = operators.FirstOrDefault(op => source.AsSpan(index).StartsWith(op, StringComparison.Ordinal));
-            var punctuation = op ?? character.ToString();
-            tokens.Add(new('p', punctuation, line));
-            index += punctuation.Length;
+            scanner.Next();
         }
-        return tokens;
+        return scanner.Tokens;
     }
 
-    private static bool RegexAfter(CodeToken? previous) =>
-        previous is null
-        || previous.Kind is 'p'
-            && ("(,=:[!&|?{};+-*%<>~^".Contains(previous.Text, StringComparison.Ordinal) || previous.Text is "=>")
-        || previous.Kind is 'i' && previous.Text is "return" or "typeof" or "case" or "in" or "of";
+    /// <summary>A cursor over the source that reads one token, comment or whitespace character per step.</summary>
+    private sealed class Scanner(string source, string language)
+    {
+        private readonly bool _js = language is "ts";
+        private readonly bool _go = language is "go";
+        private int _index;
+        private int _line = 1;
+
+        public List<CodeToken> Tokens { get; } = [];
+
+        public bool Done => _index >= source.Length;
+
+        /// <summary>The character <paramref name="offset"/> after the cursor, or '\0' past the end.</summary>
+        private char At(int offset) => _index + offset < source.Length ? source[_index + offset] : '\0';
+
+        public void Next()
+        {
+            var character = source[_index];
+            if (char.IsWhiteSpace(character))
+            {
+                _line += character is '\n' ? 1 : 0;
+                _index++;
+            }
+            else if (character is '/' && At(1) is '/' || character is '#' && Directive())
+            {
+                SkipLine();
+            }
+            else if (character is '/' && At(1) is '*')
+            {
+                SkipBlockComment();
+            }
+            else if (StringStart(character))
+            {
+                ReadString();
+            }
+            else if (character is '/' && _js && RegexAfter(Tokens.LastOrDefault()))
+            {
+                ReadRegex();
+            }
+            else
+            {
+                ReadWord(character);
+            }
+        }
+
+        /// <summary>A C# preprocessor directive: '#' first on its line.</summary>
+        private bool Directive() =>
+            !_js
+            && !_go
+            && (
+                Tokens.Count is 0
+                || source[(source.LastIndexOf('\n', Math.Max(0, _index - 1)) + 1).._index]
+                    .All(item => item is ' ' or '\t')
+            );
+
+        private static bool RegexAfter(CodeToken? previous) =>
+            previous is null
+            || previous.Kind is 'p'
+                && ("(,=:[!&|?{};+-*%<>~^".Contains(previous.Text, StringComparison.Ordinal) || previous.Text is "=>")
+            || previous.Kind is 'i' && previous.Text is "return" or "typeof" or "case" or "in" or "of";
+
+        private bool StringStart(char character) =>
+            character is '"' or '\'' or '`'
+            || character is '@' or '$' && (At(1) is '"' || At(1) is '@' or '$' && At(2) is '"');
+
+        private void SkipLine()
+        {
+            while (_index < source.Length && source[_index] is not '\n')
+            {
+                _index++;
+            }
+        }
+
+        private void SkipBlockComment()
+        {
+            _index += 2;
+            while (_index + 1 < source.Length && !(source[_index] is '*' && source[_index + 1] is '/'))
+            {
+                CountLine(source[_index++]);
+            }
+            _index = Math.Min(source.Length, _index + 2);
+        }
+
+        private void CountLine(char character)
+        {
+            if (character is '\n')
+            {
+                _line++;
+            }
+        }
+
+        private void ReadString()
+        {
+            var start = _index;
+            var firstLine = _line;
+            var verbatim = false;
+            while (_index < source.Length && source[_index] is '@' or '$')
+            {
+                verbatim |= source[_index++] is '@';
+            }
+            var quote = source[_index];
+            if (quote is '"' && _index + 2 < source.Length && source.AsSpan(_index, 3).SequenceEqual("\"\"\""))
+            {
+                ReadRawString();
+            }
+            else
+            {
+                ReadQuoted(quote, verbatim);
+            }
+            Tokens.Add(new(_go && quote is '\'' ? 'n' : 's', source[start.._index], firstLine));
+        }
+
+        private void ReadRawString()
+        {
+            _index += 3;
+            while (_index + 2 < source.Length && !source.AsSpan(_index, 3).SequenceEqual("\"\"\""))
+            {
+                CountLine(source[_index++]);
+            }
+            _index = Math.Min(source.Length, _index + 3);
+        }
+
+        /// <summary>
+        /// Reads past the closing quote; an ordinary string also stops before a line break, leaving it
+        /// unread.
+        /// </summary>
+        private void ReadQuoted(char quote, bool verbatim)
+        {
+            var escapes = !verbatim && quote is not '`';
+            _index++;
+            while (_index < source.Length)
+            {
+                var character = source[_index];
+                CountLine(character);
+                if (character is '\n' && escapes)
+                {
+                    return;
+                }
+
+                if (character is '\\' && escapes)
+                {
+                    _index = Math.Min(source.Length, _index + 2);
+                    continue;
+                }
+
+                if (character == quote && !(verbatim && At(1) == quote))
+                {
+                    _index++;
+                    return;
+                }
+
+                // A verbatim string's doubled quote is one escaped quote.
+                _index += character == quote ? 2 : 1;
+            }
+        }
+
+        private void ReadRegex()
+        {
+            var start = _index;
+            var inClass = false;
+            _index++;
+            while (_index < source.Length && source[_index] is not '\n')
+            {
+                var character = source[_index];
+                if (character is '\\')
+                {
+                    _index = Math.Min(source.Length, _index + 2);
+                    continue;
+                }
+
+                _index++;
+                if (character is '/' && !inClass)
+                {
+                    break;
+                }
+
+                inClass = character switch
+                {
+                    '[' => true,
+                    ']' => false,
+                    _ => inClass,
+                };
+            }
+            SkipWhile(Identifier);
+            Tokens.Add(new('s', source[start.._index], _line));
+        }
+
+        /// <summary>A number, an identifier or keyword, or punctuation (the longest operator first).</summary>
+        private void ReadWord(char character)
+        {
+            var start = _index;
+            if (char.IsAsciiDigit(character))
+            {
+                SkipWhile(item => Identifier(item) || item is '.');
+                Tokens.Add(new('n', source[start.._index], _line));
+                return;
+            }
+
+            if (IdentifierStart(character))
+            {
+                _index++;
+                SkipWhile(Identifier);
+                Tokens.Add(new('i', source[start.._index].TrimStart('@'), _line));
+                return;
+            }
+
+            var punctuation =
+                (_go ? GoOperators : CLikeOperators).FirstOrDefault(op =>
+                    source.AsSpan(_index).StartsWith(op, StringComparison.Ordinal)
+                ) ?? character.ToString();
+            Tokens.Add(new('p', punctuation, _line));
+            _index += punctuation.Length;
+        }
+
+        private void SkipWhile(Func<char, bool> predicate)
+        {
+            while (_index < source.Length && predicate(source[_index]))
+            {
+                _index++;
+            }
+        }
+    }
 }
