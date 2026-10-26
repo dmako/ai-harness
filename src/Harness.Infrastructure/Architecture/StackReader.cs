@@ -75,109 +75,158 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
         return stack with { Badge = Badge(stack) };
     }
 
+    /// <summary>
+    /// A project's target framework, where it is set, and its host rank (2 web/worker, 1 exe, 0 library).
+    /// </summary>
+    private readonly record struct DotnetTarget(string Framework, string At, int Host);
+
+    private static readonly Regex NetFramework = EcosystemReader.Rx(@"^net(\d+)\.(\d+)$");
+    private static readonly Regex NetStandard = EcosystemReader.Rx(@"^netstandard(\d+\.\d+)$");
+
     private ProjectStack Dotnet(IReadOnlyList<string> files)
     {
-        List<(string Framework, string At, int Host)> targets = [];
+        List<DotnetTarget> targets = [];
         Dictionary<string, (string Version, string At)> packages = new(StringComparer.Ordinal);
-        foreach (var file in files.Where(file => Path.GetExtension(file) is ".csproj"))
-        {
-            if (
-                TaskParsing.IsTestFile(file)
-                || file.Contains("example", StringComparison.OrdinalIgnoreCase)
-                || ecosystem.DotnetTest(file)
+        foreach (
+            var file in files.Where(file =>
+                Path.GetExtension(file) is ".csproj"
+                && !TaskParsing.IsTestFile(file)
+                && !file.Contains("example", StringComparison.OrdinalIgnoreCase)
+                && !ecosystem.DotnetTest(file)
             )
+        )
+        {
+            ReadProject(file, targets, packages);
+        }
+
+        var runtime = DotnetRuntime(targets);
+        return new("C#", runtime, DotnetFrameworksOf(packages, runtime), "");
+    }
+
+    /// <summary>
+    /// Adds the project's target frameworks with its host rank, and its packages (a version found later
+    /// fills an empty one).
+    /// </summary>
+    private void ReadProject(
+        string file,
+        List<DotnetTarget> targets,
+        Dictionary<string, (string Version, string At)> packages
+    )
+    {
+        var host = WebOrWorker(file) ? 2 : 0;
+        if (host is 2)
+        {
+            packages["Microsoft.AspNetCore"] = ("", "");
+        }
+
+        var evaluated = ecosystem.Build.Evaluate(file);
+        if (
+            host is 0
+            && evaluated
+                .Properties.GetValueOrDefault("OutputType", "")
+                .Equals("exe", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            host = 1;
+        }
+
+        var at =
+            evaluated.PropertyLocations.GetValueOrDefault("TargetFrameworks")
+            ?? evaluated.PropertyLocations.GetValueOrDefault("TargetFramework", "");
+        targets.AddRange(evaluated.Frameworks.Select(framework => new DotnetTarget(framework, at, host)));
+        foreach (var package in evaluated.Packages)
+        {
+            if (!packages.TryGetValue(package.Name, out var old) || old.Version.Length is 0)
+            {
+                packages[package.Name] = (package.Unresolved ? "" : package.Version, package.At);
+            }
+        }
+    }
+
+    private bool WebOrWorker(string file) =>
+        AnalysisRepository
+            .Lines(repository.Read(file))
+            .Select(line => SdkAttribute.Match(line).Groups[1].Value)
+            .Any(name =>
+                name.EndsWith(".Web", StringComparison.Ordinal) || name.EndsWith(".Worker", StringComparison.Ordinal)
+            );
+
+    /// <summary>The runtime of the highest host rank that targets one: the highest .NET, else .NET Standard.</summary>
+    private static StackPart? DotnetRuntime(List<DotnetTarget> targets)
+    {
+        for (var rank = 2; rank >= 0; rank--)
+        {
+            if (RankRuntime(targets, rank) is { } runtime)
+            {
+                return runtime;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The highest .NET version among the targets of at least this host rank; the first .NET Standard
+    /// one when none is .NET.
+    /// </summary>
+    private static StackPart? RankRuntime(List<DotnetTarget> targets, int rank)
+    {
+        StackPart? runtime = null;
+        var highest = -1d;
+        foreach (var target in targets.Where(target => target.Host >= rank))
+        {
+            var match = NetFramework.Match(target.Framework);
+            if (match.Success)
+            {
+                var version = match.Groups[1].Value + "." + match.Groups[2].Value;
+                var numeric = double.Parse(version, CultureInfo.InvariantCulture);
+                if (numeric > highest)
+                {
+                    highest = numeric;
+                    runtime = Part(
+                        ".NET",
+                        version,
+                        match.Groups[2].Value is "0" ? match.Groups[1].Value : version,
+                        target.At
+                    );
+                }
+            }
+            else if (NetStandard.Match(target.Framework) is { Success: true } std && runtime is null)
+            {
+                runtime = Part(".NET Standard", std.Groups[1].Value, std.Groups[1].Value, target.At);
+            }
+        }
+        return runtime;
+    }
+
+    /// <summary>
+    /// Each known framework found among the packages (exact name first, then by prefix); ASP.NET Core
+    /// takes the runtime's version.
+    /// </summary>
+    private static List<StackPart> DotnetFrameworksOf(
+        Dictionary<string, (string Version, string At)> packages,
+        StackPart? runtime
+    )
+    {
+        List<StackPart> frameworks = [];
+        foreach (var framework in DotnetFrameworks)
+        {
+            var name = packages
+                .Keys.OrderByDescending(name => name == framework.Package)
+                .ThenBy(name => name, WorkspaceNameComparer.Instance)
+                .FirstOrDefault(name =>
+                    name == framework.Package || name.StartsWith(framework.Package + ".", StringComparison.Ordinal)
+                );
+            if (name is null)
             {
                 continue;
             }
 
-            var host = AnalysisRepository
-                .Lines(repository.Read(file))
-                .Select(line => SdkAttribute.Match(line).Groups[1].Value)
-                .Any(name =>
-                    name.EndsWith(".Web", StringComparison.Ordinal)
-                    || name.EndsWith(".Worker", StringComparison.Ordinal)
-                )
-                ? 2
-                : 0;
-            if (host is 2)
-            {
-                packages["Microsoft.AspNetCore"] = ("", "");
-            }
-
-            var evaluated = ecosystem.Build.Evaluate(file);
-            if (
-                host is 0
-                && evaluated
-                    .Properties.GetValueOrDefault("OutputType", "")
-                    .Equals("exe", StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                host = 1;
-            }
-
-            var at =
-                evaluated.PropertyLocations.GetValueOrDefault("TargetFrameworks")
-                ?? evaluated.PropertyLocations.GetValueOrDefault("TargetFramework", "");
-            targets.AddRange(evaluated.Frameworks.Select(framework => (framework, at, host)));
-            foreach (var package in evaluated.Packages)
-            {
-                if (!packages.TryGetValue(package.Name, out var old) || old.Version.Length is 0)
-                {
-                    packages[package.Name] = (package.Unresolved ? "" : package.Version, package.At);
-                }
-            }
+            var value = packages[name];
+            var version =
+                framework.Name is "ASP.NET Core" && runtime is not null ? runtime.Version ?? "" : value.Version;
+            frameworks.Add(Part(framework.Name, version, Major(version), value.At));
         }
-        StackPart? runtime = null;
-        var net = EcosystemReader.Rx(@"^net(\d+)\.(\d+)$");
-        var standard = EcosystemReader.Rx(@"^netstandard(\d+\.\d+)$");
-        for (var rank = 2; rank >= 0 && runtime is null; rank--)
-        {
-            var highest = -1d;
-            foreach (var target in targets.Where(target => target.Host >= rank))
-            {
-                var match = net.Match(target.Framework);
-                if (match.Success)
-                {
-                    var version = match.Groups[1].Value + "." + match.Groups[2].Value;
-                    var numeric = double.Parse(version, CultureInfo.InvariantCulture);
-                    if (numeric > highest)
-                    {
-                        highest = numeric;
-                        runtime = Part(
-                            ".NET",
-                            version,
-                            match.Groups[2].Value is "0" ? match.Groups[1].Value : version,
-                            target.At
-                        );
-                    }
-                }
-                else if (standard.Match(target.Framework) is { Success: true } std && runtime is null)
-                {
-                    runtime = Part(".NET Standard", std.Groups[1].Value, std.Groups[1].Value, target.At);
-                }
-            }
-        }
-        List<StackPart> frameworks = [];
-        foreach (var framework in DotnetFrameworks)
-        {
-            foreach (
-                var name in packages
-                    .Keys.OrderByDescending(name => name == framework.Package)
-                    .ThenBy(name => name, WorkspaceNameComparer.Instance)
-            )
-            {
-                if (name == framework.Package || name.StartsWith(framework.Package + ".", StringComparison.Ordinal))
-                {
-                    var value = packages[name];
-                    var version =
-                        framework.Name is "ASP.NET Core" && runtime is not null ? runtime.Version ?? "" : value.Version;
-                    frameworks.Add(Part(framework.Name, version, Major(version), value.At));
-                    break;
-                }
-            }
-        }
-
-        return new("C#", runtime, frameworks, "");
+        return frameworks;
     }
 
     private ProjectStack Node(IReadOnlyList<string> files, string language)
