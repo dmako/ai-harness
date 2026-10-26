@@ -255,14 +255,6 @@ public sealed class ClientConfiguration(ClientPaths paths)
             }
 
             var before = JsonConfigurationEditor.ParseObject(source);
-            JsonNode? current = before;
-            foreach (var key in target.Keys)
-            {
-                current = (current as JsonObject)?[key];
-            }
-
-            var hasExisting = current is JsonObject container && container.ContainsKey("harness");
-            var existing = (current as JsonObject)?["harness"];
             TextEdit edit;
             JsonObject? want = null;
             if (spec is null)
@@ -271,17 +263,8 @@ public sealed class ClientConfiguration(ClientPaths paths)
             }
             else
             {
-                if (hasExisting && existing is not JsonObject)
-                {
-                    throw new InvalidDataException("existing harness entry is not an object");
-                }
-
-                want = existing?.DeepClone() as JsonObject ?? new();
-                if (
-                    Expand(want["command"]?.GetValue<string>() ?? "", paths.Home) == Expand(spec.Command, paths.Home)
-                    && (!want.ContainsKey("type") || want["type"]?.GetValue<string>() is "stdio")
-                    && JsonNode.DeepEquals(want["args"], HarnessJson.SerializeToNode(spec.Args))
-                )
+                want = Existing(Servers(before, target.Keys));
+                if (Serves(want, spec))
                 {
                     return new(source, "unchanged");
                 }
@@ -291,15 +274,54 @@ public sealed class ClientConfiguration(ClientPaths paths)
                 want["args"] = HarnessJson.SerializeToNode(spec.Args);
                 edit = JsonConfigurationEditor.Set(source, target.Keys, "harness", want);
             }
-            var after = JsonConfigurationEditor.ParseObject(edit.Text);
-            var got = Pop(after, target.Keys);
-            Pop(before, target.Keys);
+            EnsureOnlyHarnessChanged(before, edit.Text, target.Keys, want);
+            return edit;
+        }
+
+        /// <summary>The object at the keys, where the servers are listed; null when it is missing or not one.</summary>
+        private static JsonObject? Servers(JsonObject root, IReadOnlyList<string> keys)
+        {
+            JsonNode? current = root;
+            foreach (var key in keys)
+            {
+                current = (current as JsonObject)?[key];
+            }
+
+            return current as JsonObject;
+        }
+
+        /// <summary>A copy of the existing harness entry, which must be an object, or a new one.</summary>
+        private static JsonObject Existing(JsonObject? servers)
+        {
+            var existing = servers?["harness"];
+            if (servers is not null && servers.ContainsKey("harness") && existing is not JsonObject)
+            {
+                throw new InvalidDataException("existing harness entry is not an object");
+            }
+
+            return existing?.DeepClone() as JsonObject ?? new();
+        }
+
+        /// <summary>The entry already runs the spec's command (expanded) over stdio with its arguments.</summary>
+        private bool Serves(JsonObject entry, ServerSpec spec) =>
+            Expand(entry["command"]?.GetValue<string>() ?? "", paths.Home) == Expand(spec.Command, paths.Home)
+            && (!entry.ContainsKey("type") || entry["type"]?.GetValue<string>() is "stdio")
+            && JsonNode.DeepEquals(entry["args"], HarnessJson.SerializeToNode(spec.Args));
+
+        private static void EnsureOnlyHarnessChanged(
+            JsonObject before,
+            string edited,
+            IReadOnlyList<string> keys,
+            JsonObject? want
+        )
+        {
+            var after = JsonConfigurationEditor.ParseObject(edited);
+            var got = Pop(after, keys);
+            Pop(before, keys);
             if (!JsonNode.DeepEquals(want, got) || !JsonNode.DeepEquals(before, after))
             {
                 throw new InvalidDataException("edit would change unrelated configuration; nothing written");
             }
-
-            return edit;
         }
     }
 
