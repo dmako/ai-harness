@@ -39,7 +39,9 @@ public sealed partial class CloneExtractor
         return writer.Finish();
     }
 
-    /// <summary>The names in the parameter list at <paramref name="parameters"/>, or the single bare parameter.</summary>
+    /// <summary>
+    /// The names in the parameter list at <paramref name="parameters"/>, or the single bare parameter.
+    /// </summary>
     private static HashSet<string> ParameterNames(List<CodeToken> tokens, int parameters)
     {
         HashSet<string> locals = new(StringComparer.Ordinal);
@@ -123,7 +125,11 @@ public sealed partial class CloneExtractor
         if (close > 0)
         {
             locals.UnionWith(
-                tokens.Skip(open + 1).Take(close - open - 1).Where(token => token.Kind is 'i').Select(token => token.Text)
+                tokens
+                    .Skip(open + 1)
+                    .Take(close - open - 1)
+                    .Where(token => token.Kind is 'i')
+                    .Select(token => token.Text)
             );
         }
     }
@@ -217,7 +223,9 @@ public sealed partial class CloneExtractor
                 && token.Text is not ("=>" or "&&" or "||");
         }
 
-        /// <summary>Counts open brackets; a brace starts a fresh count and restores the outer one when closed.</summary>
+        /// <summary>
+        /// Counts open brackets; a brace starts a fresh count and restores the outer one when closed.
+        /// </summary>
         private void Nest(string text)
         {
             switch (text)

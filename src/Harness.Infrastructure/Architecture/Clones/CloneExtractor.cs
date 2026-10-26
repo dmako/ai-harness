@@ -117,7 +117,9 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             )
             .ToArray();
         return declarations
-            .Select(declaration => CFunction(tokens, language, declaration, CapturedNames(declarations, locals, declaration)))
+            .Select(declaration =>
+                CFunction(tokens, language, declaration, CapturedNames(declarations, locals, declaration))
+            )
             .ToList();
     }
 
@@ -154,7 +156,9 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
         && !CloneLexer.Control.Contains(tokens[index].Text)
         && !CloneLexer.Keywords.Contains(tokens[index].Text);
 
-    /// <summary>The member named at <paramref name="name"/>, unless it is a call, a constructor call or a type.</summary>
+    /// <summary>
+    /// The member named at <paramref name="name"/>, unless it is a call, a constructor call or a type.
+    /// </summary>
     private static Declaration? MemberDeclaration(string path, string language, List<CodeToken> tokens, int name)
     {
         if (
@@ -351,7 +355,10 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
         )
         {
             var owner =
-                outer.value.Function.Name + "@" + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture) + ".";
+                outer.value.Function.Name
+                + "@"
+                + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture)
+                + ".";
             foreach (var local in locals[outer.index])
             {
                 captured[local] = owner;

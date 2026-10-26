@@ -213,7 +213,9 @@ public sealed partial class CloneExtractor
     private static string GoReceiverType(List<CodeToken> receiver) =>
         receiver.Skip(1).FirstOrDefault(token => token.Kind is 'i')?.Text ?? "?";
 
-    /// <summary>The ends of the parameter list starting at <paramref name="parameters"/> and of the body after it.</summary>
+    /// <summary>
+    /// The ends of the parameter list starting at <paramref name="parameters"/> and of the body after it.
+    /// </summary>
     private static (int CloseParameters, int Body, int End)? ReadGoSignature(List<CodeToken> tokens, int parameters)
     {
         if (parameters >= tokens.Count || tokens[parameters].Text is not "(")
