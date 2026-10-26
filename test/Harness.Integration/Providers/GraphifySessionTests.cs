@@ -163,9 +163,7 @@ public sealed class GraphifySessionTests
         {
             provider.Warm();
             await ProviderFixture.EventuallyAsync(() => File.Exists(Path.Combine(fixture.Data, "sessions.json")));
-            var sessions = JsonNode.Parse(
-                await File.ReadAllTextAsync(Path.Combine(fixture.Data, "sessions.json"), Token)
-            )!;
+            JsonNode sessions = fixture.Sessions();
             var owned = sessions["sessions"]![0]!;
             var ownedId = owned["session_id"]!.GetValue<string>();
             var pid = owned["process_id"]!.GetValue<int>();

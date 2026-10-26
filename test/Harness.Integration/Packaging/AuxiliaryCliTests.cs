@@ -101,10 +101,7 @@ public sealed class AuxiliaryCliTests
         var start = await RunAsync(fixture, "providers", "sessions", "start", "--project", fixture.Root);
         start.Code.Should().Be(0, start.Error);
         await ProviderFixture.EventuallyAsync(() => fixture.Calls().Any(c => c.Length > 0 && c[0] is "watch"));
-        await ProviderFixture.EventuallyAsync(() =>
-            JsonNode.Parse(File.ReadAllText(Path.Combine(fixture.Data, "sessions.json")))!["sessions"]!.AsArray().Count
-            > 0
-        );
+        await ProviderFixture.EventuallyAsync(() => fixture.Sessions()["sessions"]!.AsArray().Count > 0);
         var stopped = await RunAsync(fixture, "providers", "sessions", "stop", "--project", fixture.Root);
         stopped.Code.Should().Be(0, stopped.Error);
         stopped.Output.Should().Contain("Stopped 1 session(s)");
