@@ -43,7 +43,9 @@ public sealed partial class BuildReader
         internal HashSet<string> Npm { get; } = new(StringComparer.Ordinal);
     }
 
-    /// <summary>What resolving imports needs: the units, their names, the aliases, and the deep imports found.</summary>
+    /// <summary>
+    /// What resolving imports needs: the units, their names, the aliases, and the deep imports found.
+    /// </summary>
     private sealed record TsGraph(
         HashSet<string> Files,
         List<TsUnit> Units,
@@ -237,7 +239,9 @@ public sealed partial class BuildReader
         }
     }
 
-    /// <summary>Whether <paramref name="target"/> is a file inside a feature of a container folder, not its index.</summary>
+    /// <summary>
+    /// Whether <paramref name="target"/> is a file inside a feature of a container folder, not its index.
+    /// </summary>
     private static bool DeepInto(TsUnit to, string target)
     {
         if (to.Folder.Length is 0 || !Containers.Contains(Path.GetFileName(Directory(to.Folder))))
@@ -289,7 +293,11 @@ public sealed partial class BuildReader
             unit.Npm.Order(WorkspaceNameComparer.Instance)
                 .Select(name => new BuildPackage(
                     name,
-                    Empty(PackageVersion(source, name) is { Length: > 0 } version ? version : PackageVersion(root, name))
+                    Empty(
+                        PackageVersion(source, name) is { Length: > 0 } version
+                            ? version
+                            : PackageVersion(root, name)
+                    )
                 ))
         );
         unit.Build.References.Sort(WorkspaceNameComparer.Instance);

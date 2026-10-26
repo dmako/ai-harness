@@ -240,7 +240,9 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
         };
     }
 
-    /// <summary>A non-test .go file of this module, outside nested modules, vendor, testdata and hidden folders.</summary>
+    /// <summary>
+    /// A non-test .go file of this module, outside nested modules, vendor, testdata and hidden folders.
+    /// </summary>
     private static bool GoSource(string file, string[] nested) =>
         Path.GetExtension(file) is ".go"
         && !file.EndsWith("_test.go", StringComparison.Ordinal)
@@ -372,7 +374,9 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
             .FirstOrDefault()
         ?? path;
 
-    /// <summary>Adds the unit's external modules with their required versions, and marks test helper packages.</summary>
+    /// <summary>
+    /// Adds the unit's external modules with their required versions, and marks test helper packages.
+    /// </summary>
     private static void FinishGoUnit(BuildUnit unit, GoModule module)
     {
         unit.Packages.AddRange(
