@@ -94,66 +94,16 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
         {
             throw new ArgumentException("choose one --scope (user, project or local)");
         }
-        var scope = verb is "status" ? "all" : settings.Scope;
-        var root = "";
-        try
-        {
-            root = (await GitRepository.DiscoverAsync(settings.Project, token)).Root;
-        }
-        catch (NotRepositoryException) when (settings.Scope is "user")
-        {
-            scope = "user";
-        }
+        var (scope, root) = await ClientScopeAsync(verb, settings, token);
         var targets = ClientHookCleanup.Targets(_paths, client, scope, root);
-        var command = "";
-        if (verb is "install")
-        {
-            var spec = SetupCommandRunner.Executable(settings.Command);
-            // Client hooks accept one executable. The apphost is available beside framework builds.
-            var apphost = OperatingSystem.IsWindows() ? "harness.exe" : "harness";
-            var executable =
-                spec.Args.Count > 1 ? Path.Combine(Path.GetDirectoryName(spec.Args[0])!, apphost) : spec.Command;
-            if (!ClientConfiguration.Executable(executable))
-            {
-                throw new IOException("hook executable is unavailable; pass --command");
-            }
-            command = ClientHookCleanup.Command(executable, client);
-        }
+        var command = verb is "install" ? HookCommand(settings.Command, client) : "";
         await output.WriteLineAsync(client + " tool-event hook:");
         var failed = false;
         foreach (var target in targets)
         {
             try
             {
-                var label = "  " + target.Path + " (" + target.Scope + ")";
-                if (verb is "status")
-                {
-                    var installed = ClientHookCleanup.Installed(target.Path);
-                    await output.WriteLineAsync(
-                        label + (installed.Length is 0 ? ": not installed" : ": installed (" + installed + ")")
-                    );
-                    if (ClientHookCleanup.CommandProblem(installed) is { Length: > 0 } problem)
-                    {
-                        await output.WriteLineAsync("    " + problem);
-                    }
-                    if (
-                        client is "claude-code"
-                        && installed.Length > 0
-                        && ClientHookCleanup.Installed(target.Path, "session").Length is 0
-                    )
-                    {
-                        await output.WriteLineAsync("    SessionStart hook missing; run 'harness hooks install' again");
-                    }
-                    continue;
-                }
-                var change = verb is "install"
-                    ? ClientHookCleanup.Install(target, command, settings.DryRun)
-                    : ClientHookCleanup.Remove(target, settings.DryRun);
-                await EditOutput.PrintAsync(output, label, ClientWords, change, settings.DryRun);
-                if (client is "codex" && verb is "install" && change.Writes && !settings.DryRun)
-                {
-                    await output.WriteLineAsync("    " + ClientHookCleanup.CodexTrustNote);
-                }
+                await ClientTargetAsync(verb, client, target, command, settings.DryRun);
             }
             catch (Exception exception) when (EditError(exception))
             {
@@ -162,6 +112,77 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
             }
         }
         return failed ? 1 : 0;
+    }
+
+    /// <summary>The scopes to act on and the repository root; outside Git a user-scope command still runs.</summary>
+    private static async Task<(string Scope, string Root)> ClientScopeAsync(
+        string verb,
+        HookOptions settings,
+        CancellationToken token
+    )
+    {
+        var scope = verb is "status" ? "all" : settings.Scope;
+        try
+        {
+            return (scope, (await GitRepository.DiscoverAsync(settings.Project, token)).Root);
+        }
+        catch (NotRepositoryException) when (settings.Scope is "user")
+        {
+            return ("user", "");
+        }
+    }
+
+    /// <summary>The hook command line for the client, run by the harness executable itself.</summary>
+    private static string HookCommand(string explicitPath, string client)
+    {
+        var spec = SetupCommandRunner.Executable(explicitPath);
+        // Client hooks accept one executable. The apphost is available beside framework builds.
+        var apphost = OperatingSystem.IsWindows() ? "harness.exe" : "harness";
+        var executable =
+            spec.Args.Count > 1 ? Path.Combine(Path.GetDirectoryName(spec.Args[0])!, apphost) : spec.Command;
+        if (!ClientConfiguration.Executable(executable))
+        {
+            throw new IOException("hook executable is unavailable; pass --command");
+        }
+        return ClientHookCleanup.Command(executable, client);
+    }
+
+    private async Task ClientTargetAsync(string verb, string client, ClientTarget target, string command, bool dryRun)
+    {
+        var label = "  " + target.Path + " (" + target.Scope + ")";
+        if (verb is "status")
+        {
+            await ClientStatusAsync(client, target, label);
+            return;
+        }
+        var change = verb is "install"
+            ? ClientHookCleanup.Install(target, command, dryRun)
+            : ClientHookCleanup.Remove(target, dryRun);
+        await EditOutput.PrintAsync(output, label, ClientWords, change, dryRun);
+        if (client is "codex" && verb is "install" && change.Writes && !dryRun)
+        {
+            await output.WriteLineAsync("    " + ClientHookCleanup.CodexTrustNote);
+        }
+    }
+
+    private async Task ClientStatusAsync(string client, ClientTarget target, string label)
+    {
+        var installed = ClientHookCleanup.Installed(target.Path);
+        await output.WriteLineAsync(
+            label + (installed.Length is 0 ? ": not installed" : ": installed (" + installed + ")")
+        );
+        if (ClientHookCleanup.CommandProblem(installed) is { Length: > 0 } problem)
+        {
+            await output.WriteLineAsync("    " + problem);
+        }
+        if (
+            client is "claude-code"
+            && installed.Length > 0
+            && ClientHookCleanup.Installed(target.Path, "session").Length is 0
+        )
+        {
+            await output.WriteLineAsync("    SessionStart hook missing; run 'harness hooks install' again");
+        }
     }
 
     public Task<int> CompletionAsync(string verb, CompletionSettings settings, CancellationToken token) =>
