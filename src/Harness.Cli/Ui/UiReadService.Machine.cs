@@ -233,16 +233,6 @@ internal sealed partial class UiReadService
         return UiJson.Node(new JsonObjectMap { ["level"] = scope.ToString(), ["memories"] = rows });
     }
 
-    [SuppressMessage(
-        "Globalization",
-        "CA1308:Normalize strings to uppercase",
-        Justification = "SQLite lower() and the search query use lowercase text."
-    )]
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "Each level database is owned by a using declaration in the loop."
-    )]
     private async Task<JsonNode?> SearchAsync(UiReadRequest request, CancellationToken token)
     {
         var query = request.Parameter("q").Trim();
@@ -250,10 +240,142 @@ internal sealed partial class UiReadService
         {
             throw new UiRequestException(400, "type at least two characters");
         }
-        List<JsonObject> hits = [];
-        Dictionary<string, int> counts = [];
-        bool Has(params string[] values) => values.Any(v => v.Contains(query, StringComparison.OrdinalIgnoreCase));
-        void Add(
+        var hits = new SearchHits(query);
+        var projects = await catalog.ListAsync(token);
+        foreach (
+            var project in projects.Where(p =>
+                hits.Has(UiProjectCatalog.Display(p), WorkspaceStore.ShortName(p), UiProjectCatalog.Text(p, "root"))
+            )
+        )
+        {
+            hits.Add("project", UiProjectCatalog.Display(project), UiProjectCatalog.Text(project, "root"), project);
+        }
+        foreach (var workspace in Workspaces.Load().Where(w => hits.Has(w.Name, w.Title)))
+        {
+            hits.Add(
+                "workspace",
+                workspace.Title.Length > 0 ? workspace.Title : workspace.Name,
+                workspace.Name,
+                workspace: workspace.Name
+            );
+        }
+        foreach (var project in projects.Where(p => p["live"]?["state"]?.GetValue<string>() is "ok"))
+        {
+            try
+            {
+                await SearchProjectAsync(project, hits, token);
+            }
+            catch (Exception exception) when (ReadError(exception) || exception is UiRequestException)
+            { /* Search remains useful with unreadable peers. */
+            }
+        }
+        SearchLevels(hits, token);
+        return UiJson.Node(
+            new JsonObjectMap
+            {
+                ["query"] = query,
+                ["hits"] = hits.Ordered(),
+                ["per_kind"] = 20,
+            }
+        );
+    }
+
+    /// <summary>A project's memories, tasks and milestones matching the query.</summary>
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "SQLite lower() and the search query use lowercase text."
+    )]
+    private static async Task SearchProjectAsync(JsonObject project, SearchHits hits, CancellationToken token)
+    {
+        using var database = Open(project);
+        foreach (var memory in new MemoryStore(database).Search(new() { Text = hits.Query, Limit = 8 }, token))
+        {
+            hits.Add(
+                "memory",
+                memory.Content,
+                memory.Type,
+                project,
+                reference: memory.Id,
+                scope: memory.Scope.ToString()
+            );
+        }
+        using var connection = database.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT id,title,status FROM tasks WHERE lower(id) LIKE $q OR lower(title) LIKE $q ORDER BY id LIMIT 8";
+        command.Parameters.AddWithValue("$q", "%" + hits.Query.ToLowerInvariant() + "%");
+        using (var reader = await command.ExecuteReaderAsync(token))
+        {
+            while (await reader.ReadAsync(token))
+            {
+                hits.Add(
+                    "task",
+                    reader.GetString(0) + " " + reader.GetString(1),
+                    reader.GetString(2),
+                    project,
+                    reference: reader.GetString(0)
+                );
+            }
+        }
+        command.CommandText =
+            "SELECT id,title FROM milestones WHERE lower(id) LIKE $q OR lower(title) LIKE $q UNION SELECT DISTINCT milestone,'' FROM tasks WHERE lower(milestone) LIKE $q AND milestone NOT IN (SELECT id FROM milestones) ORDER BY 1 LIMIT 5";
+        using var milestones = await command.ExecuteReaderAsync(token);
+        while (await milestones.ReadAsync(token))
+        {
+            hits.Add(
+                "milestone",
+                (milestones.GetString(0) + " " + milestones.GetString(1)).Trim(),
+                project: project,
+                reference: milestones.GetString(0)
+            );
+        }
+    }
+
+    /// <summary>The user's and each workspace's memories matching the query.</summary>
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "Each level database is owned by a using declaration in the loop."
+    )]
+    private void SearchLevels(SearchHits hits, CancellationToken token)
+    {
+        foreach (
+            var scope in new[] { MemoryScope.Parse("user") }.Concat(
+                Workspaces.Load().Select(w => MemoryScope.Parse("workspace:" + w.Name))
+            )
+        )
+        {
+            using var database = OpenLevel(scope);
+            if (database is null)
+            {
+                continue;
+            }
+            foreach (var memory in new MemoryStore(database).Search(new() { Text = hits.Query, Limit = 8 }, token))
+            {
+                hits.Add(
+                    "memory",
+                    memory.Content,
+                    memory.Type,
+                    workspace: scope.Kind is "workspace" ? scope.Value : "",
+                    reference: memory.Id,
+                    scope: scope.ToString()
+                );
+            }
+        }
+    }
+
+    /// <summary>Search hits, at most 20 of a kind, ordered by kind.</summary>
+    private sealed class SearchHits(string query)
+    {
+        private readonly List<JsonObject> _hits = [];
+        private readonly Dictionary<string, int> _counts = [];
+        internal string Query => query;
+
+        internal bool Has(params string[] values) =>
+            values.Any(v => v.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+        internal void Add(
             string kind,
             string title,
             string detail = "",
@@ -263,11 +385,11 @@ internal sealed partial class UiReadService
             string scope = ""
         )
         {
-            if (counts.GetValueOrDefault(kind) >= 20)
+            if (_counts.GetValueOrDefault(kind) >= 20)
             {
                 return;
             }
-            counts[kind] = counts.GetValueOrDefault(kind) + 1;
+            _counts[kind] = _counts.GetValueOrDefault(kind) + 1;
             JsonObject hit = new() { ["kind"] = kind, ["title"] = title };
             foreach (
                 var (key, value) in new[]
@@ -286,117 +408,21 @@ internal sealed partial class UiReadService
                     hit[key] = value;
                 }
             }
-            hits.Add(hit);
+            _hits.Add(hit);
         }
-        var projects = await catalog.ListAsync(token);
-        foreach (
-            var project in projects.Where(p =>
-                Has(UiProjectCatalog.Display(p), WorkspaceStore.ShortName(p), UiProjectCatalog.Text(p, "root"))
-            )
-        )
-        {
-            Add("project", UiProjectCatalog.Display(project), UiProjectCatalog.Text(project, "root"), project);
-        }
-        foreach (var workspace in Workspaces.Load().Where(w => Has(w.Name, w.Title)))
-        {
-            Add(
-                "workspace",
-                workspace.Title.Length > 0 ? workspace.Title : workspace.Name,
-                workspace.Name,
-                workspace: workspace.Name
-            );
-        }
-        foreach (var project in projects.Where(p => p["live"]?["state"]?.GetValue<string>() is "ok"))
-        {
-            try
-            {
-                using var database = Open(project);
-                foreach (var memory in new MemoryStore(database).Search(new() { Text = query, Limit = 8 }, token))
-                {
-                    Add(
-                        "memory",
-                        memory.Content,
-                        memory.Type,
-                        project,
-                        reference: memory.Id,
-                        scope: memory.Scope.ToString()
-                    );
-                }
-                using var connection = database.OpenConnection();
-                using var command = connection.CreateCommand();
-                command.CommandText =
-                    "SELECT id,title,status FROM tasks WHERE lower(id) LIKE $q OR lower(title) LIKE $q ORDER BY id LIMIT 8";
-                command.Parameters.AddWithValue("$q", "%" + query.ToLowerInvariant() + "%");
-                using (var reader = await command.ExecuteReaderAsync(token))
-                {
-                    while (await reader.ReadAsync(token))
+
+        internal JsonObject[] Ordered() =>
+            _hits
+                .OrderBy(h =>
+                    UiProjectCatalog.Text(h, "kind") switch
                     {
-                        Add(
-                            "task",
-                            reader.GetString(0) + " " + reader.GetString(1),
-                            reader.GetString(2),
-                            project,
-                            reference: reader.GetString(0)
-                        );
+                        "project" => 0,
+                        "workspace" => 1,
+                        "memory" => 2,
+                        "task" => 3,
+                        _ => 4,
                     }
-                }
-                command.CommandText =
-                    "SELECT id,title FROM milestones WHERE lower(id) LIKE $q OR lower(title) LIKE $q UNION SELECT DISTINCT milestone,'' FROM tasks WHERE lower(milestone) LIKE $q AND milestone NOT IN (SELECT id FROM milestones) ORDER BY 1 LIMIT 5";
-                using var milestones = await command.ExecuteReaderAsync(token);
-                while (await milestones.ReadAsync(token))
-                {
-                    Add(
-                        "milestone",
-                        (milestones.GetString(0) + " " + milestones.GetString(1)).Trim(),
-                        project: project,
-                        reference: milestones.GetString(0)
-                    );
-                }
-            }
-            catch (Exception exception) when (ReadError(exception) || exception is UiRequestException)
-            { /* Search remains useful with unreadable peers. */
-            }
-        }
-        foreach (
-            var scope in new[] { MemoryScope.Parse("user") }.Concat(
-                Workspaces.Load().Select(w => MemoryScope.Parse("workspace:" + w.Name))
-            )
-        )
-        {
-            using var database = OpenLevel(scope);
-            if (database is null)
-            {
-                continue;
-            }
-            foreach (var memory in new MemoryStore(database).Search(new() { Text = query, Limit = 8 }, token))
-            {
-                Add(
-                    "memory",
-                    memory.Content,
-                    memory.Type,
-                    workspace: scope.Kind is "workspace" ? scope.Value : "",
-                    reference: memory.Id,
-                    scope: scope.ToString()
-                );
-            }
-        }
-        return UiJson.Node(
-            new JsonObjectMap
-            {
-                ["query"] = query,
-                ["hits"] = hits.OrderBy(h =>
-                        UiProjectCatalog.Text(h, "kind") switch
-                        {
-                            "project" => 0,
-                            "workspace" => 1,
-                            "memory" => 2,
-                            "task" => 3,
-                            _ => 4,
-                        }
-                    )
-                    .ToArray(),
-                ["per_kind"] = 20,
-            }
-        );
+                )
+                .ToArray();
     }
 }
