@@ -58,16 +58,9 @@ internal sealed partial class UiReadService
     {
         var id = UiProjectCatalog.Text(project, "id");
         var root = UiProjectCatalog.Text(project, "root");
-        var members = Workspaces.Members(id);
-        var current =
-            members.FirstOrDefault(m => m.Id == id)
-            ?? new WorkspaceMember("", id, root, UiProjectCatalog.Text(project, "db_path"));
-        if (!members.Any(m => m.Id == id))
-        {
-            members = members.Append(current).ToArray();
-        }
+        var (members, current) = StructureMembers(project, id, root);
         var reader = new ArchitectureReader(members);
-        using var state = project["live"]?["state"]?.GetValue<string>() is "ok" ? Open(project) : null;
+        using var state = Live(project) ? Open(project) : null;
         var rules = ArchitectureReader.RulesFor(state is null ? null : new MemoryStore(state), Levels, id, token);
         var workspaceCount = Workspaces.Load().Count(w => w.Members.Contains(id, StringComparer.Ordinal));
         var read = await reader.ProjectAsync(current, rules, true, token, workspaceKnown: workspaceCount > 0);
@@ -90,6 +83,43 @@ internal sealed partial class UiReadService
             result["workspaces"] = workspaceCount;
         }
         result["architecture"] = UiJson.Node(architecture);
+        result["package_users"] = await PackageUsersAsync(reader, members, id, architecture, token);
+        if (Live(project))
+        {
+            await AddFindingsAsync(result, project, root, id, read, token);
+        }
+        return result;
+    }
+
+    private static bool Live(JsonObject project) => project["live"]?["state"]?.GetValue<string>() is "ok";
+
+    /// <summary>The project's workspace members, with the project itself added when it is in no workspace.</summary>
+    private (IReadOnlyList<WorkspaceMember> Members, WorkspaceMember Current) StructureMembers(
+        JsonObject project,
+        string id,
+        string root
+    )
+    {
+        var members = Workspaces.Members(id);
+        var current =
+            members.FirstOrDefault(m => m.Id == id)
+            ?? new WorkspaceMember("", id, root, UiProjectCatalog.Text(project, "db_path"));
+        if (!members.Any(m => m.Id == id))
+        {
+            members = members.Append(current).ToArray();
+        }
+        return (members, current);
+    }
+
+    /// <summary>For each package the project publishes, the other members' projects that reference it.</summary>
+    private static async Task<JsonObject> PackageUsersAsync(
+        ArchitectureReader reader,
+        IReadOnlyList<WorkspaceMember> members,
+        string id,
+        ProjectArchitecture architecture,
+        CancellationToken token
+    )
+    {
         JsonObject users = [];
         var packages = architecture
             .Projects.Where(p => !string.IsNullOrEmpty(p.Package))
@@ -100,48 +130,65 @@ internal sealed partial class UiReadService
             try
             {
                 var repo = await reader.RepositoryAsync(member, token);
-                var build = new BuildReader(repo, new EcosystemReader(repo)).Read();
-                foreach (var unit in build?.Projects ?? [])
-                {
-                    foreach (var package in unit.Packages.Where(p => packages.Contains(p.Name)).Select(p => p.Name))
-                    {
-                        users[package] ??= new JsonArray();
-                        users[package]!
-                            .AsArray()
-                            .Add(
-                                UiJson.Node(
-                                    new JsonObjectMap
-                                    {
-                                        ["member"] = member.Title.Length > 0 ? member.Title : member.Name,
-                                        ["member_id"] = member.Id,
-                                        ["project"] = unit.Path,
-                                    }
-                                )
-                            );
-                    }
-                }
+                AddUsers(users, member, new BuildReader(repo, new EcosystemReader(repo)).Read(), packages);
             }
             catch (Exception exception) when (ReadError(exception))
             { /* A partial peer cannot prove usage. */
             }
         }
-        result["package_users"] = users;
-        if (project["live"]?["state"]?.GetValue<string>() is "ok")
+        return users;
+    }
+
+    private static void AddUsers(
+        JsonObject users,
+        WorkspaceMember member,
+        ProjectBuild? build,
+        HashSet<string> packages
+    )
+    {
+        foreach (var unit in build?.Projects ?? [])
         {
-            using var database = Open(project);
-            var found = await new FindingSets(
-                root,
-                id,
-                database,
-                lifecycle.GlobalConfigurationPath,
-                lifecycle.Registry,
-                read
-            ).ReadAsync("project", token);
-            var group = found.Groups.Count > 0 ? found.Groups[0] : null;
-            result["findings"] = UiJson.Node(group?.Findings ?? []);
-            result["snapshot"] = UiJson.Node(group?.Snapshot);
+            foreach (var package in unit.Packages.Where(p => packages.Contains(p.Name)).Select(p => p.Name))
+            {
+                users[package] ??= new JsonArray();
+                users[package]!
+                    .AsArray()
+                    .Add(
+                        UiJson.Node(
+                            new JsonObjectMap
+                            {
+                                ["member"] = member.Title.Length > 0 ? member.Title : member.Name,
+                                ["member_id"] = member.Id,
+                                ["project"] = unit.Path,
+                            }
+                        )
+                    );
+            }
         }
-        return result;
+    }
+
+    /// <summary>The project's current findings and their snapshot, read from its state.</summary>
+    private async Task AddFindingsAsync(
+        JsonObject result,
+        JsonObject project,
+        string root,
+        string id,
+        ArchitectureRead read,
+        CancellationToken token
+    )
+    {
+        using var database = Open(project);
+        var found = await new FindingSets(
+            root,
+            id,
+            database,
+            lifecycle.GlobalConfigurationPath,
+            lifecycle.Registry,
+            read
+        ).ReadAsync("project", token);
+        var group = found.Groups.Count > 0 ? found.Groups[0] : null;
+        result["findings"] = UiJson.Node(group?.Findings ?? []);
+        result["snapshot"] = UiJson.Node(group?.Snapshot);
     }
 
     private static string Input(AnalysisRepository repository)
