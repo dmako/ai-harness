@@ -170,6 +170,65 @@ public static class CloneSequences
         return true;
     }
 
+    /// <summary>A run's statements (trailing idioms dropped) and what its non-idiom statements weigh.</summary>
+    private sealed record Run(List<CloneStatement> Units, int Statements, int Tokens, bool Data)
+    {
+        public int Length => Units.Count;
+
+        public static Run Of(CloneFunction function, int start, int length)
+        {
+            var units = function.Statements.Skip(start).Take(length).ToList();
+            while (units.Count > 0 && units[^1].Idiom)
+            {
+                units.RemoveAt(units.Count - 1);
+            }
+
+            return new(
+                units,
+                units.Count(unit => !unit.Idiom && unit.Work),
+                units.Where(unit => !unit.Idiom).Sum(unit => unit.Size),
+                units.Any(unit => !unit.Idiom && unit.Data)
+            );
+        }
+
+        /// <summary>
+        /// Large enough (plain runs need more tokens than runs with data), and not one repeated call.
+        /// </summary>
+        public bool Reportable(SequenceOptions options) =>
+            Statements >= options.MinStatements
+            && Tokens >= options.MinTokens
+            && (Data || Tokens >= options.MinPlain)
+            && !OneCall(Units);
+
+        public bool Long(SequenceOptions options) =>
+            Statements >= options.LongStatements && Tokens >= options.LongTokens;
+
+        private static bool OneCall(List<CloneStatement> units)
+        {
+            var name = "";
+            foreach (var unit in units)
+            {
+                if (unit.Header)
+                {
+                    return false;
+                }
+
+                if (!unit.Work)
+                {
+                    continue;
+                }
+
+                if (unit.Callee.Length is 0 || name.Length > 0 && unit.Callee != name)
+                {
+                    return false;
+                }
+
+                name = unit.Callee;
+            }
+            return name.Length > 0;
+        }
+    }
+
     private static List<CloneSequence> Runs(
         IReadOnlyList<CloneFunction> functions,
         List<Position> positions,
@@ -178,26 +237,40 @@ public static class CloneSequences
         SequenceOptions options
     )
     {
-        var units = functions[positions[0].Function].Statements.Skip(positions[0].Unit).Take(length).ToList();
-        while (units.Count > 0 && units[^1].Idiom)
-        {
-            units.RemoveAt(units.Count - 1);
-        }
-
-        length = units.Count;
-        var statements = units.Count(unit => !unit.Idiom && unit.Work);
-        var tokens = units.Where(unit => !unit.Idiom).Sum(unit => unit.Size);
-        var data = units.Any(unit => !unit.Idiom && unit.Data);
-        if (
-            statements < options.MinStatements
-            || tokens < options.MinTokens
-            || !data && tokens < options.MinPlain
-            || OneCall(units)
-        )
+        var run = Run.Of(functions[positions[0].Function], positions[0].Unit, length);
+        if (!run.Reportable(options))
         {
             return [];
         }
 
+        List<CloneSequence> output = [];
+        foreach (
+            var part in DistinctPositions(functions, positions, run.Length, groups)
+                .GroupBy(position => OwnKey(functions, position, run.Length), StringComparer.Ordinal)
+        )
+        {
+            var count = part.Count();
+            if (count < options.Places && !(run.Long(options) && count >= 2))
+            {
+                continue;
+            }
+
+            output.Add(Sequence(functions, part.ToArray(), run, part.Key));
+        }
+        return output;
+    }
+
+    /// <summary>
+    /// One position per copy group and per source line, without runs that overlap an earlier one in the
+    /// same function.
+    /// </summary>
+    private static List<Position> DistinctPositions(
+        IReadOnlyList<CloneFunction> functions,
+        List<Position> positions,
+        int length,
+        Dictionary<string, string> groups
+    )
+    {
         HashSet<string> taken = new(StringComparer.Ordinal);
         Dictionary<int, int> ends = [];
         List<Position> kept = [];
@@ -225,130 +298,132 @@ public static class CloneSequences
 
             kept.Add(position);
         }
-        string OwnKey(Position position)
+        return kept;
+    }
+
+    /// <summary>The pattern of the run's own names: each name numbered by its first appearance.</summary>
+    private static string OwnKey(IReadOnlyList<CloneFunction> functions, Position position, int length)
+    {
+        Dictionary<string, int> names = new(StringComparer.Ordinal);
+        StringBuilder key = new();
+        foreach (
+            var name in functions[position.Function]
+                .Statements.Skip(position.Unit)
+                .Take(length)
+                .SelectMany(unit => unit.Own)
+        )
         {
-            Dictionary<string, int> names = new(StringComparer.Ordinal);
-            StringBuilder key = new();
-            foreach (
-                var name in functions[position.Function]
-                    .Statements.Skip(position.Unit)
-                    .Take(length)
-                    .SelectMany(unit => unit.Own)
-            )
+            if (!names.TryGetValue(name, out var id))
             {
-                if (!names.TryGetValue(name, out var id))
-                {
-                    id = names.Count;
-                    names.Add(name, id);
-                }
-                key.Append(id.ToString(CultureInfo.InvariantCulture)).Append(',');
+                id = names.Count;
+                names.Add(name, id);
             }
-            return key.ToString();
+            key.Append(id.ToString(CultureInfo.InvariantCulture)).Append(',');
         }
-        List<CloneSequence> output = [];
-        foreach (var part in kept.GroupBy(OwnKey, StringComparer.Ordinal))
+        return key.ToString();
+    }
+
+    /// <summary>
+    /// The run at each position, with the numbers that differ between them and the function it fills.
+    /// </summary>
+    private static CloneSequence Sequence(
+        IReadOnlyList<CloneFunction> functions,
+        Position[] positions,
+        Run run,
+        string ownKey
+    )
+    {
+        var values = NumberValues(functions, positions, run.Length);
+        List<ClonePlace> places = [];
+        CloneFunction? holder = null;
+        foreach (var position in positions)
         {
-            var longRun = statements >= options.LongStatements && tokens >= options.LongTokens;
-            if (part.Count() < options.Places && !(longRun && part.Count() >= 2))
-            {
-                continue;
-            }
-
-            var positionsOfPart = part.ToArray();
-            Dictionary<(int Unit, int Token), HashSet<string>> values = [];
-            foreach (var position in positionsOfPart)
-            {
-                for (var number = 0; number < length; number++)
-                {
-                    var raw = functions[position.Function].Statements[position.Unit + number].Raw;
-                    for (var token = 0; token < raw.Count; token++)
-                    {
-                        if (raw[token].Length > 0 && char.IsAsciiDigit(raw[token][0]))
-                        {
-                            var key = (number, token);
-                            if (!values.TryGetValue(key, out var set))
-                            {
-                                set = new(StringComparer.Ordinal);
-                                values.Add(key, set);
-                            }
-                            set.Add(raw[token]);
-                        }
-                    }
-                }
-            }
-
-            List<ClonePlace> places = [];
-            CloneFunction? holder = null;
-            foreach (var position in positionsOfPart)
-            {
-                var function = functions[position.Function];
-                List<string> differs = [];
-                for (var number = 0; number < length; number++)
-                {
-                    var raw = function.Statements[position.Unit + number].Raw;
-                    for (var token = 0; token < raw.Count; token++)
-                    {
-                        if (
-                            values.TryGetValue((number, token), out var set)
-                            && set.Count > 1
-                            && !differs.Contains(raw[token], StringComparer.Ordinal)
-                        )
-                        {
-                            differs.Add(raw[token]);
-                        }
-                    }
-                }
-                places.Add(
-                    new(
-                        function,
-                        function.Statements[position.Unit].Line,
-                        differs.Count is 0 ? null : differs.Take(4).ToArray()
-                    )
-                );
-                if (holder is null && Holds(function, position.Unit, length))
-                {
-                    holder = function;
-                }
-            }
-            output.Add(
+            var function = functions[position.Function];
+            var differs = Differs(function, position.Unit, run.Length, values);
+            places.Add(
                 new(
-                    places,
-                    statements,
-                    tokens,
-                    units.Select(unit => Render(unit.Raw)).ToArray(),
-                    data,
-                    holder,
-                    string.Join('\n', units.Select(unit => unit.Key)) + "\n" + part.Key
+                    function,
+                    function.Statements[position.Unit].Line,
+                    differs.Count is 0 ? null : differs.Take(4).ToArray()
                 )
             );
+            if (holder is null && Holds(function, position.Unit, run.Length))
+            {
+                holder = function;
+            }
         }
-        return output;
+        return new(
+            places,
+            run.Statements,
+            run.Tokens,
+            run.Units.Select(unit => Render(unit.Raw)).ToArray(),
+            run.Data,
+            holder,
+            string.Join('\n', run.Units.Select(unit => unit.Key)) + "\n" + ownKey
+        );
     }
 
-    private static bool OneCall(List<CloneStatement> units)
+    /// <summary>
+    /// For each (statement, token) slot that holds a number in some position, the numbers seen there.
+    /// </summary>
+    private static Dictionary<(int Unit, int Token), HashSet<string>> NumberValues(
+        IReadOnlyList<CloneFunction> functions,
+        Position[] positions,
+        int length
+    )
     {
-        var name = "";
-        foreach (var unit in units)
+        Dictionary<(int Unit, int Token), HashSet<string>> values = [];
+        foreach (var position in positions)
         {
-            if (unit.Header)
+            for (var number = 0; number < length; number++)
             {
-                return false;
-            }
+                var raw = functions[position.Function].Statements[position.Unit + number].Raw;
+                for (var token = 0; token < raw.Count; token++)
+                {
+                    if (raw[token].Length is 0 || !char.IsAsciiDigit(raw[token][0]))
+                    {
+                        continue;
+                    }
 
-            if (!unit.Work)
-            {
-                continue;
+                    if (!values.TryGetValue((number, token), out var set))
+                    {
+                        set = new(StringComparer.Ordinal);
+                        values.Add((number, token), set);
+                    }
+                    set.Add(raw[token]);
+                }
             }
-
-            if (unit.Callee.Length is 0 || name.Length > 0 && unit.Callee != name)
-            {
-                return false;
-            }
-
-            name = unit.Callee;
         }
-        return name.Length > 0;
+        return values;
     }
+
+    /// <summary>This position's tokens in slots where the positions hold different numbers, each once.</summary>
+    private static List<string> Differs(
+        CloneFunction function,
+        int start,
+        int length,
+        Dictionary<(int Unit, int Token), HashSet<string>> values
+    )
+    {
+        List<string> differs = [];
+        for (var number = 0; number < length; number++)
+        {
+            var raw = function.Statements[start + number].Raw;
+            for (var token = 0; token < raw.Count; token++)
+            {
+                if (
+                    values.TryGetValue((number, token), out var set)
+                    && set.Count > 1
+                    && !differs.Contains(raw[token], StringComparer.Ordinal)
+                )
+                {
+                    differs.Add(raw[token]);
+                }
+            }
+        }
+        return differs;
+    }
+
 
     private static bool Holds(CloneFunction function, int start, int length)
     {
