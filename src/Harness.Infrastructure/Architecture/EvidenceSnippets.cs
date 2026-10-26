@@ -43,20 +43,49 @@ public static class EvidenceSnippets
         var file = repository.Resolve(site.Path);
         if (Directory.Exists(file))
         {
-            var entries = new DirectoryInfo(file)
-                .EnumerateFileSystemInfos()
-                .Where(entry => !entry.Name.StartsWith('.'))
-                .OrderBy(entry => entry is DirectoryInfo ? 0 : 1)
-                .ThenBy(entry => entry.Name, StringComparer.Ordinal)
-                .Select(entry => entry.Name + (entry is DirectoryInfo ? "/" : ""))
-                .ToArray();
-            return new(site)
-            {
-                Folder = true,
-                Lines = entries.Length is 0 ? null : entries.Take(max).ToArray(),
-                Truncated = entries.Length > max,
-            };
+            return Folder(site, file, max);
         }
+
+        var lines = TextLines(repository, site, file);
+        var function =
+            site.Line > 0
+                ? (locate ?? new Clones.CloneExtractor(new(repository.Root, [site.Path])).Locate).Invoke(site)
+                : null;
+        var (start, end, truncated) = Window(site, lines.Length, function, max);
+        return new(site)
+        {
+            Start = start,
+            Lines = lines.Skip(start - 1).Take(Math.Max(0, end - start + 1)).ToArray(),
+            Focus =
+                span > 1 && site.Line > 0
+                    ? [site.Line, (int)Math.Min((long)site.Line + span - 1, lines.Length)]
+                    : [0, 0],
+            Function = function?.Name,
+            Truncated = truncated,
+        };
+    }
+
+    /// <summary>A folder's visible entries, folders first.</summary>
+    private static EvidenceSnippet Folder(EvidenceSite site, string folder, int max)
+    {
+        var entries = new DirectoryInfo(folder)
+            .EnumerateFileSystemInfos()
+            .Where(entry => !entry.Name.StartsWith('.'))
+            .OrderBy(entry => entry is DirectoryInfo ? 0 : 1)
+            .ThenBy(entry => entry.Name, StringComparer.Ordinal)
+            .Select(entry => entry.Name + (entry is DirectoryInfo ? "/" : ""))
+            .ToArray();
+        return new(site)
+        {
+            Folder = true,
+            Lines = entries.Length is 0 ? null : entries.Take(max).ToArray(),
+            Truncated = entries.Length > max,
+        };
+    }
+
+    /// <summary>The file's lines; a missing, large, unreadable or binary file throws.</summary>
+    private static string[] TextLines(AnalysisRepository repository, EvidenceSite site, string file)
+    {
         if (!File.Exists(file))
         {
             throw new FileNotFoundException("no place in a file", site.Path);
@@ -77,17 +106,26 @@ public static class EvidenceSnippets
             throw new InvalidDataException(site.Path + ": too large or not text");
         }
 
-        var lines = text.TrimEnd('\n').Split('\n');
+        return text.TrimEnd('\n').Split('\n');
+    }
+
+    /// <summary>
+    /// The lines shown: the containing function, else five lines around the site (the first 20 without one),
+    /// cut to max lines that keep the site in view.
+    /// </summary>
+    private static (int Start, int End, bool Truncated) Window(
+        EvidenceSite site,
+        int count,
+        EvidenceFunction? function,
+        int max
+    )
+    {
         var start = site.Line > 0 ? Math.Max(1, site.Line - 5) : 1;
-        var end = site.Line > 0 ? (int)Math.Min(lines.Length, (long)site.Line + 5) : Math.Min(lines.Length, 20);
-        var function =
-            site.Line > 0
-                ? (locate ?? new Clones.CloneExtractor(new(repository.Root, [site.Path])).Locate).Invoke(site)
-                : null;
+        var end = site.Line > 0 ? (int)Math.Min(count, (long)site.Line + 5) : Math.Min(count, 20);
         if (function is not null && function.Start > 0 && function.Start <= site.Line && site.Line <= function.End)
         {
             start = function.Start;
-            end = Math.Min(function.End, lines.Length);
+            end = Math.Min(function.End, count);
         }
         var truncated = end - start + 1 > max;
         if (truncated)
@@ -97,20 +135,9 @@ public static class EvidenceSnippets
                 start = Math.Max(1, site.Line - 5);
             }
 
-            end = (int)Math.Min(lines.Length, (long)start + max - 1);
+            end = (int)Math.Min(count, (long)start + max - 1);
         }
-        start = Math.Clamp(start, 1, lines.Length + 1);
-        return new(site)
-        {
-            Start = start,
-            Lines = lines.Skip(start - 1).Take(Math.Max(0, end - start + 1)).ToArray(),
-            Focus =
-                span > 1 && site.Line > 0
-                    ? [site.Line, (int)Math.Min((long)site.Line + span - 1, lines.Length)]
-                    : [0, 0],
-            Function = function?.Name,
-            Truncated = truncated,
-        };
+        return (Math.Clamp(start, 1, count + 1), end, truncated);
     }
 
     private static string? Empty(string text) => text.Length is 0 ? null : text;
