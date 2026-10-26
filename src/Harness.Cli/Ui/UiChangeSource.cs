@@ -42,61 +42,12 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
     {
         JsonObject result = [];
         JsonObject kinds = [];
-        void Add(string id, IEnumerable<string> values)
-        {
-            var previous = kinds[id]?.AsArray().Select(n => n!.GetValue<string>()) ?? [];
-            kinds[id] = new JsonArray(
-                previous
-                    .Concat(values)
-                    .Distinct(StringComparer.Ordinal)
-                    .Select(s => (JsonNode?)JsonValue.Create(s))
-                    .ToArray()
-            );
-        }
         var registry = Stamp(Path.Combine(DirectoryPath, "projects.json"));
         if (!_started || registry != _registryStamp)
         {
             try
             {
-                var entries = lifecycle.Registry.Load()["projects"]!
-                    .AsArray()
-                    .OfType<JsonObject>()
-                    .ToDictionary(
-                        p => p["id"]!.GetValue<string>(),
-                        p => (JsonObject)p.DeepClone(),
-                        StringComparer.Ordinal
-                    );
-                var structural = entries.Count != _entries.Count;
-                foreach (var (id, project) in entries)
-                {
-                    if (
-                        !_entries.TryGetValue(id, out var old)
-                        || new[] { "root", "db_path", "name", "title" }.Any(key =>
-                            !JsonNode.DeepEquals(old[key], project[key])
-                        )
-                    )
-                    {
-                        structural = true;
-                    }
-                    else if (!JsonNode.DeepEquals(old, project))
-                    {
-                        Add(id, ["summary"]);
-                    }
-                    var path = project["db_path"]?.GetValue<string>() ?? "";
-                    if (!_databases.TryGetValue(id, out var database) || database.Path != path)
-                    {
-                        database?.Dispose();
-                        _databases[id] = new(path);
-                    }
-                }
-                foreach (var id in _databases.Keys.Where(id => !entries.ContainsKey(id)).ToArray())
-                {
-                    _databases[id].Dispose();
-                    _databases.Remove(id);
-                }
-                _entries = entries;
-                _registryStamp = registry;
-                if (structural)
+                if (Reload(registry, kinds))
                 {
                     result["registry"] = true;
                 }
@@ -117,7 +68,7 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
             var changed = database.Check();
             if (changed.Length > 0)
             {
-                Add(id, changed);
+                Add(kinds, id, changed);
             }
         }
         if (kinds.Count > 0)
@@ -141,6 +92,65 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
             catalog.Forget();
         }
         return Task.FromResult(result);
+    }
+
+    /// <summary>
+    /// Reads the registry, notes a project's summary change and watches each project's database; true when
+    /// projects came, went, moved or were renamed.
+    /// </summary>
+    private bool Reload(string stamp, JsonObject kinds)
+    {
+        var entries = lifecycle.Registry.Load()["projects"]!
+            .AsArray()
+            .OfType<JsonObject>()
+            .ToDictionary(p => p["id"]!.GetValue<string>(), p => (JsonObject)p.DeepClone(), StringComparer.Ordinal);
+        var structural = entries.Count != _entries.Count;
+        foreach (var (id, project) in entries)
+        {
+            if (Moved(id, project))
+            {
+                structural = true;
+            }
+            else if (!JsonNode.DeepEquals(_entries[id], project))
+            {
+                Add(kinds, id, ["summary"]);
+            }
+            Watch(id, project["db_path"]?.GetValue<string>() ?? "");
+        }
+        foreach (var id in _databases.Keys.Where(id => !entries.ContainsKey(id)).ToArray())
+        {
+            _databases[id].Dispose();
+            _databases.Remove(id);
+        }
+        _entries = entries;
+        _registryStamp = stamp;
+        return structural;
+    }
+
+    /// <summary>A new project, or one whose root, database, name or title changed.</summary>
+    private bool Moved(string id, JsonObject project) =>
+        !_entries.TryGetValue(id, out var old)
+        || new[] { "root", "db_path", "name", "title" }.Any(key => !JsonNode.DeepEquals(old[key], project[key]));
+
+    private void Watch(string id, string path)
+    {
+        if (!_databases.TryGetValue(id, out var database) || database.Path != path)
+        {
+            database?.Dispose();
+            _databases[id] = new(path);
+        }
+    }
+
+    private static void Add(JsonObject kinds, string id, IEnumerable<string> values)
+    {
+        var previous = kinds[id]?.AsArray().Select(n => n!.GetValue<string>()) ?? [];
+        kinds[id] = new JsonArray(
+            previous
+                .Concat(values)
+                .Distinct(StringComparer.Ordinal)
+                .Select(s => (JsonNode?)JsonValue.Create(s))
+                .ToArray()
+        );
     }
 
     private static bool ReadFailure(Exception exception) =>
