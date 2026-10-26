@@ -43,6 +43,17 @@ public sealed partial class BuildReader
         internal HashSet<string> Npm { get; } = new(StringComparer.Ordinal);
     }
 
+    /// <summary>What resolving imports needs: the units, their names, the aliases, and the deep imports found.</summary>
+    private sealed record TsGraph(
+        HashSet<string> Files,
+        List<TsUnit> Units,
+        Dictionary<string, TsUnit> ByName,
+        List<(string Prefix, string Directory)> Aliases
+    )
+    {
+        internal Dictionary<(string From, string To), List<string>> Deeps { get; } = [];
+    }
+
     public ProjectBuild TypeScript()
     {
         var files = repository.Files.Where(file => !TsGenerated(file)).ToHashSet(StringComparer.Ordinal);
@@ -54,197 +65,29 @@ public sealed partial class BuildReader
             )
             .ToArray();
         var root = ReadPackage("package.json");
-        List<string> globs = [.. root.Workspaces];
-        var inPackages = false;
-        if (repository.Exists("pnpm-workspace.yaml"))
-        {
-            foreach (var line in AnalysisRepository.Lines(repository.Read("pnpm-workspace.yaml")))
-            {
-                var text = line.Trim();
-                if (text.StartsWith("packages:", StringComparison.Ordinal))
-                {
-                    inPackages = true;
-                }
-                else if (inPackages && text.StartsWith("- ", StringComparison.Ordinal))
-                {
-                    globs.Add(text[2..].Trim().Trim('\'', '"'));
-                }
-                else if (inPackages && text.Length > 0 && !text.StartsWith('#'))
-                {
-                    inPackages = false;
-                }
-            }
-        }
-
+        List<string> globs = [.. root.Workspaces, .. PnpmWorkspaces()];
         var noun = globs.Count > 0 ? "package" : "folder";
-        List<TsUnit> units = [];
-        if (noun is "package")
-        {
-            foreach (
-                var file in repository.Files.Where(file =>
-                    files.Contains(file)
-                    && file != "package.json"
-                    && Path.GetFileName(file) is "package.json"
-                    && globs.Any(glob => Glob(glob, Directory(file)))
-                )
-            )
-            {
-                var package = ReadPackage(file);
-                if (package.Name.Length is 0)
-                {
-                    continue;
-                }
-
-                var dir = Directory(file);
-                var kind =
-                    dir.StartsWith("apps/", StringComparison.Ordinal)
-                    || package.Private && package.Main.Length is 0 && !package.Bin
-                        ? "entry"
-                        : "library";
-                if (TestDirectories.Contains(Path.GetFileName(dir)))
-                {
-                    kind = "test";
-                }
-
-                units.Add(
-                    new(
-                        new()
-                        {
-                            Name = package.Name,
-                            Path = file,
-                            Kind = kind,
-                            Package = package.Private ? null : package.Name,
-                            Version = package.Private ? null : Empty(package.Version),
-                        },
-                        dir,
-                        false,
-                        package
-                    )
-                );
-            }
-        }
-        else
-        {
-            units = FolderUnits(code, root);
-        }
-
-        var aliases = Aliases();
-        var byName = noun is "package"
-            ? units.ToDictionary(unit => unit.Build.Name, StringComparer.Ordinal)
-            : new Dictionary<string, TsUnit>(StringComparer.Ordinal);
-        Dictionary<(string From, string To), List<string>> deeps = [];
+        var units = noun is "package" ? PackageUnits(files, globs) : FolderUnits(code, root);
+        var graph = new TsGraph(
+            files,
+            units,
+            noun is "package"
+                ? units.ToDictionary(unit => unit.Build.Name, StringComparer.Ordinal)
+                : new(StringComparer.Ordinal),
+            Aliases()
+        );
         foreach (var file in code)
         {
-            var from = UnitOf(file);
-            if (from is null || TsTest(file) && from.Build.Kind is not "test")
-            {
-                continue;
-            }
-
-            var lines = AnalysisRepository.Lines(repository.Read(file));
-            for (var index = 0; index < lines.Length; index++)
-            {
-                var line = lines[index].Trim();
-                if (line.StartsWith("//", StringComparison.Ordinal) || line.StartsWith('*'))
-                {
-                    continue;
-                }
-
-                foreach (var import in Imports.Matches(lines[index]).Select(match => match.Groups))
-                {
-                    var (target, bare) = Resolve(import[1].Value, file, aliases, files);
-                    TsUnit? to = null;
-                    if (target.Length > 0)
-                    {
-                        to = UnitOf(target);
-                    }
-                    else if (
-                        bare.Length > 0
-                        && !byName.TryGetValue(bare, out to)
-                        && !bare.StartsWith("node:", StringComparison.Ordinal)
-                    )
-                    {
-                        from.Npm.Add(bare);
-                    }
-
-                    if (to is not null && to != from)
-                    {
-                        Reference(
-                            from.Build,
-                            to.Build.Path,
-                            file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture)
-                        );
-                        if (
-                            target.Length > 0
-                            && to.Folder.Length > 0
-                            && Containers.Contains(Path.GetFileName(Directory(to.Folder)))
-                        )
-                        {
-                            var rest = target[to.Folder.Length..].TrimStart('/');
-                            if (
-                                rest.Length > 0
-                                && rest is not "index"
-                                && !rest.StartsWith("index.", StringComparison.Ordinal)
-                            )
-                            {
-                                var key = (from.Build.Path, to.Build.Path);
-                                if (!deeps.TryGetValue(key, out var places))
-                                {
-                                    places = [];
-                                    deeps.Add(key, places);
-                                }
-                                if (places.Count < 3)
-                                {
-                                    places.Add(
-                                        file
-                                            + ":"
-                                            + (index + 1).ToString(CultureInfo.InvariantCulture)
-                                            + " "
-                                            + import[1].Value
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            ReadImports(graph, file);
         }
         foreach (var unit in units)
         {
             if (noun is "package")
             {
-                foreach (var section in unit.Package.Dependencies)
-                {
-                    foreach (var name in section.Keys)
-                    {
-                        if (byName.TryGetValue(name, out var to))
-                        {
-                            if (to != unit)
-                            {
-                                Reference(unit.Build, to.Build.Path, LineOf(unit.Build.Path, '"' + name + '"'));
-                            }
-                        }
-                        else
-                        {
-                            unit.Npm.Add(name);
-                        }
-                    }
-                }
+                ReferenceDependencies(graph, unit);
             }
 
-            var source = noun is "package" ? unit.Package : root;
-            unit.Build.Packages.AddRange(
-                unit.Npm.Order(WorkspaceNameComparer.Instance)
-                    .Select(name => new BuildPackage(
-                        name,
-                        Empty(
-                            PackageVersion(source, name) is { Length: > 0 } version
-                                ? version
-                                : PackageVersion(root, name)
-                        )
-                    ))
-            );
-            unit.Build.References.Sort(WorkspaceNameComparer.Instance);
+            AddPackages(unit, noun is "package" ? unit.Package : root, root);
         }
         var names = units.ToDictionary(unit => unit.Build.Path, unit => unit.Build.Name, StringComparer.Ordinal);
         return new(
@@ -254,46 +97,241 @@ public sealed partial class BuildReader
             units.Select(unit => unit.Build).OrderBy(unit => unit.Path, WorkspaceNameComparer.Instance).ToArray()
         )
         {
-            Extra = deeps
-                .Select(pair => new ArchitectureFinding
-                {
-                    Kind = "deep-import",
-                    Level = "warn",
-                    Title = names[pair.Key.From] + " reaches into " + names[pair.Key.To] + "'s internals",
-                    Why =
-                        "It imports files inside the feature instead of its entry file (index), so a change inside "
-                        + names[pair.Key.To]
-                        + " can break "
-                        + names[pair.Key.From]
-                        + ". Export what is needed from its index.",
-                    Fix = "Export what is used from the feature's index and import it from there.",
-                    Project = pair.Key.From,
-                    Evidence = pair.Value,
-                    Key = ArchitectureAnalyzer.Key("deep-import", pair.Key.From, pair.Key.To),
-                })
-                .OrderBy(finding => finding.Title, StringComparer.Ordinal)
-                .ToArray(),
+            Extra = DeepImportFindings(graph.Deeps, names),
         };
+    }
 
-        TsUnit? UnitOf(string file)
+    /// <summary>The package globs listed under <c>packages:</c> in pnpm-workspace.yaml.</summary>
+    private List<string> PnpmWorkspaces()
+    {
+        List<string> globs = [];
+        if (!repository.Exists("pnpm-workspace.yaml"))
         {
-            var best = units
-                .Where(unit =>
-                    unit.Folder.Length > 0
-                    && (file == unit.Folder || file.StartsWith(unit.Folder + "/", StringComparison.Ordinal))
+            return globs;
+        }
+
+        var inPackages = false;
+        foreach (var line in AnalysisRepository.Lines(repository.Read("pnpm-workspace.yaml")))
+        {
+            var text = line.Trim();
+            if (text.StartsWith("packages:", StringComparison.Ordinal))
+            {
+                inPackages = true;
+            }
+            else if (inPackages && text.StartsWith("- ", StringComparison.Ordinal))
+            {
+                globs.Add(text[2..].Trim().Trim('\'', '"'));
+            }
+            else if (inPackages && text.Length > 0 && !text.StartsWith('#'))
+            {
+                inPackages = false;
+            }
+        }
+        return globs;
+    }
+
+    /// <summary>One unit per named package.json (other than the root one) in a workspace glob.</summary>
+    private List<TsUnit> PackageUnits(HashSet<string> files, List<string> globs)
+    {
+        List<TsUnit> units = [];
+        foreach (
+            var file in repository.Files.Where(file =>
+                files.Contains(file)
+                && file != "package.json"
+                && Path.GetFileName(file) is "package.json"
+                && globs.Any(glob => Glob(glob, Directory(file)))
+            )
+        )
+        {
+            var package = ReadPackage(file);
+            if (package.Name.Length is 0)
+            {
+                continue;
+            }
+
+            var dir = Directory(file);
+            units.Add(
+                new(
+                    new()
+                    {
+                        Name = package.Name,
+                        Path = file,
+                        Kind = TsPackageKind(dir, package),
+                        Package = package.Private ? null : package.Name,
+                        Version = package.Private ? null : Empty(package.Version),
+                    },
+                    dir,
+                    false,
+                    package
                 )
-                .OrderByDescending(unit => unit.Folder.Length)
-                .FirstOrDefault();
-            return best
-                ?? units.FirstOrDefault(unit =>
-                    unit.Root
-                    && (
-                        !Under(file, unit.Build.Path, out var relative)
-                        || !relative.Contains('/', StringComparison.Ordinal)
-                    )
-                );
+            );
+        }
+        return units;
+    }
+
+    private static string TsPackageKind(string dir, PackageInfo package)
+    {
+        if (TestDirectories.Contains(Path.GetFileName(dir)))
+        {
+            return "test";
+        }
+
+        return dir.StartsWith("apps/", StringComparison.Ordinal)
+            || package.Private && package.Main.Length is 0 && !package.Bin
+            ? "entry"
+            : "library";
+    }
+
+    /// <summary>Records the references and npm packages a code file's imports add to its unit.</summary>
+    private void ReadImports(TsGraph graph, string file)
+    {
+        var from = TsUnitOf(graph.Units, file);
+        if (from is null || TsTest(file) && from.Build.Kind is not "test")
+        {
+            return;
+        }
+
+        var lines = AnalysisRepository.Lines(repository.Read(file));
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index].Trim();
+            if (line.StartsWith("//", StringComparison.Ordinal) || line.StartsWith('*'))
+            {
+                continue;
+            }
+
+            var at = file + ":" + (index + 1).ToString(CultureInfo.InvariantCulture);
+            foreach (var import in Imports.Matches(lines[index]).Select(match => match.Groups))
+            {
+                TsImport(graph, from, file, at, import[1].Value);
+            }
         }
     }
+
+    private void TsImport(TsGraph graph, TsUnit from, string file, string at, string spec)
+    {
+        var (target, bare) = Resolve(spec, file, graph.Aliases, graph.Files);
+        TsUnit? to = null;
+        if (target.Length > 0)
+        {
+            to = TsUnitOf(graph.Units, target);
+        }
+        else if (
+            bare.Length > 0
+            && !graph.ByName.TryGetValue(bare, out to)
+            && !bare.StartsWith("node:", StringComparison.Ordinal)
+        )
+        {
+            from.Npm.Add(bare);
+        }
+
+        if (to is null || to == from)
+        {
+            return;
+        }
+
+        Reference(from.Build, to.Build.Path, at);
+        if (target.Length > 0 && DeepInto(to, target))
+        {
+            AddDeepImport(graph.Deeps, (from.Build.Path, to.Build.Path), at + " " + spec);
+        }
+    }
+
+    /// <summary>Whether <paramref name="target"/> is a file inside a feature of a container folder, not its index.</summary>
+    private static bool DeepInto(TsUnit to, string target)
+    {
+        if (to.Folder.Length is 0 || !Containers.Contains(Path.GetFileName(Directory(to.Folder))))
+        {
+            return false;
+        }
+
+        var rest = target[to.Folder.Length..].TrimStart('/');
+        return rest.Length > 0 && rest is not "index" && !rest.StartsWith("index.", StringComparison.Ordinal);
+    }
+
+    /// <summary>Keeps the first three places of each deep import between two units.</summary>
+    private static void AddDeepImport(
+        Dictionary<(string From, string To), List<string>> deeps,
+        (string From, string To) key,
+        string place
+    )
+    {
+        if (!deeps.TryGetValue(key, out var places))
+        {
+            places = [];
+            deeps.Add(key, places);
+        }
+        if (places.Count < 3)
+        {
+            places.Add(place);
+        }
+    }
+
+    /// <summary>A package's dependencies: references to workspace packages, npm packages otherwise.</summary>
+    private void ReferenceDependencies(TsGraph graph, TsUnit unit)
+    {
+        foreach (var name in unit.Package.Dependencies.SelectMany(section => section.Keys))
+        {
+            if (!graph.ByName.TryGetValue(name, out var to))
+            {
+                unit.Npm.Add(name);
+            }
+            else if (to != unit)
+            {
+                Reference(unit.Build, to.Build.Path, LineOf(unit.Build.Path, '"' + name + '"'));
+            }
+        }
+    }
+
+    private static void AddPackages(TsUnit unit, PackageInfo source, PackageInfo root)
+    {
+        unit.Build.Packages.AddRange(
+            unit.Npm.Order(WorkspaceNameComparer.Instance)
+                .Select(name => new BuildPackage(
+                    name,
+                    Empty(PackageVersion(source, name) is { Length: > 0 } version ? version : PackageVersion(root, name))
+                ))
+        );
+        unit.Build.References.Sort(WorkspaceNameComparer.Instance);
+    }
+
+    private static ArchitectureFinding[] DeepImportFindings(
+        Dictionary<(string From, string To), List<string>> deeps,
+        Dictionary<string, string> names
+    ) =>
+        deeps
+            .Select(pair => new ArchitectureFinding
+            {
+                Kind = "deep-import",
+                Level = "warn",
+                Title = names[pair.Key.From] + " reaches into " + names[pair.Key.To] + "'s internals",
+                Why =
+                    "It imports files inside the feature instead of its entry file (index), so a change inside "
+                    + names[pair.Key.To]
+                    + " can break "
+                    + names[pair.Key.From]
+                    + ". Export what is needed from its index.",
+                Fix = "Export what is used from the feature's index and import it from there.",
+                Project = pair.Key.From,
+                Evidence = pair.Value,
+                Key = ArchitectureAnalyzer.Key("deep-import", pair.Key.From, pair.Key.To),
+            })
+            .OrderBy(finding => finding.Title, StringComparer.Ordinal)
+            .ToArray();
+
+    /// <summary>The unit with the longest folder containing the file, else a root unit owning it.</summary>
+    private static TsUnit? TsUnitOf(List<TsUnit> units, string file) =>
+        units
+            .Where(unit =>
+                unit.Folder.Length > 0
+                && (file == unit.Folder || file.StartsWith(unit.Folder + "/", StringComparison.Ordinal))
+            )
+            .OrderByDescending(unit => unit.Folder.Length)
+            .FirstOrDefault()
+        ?? units.FirstOrDefault(unit =>
+            unit.Root
+            && (!Under(file, unit.Build.Path, out var relative) || !relative.Contains('/', StringComparison.Ordinal))
+        );
 
     private List<TsUnit> FolderUnits(string[] code, PackageInfo root)
     {
