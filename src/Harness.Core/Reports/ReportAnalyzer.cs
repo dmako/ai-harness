@@ -263,93 +263,33 @@ public static class ReportAnalyzer
         );
     }
 
+    /// <summary>
+    /// A provider problem to report: its level, what happened, the action, and from the trend when it
+    /// last happened, how many calls followed, and which days count as bad.
+    /// </summary>
+    private sealed record ProviderProblem(
+        string Level,
+        string What,
+        string Action,
+        string? Last,
+        int After,
+        Func<ProviderDay, int> Bad
+    );
+
     private static void ProviderFindings(List<ReportFinding> result, ProviderMetrics p, ProviderTrend? trend)
     {
         var name =
             p.Provider
             + " "
             + (p.Capability.StartsWith("code.", StringComparison.Ordinal) ? p.Capability[5..] : p.Capability);
-        void Judge(string level, string what, string action, string? last, int after, Func<ProviderDay, int> bad)
+        if (FailureProblem(p, trend) is { } failure)
         {
-            var history = trend is null ? null : Histogram(trend.Days, bad);
-            if (history?.Length is 0)
-            {
-                history = null;
-            }
-
-            var message = name + " " + what;
-            if (trend is not null && after >= ResolvedCalls)
-            {
-                level = "info";
-                action = "nothing to do while it stays clean";
-                message += string.Create(
-                    CultureInfo.InvariantCulture,
-                    $", but not in the {after} calls since {Day(last)}: resolved"
-                );
-            }
-            else if (trend is not null && after > 0)
-            {
-                message += string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"; only {after} call(s) since the last one ({Day(last)}): too few to tell whether it stopped"
-                );
-            }
-            else if (trend is not null && !string.IsNullOrEmpty(last) && last == trend.LastCall)
-            {
-                message += "; still happening (last call " + Day(last) + ")";
-            }
-
-            result.Add(new(level, "providers", message, action, history, trend));
-        }
-        var failure = string.Create(CultureInfo.InvariantCulture, $"failed {Percent(p.ErrorRate)} of {p.Calls} calls");
-        if (p.ErrorRate >= .50)
-        {
-            Judge(
-                "problem",
-                failure,
-                "run harness doctor and check the provider's own log; route the capability elsewhere until fixed",
-                trend?.LastError,
-                trend?.CallsAfterError ?? 0,
-                d => d.Errors
-            );
-        }
-        else if (p.ErrorRate >= .10)
-        {
-            Judge(
-                "warn",
-                failure,
-                "run harness doctor and check the provider's errors",
-                trend?.LastError,
-                trend?.CallsAfterError ?? 0,
-                d => d.Errors
-            );
+            result.Add(Judge(name, failure, trend));
         }
 
-        var slow = string.Create(
-            CultureInfo.InvariantCulture,
-            $"was slow: p95 {(double)p.P95MS / 1000:F1} s over {p.Calls} calls"
-        );
-        if (p.P95MS >= SlowProblemMs)
+        if (SlowProblem(p, trend) is { } slow)
         {
-            Judge(
-                "problem",
-                slow,
-                "lower its timeout or route the capability elsewhere; slow calls hold up get_context",
-                trend?.LastSlow,
-                trend?.CallsAfterSlow ?? 0,
-                d => d.Slow
-            );
-        }
-        else if (p.P95MS >= SlowWarnMs)
-        {
-            Judge(
-                "warn",
-                slow,
-                "check why the provider is slow (indexing, cold start)",
-                trend?.LastSlow,
-                trend?.CallsAfterSlow ?? 0,
-                d => d.Slow
-            );
+            result.Add(Judge(name, slow, trend));
         }
 
         if (p.Calls >= 10 && p.EmptyRate >= .80 && p.HitShare <= 0)
@@ -366,6 +306,96 @@ public static class ReportAnalyzer
                 )
             );
         }
+    }
+
+    /// <summary>A problem from half the calls failing, a warning from a tenth.</summary>
+    private static ProviderProblem? FailureProblem(ProviderMetrics p, ProviderTrend? trend)
+    {
+        var failure = string.Create(CultureInfo.InvariantCulture, $"failed {Percent(p.ErrorRate)} of {p.Calls} calls");
+        var (last, after) = (trend?.LastError, trend?.CallsAfterError ?? 0);
+        if (p.ErrorRate >= .50)
+        {
+            return new(
+                "problem",
+                failure,
+                "run harness doctor and check the provider's own log; route the capability elsewhere until fixed",
+                last,
+                after,
+                d => d.Errors
+            );
+        }
+
+        return p.ErrorRate >= .10
+            ? new("warn", failure, "run harness doctor and check the provider's errors", last, after, d => d.Errors)
+            : null;
+    }
+
+    /// <summary>A problem from a p95 latency of SlowProblemMs, a warning from SlowWarnMs.</summary>
+    private static ProviderProblem? SlowProblem(ProviderMetrics p, ProviderTrend? trend)
+    {
+        var slow = string.Create(
+            CultureInfo.InvariantCulture,
+            $"was slow: p95 {(double)p.P95MS / 1000:F1} s over {p.Calls} calls"
+        );
+        var (last, after) = (trend?.LastSlow, trend?.CallsAfterSlow ?? 0);
+        if (p.P95MS >= SlowProblemMs)
+        {
+            return new(
+                "problem",
+                slow,
+                "lower its timeout or route the capability elsewhere; slow calls hold up get_context",
+                last,
+                after,
+                d => d.Slow
+            );
+        }
+
+        return p.P95MS >= SlowWarnMs
+            ? new("warn", slow, "check why the provider is slow (indexing, cold start)", last, after, d => d.Slow)
+            : null;
+    }
+
+    /// <summary>
+    /// The finding with the trend's history; resolved after ResolvedCalls clean calls, otherwise noted
+    /// as too recent to tell or still happening.
+    /// </summary>
+    private static ReportFinding Judge(string name, ProviderProblem problem, ProviderTrend? trend)
+    {
+        var history = trend is null ? null : Histogram(trend.Days, problem.Bad);
+        if (history?.Length is 0)
+        {
+            history = null;
+        }
+
+        var message = name + " " + problem.What;
+        if (trend is null)
+        {
+            return new(problem.Level, "providers", message, problem.Action, history, trend);
+        }
+
+        var (last, after) = (problem.Last, problem.After);
+        if (after >= ResolvedCalls)
+        {
+            message += string.Create(
+                CultureInfo.InvariantCulture,
+                $", but not in the {after} calls since {Day(last)}: resolved"
+            );
+            return new("info", "providers", message, "nothing to do while it stays clean", history, trend);
+        }
+
+        if (after > 0)
+        {
+            message += string.Create(
+                CultureInfo.InvariantCulture,
+                $"; only {after} call(s) since the last one ({Day(last)}): too few to tell whether it stopped"
+            );
+        }
+        else if (!string.IsNullOrEmpty(last) && last == trend.LastCall)
+        {
+            message += "; still happening (last call " + Day(last) + ")";
+        }
+
+        return new(problem.Level, "providers", message, problem.Action, history, trend);
     }
 
     public static string Percent(double rate) => (rate * 100).ToString("F0", CultureInfo.InvariantCulture) + "%";
