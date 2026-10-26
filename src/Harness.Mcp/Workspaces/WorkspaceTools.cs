@@ -178,115 +178,181 @@ public sealed class WorkspaceTools(
         CancellationToken token
     ) =>
         UseAsync<object>(
-            async search =>
-            {
-                var reference = WorkspaceReferences.Parse(path, search.Members);
-                var only = reference?.Project ?? "";
-                path = reference?.Path.TrimEnd('/') ?? path;
-                if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(path))
-                {
-                    throw new ArgumentException(
-                        "path must be relative to the project root (<project>:<relative path>)"
-                    );
-                }
-
-                List<object> results = [],
-                    calls = [];
-                List<string> errors = [],
-                    notes = [];
-                var impact = kind is "impact" && only.Length is 0;
-                SymbolHome home = new();
-                var hits = new List<WorkspaceHit>();
-                if (impact)
-                {
-                    var answer = await search.ImpactAsync(query, limit, deep, token).ConfigureAwait(false);
-                    home = answer.Home;
-                    hits.AddRange(answer.Hits);
-                    errors.AddRange(answer.Errors);
-                    notes.AddRange(answer.Notes);
-                }
-                else
-                {
-                    foreach (var capability in capabilities)
-                    {
-                        var answer = await search
-                            .QueryAsync(new(capability, query, path, limit), deep, only, token)
-                            .ConfigureAwait(false);
-                        hits.AddRange(answer.Hits);
-                        AddUnique(errors, answer.Errors);
-                        AddUnique(notes, answer.Notes);
-                        if (debug)
-                        {
-                            calls.AddRange(
-                                answer.Calls.Select(call =>
-                                {
-                                    var row = new Dictionary<string, object?>
-                                    {
-                                        ["provider"] = call.Project + "/" + call.Result.Provider,
-                                        ["capability"] = call.Result.Capability,
-                                        ["items"] = call.Result.Items.Count,
-                                        ["latency_ms"] = (long)call.Result.Latency.TotalMilliseconds,
-                                        ["bytes"] = 0,
-                                    };
-                                    if (call.Result.Error is { } error)
-                                    {
-                                        row["error"] = error.Message;
-                                    }
-
-                                    return row;
-                                })
-                            );
-                        }
-                    }
-                }
-
-                var stale =
-                    freshness is not null
-                    && (await freshness.ReadProviderProjectAsync(token).ConfigureAwait(false)).CrossBranch;
-                var indexed = stale
-                    ? CapabilitiesOfCurrent(deep)
-                        .Where(info => info.Freshness is "indexed")
-                        .Select(info => info.Provider)
-                        .ToHashSet(StringComparer.Ordinal)
-                    : [];
-                foreach (
-                    var hit in hits.Where(hit =>
-                        hit.Member.Id != search.Current.Id || !indexed.Contains(hit.Item.Provider)
-                    )
-                )
-                {
-                    results.Add(Item(hit, debug, impact));
-                }
-
-                var head =
-                    (impact ? "workspace impact: " : "workspace: ")
-                    + string.Join(", ", search.Members.Select(member => member.Name))
-                    + (deep ? " (deep)" : "");
-                if (impact)
-                {
-                    head += "; " + Describe(home, query, search.Current.Name);
-                }
-
-                var output = new Dictionary<string, object?>
-                {
-                    ["query"] = query,
-                    ["results"] = results,
-                    ["note"] = string.Join("; ", new[] { head }.Concat(notes)),
-                };
-                if (errors.Count > 0)
-                {
-                    output["errors"] = errors;
-                }
-
-                if (calls.Count > 0)
-                {
-                    output["calls"] = calls;
-                }
-
-                return output;
-            },
+            search => SearchInAsync(search, new(query, kind, capabilities, path, limit, deep, debug), token),
             token
         );
+
+    private sealed record SearchRequest(
+        string Query,
+        string Kind,
+        IReadOnlyList<string> Capabilities,
+        string Path,
+        int Limit,
+        bool Deep,
+        bool Debug
+    );
+
+    /// <summary>The hits, notes, errors and debug calls of a workspace search.</summary>
+    private sealed class SearchAnswer
+    {
+        internal SymbolHome Home { get; set; } = new();
+        internal List<WorkspaceHit> Hits { get; } = [];
+        internal List<string> Errors { get; } = [];
+        internal List<string> Notes { get; } = [];
+        internal List<object> Calls { get; } = [];
+    }
+
+    private async Task<object> SearchInAsync(
+        IWorkspaceSearchSession search,
+        SearchRequest request,
+        CancellationToken token
+    )
+    {
+        var (only, path) = SearchScope(request.Path, search.Members);
+        var impact = request.Kind is "impact" && only.Length is 0;
+        var answer = impact
+            ? await ImpactAnswerAsync(search, request, token).ConfigureAwait(false)
+            : await QueryAnswerAsync(search, request with { Path = path }, only, token).ConfigureAwait(false);
+        var indexed = await StaleIndexedAsync(request.Deep, token).ConfigureAwait(false);
+        List<object> results = [];
+        foreach (
+            var hit in answer.Hits.Where(hit =>
+                hit.Member.Id != search.Current.Id || !indexed.Contains(hit.Item.Provider)
+            )
+        )
+        {
+            results.Add(Item(hit, request.Debug, impact));
+        }
+
+        return SearchOutput(request.Query, results, SearchHead(search, request, impact, answer.Home), answer);
+    }
+
+    /// <summary>The member a "project:path" names (empty for all) and the relative path to search.</summary>
+    private static (string Only, string Path) SearchScope(string path, IReadOnlyList<WorkspaceMember> members)
+    {
+        var reference = WorkspaceReferences.Parse(path, members);
+        var only = reference?.Project ?? "";
+        path = reference?.Path.TrimEnd('/') ?? path;
+        if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(path))
+        {
+            throw new ArgumentException("path must be relative to the project root (<project>:<relative path>)");
+        }
+
+        return (only, path);
+    }
+
+    private static string SearchHead(
+        IWorkspaceSearchSession search,
+        SearchRequest request,
+        bool impact,
+        SymbolHome home
+    )
+    {
+        var head =
+            (impact ? "workspace impact: " : "workspace: ")
+            + string.Join(", ", search.Members.Select(member => member.Name))
+            + (request.Deep ? " (deep)" : "");
+        return impact ? head + "; " + Describe(home, request.Query, search.Current.Name) : head;
+    }
+
+    private static async Task<SearchAnswer> ImpactAnswerAsync(
+        IWorkspaceSearchSession search,
+        SearchRequest request,
+        CancellationToken token
+    )
+    {
+        var impact = await search
+            .ImpactAsync(request.Query, request.Limit, request.Deep, token)
+            .ConfigureAwait(false);
+        var answer = new SearchAnswer { Home = impact.Home };
+        answer.Hits.AddRange(impact.Hits);
+        answer.Errors.AddRange(impact.Errors);
+        answer.Notes.AddRange(impact.Notes);
+        return answer;
+    }
+
+    /// <summary>Each capability's answer, its notes and errors once each, and with debug its provider calls.</summary>
+    private static async Task<SearchAnswer> QueryAnswerAsync(
+        IWorkspaceSearchSession search,
+        SearchRequest request,
+        string only,
+        CancellationToken token
+    )
+    {
+        var answer = new SearchAnswer();
+        foreach (var capability in request.Capabilities)
+        {
+            var found = await search
+                .QueryAsync(new(capability, request.Query, request.Path, request.Limit), request.Deep, only, token)
+                .ConfigureAwait(false);
+            answer.Hits.AddRange(found.Hits);
+            AddUnique(answer.Errors, found.Errors);
+            AddUnique(answer.Notes, found.Notes);
+            if (request.Debug)
+            {
+                answer.Calls.AddRange(found.Calls.Select(CallRow));
+            }
+        }
+        return answer;
+    }
+
+    private static Dictionary<string, object?> CallRow(WorkspaceCall call)
+    {
+        var row = new Dictionary<string, object?>
+        {
+            ["provider"] = call.Project + "/" + call.Result.Provider,
+            ["capability"] = call.Result.Capability,
+            ["items"] = call.Result.Items.Count,
+            ["latency_ms"] = (long)call.Result.Latency.TotalMilliseconds,
+            ["bytes"] = 0,
+        };
+        if (call.Result.Error is { } error)
+        {
+            row["error"] = error.Message;
+        }
+
+        return row;
+    }
+
+    /// <summary>When the indexes describe another branch, the current project's indexed providers.</summary>
+    private async Task<IReadOnlySet<string>> StaleIndexedAsync(bool deep, CancellationToken token)
+    {
+        var stale =
+            freshness is not null
+            && (await freshness.ReadProviderProjectAsync(token).ConfigureAwait(false)).CrossBranch;
+        return stale
+            ? CapabilitiesOfCurrent(deep)
+                .Where(info => info.Freshness is "indexed")
+                .Select(info => info.Provider)
+                .ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
+    }
+
+    private static Dictionary<string, object?> SearchOutput(
+        string query,
+        List<object> results,
+        string head,
+        SearchAnswer answer
+    )
+    {
+        var output = new Dictionary<string, object?>
+        {
+            ["query"] = query,
+            ["results"] = results,
+            ["note"] = string.Join("; ", new[] { head }.Concat(answer.Notes)),
+        };
+        if (answer.Errors.Count > 0)
+        {
+            output["errors"] = answer.Errors;
+        }
+
+        if (answer.Calls.Count > 0)
+        {
+            output["calls"] = answer.Calls;
+        }
+
+        return output;
+    }
 
     public Task<ContextWorkspace> ContextAsync(
         string task,
