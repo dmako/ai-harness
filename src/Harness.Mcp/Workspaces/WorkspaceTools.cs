@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Harness.Core.Memory;
 using Harness.Core.Providers;
 using Harness.Core.Retrieval;
 using Harness.Core.Workspaces;
@@ -296,154 +297,189 @@ public sealed class WorkspaceTools(
         CancellationToken token
     ) =>
         UseAsync(
-            async search =>
-            {
-                var names = symbols.Concat(phrases).ToArray();
-                List<(WorkspaceHit Hit, int Score)> hits = [];
-                HashSet<string> seen = new(StringComparer.Ordinal);
-                List<string> notes = [];
-                foreach (var query in names)
-                {
-                    var answer = await search
-                        .QueryAsync(new(Capabilities.SymbolSearch, query, Limit: 5), deep, "", token)
-                        .ConfigureAwait(false);
-                    foreach (var hit in answer.Hits)
-                    {
-                        if (
-                            hit.Member.Id == search.Current.Id
-                            || !seen.Add(hit.Member.Name + ":" + hit.Item.Path + "#" + hit.Item.Name)
-                        )
-                        {
-                            continue;
-                        }
-
-                        var name = WorkspaceReferences.LastSegment(hit.Item.Name ?? "");
-                        var score = 0;
-                        if (
-                            names.Any(want =>
-                                WorkspaceReferences.LastSegment(want).Length >= 4
-                                && name.Contains(
-                                    WorkspaceReferences.LastSegment(want),
-                                    StringComparison.OrdinalIgnoreCase
-                                )
-                            )
-                        )
-                        {
-                            score = 1;
-                        }
-
-                        if (
-                            names.Any(want =>
-                                string.Equals(
-                                    WorkspaceReferences.LastSegment(want),
-                                    name,
-                                    StringComparison.OrdinalIgnoreCase
-                                )
-                            )
-                        )
-                        {
-                            score = 2;
-                        }
-
-                        if (score > 0)
-                        {
-                            hits.Add((hit, score));
-                        }
-                    }
-                    AddUnique(notes, answer.Notes.Concat(answer.Errors));
-                }
-                List<object> output = [];
-                Dictionary<string, Dictionary<string, object?>> groups = new(StringComparer.Ordinal);
-                Dictionary<string, List<string>> paths = new(StringComparer.Ordinal);
-                Dictionary<string, WorkspaceMember> members = new(StringComparer.Ordinal);
-                var dropped = 0;
-                foreach (var (hit, _) in hits.OrderByDescending(hit => hit.Score))
-                {
-                    var opened = !groups.TryGetValue(hit.Member.Id, out var group);
-                    if (opened)
-                    {
-                        group = new() { ["project"] = hit.Member.Name, ["code"] = new List<object>() };
-                        output.Add(group);
-                        groups.Add(hit.Member.Id, group);
-                    }
-                    var code = (List<object>)group!["code"]!;
-                    var item = Item(hit, false, false);
-                    item.Remove("project");
-                    item.Remove("snippet");
-                    item.Remove("depth");
-                    code.Add(item);
-                    if (ContextJson.Size(output) > reserve)
-                    {
-                        code.RemoveAt(code.Count - 1);
-                        dropped++;
-                        if (opened)
-                        {
-                            output.RemoveAt(output.Count - 1);
-                            groups.Remove(hit.Member.Id);
-                        }
-                        continue;
-                    }
-                    members[hit.Member.Id] = hit.Member;
-                    if (!paths.TryGetValue(hit.Member.Id, out var files))
-                    {
-                        files = [];
-                        paths.Add(hit.Member.Id, files);
-                    }
-                    if (!files.Contains(hit.Item.Path ?? "", StringComparer.Ordinal))
-                    {
-                        files.Add(hit.Item.Path ?? "");
-                    }
-                }
-                foreach (var member in search.Members.Where(member => members.ContainsKey(member.Id)))
-                {
-                    var group = groups[member.Id];
-                    List<object> memories = [];
-                    foreach (
-                        var memory in await search
-                            .ContextMemoriesAsync(member, paths[member.Id], TaskParsing.ContentWords(task), token)
-                            .ConfigureAwait(false)
-                    )
-                    {
-                        var row = new Dictionary<string, object?>
-                        {
-                            ["id"] = memory.Id,
-                            ["type"] = memory.Type,
-                            ["content"] = memory.Content,
-                        };
-                        if (memory.Scope.Kind is "path" && memory.Scope.Value.Length > 0)
-                        {
-                            row["path"] = memory.Scope.Value;
-                        }
-
-                        memories.Add(row);
-                        group["memory"] = memories;
-                        if (ContextJson.Size(output) > reserve)
-                        {
-                            memories.RemoveAt(memories.Count - 1);
-                            if (memories.Count is 0)
-                            {
-                                group.Remove("memory");
-                            }
-
-                            dropped++;
-                        }
-                    }
-                }
-                output = search
-                    .Members.Where(member => groups.ContainsKey(member.Id))
-                    .Select(member => (object)groups[member.Id])
-                    .ToList();
-                if (dropped > 0)
-                {
-                    notes.Add(
-                        $"workspace: {dropped} more match(es) or decision(s) did not fit in its share of the budget"
-                    );
-                }
-
-                return new ContextWorkspace(output, notes);
-            },
+            search => ContextOfAsync(search, task, symbols.Concat(phrases).ToArray(), deep, reserve, token),
             token
         );
+
+    /// <summary>Other members' code named like the task's names, then their memories, while they fit.</summary>
+    private static async Task<ContextWorkspace> ContextOfAsync(
+        IWorkspaceSearchSession search,
+        string task,
+        string[] names,
+        bool deep,
+        int reserve,
+        CancellationToken token
+    )
+    {
+        List<string> notes = [];
+        var hits = await ContextHitsAsync(search, names, deep, notes, token).ConfigureAwait(false);
+        var budget = new ContextBudget(reserve);
+        foreach (var (hit, _) in hits.OrderByDescending(hit => hit.Score))
+        {
+            budget.AddCode(hit);
+        }
+        foreach (var member in search.Members.Where(member => budget.Members.ContainsKey(member.Id)))
+        {
+            budget.AddMemories(
+                member.Id,
+                await search
+                    .ContextMemoriesAsync(member, budget.Paths[member.Id], TaskParsing.ContentWords(task), token)
+                    .ConfigureAwait(false)
+            );
+        }
+        var output = search
+            .Members.Where(member => budget.Groups.ContainsKey(member.Id))
+            .Select(member => (object)budget.Groups[member.Id])
+            .ToList();
+        if (budget.Dropped > 0)
+        {
+            notes.Add(
+                $"workspace: {budget.Dropped} more match(es) or decision(s) did not fit in its share of the budget"
+            );
+        }
+
+        return new ContextWorkspace(output, notes);
+    }
+
+    /// <summary>Other members' symbols matching a name, each once, with the answers' notes and errors.</summary>
+    private static async Task<List<(WorkspaceHit Hit, int Score)>> ContextHitsAsync(
+        IWorkspaceSearchSession search,
+        string[] names,
+        bool deep,
+        List<string> notes,
+        CancellationToken token
+    )
+    {
+        List<(WorkspaceHit Hit, int Score)> hits = [];
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        foreach (var query in names)
+        {
+            var answer = await search
+                .QueryAsync(new(Capabilities.SymbolSearch, query, Limit: 5), deep, "", token)
+                .ConfigureAwait(false);
+            foreach (var hit in answer.Hits)
+            {
+                if (
+                    hit.Member.Id == search.Current.Id
+                    || !seen.Add(hit.Member.Name + ":" + hit.Item.Path + "#" + hit.Item.Name)
+                )
+                {
+                    continue;
+                }
+
+                var score = Score(names, hit);
+                if (score > 0)
+                {
+                    hits.Add((hit, score));
+                }
+            }
+            AddUnique(notes, answer.Notes.Concat(answer.Errors));
+        }
+        return hits;
+    }
+
+    /// <summary>2 when the hit's last name segment is a wanted one, 1 when it contains one of 4+ letters.</summary>
+    private static int Score(string[] names, WorkspaceHit hit)
+    {
+        var name = WorkspaceReferences.LastSegment(hit.Item.Name ?? "");
+        if (
+            names.Any(want =>
+                string.Equals(WorkspaceReferences.LastSegment(want), name, StringComparison.OrdinalIgnoreCase)
+            )
+        )
+        {
+            return 2;
+        }
+
+        return names.Any(want =>
+            WorkspaceReferences.LastSegment(want).Length >= 4
+            && name.Contains(WorkspaceReferences.LastSegment(want), StringComparison.OrdinalIgnoreCase)
+        )
+            ? 1
+            : 0;
+    }
+
+    /// <summary>The context's project groups, filled in order while their JSON fits in the reserve.</summary>
+    private sealed class ContextBudget(int reserve)
+    {
+        private readonly List<object> _output = [];
+        internal Dictionary<string, Dictionary<string, object?>> Groups { get; } = new(StringComparer.Ordinal);
+        internal Dictionary<string, List<string>> Paths { get; } = new(StringComparer.Ordinal);
+        internal Dictionary<string, WorkspaceMember> Members { get; } = new(StringComparer.Ordinal);
+        internal int Dropped { get; private set; }
+
+        /// <summary>Adds the hit to its member's group, opening the group, unless that overflows the reserve.</summary>
+        internal void AddCode(WorkspaceHit hit)
+        {
+            var opened = !Groups.TryGetValue(hit.Member.Id, out var group);
+            if (opened)
+            {
+                group = new() { ["project"] = hit.Member.Name, ["code"] = new List<object>() };
+                _output.Add(group);
+                Groups.Add(hit.Member.Id, group);
+            }
+            var code = (List<object>)group!["code"]!;
+            var item = Item(hit, false, false);
+            item.Remove("project");
+            item.Remove("snippet");
+            item.Remove("depth");
+            code.Add(item);
+            if (ContextJson.Size(_output) > reserve)
+            {
+                code.RemoveAt(code.Count - 1);
+                Dropped++;
+                if (opened)
+                {
+                    _output.RemoveAt(_output.Count - 1);
+                    Groups.Remove(hit.Member.Id);
+                }
+                return;
+            }
+            Members[hit.Member.Id] = hit.Member;
+            if (!Paths.TryGetValue(hit.Member.Id, out var files))
+            {
+                files = [];
+                Paths.Add(hit.Member.Id, files);
+            }
+            if (!files.Contains(hit.Item.Path ?? "", StringComparer.Ordinal))
+            {
+                files.Add(hit.Item.Path ?? "");
+            }
+        }
+
+        /// <summary>Adds the member's memories that still fit in the reserve.</summary>
+        internal void AddMemories(string member, IReadOnlyList<MemoryRecord> found)
+        {
+            var group = Groups[member];
+            List<object> memories = [];
+            foreach (var memory in found)
+            {
+                var row = new Dictionary<string, object?>
+                {
+                    ["id"] = memory.Id,
+                    ["type"] = memory.Type,
+                    ["content"] = memory.Content,
+                };
+                if (memory.Scope.Kind is "path" && memory.Scope.Value.Length > 0)
+                {
+                    row["path"] = memory.Scope.Value;
+                }
+
+                memories.Add(row);
+                group["memory"] = memories;
+                if (ContextJson.Size(_output) > reserve)
+                {
+                    memories.RemoveAt(memories.Count - 1);
+                    if (memories.Count is 0)
+                    {
+                        group.Remove("memory");
+                    }
+
+                    Dropped++;
+                }
+            }
+        }
+    }
 
     private IReadOnlyList<CapabilityInfo> CapabilitiesOfCurrent(bool deep) =>
         !deep && currentRegistry is IContextProviderRegistry context
