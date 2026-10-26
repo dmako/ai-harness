@@ -41,13 +41,7 @@ public sealed class FindingSets(
         CancellationToken token
     )
     {
-        var members = full ? _workspaces.Members(projectId) : [];
-        if (!members.Any(m => m.Id == projectId))
-        {
-            members = members.Append(Current).ToArray();
-        }
-
-        var reader = new ArchitectureReader(members);
+        var reader = new ArchitectureReader(ReadMembers(full));
         var own = database is null ? null : new MemoryStore(database);
         var rules = ArchitectureReader.RulesFor(own, _levels, projectId, token);
         var read = projectRead ?? await reader.ProjectAsync(Current, rules, full, token).ConfigureAwait(false);
@@ -55,56 +49,99 @@ public sealed class FindingSets(
         var stored = database is null ? [] : new FindingStore(database).Current(token).Findings;
         if (!full)
         {
-            var have = found.Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
-            var published = (read.Architecture?.Projects ?? [])
-                .Where(p => !string.IsNullOrEmpty(p.Package))
-                .Select(p => p.Path)
-                .ToHashSet(StringComparer.Ordinal);
-            found.AddRange(
-                stored.Where(f =>
-                    f.Source.Provider is not ("" or "harness")
-                    || f.Source.Tool is "internal/clones" or "internal/complexity" or ComplexityReader.Measured
-                    || f.Kind is "stale-knowledge"
-                    || f.Kind is "unused" && published.Contains(f.Project ?? "") && !have.Contains(f.Key)
-                )
-            );
+            found.AddRange(SyncOnly(read.Architecture?.Projects ?? [], found, stored));
         }
         else if (read.Architecture is not null)
         {
-            var repo = await reader.RepositoryAsync(Current, token).ConfigureAwait(false);
-            if (own is not null)
-            {
-                found.AddRange(
-                    KnowledgeDrift.Read(
-                        repo,
-                        own.Search(new() { Types = ["constraint", "decision", "convention"], Limit = 2000 }, token),
-                        token
-                    )
-                );
-            }
-
-            if (providers is not null)
-            {
-                await providers.DiscoverAsync(token).ConfigureAwait(false);
-            }
-
-            var cycles = await ArchitectureProviders.CyclesAsync(providers, token).ConfigureAwait(false);
-            var duplicates = await RepeatedCodeReader.ProviderDuplicatesAsync(providers, token).ConfigureAwait(false);
-            var fresh = cycles.Findings.Concat(duplicates.Findings).ToList();
-            fresh.AddRange(
-                stored.Where(f =>
-                    f.Source.Provider is not "harness"
-                    && !(f.Kind is "cycle" && cycles.Answered || f.Kind is "duplicate" && duplicates.Answered)
-                )
-            );
-            found.AddRange(await reader.RepeatedAsync(Current, fresh, token).ConfigureAwait(false));
-            var complexity = Complexity();
-            var exact = await ExactAsync(complexity, token).ConfigureAwait(false);
-            found.AddRange(
-                await reader.ComplexityAsync(Current, complexity.Thresholds(), exact, token).ConfigureAwait(false)
-            );
+            found.AddRange(await SyncedAsync(reader, own, stored, providers, token).ConfigureAwait(false));
         }
         return (FindingStore.Merge(found), read.Architecture is not null);
+    }
+
+    /// <summary>This project, with a full read also its workspaces' other members.</summary>
+    private IReadOnlyList<WorkspaceMember> ReadMembers(bool full)
+    {
+        var members = full ? _workspaces.Members(projectId) : [];
+        return members.Any(m => m.Id == projectId) ? members : members.Append(Current).ToArray();
+    }
+
+    /// <summary>
+    /// The stored findings a quick read cannot recompute: providers', clones', complexity, stale knowledge
+    /// and published packages' unused code.
+    /// </summary>
+    private static IEnumerable<ArchitectureFinding> SyncOnly(
+        IEnumerable<LayeredUnit> projects,
+        List<ArchitectureFinding> found,
+        IReadOnlyList<Finding> stored
+    )
+    {
+        var have = found.Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
+        var published = projects
+            .Where(p => !string.IsNullOrEmpty(p.Package))
+            .Select(p => p.Path)
+            .ToHashSet(StringComparer.Ordinal);
+        return stored.Where(f =>
+            f.Source.Provider is not ("" or "harness")
+            || f.Source.Tool is "internal/clones" or "internal/complexity" or ComplexityReader.Measured
+            || f.Kind is "stale-knowledge"
+            || f.Kind is "unused" && published.Contains(f.Project ?? "") && !have.Contains(f.Key)
+        );
+    }
+
+    /// <summary>What only a sync computes: knowledge drift, providers' cycles and duplicates, complexity.</summary>
+    private async Task<List<ArchitectureFinding>> SyncedAsync(
+        ArchitectureReader reader,
+        MemoryStore? own,
+        IReadOnlyList<Finding> stored,
+        IProviderRegistry? providers,
+        CancellationToken token
+    )
+    {
+        List<ArchitectureFinding> found = [];
+        var repo = await reader.RepositoryAsync(Current, token).ConfigureAwait(false);
+        if (own is not null)
+        {
+            found.AddRange(
+                KnowledgeDrift.Read(
+                    repo,
+                    own.Search(new() { Types = ["constraint", "decision", "convention"], Limit = 2000 }, token),
+                    token
+                )
+            );
+        }
+
+        if (providers is not null)
+        {
+            await providers.DiscoverAsync(token).ConfigureAwait(false);
+        }
+
+        var fresh = await ProviderFindingsAsync(stored, providers, token).ConfigureAwait(false);
+        found.AddRange(await reader.RepeatedAsync(Current, fresh, token).ConfigureAwait(false));
+        var complexity = Complexity();
+        var exact = await ExactAsync(complexity, token).ConfigureAwait(false);
+        found.AddRange(
+            await reader.ComplexityAsync(Current, complexity.Thresholds(), exact, token).ConfigureAwait(false)
+        );
+        return found;
+    }
+
+    /// <summary>Providers' cycles and duplicates; stored ones stay for a kind no provider answered.</summary>
+    private static async Task<List<ArchitectureFinding>> ProviderFindingsAsync(
+        IReadOnlyList<Finding> stored,
+        IProviderRegistry? providers,
+        CancellationToken token
+    )
+    {
+        var cycles = await ArchitectureProviders.CyclesAsync(providers, token).ConfigureAwait(false);
+        var duplicates = await RepeatedCodeReader.ProviderDuplicatesAsync(providers, token).ConfigureAwait(false);
+        var fresh = cycles.Findings.Concat(duplicates.Findings).ToList();
+        fresh.AddRange(
+            stored.Where(f =>
+                f.Source.Provider is not "harness"
+                && !(f.Kind is "cycle" && cycles.Answered || f.Kind is "duplicate" && duplicates.Answered)
+            )
+        );
+        return fresh;
     }
 
     private ComplexityConfiguration Complexity()
