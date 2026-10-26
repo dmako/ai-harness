@@ -21,6 +21,7 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         internal Dictionary<string, string> Locations { get; } = new(StringComparer.OrdinalIgnoreCase);
         internal List<(string File, XElement Root)> Order { get; } = [];
         internal HashSet<string> Globals { get; } = new(StringComparer.OrdinalIgnoreCase);
+        internal HashSet<string> Seen { get; } = new(StringComparer.Ordinal);
     }
 
     public EvaluatedProject Evaluate(string project)
@@ -110,7 +111,6 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             context.Globals.Add("TargetFramework");
             FrameworkProperties(framework, context.Properties);
         }
-        HashSet<string> seen = new(StringComparer.Ordinal);
         foreach (
             var file in new[]
             {
@@ -123,81 +123,96 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         {
             if (file.Length > 0)
             {
-                Walk(file, 0);
+                Walk(context, file, 0);
             }
         }
 
         return context;
+    }
 
-        void Walk(string file, int depth)
+    /// <summary>Reads a file's properties and follows its imports, at most 8 deep and each file once.</summary>
+    private void Walk(Context context, string file, int depth)
+    {
+        if (depth > 8 || !context.Seen.Add(file) || Parse(file) is not { } xml)
         {
-            if (depth > 8 || !seen.Add(file) || Parse(file) is not { } xml)
+            return;
+        }
+
+        context.Order.Add((file, xml));
+        var dir = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
+        foreach (var element in xml.Elements())
+        {
+            switch (element.Name.LocalName)
             {
-                return;
+                case "PropertyGroup":
+                    PropertyGroup(context, element, file, dir);
+                    break;
+                case "Import":
+                    Import(context, element, dir, depth, checkCondition: true);
+                    break;
+                case "ImportGroup":
+                    ImportGroup(context, element, dir, depth);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the group's properties, except global ones and, under an unknown condition, ones already set.
+    /// </summary>
+    private void PropertyGroup(Context context, XElement group, string file, string dir)
+    {
+        if (!Condition(context, Attr(group, "Condition"), dir).Value)
+        {
+            return;
+        }
+
+        foreach (var property in group.Elements())
+        {
+            var (value, known) = Condition(context, Attr(property, "Condition"), dir);
+            var name = property.Name.LocalName;
+            if (
+                !value && known
+                || context.Globals.Contains(name)
+                || !known && context.Properties.GetValueOrDefault(name, "").Length > 0
+            )
+            {
+                continue;
             }
 
-            context.Order.Add((file, xml));
-            var dir = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
-            foreach (var element in xml.Elements())
-            {
-                switch (element.Name.LocalName)
-                {
-                    case "PropertyGroup":
-                        if (!Condition(context, Attr(element, "Condition"), dir).Value)
-                        {
-                            break;
-                        }
+            context.Properties[name] = Expand(context, property.Value.Trim(), dir);
+            context.Locations[name] =
+                file + ":" + ((IXmlLineInfo)property).LineNumber.ToString(CultureInfo.InvariantCulture);
+        }
+    }
 
-                        foreach (var property in element.Elements())
-                        {
-                            var (value, known) = Condition(context, Attr(property, "Condition"), dir);
-                            var name = property.Name.LocalName;
-                            if (
-                                !value && known
-                                || context.Globals.Contains(name)
-                                || !known && context.Properties.GetValueOrDefault(name, "").Length > 0
-                            )
-                            {
-                                continue;
-                            }
+    /// <summary>The group's imports, whose own conditions are not checked.</summary>
+    private void ImportGroup(Context context, XElement group, string dir, int depth)
+    {
+        var condition = Condition(context, Attr(group, "Condition"), dir);
+        if (!condition.Value && condition.Known)
+        {
+            return;
+        }
 
-                            context.Properties[name] = Expand(context, property.Value.Trim(), dir);
-                            context.Locations[name] =
-                                file + ":" + ((IXmlLineInfo)property).LineNumber.ToString(CultureInfo.InvariantCulture);
-                        }
-                        break;
-                    case "Import":
-                        Import(element);
-                        break;
-                    case "ImportGroup":
-                        var condition = Condition(context, Attr(element, "Condition"), dir);
-                        if (!condition.Value && condition.Known)
-                        {
-                            break;
-                        }
+        foreach (var import in group.Elements().Where(e => e.Name.LocalName is "Import"))
+        {
+            Import(context, import, dir, depth, checkCondition: false);
+        }
+    }
 
-                        foreach (var import in element.Elements().Where(e => e.Name.LocalName is "Import"))
-                        {
-                            Import(import, checkCondition: false);
-                        }
+    private void Import(Context context, XElement element, string dir, int depth, bool checkCondition)
+    {
+        var condition = Condition(context, Attr(element, "Condition"), dir);
+        if (checkCondition && !condition.Value && condition.Known)
+        {
+            return;
+        }
 
-                        break;
-                }
-            }
-            void Import(XElement element, bool checkCondition = true)
-            {
-                var condition = Condition(context, Attr(element, "Condition"), dir);
-                if (checkCondition && !condition.Value && condition.Known)
-                {
-                    return;
-                }
-
-                var path = ImportPath(context, Attr(element, "Project"), dir);
-                if (path.Length > 0)
-                {
-                    Walk(path, depth + 1);
-                }
-            }
+        var path = ImportPath(context, Attr(element, "Project"), dir);
+        if (path.Length > 0)
+        {
+            Walk(context, path, depth + 1);
         }
     }
 
