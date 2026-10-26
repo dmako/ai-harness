@@ -48,134 +48,177 @@ public static class TomlConfigurationEditor
         return string.Join('.', new[] { Part(key.Key) }.Concat(key.DotKeys.Select(part => Part(part.Key))));
     }
 
+    /// <summary>A [mcp_servers.harness] table or one of its subtables, with its position among all tables.</summary>
+    private readonly record struct OwnedTable(TableSyntaxBase Table, int Index, string Key);
+
     public static TextEdit Edit(string source, ServerSpec? spec)
     {
         var before = Json(Parse(source));
         var entry = before["mcp_servers"]?["harness"] as JsonObject;
-        if (
-            spec is not null
-            && entry?["command"]?.GetValue<string>() == spec.Command
-            && JsonNode.DeepEquals(entry["args"], HarnessJson.SerializeToNode(spec.Args))
-        )
+        if (spec is not null && Current(entry, spec))
         {
             return new(source, "unchanged");
         }
 
-        var document = SyntaxParser.Parse(source);
-        var tables = document.Tables.ToArray();
-        var owned = tables
-            .Select((table, index) => (Table: table, Index: index, Name: Name(table.Name)))
+        var tables = SyntaxParser.Parse(source).Tables.ToArray();
+        var owned = OwnedTables(tables);
+        if (spec is null && owned.Length is 0)
+        {
+            return entry is null ? new(source, "absent") : throw new InvalidDataException(LayoutError);
+        }
+
+        var edit = spec is null
+            ? new TextEdit(Remove(source, tables, owned), "remove")
+            : Set(source, spec, owned, entry is not null);
+        Verify(before, Json(Parse(edit.Text)), spec);
+        return edit;
+    }
+
+    private static OwnedTable[] OwnedTables(TableSyntaxBase[] tables) =>
+        tables
+            .Select((table, index) => new OwnedTable(table, index, Name(table.Name)))
             .Where(t =>
-                t.Name is "mcp_servers.harness" || t.Name.StartsWith("mcp_servers.harness.", StringComparison.Ordinal)
+                t.Key is "mcp_servers.harness" || t.Key.StartsWith("mcp_servers.harness.", StringComparison.Ordinal)
             )
             .ToArray();
-        var main = owned.FirstOrDefault(t => t.Name is "mcp_servers.harness").Table;
-        string output;
-        string action;
-        if (spec is null)
+
+    /// <summary>
+    /// Updates the [mcp_servers.harness] table, or adds one when there is no entry in any other layout
+    /// (subtables only, inline table or dotted keys).
+    /// </summary>
+    private static TextEdit Set(string source, ServerSpec spec, OwnedTable[] owned, bool entry)
+    {
+        var main = owned.FirstOrDefault(t => t.Key is "mcp_servers.harness").Table;
+        if (main is not null)
         {
-            if (owned.Length is 0)
-            {
-                return entry is null ? new(source, "absent") : throw new InvalidDataException(LayoutError);
-            }
-
-            output = source;
-            foreach (var item in owned.Reverse())
-            {
-                var start = LineStart(source, item.Table.OpenBracket!.Span.Offset);
-                var end =
-                    item.Index + 1 < tables.Length
-                        ? LineStart(source, tables[item.Index + 1].OpenBracket!.Span.Offset)
-                        : source.Length;
-                var previous = start > 0 ? LineStart(source, start - 1) : 0;
-                if (source[previous..start].Trim() == Marker)
-                {
-                    start = previous;
-                }
-
-                if (end < source.Length)
-                {
-                    while (
-                        end > item.Table.CloseBracket!.Span.Offset
-                        && source[LineStart(source, end - 1)..end].Trim().Length is 0
-                    )
-                    {
-                        end = LineStart(source, end - 1);
-                    }
-                }
-
-                output = output[..start] + output[end..];
-            }
-            if (source.EndsWith('\n'))
-            {
-                output = string.IsNullOrWhiteSpace(output) ? "" : output.TrimEnd('\n') + "\n";
-            }
-
-            action = "remove";
+            return new(Update(source, main, spec), "update");
         }
-        else if (main is null)
+
+        return owned.Length > 0 || entry
+            ? throw new InvalidDataException(LayoutError)
+            : new(Add(source, spec), "add");
+    }
+
+    private static bool Current(JsonObject? entry, ServerSpec spec) =>
+        entry?["command"]?.GetValue<string>() == spec.Command
+        && JsonNode.DeepEquals(entry["args"], HarnessJson.SerializeToNode(spec.Args));
+
+    /// <summary>Cuts each owned table, its marker line and its trailing blank lines; keeps one final newline.</summary>
+    private static string Remove(string source, TableSyntaxBase[] tables, OwnedTable[] owned)
+    {
+        var output = source;
+        foreach (var item in owned.Reverse())
         {
-            if (owned.Length > 0 || entry is not null)
-            {
-                throw new InvalidDataException(LayoutError);
-            }
-
-            output = source;
-            if (output.Length > 0 && !output.EndsWith('\n'))
-            {
-                output += "\n";
-            }
-
-            if (!string.IsNullOrWhiteSpace(output) && !output.EndsWith("\n\n", StringComparison.Ordinal))
-            {
-                output += "\n";
-            }
-
-            output +=
-                Marker
-                + "\n[mcp_servers.harness]\ncommand = "
-                + Quote(spec.Command)
-                + "\nargs = "
-                + Args(spec.Args)
-                + "\n";
-            action = "add";
+            var (start, end) = RemovedRange(source, tables, item);
+            output = output[..start] + output[end..];
         }
-        else
+        if (source.EndsWith('\n'))
         {
-            List<(int Start, int Length, string Text)> edits = [];
-            List<string> missing = [];
-            foreach (var (key, value) in new[] { ("command", Quote(spec.Command)), ("args", Args(spec.Args)) })
-            {
-                var item = main.Items.FirstOrDefault(i => Name(i.Key) == key);
-                if (item is null)
-                {
-                    missing.Add(key + " = " + value);
-                }
-                else
-                {
-                    edits.Add((item.Value!.Span.Offset, item.Value.Span.Length, value));
-                }
-            }
-            if (missing.Count > 0)
-            {
-                var end = source.IndexOf('\n', main.CloseBracket!.Span.Offset);
-                var newline = MarkedBlock.Newline(source);
-                edits.Add(
-                    end < 0
-                        ? (source.Length, 0, newline + string.Join(newline, missing) + newline)
-                        : (end + 1, 0, string.Join(newline, missing) + newline)
-                );
-            }
-            output = source;
-            foreach (var edit in edits.OrderByDescending(e => e.Start))
-            {
-                output = output[..edit.Start] + edit.Text + output[(edit.Start + edit.Length)..];
-            }
-
-            action = "update";
+            output = string.IsNullOrWhiteSpace(output) ? "" : output.TrimEnd('\n') + "\n";
         }
-        Verify(before, Json(Parse(output)), spec);
-        return new(output, action);
+
+        return output;
+    }
+
+    /// <summary>
+    /// From the table's line (or the marker line above it) to the next table, without the blank lines
+    /// before that table.
+    /// </summary>
+    private static (int Start, int End) RemovedRange(string source, TableSyntaxBase[] tables, OwnedTable item)
+    {
+        var start = LineStart(source, item.Table.OpenBracket!.Span.Offset);
+        var end =
+            item.Index + 1 < tables.Length
+                ? LineStart(source, tables[item.Index + 1].OpenBracket!.Span.Offset)
+                : source.Length;
+        var previous = start > 0 ? LineStart(source, start - 1) : 0;
+        if (source[previous..start].Trim() == Marker)
+        {
+            start = previous;
+        }
+
+        if (end >= source.Length)
+        {
+            return (start, end);
+        }
+
+        while (
+            end > item.Table.CloseBracket!.Span.Offset && source[LineStart(source, end - 1)..end].Trim().Length is 0
+        )
+        {
+            end = LineStart(source, end - 1);
+        }
+        return (start, end);
+    }
+
+    /// <summary>Appends the marked harness table after a blank line.</summary>
+    private static string Add(string source, ServerSpec spec)
+    {
+        var output = source;
+        if (output.Length > 0 && !output.EndsWith('\n'))
+        {
+            output += "\n";
+        }
+
+        if (!string.IsNullOrWhiteSpace(output) && !output.EndsWith("\n\n", StringComparison.Ordinal))
+        {
+            output += "\n";
+        }
+
+        return output
+            + Marker
+            + "\n[mcp_servers.harness]\ncommand = "
+            + Quote(spec.Command)
+            + "\nargs = "
+            + Args(spec.Args)
+            + "\n";
+    }
+
+    /// <summary>
+    /// Replaces the command and args values in place; a missing key is added after the table's header
+    /// line.
+    /// </summary>
+    private static string Update(string source, TableSyntaxBase main, ServerSpec spec)
+    {
+        List<(int Start, int Length, string Text)> edits = [];
+        List<string> missing = [];
+        foreach (var (key, value) in new[] { ("command", Quote(spec.Command)), ("args", Args(spec.Args)) })
+        {
+            var item = main.Items.FirstOrDefault(i => Name(i.Key) == key);
+            if (item is null)
+            {
+                missing.Add(key + " = " + value);
+            }
+            else
+            {
+                edits.Add((item.Value!.Span.Offset, item.Value.Span.Length, value));
+            }
+        }
+        if (missing.Count > 0)
+        {
+            edits.Add(MissingKeys(source, main, missing));
+        }
+
+        var output = source;
+        foreach (var edit in edits.OrderByDescending(e => e.Start))
+        {
+            output = output[..edit.Start] + edit.Text + output[(edit.Start + edit.Length)..];
+        }
+
+        return output;
+    }
+
+    private static (int Start, int Length, string Text) MissingKeys(
+        string source,
+        TableSyntaxBase main,
+        List<string> missing
+    )
+    {
+        var end = source.IndexOf('\n', main.CloseBracket!.Span.Offset);
+        var newline = MarkedBlock.Newline(source);
+        return end < 0
+            ? (source.Length, 0, newline + string.Join(newline, missing) + newline)
+            : (end + 1, 0, string.Join(newline, missing) + newline);
     }
 
     private static int LineStart(string source, int offset) =>
