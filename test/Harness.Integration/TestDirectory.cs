@@ -8,7 +8,7 @@ internal static class TestDirectory
     [SuppressMessage(
         "Major Code Smell",
         "S2925:Thread.Sleep should not be used in tests",
-        Justification = "IDisposable cleanup briefly yields while Windows releases terminated child-process file handles."
+        Justification = "IDisposable cleanup briefly yields while exiting child processes release or stop writing files."
     )]
     public static void Delete(string directory)
     {
@@ -20,10 +20,14 @@ internal static class TestDirectory
                 Directory.Delete(directory, recursive: true);
                 return;
             }
-            catch (IOException)
-                when (OperatingSystem.IsWindows() && Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(5))
+            catch (DirectoryNotFoundException)
             {
-                // MCP transport shutdown can return before descendant working-directory handles are released.
+                return;
+            }
+            catch (IOException) when (Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(5))
+            {
+                // MCP transport shutdown can return before descendant working-directory handles are released (Windows),
+                // and a child process that is still exiting can add files mid-delete ("Directory not empty" elsewhere).
                 Thread.Sleep(50);
             }
         }
