@@ -108,226 +108,286 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
 
     internal sealed record Declaration(CloneFunction Function, int Parameters, int Body, int End);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "CodeSmell",
-        "S127:For loop stop conditions should be invariant",
-        Justification = "The token cursor deliberately skips matched parameter/body subtrees."
-    )]
     private static List<CloneFunction> CFunctions(string path, string language, List<CodeToken> tokens)
     {
-        List<Declaration> declarations = [];
-        void Add(int name, int parameters, int body)
-        {
-            var end = CloneLexer.Match(tokens, body);
-            if (end < 0)
-            {
-                return;
-            }
-
-            var overrides = false;
-            List<string> result = [];
-            for (
-                var index = name - 1;
-                index >= 0 && index >= name - 12 && !";{}],()=".Contains(tokens[index].Text, StringComparison.Ordinal);
-                index--
-            )
-            {
-                overrides |= tokens[index].Text is "override";
-                if (!CloneLexer.Modifiers.Contains(tokens[index].Text))
-                {
-                    result.Insert(0, tokens[index].Text);
-                }
-            }
-            var close = tokens[parameters].Text is "(" ? CloneLexer.Match(tokens, parameters) : parameters;
-            if (language is "ts" && close + 1 < body && tokens[close + 1].Text is ":")
-            {
-                result = tokens
-                    .Skip(close + 2)
-                    .Take(body - close - 2)
-                    .TakeWhile(token => token.Text is not "=>")
-                    .Select(token => token.Text)
-                    .ToList();
-            }
-
-            var signature = new List<string> { string.Concat(result), "|" };
-            signature.AddRange(
-                tokens[parameters].Text is "("
-                    ? ParameterTypes(tokens.GetRange(parameters + 1, close - parameters - 1), language)
-                    : ["?"]
-            );
-            declarations.Add(
-                new(
-                    new()
-                    {
-                        Path = path,
-                        Name = tokens[name].Text,
-                        Line = tokens[name].Line,
-                        End = tokens[end].Line,
-                        Language = language,
-                        Override = overrides,
-                        Signature = signature,
-                    },
-                    parameters,
-                    body,
-                    end
-                )
-            );
-        }
-        for (var index = 0; index + 1 < tokens.Count; index++)
-        {
-            var token = tokens[index];
-            if (
-                token.Kind is 'i'
-                && tokens[index + 1].Text is "("
-                && !CloneLexer.Control.Contains(token.Text)
-                && !CloneLexer.Keywords.Contains(token.Text)
-            )
-            {
-                if (
-                    index > 0
-                    && (
-                        tokens[index - 1].Text is "." or "?." or "new"
-                        || CloneLexer.Declares.Contains(tokens[index - 1].Text)
-                    )
-                )
-                {
-                    continue;
-                }
-
-                var declaration = index is 0 || language is "ts" || CloneLexer.TypeLike(tokens[index - 1]);
-                var close = CloneLexer.Match(tokens, index + 1);
-                if (!declaration || close < 0)
-                {
-                    continue;
-                }
-
-                for (var cursor = close + 1; cursor < tokens.Count && cursor < close + 60; cursor++)
-                {
-                    var current = tokens[cursor];
-                    if (current.Kind is 'p' && current.Text is ";" or "=>" or "=" or "}" or ",")
-                    {
-                        break;
-                    }
-
-                    if (
-                        current.Kind is 'p'
-                        && current.Text is "("
-                        && CloneLexer.Match(tokens, cursor) is var end
-                        && end > 0
-                    )
-                    {
-                        cursor = end;
-                        continue;
-                    }
-                    if (current.Kind is 'p' && current.Text is "{")
-                    {
-                        if (language is "cs" || cursor == close + 1 || tokens[close + 1].Text is ":")
-                        {
-                            Add(index, index + 1, cursor);
-                        }
-
-                        break;
-                    }
-                    if (language is "ts" && cursor == close + 1 && current.Text is not ":")
-                    {
-                        break;
-                    }
-                }
-                continue;
-            }
-            if (token.Text is not "=>" || tokens[index + 1].Text is not "{" || language is not "ts")
-            {
-                continue;
-            }
-
-            var before = index - 1;
-            var parameters = -1;
-            if (before >= 0 && tokens[before].Text is ")")
-            {
-                var depth = 0;
-                for (; before >= 0; before--)
-                {
-                    if (tokens[before].Text is ")")
-                    {
-                        depth++;
-                    }
-                    else if (tokens[before].Text is "(" && --depth is 0)
-                    {
-                        break;
-                    }
-                }
-                parameters = before--;
-            }
-            else if (before >= 0 && tokens[before].Kind is 'i')
-            {
-                parameters = before--;
-            }
-
-            if (before >= 0 && tokens[before].Text is "async")
-            {
-                before--;
-            }
-
-            if (before >= 1 && tokens[before].Text is "=" or ":" && tokens[before - 1].Kind is 'i' && parameters >= 0)
-            {
-                Add(before - 1, parameters, index + 1);
-            }
-        }
+        var declarations = CDeclarations(path, language, tokens);
         var locals = declarations
             .Select(declaration =>
                 Forms(tokens, declaration.Parameters, declaration.Body, declaration.End, null, language is "ts").Locals
             )
             .ToArray();
-        List<CloneFunction> output = [];
-        foreach (var declaration in declarations)
+        return declarations
+            .Select(declaration => CFunction(tokens, language, declaration, CapturedNames(declarations, locals, declaration)))
+            .ToList();
+    }
+
+    /// <summary>Named members and methods with a body, and (TypeScript) arrow functions bound to a name.</summary>
+    private static List<Declaration> CDeclarations(string path, string language, List<CodeToken> tokens)
+    {
+        List<Declaration> declarations = [];
+        for (var index = 0; index + 1 < tokens.Count; index++)
         {
-            Dictionary<string, string> captured = new(StringComparer.Ordinal);
-            foreach (
-                var outer in declarations
-                    .Select((value, index) => (value, index))
-                    .Where(pair =>
-                        pair.value != declaration
-                        && pair.value.Body < declaration.Body
-                        && declaration.End <= pair.value.End
-                    )
-                    .OrderBy(pair => pair.value.Body)
-            )
+            if (DeclarationAt(path, language, tokens, index) is { } declaration)
             {
-                foreach (var local in locals[outer.index])
-                {
-                    captured[local] =
-                        outer.value.Function.Name
-                        + "@"
-                        + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture)
-                        + ".";
-                }
+                declarations.Add(declaration);
+            }
+        }
+        return declarations;
+    }
+
+    private static Declaration? DeclarationAt(string path, string language, List<CodeToken> tokens, int index)
+    {
+        if (NamedCall(tokens, index))
+        {
+            return MemberDeclaration(path, language, tokens, index);
+        }
+
+        return language is "ts" && tokens[index].Text is "=>" && tokens[index + 1].Text is "{"
+            ? ArrowDeclaration(path, language, tokens, index)
+            : null;
+    }
+
+    /// <summary>An identifier, not a keyword, directly followed by '('.</summary>
+    private static bool NamedCall(List<CodeToken> tokens, int index) =>
+        tokens[index].Kind is 'i'
+        && tokens[index + 1].Text is "("
+        && !CloneLexer.Control.Contains(tokens[index].Text)
+        && !CloneLexer.Keywords.Contains(tokens[index].Text);
+
+    /// <summary>The member named at <paramref name="name"/>, unless it is a call, a constructor call or a type.</summary>
+    private static Declaration? MemberDeclaration(string path, string language, List<CodeToken> tokens, int name)
+    {
+        if (
+            name > 0
+            && (tokens[name - 1].Text is "." or "?." or "new" || CloneLexer.Declares.Contains(tokens[name - 1].Text))
+        )
+        {
+            return null;
+        }
+
+        if (name > 0 && language is not "ts" && !CloneLexer.TypeLike(tokens[name - 1]))
+        {
+            return null;
+        }
+
+        var close = CloneLexer.Match(tokens, name + 1);
+        return close >= 0 && MemberBody(language, tokens, close) is { } body
+            ? Declare(path, language, tokens, name, name + 1, body)
+            : null;
+    }
+
+    /// <summary>
+    /// The '{' opening the body after the parameter list closed at <paramref name="close"/>, within 60
+    /// tokens and before any ';', '=>', '=', '}' or ','.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "CodeSmell",
+        "S127:For loop stop conditions should be invariant",
+        Justification = "The token cursor deliberately skips matched parenthesized subtrees."
+    )]
+    private static int? MemberBody(string language, List<CodeToken> tokens, int close)
+    {
+        for (var cursor = close + 1; cursor < tokens.Count && cursor < close + 60; cursor++)
+        {
+            var current = tokens[cursor];
+            if (current.Kind is 'p' && current.Text is ";" or "=>" or "=" or "}" or ",")
+            {
+                return null;
             }
 
-            var forms = Forms(
-                tokens,
-                declaration.Parameters,
-                declaration.Body,
-                declaration.End,
-                captured,
-                language is "ts"
-            );
-            output.Add(
-                declaration.Function with
-                {
-                    Canonical = forms.Canonical,
-                    Shape = forms.Shape,
-                    Statements = forms.Statements,
-                    Data = tokens
-                        .Skip(declaration.Body)
-                        .Take(declaration.End - declaration.Body)
-                        .Any(token =>
-                            token.Kind is 'n' && token.Text is not "0" and not "1"
-                            || token.Kind is 's' && token.Text.EnumerateRunes().Count() > 3
-                        ),
-                }
-            );
+            if (current.Kind is 'p' && current.Text is "(" && CloneLexer.Match(tokens, cursor) is var end && end > 0)
+            {
+                cursor = end;
+                continue;
+            }
+
+            if (current.Kind is 'p' && current.Text is "{")
+            {
+                return language is "cs" || cursor == close + 1 || tokens[close + 1].Text is ":" ? cursor : null;
+            }
+
+            if (language is "ts" && cursor == close + 1 && current.Text is not ":")
+            {
+                return null;
+            }
         }
-        return output;
+        return null;
+    }
+
+    /// <summary>An arrow function with a block body assigned to, or a property named, an identifier.</summary>
+    private static Declaration? ArrowDeclaration(string path, string language, List<CodeToken> tokens, int arrow)
+    {
+        var before = arrow - 1;
+        var parameters = -1;
+        if (before >= 0 && tokens[before].Text is ")")
+        {
+            parameters = OpeningParenthesis(tokens, before);
+            before = parameters - 1;
+        }
+        else if (before >= 0 && tokens[before].Kind is 'i')
+        {
+            parameters = before--;
+        }
+
+        if (before >= 0 && tokens[before].Text is "async")
+        {
+            before--;
+        }
+
+        return before >= 1 && tokens[before].Text is "=" or ":" && tokens[before - 1].Kind is 'i' && parameters >= 0
+            ? Declare(path, language, tokens, before - 1, parameters, arrow + 1)
+            : null;
+    }
+
+    /// <summary>The '(' matching the ')' at <paramref name="close"/>, scanning backwards; -1 if none.</summary>
+    private static int OpeningParenthesis(List<CodeToken> tokens, int close)
+    {
+        var depth = 0;
+        for (var index = close; index >= 0; index--)
+        {
+            if (tokens[index].Text is ")")
+            {
+                depth++;
+            }
+            else if (tokens[index].Text is "(" && --depth is 0)
+            {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static Declaration? Declare(
+        string path,
+        string language,
+        List<CodeToken> tokens,
+        int name,
+        int parameters,
+        int body
+    )
+    {
+        var end = CloneLexer.Match(tokens, body);
+        if (end < 0)
+        {
+            return null;
+        }
+
+        var (result, overrides) = ReturnPrefix(tokens, name);
+        var close = tokens[parameters].Text is "(" ? CloneLexer.Match(tokens, parameters) : parameters;
+        if (language is "ts" && close + 1 < body && tokens[close + 1].Text is ":")
+        {
+            result = tokens
+                .Skip(close + 2)
+                .Take(body - close - 2)
+                .TakeWhile(token => token.Text is not "=>")
+                .Select(token => token.Text)
+                .ToList();
+        }
+
+        var signature = new List<string> { string.Concat(result), "|" };
+        signature.AddRange(
+            tokens[parameters].Text is "("
+                ? ParameterTypes(tokens.GetRange(parameters + 1, close - parameters - 1), language)
+                : ["?"]
+        );
+        return new(
+            new()
+            {
+                Path = path,
+                Name = tokens[name].Text,
+                Line = tokens[name].Line,
+                End = tokens[end].Line,
+                Language = language,
+                Override = overrides,
+                Signature = signature,
+            },
+            parameters,
+            body,
+            end
+        );
+    }
+
+    /// <summary>
+    /// The tokens before the name (up to 12, back to a delimiter) without modifiers, and whether one was
+    /// <c>override</c>.
+    /// </summary>
+    private static (List<string> Result, bool Overrides) ReturnPrefix(List<CodeToken> tokens, int name)
+    {
+        var overrides = false;
+        List<string> result = [];
+        for (
+            var index = name - 1;
+            index >= 0 && index >= name - 12 && !";{}],()=".Contains(tokens[index].Text, StringComparison.Ordinal);
+            index--
+        )
+        {
+            overrides |= tokens[index].Text is "override";
+            if (!CloneLexer.Modifiers.Contains(tokens[index].Text))
+            {
+                result.Insert(0, tokens[index].Text);
+            }
+        }
+        return (result, overrides);
+    }
+
+    /// <summary>
+    /// The locals of every declaration enclosing <paramref name="declaration"/>, each mapped to its
+    /// owner's name@line prefix; inner owners win.
+    /// </summary>
+    private static Dictionary<string, string> CapturedNames(
+        List<Declaration> declarations,
+        HashSet<string>[] locals,
+        Declaration declaration
+    )
+    {
+        Dictionary<string, string> captured = new(StringComparer.Ordinal);
+        foreach (
+            var outer in declarations
+                .Select((value, index) => (value, index))
+                .Where(pair =>
+                    pair.value != declaration && pair.value.Body < declaration.Body && declaration.End <= pair.value.End
+                )
+                .OrderBy(pair => pair.value.Body)
+        )
+        {
+            var owner =
+                outer.value.Function.Name + "@" + outer.value.Function.Line.ToString(CultureInfo.InvariantCulture) + ".";
+            foreach (var local in locals[outer.index])
+            {
+                captured[local] = owner;
+            }
+        }
+        return captured;
+    }
+
+    private static CloneFunction CFunction(
+        List<CodeToken> tokens,
+        string language,
+        Declaration declaration,
+        Dictionary<string, string> captured
+    )
+    {
+        var forms = Forms(
+            tokens,
+            declaration.Parameters,
+            declaration.Body,
+            declaration.End,
+            captured,
+            language is "ts"
+        );
+        return declaration.Function with
+        {
+            Canonical = forms.Canonical,
+            Shape = forms.Shape,
+            Statements = forms.Statements,
+            Data = tokens
+                .Skip(declaration.Body)
+                .Take(declaration.End - declaration.Body)
+                .Any(token =>
+                    token.Kind is 'n' && token.Text is not "0" and not "1"
+                    || token.Kind is 's' && token.Text.EnumerateRunes().Count() > 3
+                ),
+        };
     }
 
     private static string[] ParameterTypes(List<CodeToken> tokens, string language)
