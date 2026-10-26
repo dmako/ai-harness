@@ -185,64 +185,97 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             values["project"] = await ResolveProjectAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var output = new ProviderResult();
-        var items = new List<ProviderItem>();
-        var misses = new List<string>();
-        var answered = false;
-        var allMatched = true;
-        var emptyOnMiss =
-            request.Capability.StartsWith("code.", StringComparison.Ordinal)
-            || Core.Providers.Capabilities.IsArchitecture(request.Capability);
+        var emptyOnMiss = EmptyOnMiss(request.Capability);
+        var answers = new Answers();
         foreach (var call in plan.Calls)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var part = await ExecuteCallAsync(request, call, values, limit, cancellationToken).ConfigureAwait(false);
-            output = output with
+            if (answers.Add(part, call, plan.Calls.Count > 1, emptyOnMiss) is { } failed)
             {
-                Bytes = checked(output.Bytes + part.Result.Bytes),
-                TimedOut = output.TimedOut || part.Result.TimedOut,
-            };
-            if (part.Miss)
-            {
-                allMatched &= part.Matched;
+                return failed;
             }
 
-            if (part.Result.Error is { } error)
-            {
-                if (plan.Calls.Count > 1)
-                {
-                    misses.Add(call.Mapping.Tool + ": " + McpMapping.FirstLine(ErrorMessage(error)));
-                    continue;
-                }
-                return output with { Error = part.Miss && part.Matched && emptyOnMiss ? null : error };
-            }
-            answered = true;
-            items.AddRange(part.Result.Items);
-            output = output with
-            {
-                Truncated = output.Truncated || part.Result.Truncated,
-                TimedOut = output.TimedOut || part.Result.TimedOut,
-                Text =
-                    output.Text
-                    + (output.Text.Length > 0 && part.Result.Text.Length > 0 ? "\n\n" : "")
-                    + part.Result.Text,
-                Summary = output.Summary ?? part.Result.Summary,
-            };
-            if (plan.Combine is "first")
+            if (part.Result.Error is null && plan.Combine is "first")
             {
                 break;
             }
         }
-        if (!answered && !(emptyOnMiss && allMatched && misses.Count > 0))
+        var output = answers.Output;
+        if (answers.Unanswered(emptyOnMiss))
         {
-            output = output with { Error = Failure("", "no answer: " + string.Join("; ", misses)) };
+            output = output with { Error = Failure("", "no answer: " + string.Join("; ", answers.Misses)) };
         }
 
         return output with
         {
-            Items = items.Take(limit).ToArray(),
-            Truncated = output.Truncated || items.Count > limit,
+            Items = answers.Items.Take(limit).ToArray(),
+            Truncated = output.Truncated || answers.Items.Count > limit,
         };
+    }
+
+    /// <summary>Code and architecture questions answer a miss with no items instead of an error.</summary>
+    private static bool EmptyOnMiss(string capability) =>
+        capability.StartsWith("code.", StringComparison.Ordinal)
+        || Core.Providers.Capabilities.IsArchitecture(capability);
+
+    /// <summary>The plan's calls combined: their items, text and summary, and the misses of a chain.</summary>
+    private sealed class Answers
+    {
+        private bool _answered;
+        private bool _allMatched = true;
+        internal ProviderResult Output { get; private set; } = new();
+        internal List<ProviderItem> Items { get; } = [];
+        internal List<string> Misses { get; } = [];
+
+        /// <summary>
+        /// Adds a call's part; a failed call of a chain is a miss, while a single call's failure is the result
+        /// (without an error when it matched the miss pattern and an empty answer is fine).
+        /// </summary>
+        internal ProviderResult? Add(Part part, Call call, bool chain, bool emptyOnMiss)
+        {
+            Output = Output with
+            {
+                Bytes = checked(Output.Bytes + part.Result.Bytes),
+                TimedOut = Output.TimedOut || part.Result.TimedOut,
+            };
+            if (part.Miss)
+            {
+                _allMatched &= part.Matched;
+            }
+
+            if (part.Result.Error is not { } error)
+            {
+                Answer(part.Result);
+                return null;
+            }
+
+            if (chain)
+            {
+                Misses.Add(call.Mapping.Tool + ": " + McpMapping.FirstLine(ErrorMessage(error)));
+                return null;
+            }
+            return Output with { Error = part.Miss && part.Matched && emptyOnMiss ? null : error };
+        }
+
+        /// <summary>No call answered, unless every call missed by pattern and an empty answer is fine.</summary>
+        internal bool Unanswered(bool emptyOnMiss) => !_answered && !(emptyOnMiss && _allMatched && Misses.Count > 0);
+
+        private void Answer(ProviderResult result)
+        {
+            _answered = true;
+            Items.AddRange(result.Items);
+            Output = Output with
+            {
+                Truncated = Output.Truncated || result.Truncated,
+                TimedOut = Output.TimedOut || result.TimedOut,
+                Text = Output.Text + (Output.Text.Length > 0 && result.Text.Length > 0 ? "\n\n" : "") + result.Text,
+                Summary = Output.Summary ?? result.Summary,
+            };
+        }
+
+        private static string ErrorMessage(Exception error) =>
+            error is ProviderException provider ? provider.Detail : error.Message;
     }
 
     public async ValueTask DisposeAsync()
@@ -555,9 +588,6 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
                 RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
                 TimeSpan.FromSeconds(1)
             );
-
-    private static string ErrorMessage(Exception error) =>
-        error is ProviderException provider ? provider.Detail : error.Message;
 
     private static string QuoteMeta(string text) =>
         string.Concat(
