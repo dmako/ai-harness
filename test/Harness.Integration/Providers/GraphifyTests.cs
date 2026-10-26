@@ -453,6 +453,6 @@ internal sealed class GraphifyFixture : IDisposable
                 Path.TrimEndingDirectorySeparator(GraphifyDiscovery.Canonical(Path.GetTempPath()))
                     + Path.DirectorySeparatorChar
             );
-        Directory.Delete(DirectoryRoot, recursive: true);
+        TestDirectory.Delete(DirectoryRoot);
     }
 }

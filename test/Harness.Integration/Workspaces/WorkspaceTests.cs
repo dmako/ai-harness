@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -616,19 +617,36 @@ internal sealed class WorkspaceFixture : IDisposable
         return new(location, Lifecycle.Registry, new("test", "", "test", "test"), Lifecycle.GlobalConfigurationPath);
     }
 
-    public string[] Hashes() =>
-        Members
-            .Select(member =>
+    public string[] Hashes() => Members.Select(member => Hash(member.DatabasePath)).ToArray();
+
+    [SuppressMessage(
+        "Major Code Smell",
+        "S2925:Thread.Sleep should not be used in tests",
+        Justification = "Synchronous fixture reads briefly yield while a live server holds a SQLite lock."
+    )]
+    private static string Hash(string path)
+    {
+        var started = Stopwatch.GetTimestamp();
+        while (true)
+        {
+            try
             {
                 using var stream = new FileStream(
-                    member.DatabasePath,
+                    path,
                     FileMode.Open,
                     FileAccess.Read,
                     FileShare.ReadWrite | FileShare.Delete
                 );
                 return Convert.ToHexString(SHA256.HashData(stream));
-            })
-            .ToArray();
+            }
+            catch (IOException error)
+                when (error is not FileNotFoundException && Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(5))
+            {
+                // On macOS the shared flock .NET takes conflicts with SQLite's fcntl write locks (e.g. a close checkpoint).
+                Thread.Sleep(50);
+            }
+        }
+    }
 
     public void Dispose()
     {
