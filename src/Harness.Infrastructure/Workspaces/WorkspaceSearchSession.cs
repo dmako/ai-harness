@@ -70,12 +70,7 @@ public sealed partial class WorkspaceSearchSession(
         CancellationToken cancellationToken
     )
     {
-        var cap = deep ? deepCap : lightCap;
-        if (cap <= TimeSpan.Zero)
-        {
-            cap = TimeSpan.FromSeconds(deep ? 60 : 10);
-        }
-
+        var cap = Cap(deep);
         using var deadline = new CancellationTokenSource(cap);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         var token = linked.Token;
@@ -84,7 +79,9 @@ public sealed partial class WorkspaceSearchSession(
             .OrderByDescending(member => member.Id == Current.Id)
             .ThenBy(member => member.Name, WorkspaceNameComparer.Instance)
             .ToArray();
-        var tasks = members.Select(member => Task.Run(() => AskAsync(member), CancellationToken.None)).ToArray();
+        var tasks = members
+            .Select(member => Task.Run(() => AskMemberAsync(member, request, deep, token), CancellationToken.None))
+            .ToArray();
         var all = Task.WhenAll(tasks);
         Observe(all);
         try
@@ -95,157 +92,183 @@ public sealed partial class WorkspaceSearchSession(
         { /* Collect completed peers without waiting for an uncooperative member. */
         }
         cancellationToken.ThrowIfCancellationRequested();
-        List<WorkspaceHit> hits = [];
-        List<WorkspaceCall> calls = [];
-        List<string> notes = [],
-            errors = [];
+        var answers = new MemberAnswers(cap, deadline);
         for (var i = 0; i < members.Length; i++)
         {
-            if (!tasks[i].IsCompletedSuccessfully)
+            answers.Add(members[i], tasks[i]);
+        }
+        return answers.Answer();
+    }
+
+    /// <summary>The configured time limit for a light or deep query; 10 or 60 seconds when there is none.</summary>
+    private TimeSpan Cap(bool deep)
+    {
+        var cap = deep ? deepCap : lightCap;
+        if (cap > TimeSpan.Zero)
+        {
+            return cap;
+        }
+
+        return TimeSpan.FromSeconds(deep ? 60 : 10);
+    }
+
+    /// <summary>The members' answers sorted into hits, calls, notes (slow, warming, not indexed) and errors.</summary>
+    private sealed class MemberAnswers(TimeSpan cap, CancellationTokenSource deadline)
+    {
+        private readonly List<WorkspaceHit> _hits = [];
+        private readonly List<WorkspaceCall> _calls = [];
+        private readonly List<string> _notes = [];
+        private readonly List<string> _errors = [];
+
+        public void Add(WorkspaceMember member, Task<IReadOnlyList<(ProviderResult Result, string Evidence)>> task)
+        {
+            if (!task.IsCompletedSuccessfully)
             {
-                notes.Add(members[i].Name + " did not answer within " + Duration(cap));
-                continue;
+                _notes.Add(member.Name + " did not answer within " + Duration(cap));
+                return;
             }
-            foreach (var (result, evidence) in tasks[i].Result)
+            foreach (var (result, evidence) in task.Result)
             {
-                calls.Add(new(members[i].Name, result));
+                _calls.Add(new(member.Name, result));
                 if (result.Error is { } error)
                 {
-                    var message = members[i].Name + ": " + CredentialRedactor.Redact(error.Message.Split('\n')[0]);
-                    if (
-                        result.TimedOut
-                        || error is OperationCanceledException
-                        || deadline.IsCancellationRequested
-                            && error is ProviderException { Detail: "operation cancelled" }
-                    )
-                    {
-                        notes.Add(
-                            members[i].Name + " did not answer within " + Duration(cap) + " (" + result.Provider + ")"
-                        );
-                    }
-                    else if (Warming(error))
-                    {
-                        notes.Add(message + " (still warming up; ask again shortly)");
-                    }
-                    else if (error is ProviderNotIndexedException)
-                    {
-                        notes.Add(message);
-                    }
-                    else
-                    {
-                        errors.Add(message);
-                    }
+                    AddError(member, result, error);
                 }
-                hits.AddRange(result.Items.Select(item => new WorkspaceHit(members[i], item, evidence)));
+                _hits.AddRange(result.Items.Select(item => new WorkspaceHit(member, item, evidence)));
             }
         }
-        return new(hits, calls, notes, errors);
 
-        async Task<IReadOnlyList<(ProviderResult Result, string Evidence)>> AskAsync(WorkspaceMember member)
+        public WorkspaceAnswer Answer() => new(_hits, _calls, _notes, _errors);
+
+        /// <summary>A timeout, warming provider or missing index is a note; any other failure an error.</summary>
+        private void AddError(WorkspaceMember member, ProviderResult result, Exception error)
+        {
+            var message = member.Name + ": " + CredentialRedactor.Redact(error.Message.Split('\n')[0]);
+            if (
+                result.TimedOut
+                || error is OperationCanceledException
+                || deadline.IsCancellationRequested && error is ProviderException { Detail: "operation cancelled" }
+            )
+            {
+                _notes.Add(member.Name + " did not answer within " + Duration(cap) + " (" + result.Provider + ")");
+            }
+            else if (Warming(error))
+            {
+                _notes.Add(message + " (still warming up; ask again shortly)");
+            }
+            else if (error is ProviderNotIndexedException)
+            {
+                _notes.Add(message);
+            }
+            else
+            {
+                _errors.Add(message);
+            }
+        }
+
+        private static string Duration(TimeSpan cap) =>
+            cap.TotalSeconds.ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture) + "s";
+    }
+
+    /// <summary>
+    /// One member's results with each one's evidence; a missing repository, the deadline or a failure
+    /// becomes a failed result.
+    /// </summary>
+    private async Task<IReadOnlyList<(ProviderResult Result, string Evidence)>> AskMemberAsync(
+        WorkspaceMember member,
+        ProviderRequest request,
+        bool deep,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            if (!Directory.Exists(member.Root))
+            {
+                return [Failed(request, new IOException("repository not found at " + member.Root))];
+            }
+
+            var registry = Registry(member, deep);
+            await DiscoverAsync(registry, deep, token).ConfigureAwait(false);
+            var context = deep ? null : registry as IContextProviderRegistry;
+            var infos = context is null ? registry.Capabilities() : context.ContextCapabilities();
+            Func<string, bool>? skip = context is null ? null : name => !context.InContext(name);
+            var results = await registry.CallAsync(request, skip, token).ConfigureAwait(false);
+            if (deep)
+            {
+                results = await RetryWarmingAsync(registry, request, skip, results, token).ConfigureAwait(false);
+            }
+
+            return results
+                .Select(result =>
+                    (
+                        result,
+                        infos
+                            .FirstOrDefault(info =>
+                                info.Provider == result.Provider && info.Capability == result.Capability
+                            )
+                            ?.EvidenceOf()
+                            ?? Capabilities.DefaultEvidence(request.Capability)
+                    )
+                )
+                .ToArray();
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return [Failed(request, new OperationCanceledException("deadline"), timedOut: true)];
+        }
+        catch (Exception error)
+        {
+            return [Failed(request, error)];
+        }
+    }
+
+    /// <summary>Deep queries discover every provider; light ones only those that serve context when they can.</summary>
+    private static Task DiscoverAsync(IProviderRegistry registry, bool deep, CancellationToken token) =>
+        !deep && registry is IContextProviderRegistry context
+            ? context.DiscoverContextAsync(token)
+            : registry.DiscoverAsync(token);
+
+    /// <summary>Asks again, after a pause, while a provider is still warming up and the deadline allows.</summary>
+    private async Task<IReadOnlyList<ProviderResult>> RetryWarmingAsync(
+        IProviderRegistry registry,
+        ProviderRequest request,
+        Func<string, bool>? skip,
+        IReadOnlyList<ProviderResult> results,
+        CancellationToken token
+    )
+    {
+        while (results.Any(result => result.Error is { } error && Warming(error)) && !token.IsCancellationRequested)
         {
             try
             {
-                if (!Directory.Exists(member.Root))
-                {
-                    return
-                    [
-                        (
-                            new ProviderResult
-                            {
-                                Provider = "workspace",
-                                Capability = request.Capability,
-                                Error = new IOException("repository not found at " + member.Root),
-                            },
-                            ""
-                        ),
-                    ];
-                }
-
-                var registry = Registry(member, deep);
-                if (deep)
-                {
-                    await registry.DiscoverAsync(token).ConfigureAwait(false);
-                }
-                else if (registry is IContextProviderRegistry context)
-                {
-                    await context.DiscoverContextAsync(token).ConfigureAwait(false);
-                }
-                else
-                {
-                    await registry.DiscoverAsync(token).ConfigureAwait(false);
-                }
-
-                var infos =
-                    !deep && registry is IContextProviderRegistry contextRegistry
-                        ? contextRegistry.ContextCapabilities()
-                        : registry.Capabilities();
-                Func<string, bool>? skip =
-                    !deep && registry is IContextProviderRegistry filter ? name => !filter.InContext(name) : null;
-                var results = await registry.CallAsync(request, skip, token).ConfigureAwait(false);
-                while (
-                    deep
-                    && results.Any(result => result.Error is { } error && Warming(error))
-                    && !token.IsCancellationRequested
-                )
-                {
-                    try
-                    {
-                        await Task.Delay(warmRetry > TimeSpan.Zero ? warmRetry : TimeSpan.FromSeconds(2), token)
-                            .ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (token.IsCancellationRequested)
-                    {
-                        break;
-                    }
-                    results = await registry.CallAsync(request, skip, token).ConfigureAwait(false);
-                }
-                return results
-                    .Select(result =>
-                        (
-                            result,
-                            infos
-                                .FirstOrDefault(info =>
-                                    info.Provider == result.Provider && info.Capability == result.Capability
-                                )
-                                ?.EvidenceOf()
-                                ?? Capabilities.DefaultEvidence(request.Capability)
-                        )
-                    )
-                    .ToArray();
+                await Task.Delay(warmRetry > TimeSpan.Zero ? warmRetry : TimeSpan.FromSeconds(2), token)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                return
-                [
-                    (
-                        new ProviderResult
-                        {
-                            Provider = "workspace",
-                            Capability = request.Capability,
-                            TimedOut = true,
-                            Error = new OperationCanceledException("deadline"),
-                        },
-                        ""
-                    ),
-                ];
+                break;
             }
-            catch (Exception error)
-            {
-                return
-                [
-                    (
-                        new ProviderResult
-                        {
-                            Provider = "workspace",
-                            Capability = request.Capability,
-                            Error = error,
-                        },
-                        ""
-                    ),
-                ];
-            }
+            results = await registry.CallAsync(request, skip, token).ConfigureAwait(false);
         }
+        return results;
     }
+
+    private static (ProviderResult Result, string Evidence) Failed(
+        ProviderRequest request,
+        Exception error,
+        bool timedOut = false
+    ) =>
+        (
+            new ProviderResult
+            {
+                Provider = "workspace",
+                Capability = request.Capability,
+                TimedOut = timedOut,
+                Error = error,
+            },
+            ""
+        );
 
     public Task<IReadOnlyList<MemoryRecord>> ContextMemoriesAsync(
         WorkspaceMember member,
@@ -329,9 +352,6 @@ public sealed partial class WorkspaceSearchSession(
     private static bool Warming(Exception error) =>
         error.Message.Contains("still loading", StringComparison.Ordinal)
         || error.Message.Contains("warm session", StringComparison.Ordinal);
-
-    private static string Duration(TimeSpan cap) =>
-        cap.TotalSeconds.ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture) + "s";
 
     private static void Observe(Task task) =>
         _ = task.ContinueWith(
