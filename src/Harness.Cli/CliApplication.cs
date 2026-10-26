@@ -143,38 +143,7 @@ public static class CliApplication
             return ["--help"];
         }
 
-        var normalized = NormalizeLegacyFlags(args);
-        if (
-            normalized[0] is "hooks" or "hook" or "completion"
-            && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
-        )
-        {
-            normalized = [normalized[0], normalized[0] is "completion" ? "status" : "choose", .. normalized[1..]];
-        }
-        if (
-            normalized[0] is "workspace" or "workspaces" or "projects" or "telemetry"
-            && (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
-        )
-        {
-            normalized = [normalized[0], normalized[0] is "telemetry" ? "status" : "list", .. normalized[1..]];
-        }
-
-        if (normalized[0] is "providers")
-        {
-            if (normalized.Length is 1 || normalized[1].StartsWith('-') && normalized[1] is not ("--help" or "-h"))
-            {
-                normalized = [normalized[0], "sessions", .. normalized[1..]];
-            }
-            if (
-                normalized.Length >= 2
-                && normalized[1] is "sessions"
-                && (normalized.Length is 2 || normalized[2].StartsWith('-') && normalized[2] is not ("--help" or "-h"))
-            )
-            {
-                normalized = [normalized[0], normalized[1], "list", .. normalized[2..]];
-            }
-        }
-
+        var normalized = WithDefaultCommands(NormalizeLegacyFlags(args));
         return normalized[0] switch
         {
             "-v" or "--version" => ["version", .. normalized[1..]],
@@ -182,6 +151,38 @@ public static class CliApplication
             _ => normalized,
         };
     }
+
+    /// <summary>A command group named without a subcommand runs its default one.</summary>
+    private static string[] WithDefaultCommands(string[] args)
+    {
+        if (args[0] is "hooks" or "hook" or "completion" && NoSubcommand(args, 1))
+        {
+            return [args[0], args[0] is "completion" ? "status" : "choose", .. args[1..]];
+        }
+
+        if (args[0] is "workspace" or "workspaces" or "projects" or "telemetry" && NoSubcommand(args, 1))
+        {
+            return [args[0], args[0] is "telemetry" ? "status" : "list", .. args[1..]];
+        }
+
+        return args[0] is "providers" ? WithProviderDefaults(args) : args;
+    }
+
+    /// <summary>providers defaults to sessions, and providers sessions to list.</summary>
+    private static string[] WithProviderDefaults(string[] args)
+    {
+        if (NoSubcommand(args, 1))
+        {
+            args = [args[0], "sessions", .. args[1..]];
+        }
+        return args.Length >= 2 && args[1] is "sessions" && NoSubcommand(args, 2)
+            ? [args[0], args[1], "list", .. args[2..]]
+            : args;
+    }
+
+    /// <summary>Nothing, or an option other than help, follows the command at index.</summary>
+    private static bool NoSubcommand(string[] args, int index) =>
+        args.Length == index || args[index].StartsWith('-') && args[index] is not ("--help" or "-h");
 
     private static string[] NormalizeLegacyFlags(string[] args)
     {
