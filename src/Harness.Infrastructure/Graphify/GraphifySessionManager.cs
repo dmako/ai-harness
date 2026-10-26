@@ -130,81 +130,95 @@ public sealed class GraphifySessionManager : IGraphifySessions, IAsyncDisposable
 
     public async Task<IReadOnlyList<GraphifySession>> ListAsync(bool recent, CancellationToken cancellationToken)
     {
-        byte[] bytes;
+        var list = SessionsOf(await PsAsync(recent, cancellationToken).ConfigureAwait(false));
+        var records = _records.Load();
+        var sessions = new List<GraphifySession>();
+        foreach (var row in list.Sessions ?? [])
+        {
+            var session = Session(row, records);
+            lock (_observations)
+            {
+                _pids[row.SessionId] = row.ProcessId;
+            }
+
+            sessions.Add(session);
+        }
+        return sessions
+            .OrderBy(session => session.Root, StringComparer.Ordinal)
+            .ThenBy(session => session.Id, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    /// <summary>The 'ps' output; a recent list is shared for five seconds.</summary>
+    private async Task<byte[]> PsAsync(bool recent, CancellationToken cancellationToken)
+    {
         if (!recent)
         {
-            bytes = await RunAsync(["ps", "--json"], cancellationToken).ConfigureAwait(false);
+            return await RunAsync(["ps", "--json"], cancellationToken).ConfigureAwait(false);
         }
-        else
-        {
-            await _listGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                if (_recent is null || _clock.GetUtcNow() - _listed >= TimeSpan.FromSeconds(5))
-                {
-                    _recent = await RunAsync(["ps", "--json"], cancellationToken).ConfigureAwait(false);
-                    _listed = _clock.GetUtcNow();
-                }
-                bytes = _recent;
-            }
-            finally
-            {
-                _listGate.Release();
-            }
-        }
-        SessionList list;
+
+        await _listGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            list =
-                HarnessJson.Deserialize<SessionList>(bytes, JsonOptions)
+            if (_recent is null || _clock.GetUtcNow() - _listed >= TimeSpan.FromSeconds(5))
+            {
+                _recent = await RunAsync(["ps", "--json"], cancellationToken).ConfigureAwait(false);
+                _listed = _clock.GetUtcNow();
+            }
+            return _recent;
+        }
+        finally
+        {
+            _listGate.Release();
+        }
+    }
+
+    private static SessionList SessionsOf(byte[] bytes)
+    {
+        try
+        {
+            return HarnessJson.Deserialize<SessionList>(bytes, JsonOptions)
                 ?? throw new JsonException("null session list");
         }
         catch (JsonException error)
         {
             throw new InvalidDataException("ps: unexpected output: " + error.Message, error);
         }
-        var records = _records.Load();
-        var sessions = new List<GraphifySession>();
-        foreach (var row in list.Sessions ?? [])
+    }
+
+    /// <summary>A listed session with what the records know about it.</summary>
+    private static GraphifySession Session(SessionRow row, JsonObject records)
+    {
+        var root = row.RepositoryRoot.Length is 0 ? "" : GraphifyDiscovery.Canonical(row.RepositoryRoot);
+        var record = records["sessions"]![row.SessionId];
+        return new()
         {
-            var root = row.RepositoryRoot.Length is 0 ? "" : GraphifyDiscovery.Canonical(row.RepositoryRoot);
-            var record = records["sessions"]![row.SessionId];
-            var starting = records["starting"]![root];
-            var by = record?["started_by"]?.GetValue<string>() ?? "";
-            if (record is null && starting?["pid"]?.GetValue<int>() == row.ProcessId)
-            {
-                by = starting["by"]?.GetValue<string>() ?? "";
-            }
+            Id = row.SessionId,
+            Pid = row.ProcessId,
+            Reachable = row.Reachability is "reachable",
+            State = row.LifecycleState,
+            Ready = row.Ready,
+            Stage = row.Stage,
+            Root = root,
+            Input = row.InputPath,
+            MemoryBytes = row.WorkingSetBytes,
+            UptimeMs = row.UptimeMs,
+            StartedBy = StartedBy(record, records["starting"]![root], row.ProcessId),
+            LastQuery = record?["last_query"]?.GetValue<string>() ?? "",
+            DiscoveryIncomplete = record?["discovery_incomplete"]?.GetValue<string>() ?? "",
+            LoadTookMs = records["load_ms"]![root]?.GetValue<long>() ?? 0,
+        };
+    }
 
-            lock (_observations)
-            {
-                _pids[row.SessionId] = row.ProcessId;
-            }
-
-            sessions.Add(
-                new()
-                {
-                    Id = row.SessionId,
-                    Pid = row.ProcessId,
-                    Reachable = row.Reachability is "reachable",
-                    State = row.LifecycleState,
-                    Ready = row.Ready,
-                    Stage = row.Stage,
-                    Root = root,
-                    Input = row.InputPath,
-                    MemoryBytes = row.WorkingSetBytes,
-                    UptimeMs = row.UptimeMs,
-                    StartedBy = by,
-                    LastQuery = record?["last_query"]?.GetValue<string>() ?? "",
-                    DiscoveryIncomplete = record?["discovery_incomplete"]?.GetValue<string>() ?? "",
-                    LoadTookMs = records["load_ms"]![root]?.GetValue<long>() ?? 0,
-                }
-            );
+    /// <summary>Who started the session: its record, or for an unrecorded one the pending launch of its pid.</summary>
+    private static string StartedBy(JsonNode? record, JsonNode? starting, int pid)
+    {
+        if (record is null && starting?["pid"]?.GetValue<int>() == pid)
+        {
+            return starting["by"]?.GetValue<string>() ?? "";
         }
-        return sessions
-            .OrderBy(session => session.Root, StringComparer.Ordinal)
-            .ThenBy(session => session.Id, StringComparer.Ordinal)
-            .ToArray();
+
+        return record?["started_by"]?.GetValue<string>() ?? "";
     }
 
     public async Task<IGraphifyWatch?> StartAsync(CancellationToken cancellationToken)
