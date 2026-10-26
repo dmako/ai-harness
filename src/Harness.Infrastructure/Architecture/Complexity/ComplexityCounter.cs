@@ -80,21 +80,36 @@ internal static partial class ComplexityCounter
     /// <summary>A method, constructor or local function declared at index: its name, parameter list and body end.</summary>
     private static Declared? CSharpDeclaration(List<CodeToken> tokens, int index)
     {
-        var token = tokens[index];
-        if (
-            token.Kind is not 'i'
-            || CloneLexer.Control.Contains(token.Text)
-            || CloneLexer.Keywords.Contains(token.Text)
-            || index is 0
-            || !CloneLexer.TypeLike(tokens[index - 1]) && !TupleType(tokens, index - 1)
-            || tokens[index - 1].Text is "new"
-            || CloneLexer.Declares.Contains(tokens[index - 1].Text)
-        )
+        if (!DeclaresMember(tokens, index))
         {
             return null;
         }
 
-        var parameters = tokens[index + 1].Text switch
+        var parameters = ParameterList(tokens, index);
+        if (parameters < 0 || CloneLexer.Match(tokens, parameters) is not (> 0 and var end))
+        {
+            return null;
+        }
+
+        return CSharpBody(tokens, end) is { } body ? new(index, parameters, end, body) : null;
+    }
+
+    /// <summary>An identifier, not a keyword, after a type and not after 'new' or a type declaration keyword.</summary>
+    private static bool DeclaresMember(List<CodeToken> tokens, int index)
+    {
+        var token = tokens[index];
+        return token.Kind is 'i'
+            && !CloneLexer.Control.Contains(token.Text)
+            && !CloneLexer.Keywords.Contains(token.Text)
+            && index is not 0
+            && (CloneLexer.TypeLike(tokens[index - 1]) || TupleType(tokens, index - 1))
+            && tokens[index - 1].Text is not "new"
+            && !CloneLexer.Declares.Contains(tokens[index - 1].Text);
+    }
+
+    /// <summary>The '(' opening the parameters after the name and its type parameters; -1 when there is none.</summary>
+    private static int ParameterList(List<CodeToken> tokens, int index) =>
+        tokens[index + 1].Text switch
         {
             "(" => index + 1,
             "<" => GenericEnd(tokens, index + 1) is var close and > 0
@@ -104,11 +119,13 @@ internal static partial class ComplexityCounter
                 : -1,
             _ => -1,
         };
-        if (parameters < 0 || CloneLexer.Match(tokens, parameters) is not (> 0 and var end))
-        {
-            return null;
-        }
 
+    /// <summary>
+    /// The end of the block or expression body after the parameter list closing at end; null for a field,
+    /// an abstract member or an unbalanced signature.
+    /// </summary>
+    private static int? CSharpBody(List<CodeToken> tokens, int end)
+    {
         var depth = 0;
         for (var cursor = end + 1; cursor < tokens.Count && cursor <= end + SignatureReach; cursor++)
         {
@@ -121,12 +138,8 @@ internal static partial class ComplexityCounter
                 case ")" or "]":
                     depth--;
                     break;
-                case "{" when depth is 0:
-                    var block = CloneLexer.Match(tokens, cursor);
-                    return block < 0 ? null : new(index, parameters, end, block);
-                case "=>" when depth is 0:
-                    var expression = ExpressionEnd(tokens, cursor + 1);
-                    return expression < 0 ? null : new(index, parameters, end, expression);
+                case "{" or "=>" when depth is 0:
+                    return BodyEnd(tokens, cursor);
                 case ";" or "}" or "=" or "," when depth is 0:
                     return null;
             }
@@ -136,6 +149,13 @@ internal static partial class ComplexityCounter
             }
         }
         return null;
+    }
+
+    /// <summary>The end of the block opening at start, or of the expression after its '=>'; null if open.</summary>
+    private static int? BodyEnd(List<CodeToken> tokens, int start)
+    {
+        var close = tokens[start].Text is "{" ? CloneLexer.Match(tokens, start) : ExpressionEnd(tokens, start + 1);
+        return close < 0 ? null : close;
     }
 
     private static (int Complexity, int Cases) CountCSharp(List<CodeToken> tokens, int start, int end)
