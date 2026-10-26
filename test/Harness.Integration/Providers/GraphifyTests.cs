@@ -419,12 +419,24 @@ internal sealed class GraphifyFixture : IDisposable
 
     public JsonObject Records() => JsonNode.Parse(File.ReadAllText(RecordsPath))!.AsObject();
 
+    /// <summary>The fake's session list, read under its writer lease so a live watch never replaces it mid-read.</summary>
+    public JsonObject Sessions()
+    {
+        using var lease = GraphifyRecords
+            .LockAsync(Path.Combine(Data, "fake.lock"), TimeSpan.FromSeconds(10), CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        var file = Path.Combine(Data, "sessions.json");
+        return File.Exists(file)
+            ? JsonNode.Parse(File.ReadAllText(file))!.AsObject()
+            : new JsonObject { ["sessions"] = new JsonArray() };
+    }
+
     public void Dispose()
     {
-        var file = Path.Combine(Data, "sessions.json");
-        if (File.Exists(file))
+        if (Directory.Exists(Data))
         {
-            foreach (var session in JsonNode.Parse(File.ReadAllText(file))!["sessions"]!.AsArray())
+            foreach (var session in Sessions()["sessions"]!.AsArray())
             {
                 if (
                     session?["session_id"]?.GetValue<string>().StartsWith("watch-", StringComparison.Ordinal) is true

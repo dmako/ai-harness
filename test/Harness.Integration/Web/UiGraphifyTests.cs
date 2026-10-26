@@ -119,9 +119,8 @@ public sealed class UiGraphifyTests
     {
         try
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixture.Data, "sessions.json")));
-            var sessions = document.RootElement.GetProperty("sessions");
-            return sessions.GetArrayLength() > 0 ? sessions[0].GetProperty("session_id").GetString()! : "";
+            var sessions = fixture.Sessions()["sessions"]!.AsArray();
+            return sessions.Count > 0 ? sessions[0]!["session_id"]!.GetValue<string>() : "";
         }
         catch (Exception error) when (error is JsonException or IOException)
         {
