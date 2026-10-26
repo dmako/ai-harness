@@ -94,6 +94,16 @@ public static class ArchitectureAnalyzer
         );
     }
 
+    /// <summary>
+    /// What the finding rules read: the build, its units by path, their roles and the noun for a unit.
+    /// </summary>
+    private sealed record FindingInput(
+        ProjectBuild Build,
+        Dictionary<string, BuildUnit> ByPath,
+        Dictionary<string, string?> RoleByPath,
+        string Noun
+    );
+
     private static ArchitectureFinding[] Findings(
         ProjectBuild build,
         LayeredUnit[] projects,
@@ -102,143 +112,25 @@ public static class ArchitectureAnalyzer
         Func<string, bool>? used
     )
     {
-        List<ArchitectureFinding> found = [];
-        var noun = build.Noun.Length is 0 ? "project" : build.Noun;
-        foreach (var cycle in cycles)
-        {
-            List<string> evidence = [];
-            foreach (var path in cycle)
-            {
-                var target = byPath[path]
-                    .References.FirstOrDefault(reference => cycle.Contains(reference, StringComparer.Ordinal));
-                if (target is not null && evidence.Count < 6)
-                {
-                    evidence.Add(
-                        At(byPath[path], target)[0] + " (" + byPath[path].Name + " → " + byPath[target].Name + ")"
-                    );
-                }
-            }
-            found.Add(
-                new()
-                {
-                    Kind = "cycle",
-                    Level = "problem",
-                    Title =
-                        $"{cycle.Count} {noun}s depend on each other in a circle: "
-                        + string.Join(", ", cycle.Select(path => byPath[path].Name)),
-                    Why = build.Language is "dotnet"
-                        ? "MSBuild cannot build a circle of project references."
-                        : "Each of them reaches the others through its references, so none of them can be changed, tested or understood alone.",
-                    Fix =
-                        "Move what they share into a lower unit, or turn one reference around (the lower one owns an interface the higher one implements).",
-                    Project = cycle[0],
-                    Evidence = evidence,
-                    Key = Key("cycle", [.. cycle.Order(StringComparer.Ordinal)]),
-                    Measure = cycle.Count,
-                }
-            );
-        }
-        var roles = projects.ToDictionary(unit => unit.Path, unit => unit.Role, StringComparer.Ordinal);
+        var input = new FindingInput(
+            build,
+            byPath,
+            projects.ToDictionary(unit => unit.Path, unit => unit.Role, StringComparer.Ordinal),
+            build.Noun.Length is 0 ? "project" : build.Noun
+        );
+        List<ArchitectureFinding> found = [.. cycles.Select(cycle => CycleFinding(input, cycle))];
         foreach (var unit in projects)
         {
             foreach (var reference in unit.References)
             {
-                if (!byPath.TryGetValue(reference, out var target))
-                {
-                    found.Add(
-                        new()
-                        {
-                            Kind = "missing-project",
-                            Level = "warn",
-                            Title = unit.Name + " references a " + noun + " that is not there",
-                            Why = reference + " does not exist in the repository.",
-                            Fix = "Remove the stale reference, or restore what it points to.",
-                            Project = unit.Path,
-                            Evidence = At(unit, reference),
-                            Key = Key("missing-project", unit.Path, reference),
-                        }
-                    );
-                    continue;
-                }
-                if (target.Kind is "test" && unit.Kind is not "test")
-                {
-                    found.Add(
-                        new()
-                        {
-                            Kind = "test-reference",
-                            Level = "problem",
-                            Title = unit.Name + " references the test " + noun + " " + target.Name,
-                            Why = "Production code that depends on tests ships test code and its test frameworks.",
-                            Fix =
-                                "Move what production needs out of the test project; shared test helpers go into a test-support project only tests reference.",
-                            Project = unit.Path,
-                            Evidence = At(unit, reference),
-                            Key = Key("test-reference", unit.Path, reference),
-                        }
-                    );
-                }
+                found.AddRange(ReferenceFindings(input, unit, reference));
+            }
 
-                var fromRank = Rank(build.Language, unit.Role);
-                var toRank = Rank(build.Language, roles[reference]);
-                if (unit.Kind is "library" && fromRank >= 0 && toRank >= 0 && fromRank < toRank)
-                {
-                    found.Add(
-                        new()
-                        {
-                            Kind = "layering",
-                            Level = "warn",
-                            Title = $"{unit.Name} ({unit.Role}) references {target.Name} ({roles[reference]})",
-                            Why =
-                                $"A lower layer depends on a higher one: {unit.Role} should not know {roles[reference]}. Roles are read from the names.",
-                            Fix =
-                                "Move the used code down to a lower unit, or let the lower unit own an interface the higher one implements.",
-                            Project = unit.Path,
-                            Evidence = At(unit, reference),
-                            Key = Key("layering", unit.Path, reference),
-                        }
-                    );
-                }
-            }
-            if (unit.Kind is "library" && !unit.ReferencedBy.Any(path => byPath[path].Kind is not "test"))
+            if (UnusedFinding(input, unit, used) is { } unused)
             {
-                var onlyTests = unit.ReferencedBy.Count > 0 ? " except its tests" : "";
-                if (unit.Package is null)
-                {
-                    found.Add(
-                        new()
-                        {
-                            Kind = "unused",
-                            Level = "warn",
-                            Title = unit.Name + " is not used",
-                            Why = "No " + noun + " references it" + onlyTests + ".",
-                            Fix = "Delete it, or use it where it was meant to be used.",
-                            Project = unit.Path,
-                            Evidence = [unit.Path],
-                        }
-                    );
-                }
-                else if (used is not null && !used(unit.Package))
-                {
-                    found.Add(
-                        new()
-                        {
-                            Kind = "unused",
-                            Level = "info",
-                            Title = unit.Name + " is used by nothing here and no workspace member",
-                            Why =
-                                "Nothing in the repository references it"
-                                + onlyTests
-                                + " and no other member references its package "
-                                + unit.Package
-                                + "; it may still be used outside the workspace.",
-                            Fix =
-                                "Check whether anything outside the workspace uses its package; if nothing does, it can go.",
-                            Project = unit.Path,
-                            Evidence = [unit.Path],
-                        }
-                    );
-                }
+                found.Add(unused);
             }
+
             if (build.Solutions.Count > 0 && unit.Solutions.Count is 0)
             {
                 found.Add(
@@ -256,55 +148,7 @@ public static class ArchitectureAnalyzer
                 );
             }
         }
-        foreach (var solution in build.Solutions)
-        {
-            foreach (var missing in solution.Missing ?? [])
-            {
-                found.Add(
-                    new()
-                    {
-                        Kind = "missing-project",
-                        Level = "warn",
-                        Title = solution.Path.Split('/')[^1] + " names a " + noun + " that is not there",
-                        Why = missing + " does not exist; the solution does not load cleanly.",
-                        Fix = "Remove the stale entry from the solution, or restore the project.",
-                        Evidence = [solution.Path],
-                        Key = Key("missing-project", solution.Path, missing),
-                    }
-                );
-            }
-        }
-
-        if (build.Solutions.Count > 1)
-        {
-            var partial = build
-                .Solutions.SelectMany(solution => solution.Projects)
-                .GroupBy(path => path, StringComparer.Ordinal)
-                .Where(group => group.Count() < build.Solutions.Count)
-                .Select(group => byPath.TryGetValue(group.Key, out var unit) ? unit.Name : "")
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-            if (partial.Length > 0)
-            {
-                found.Add(
-                    new()
-                    {
-                        Kind = "solutions-differ",
-                        Level = "info",
-                        Title = "The solutions hold different projects",
-                        Why =
-                            "Only some solutions include "
-                            + string.Join(", ", partial)
-                            + "; which solution is built decides what is checked.",
-                        Fix =
-                            "Decide which solution is the one that is built and checked, and keep the others in step (or say why they differ).",
-                        Evidence = build.Solutions.Select(solution => solution.Path).ToArray(),
-                        Key = Key("solutions-differ"),
-                        Measure = partial.Length,
-                    }
-                );
-            }
-        }
+        found.AddRange(SolutionFindings(input));
         var reader = build.Language switch
         {
             "dotnet" => "internal/dotnet",
@@ -317,6 +161,229 @@ public static class ArchitectureAnalyzer
             .Select(finding => Complete(finding, Harness(reader)))
             .OrderBy(finding => Severity(finding.Level))
             .ToArray();
+    }
+
+    /// <summary>A circle of units, with up to six references that close it.</summary>
+    private static ArchitectureFinding CycleFinding(FindingInput input, List<string> cycle)
+    {
+        var byPath = input.ByPath;
+        List<string> evidence = [];
+        foreach (var path in cycle)
+        {
+            var target = byPath[path]
+                .References.FirstOrDefault(reference => cycle.Contains(reference, StringComparer.Ordinal));
+            if (target is not null && evidence.Count < 6)
+            {
+                evidence.Add(
+                    At(byPath[path], target)[0] + " (" + byPath[path].Name + " → " + byPath[target].Name + ")"
+                );
+            }
+        }
+        return new()
+        {
+            Kind = "cycle",
+            Level = "problem",
+            Title =
+                $"{cycle.Count} {input.Noun}s depend on each other in a circle: "
+                + string.Join(", ", cycle.Select(path => byPath[path].Name)),
+            Why = input.Build.Language is "dotnet"
+                ? "MSBuild cannot build a circle of project references."
+                : "Each of them reaches the others through its references, so none of them can be changed, tested or understood alone.",
+            Fix =
+                "Move what they share into a lower unit, or turn one reference around (the lower one owns an interface the higher one implements).",
+            Project = cycle[0],
+            Evidence = evidence,
+            Key = Key("cycle", [.. cycle.Order(StringComparer.Ordinal)]),
+            Measure = cycle.Count,
+        };
+    }
+
+    /// <summary>A reference to a missing unit; otherwise one to a test unit, and one up the layers.</summary>
+    private static List<ArchitectureFinding> ReferenceFindings(FindingInput input, LayeredUnit unit, string reference)
+    {
+        if (!input.ByPath.TryGetValue(reference, out var target))
+        {
+            return
+            [
+                new()
+                {
+                    Kind = "missing-project",
+                    Level = "warn",
+                    Title = unit.Name + " references a " + input.Noun + " that is not there",
+                    Why = reference + " does not exist in the repository.",
+                    Fix = "Remove the stale reference, or restore what it points to.",
+                    Project = unit.Path,
+                    Evidence = At(unit, reference),
+                    Key = Key("missing-project", unit.Path, reference),
+                },
+            ];
+        }
+
+        List<ArchitectureFinding> found = [];
+        if (target.Kind is "test" && unit.Kind is not "test")
+        {
+            found.Add(
+                new()
+                {
+                    Kind = "test-reference",
+                    Level = "problem",
+                    Title = unit.Name + " references the test " + input.Noun + " " + target.Name,
+                    Why = "Production code that depends on tests ships test code and its test frameworks.",
+                    Fix =
+                        "Move what production needs out of the test project; shared test helpers go into a test-support project only tests reference.",
+                    Project = unit.Path,
+                    Evidence = At(unit, reference),
+                    Key = Key("test-reference", unit.Path, reference),
+                }
+            );
+        }
+
+        if (LayeringFinding(input, unit, reference, target) is { } layering)
+        {
+            found.Add(layering);
+        }
+
+        return found;
+    }
+
+    /// <summary>A library whose role ranks below the role of the unit it references.</summary>
+    private static ArchitectureFinding? LayeringFinding(
+        FindingInput input,
+        LayeredUnit unit,
+        string reference,
+        BuildUnit target
+    )
+    {
+        var language = input.Build.Language;
+        var targetRole = input.RoleByPath[reference];
+        var fromRank = Rank(language, unit.Role);
+        var toRank = Rank(language, targetRole);
+        if (unit.Kind is not "library" || fromRank < 0 || toRank < 0 || fromRank >= toRank)
+        {
+            return null;
+        }
+
+        return new()
+        {
+            Kind = "layering",
+            Level = "warn",
+            Title = $"{unit.Name} ({unit.Role}) references {target.Name} ({targetRole})",
+            Why =
+                $"A lower layer depends on a higher one: {unit.Role} should not know {targetRole}. Roles are read from the names.",
+            Fix =
+                "Move the used code down to a lower unit, or let the lower unit own an interface the higher one implements.",
+            Project = unit.Path,
+            Evidence = At(unit, reference),
+            Key = Key("layering", unit.Path, reference),
+        };
+    }
+
+    /// <summary>
+    /// A library nothing but tests references: unused, or (with a package) unused by any workspace member
+    /// as well.
+    /// </summary>
+    private static ArchitectureFinding? UnusedFinding(FindingInput input, LayeredUnit unit, Func<string, bool>? used)
+    {
+        if (unit.Kind is not "library" || unit.ReferencedBy.Any(path => input.ByPath[path].Kind is not "test"))
+        {
+            return null;
+        }
+
+        var onlyTests = unit.ReferencedBy.Count > 0 ? " except its tests" : "";
+        if (unit.Package is null)
+        {
+            return new()
+            {
+                Kind = "unused",
+                Level = "warn",
+                Title = unit.Name + " is not used",
+                Why = "No " + input.Noun + " references it" + onlyTests + ".",
+                Fix = "Delete it, or use it where it was meant to be used.",
+                Project = unit.Path,
+                Evidence = [unit.Path],
+            };
+        }
+
+        if (used is null || used(unit.Package))
+        {
+            return null;
+        }
+
+        return new()
+        {
+            Kind = "unused",
+            Level = "info",
+            Title = unit.Name + " is used by nothing here and no workspace member",
+            Why =
+                "Nothing in the repository references it"
+                + onlyTests
+                + " and no other member references its package "
+                + unit.Package
+                + "; it may still be used outside the workspace.",
+            Fix = "Check whether anything outside the workspace uses its package; if nothing does, it can go.",
+            Project = unit.Path,
+            Evidence = [unit.Path],
+        };
+    }
+
+    /// <summary>Projects a solution names that are missing, and projects only some of the solutions hold.</summary>
+    private static List<ArchitectureFinding> SolutionFindings(FindingInput input)
+    {
+        var solutions = input.Build.Solutions;
+        List<ArchitectureFinding> found = [];
+        foreach (var solution in solutions)
+        {
+            foreach (var missing in solution.Missing ?? [])
+            {
+                found.Add(
+                    new()
+                    {
+                        Kind = "missing-project",
+                        Level = "warn",
+                        Title = solution.Path.Split('/')[^1] + " names a " + input.Noun + " that is not there",
+                        Why = missing + " does not exist; the solution does not load cleanly.",
+                        Fix = "Remove the stale entry from the solution, or restore the project.",
+                        Evidence = [solution.Path],
+                        Key = Key("missing-project", solution.Path, missing),
+                    }
+                );
+            }
+        }
+
+        if (solutions.Count <= 1)
+        {
+            return found;
+        }
+
+        var partial = solutions
+            .SelectMany(solution => solution.Projects)
+            .GroupBy(path => path, StringComparer.Ordinal)
+            .Where(group => group.Count() < solutions.Count)
+            .Select(group => input.ByPath.TryGetValue(group.Key, out var unit) ? unit.Name : "")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (partial.Length > 0)
+        {
+            found.Add(
+                new()
+                {
+                    Kind = "solutions-differ",
+                    Level = "info",
+                    Title = "The solutions hold different projects",
+                    Why =
+                        "Only some solutions include "
+                        + string.Join(", ", partial)
+                        + "; which solution is built decides what is checked.",
+                    Fix =
+                        "Decide which solution is the one that is built and checked, and keep the others in step (or say why they differ).",
+                    Evidence = solutions.Select(solution => solution.Path).ToArray(),
+                    Key = Key("solutions-differ"),
+                    Measure = partial.Length,
+                }
+            );
+        }
+
+        return found;
     }
 
     private static (Dictionary<string, int> Components, List<List<string>> Members) Components(
