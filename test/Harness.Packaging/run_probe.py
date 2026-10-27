@@ -206,7 +206,7 @@ def probe(main_archive, developer_archive, root, report):
     with contextlib.closing(sandbox.peer()) as peer:
         check(bool(peer.initialize()['serverInfo']), 'MCP initialize')
         tools = peer.request('tools/list')['tools']
-        check(len(tools) == 30, 'MCP tool inventory')
+        check(len(tools) == 32, 'MCP tool inventory')
         peer.call('memory_put', {'type': 'decision', 'content': 'Package checks persist across MCP sessions', 'force': True})
         check(True, 'MCP memory persistence')
         check('budget_bytes' in peer.call('get_context', {'task': 'Package checks', 'budget': 4000}), 'MCP context')
