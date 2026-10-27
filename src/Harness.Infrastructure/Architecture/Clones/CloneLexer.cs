@@ -242,10 +242,7 @@ internal static class CloneLexer
 
                 if (character is '\\' && escapes)
                 {
-                    // An escaped line break, LF or CRLF, continues the string on the next line.
-                    var escaped = At(1) is '\r' && At(2) is '\n' ? 2 : 1;
-                    CountLine(At(escaped));
-                    _index = Math.Min(source.Length, _index + 1 + escaped);
+                    SkipEscape();
                     continue;
                 }
 
@@ -258,6 +255,14 @@ internal static class CloneLexer
                 // A verbatim string's doubled quote is one escaped quote.
                 _index += character == quote ? 2 : 1;
             }
+        }
+
+        /// <summary>Skips a backslash and the character it escapes; an escaped LF or CRLF continues the line.</summary>
+        private void SkipEscape()
+        {
+            var escaped = At(1) is '\r' && At(2) is '\n' ? 2 : 1;
+            CountLine(At(escaped));
+            _index = Math.Min(source.Length, _index + 1 + escaped);
         }
 
         private void ReadRegex()
