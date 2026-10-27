@@ -39,6 +39,17 @@ public sealed class CloneLexerLineTests
         LineOf(path, code).Should().Be(ExpectedLine(code, declaration));
     }
 
+    [Theory]
+    [InlineData("const x = \"a\\\nb\";\nfunction y() { return 1; }\n")]
+    [InlineData("const x = 'a\\\nb';\nfunction y() { return 1; }\n")]
+    [InlineData("const x = \"a\\\nb\\\nc\";\nfunction y() { return 1; }\n")]
+    [InlineData("const x = \"a\\\r\nb\";\r\nfunction y() { return 1; }\r\n")]
+    [InlineData("const x = 'a\\\r\nb';\r\nfunction y() { return 1; }\r\n")]
+    public void LineContinuationsInStringsCountTheirLineBreak(string code)
+    {
+        LineOf("src/a.ts", code).Should().Be(ExpectedLine(code, "function y("));
+    }
+
     private static int LineOf(string path, string code)
     {
         using var tree = new ReaderTree(new() { [path] = code });

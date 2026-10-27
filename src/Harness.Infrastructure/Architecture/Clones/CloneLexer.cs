@@ -242,6 +242,8 @@ internal static class CloneLexer
 
                 if (character is '\\' && escapes)
                 {
+                    // An escaped line break continues the string on the next line.
+                    CountLine(At(1));
                     _index = Math.Min(source.Length, _index + 2);
                     continue;
                 }
