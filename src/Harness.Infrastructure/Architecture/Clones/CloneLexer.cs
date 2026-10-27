@@ -242,9 +242,10 @@ internal static class CloneLexer
 
                 if (character is '\\' && escapes)
                 {
-                    // An escaped line break continues the string on the next line.
-                    CountLine(At(1));
-                    _index = Math.Min(source.Length, _index + 2);
+                    // An escaped line break, LF or CRLF, continues the string on the next line.
+                    var escaped = At(1) is '\r' && At(2) is '\n' ? 2 : 1;
+                    CountLine(At(escaped));
+                    _index = Math.Min(source.Length, _index + 1 + escaped);
                     continue;
                 }
 
