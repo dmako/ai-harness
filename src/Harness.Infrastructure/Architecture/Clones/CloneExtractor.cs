@@ -401,72 +401,21 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
     {
         List<string> output = [];
         List<CodeToken> current = [];
-        void Flush()
-        {
-            if (current.Count is 0)
-            {
-                return;
-            }
-
-            if (language is "ts")
-            {
-                var colon = current.FindIndex(token => token.Text is ":");
-                output.Add(colon < 0 ? "?" : string.Concat(current.Skip(colon + 1).Select(token => token.Text)));
-            }
-            else
-            {
-                output.Add(
-                    string.Concat(
-                        current
-                            .Take(current[^1].Kind is 'i' ? current.Count - 1 : current.Count)
-                            .Where(token =>
-                                token.Kind is not 'i'
-                                || token.Text is not ("this" or "ref" or "out" or "in" or "params" or "scoped")
-                            )
-                            .Select(token => token.Text)
-                    )
-                );
-            }
-
-            current.Clear();
-        }
-        var depth = 0;
-        var attribute = 0;
+        var nesting = new ParameterNesting();
         var defaultValue = false;
         foreach (var token in tokens)
         {
-            switch (token.Text)
-            {
-                case "(" or "<" or "{":
-                    depth++;
-                    break;
-                case ")" or ">" or "}":
-                    depth--;
-                    break;
-                case "[" when depth is 0 && current.Count is 0 && language is "cs":
-                    attribute++;
-                    continue;
-                case "[":
-                    depth++;
-                    break;
-                case "]" when attribute > 0:
-                    attribute--;
-                    continue;
-                case "]":
-                    depth--;
-                    break;
-            }
-            if (attribute > 0)
+            if (nesting.Skips(token.Text, current.Count is 0 && language is "cs"))
             {
                 continue;
             }
 
-            if (depth is 0 && token.Text is ",")
+            if (nesting.Depth is 0 && token.Text is ",")
             {
-                Flush();
+                Flush(output, current, language);
                 defaultValue = false;
             }
-            else if (depth is 0 && token.Text is "=")
+            else if (nesting.Depth is 0 && token.Text is "=")
             {
                 defaultValue = true;
             }
@@ -475,7 +424,72 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
                 current.Add(token);
             }
         }
-        Flush();
+        Flush(output, current, language);
         return output.ToArray();
     }
+
+    /// <summary>The bracket depth in a parameter list and the C# attributes ([ at a parameter's start).</summary>
+    private sealed class ParameterNesting
+    {
+        private int _attribute;
+        internal int Depth { get; private set; }
+
+        /// <summary>Tracks the token; true for an attribute's bracket or a token inside an attribute.</summary>
+        internal bool Skips(string text, bool attributeStart)
+        {
+            switch (text)
+            {
+                case "(" or "<" or "{":
+                    Depth++;
+                    break;
+                case ")" or ">" or "}":
+                    Depth--;
+                    break;
+                case "[" when Depth is 0 && attributeStart:
+                    _attribute++;
+                    return true;
+                case "[":
+                    Depth++;
+                    break;
+                case "]" when _attribute > 0:
+                    _attribute--;
+                    return true;
+                case "]":
+                    Depth--;
+                    break;
+            }
+            return _attribute > 0;
+        }
+    }
+
+    /// <summary>Adds the parameter read so far, if any, as its type.</summary>
+    private static void Flush(List<string> output, List<CodeToken> current, string language)
+    {
+        if (current.Count is 0)
+        {
+            return;
+        }
+
+        output.Add(language is "ts" ? ScriptParameterType(current) : CSharpParameterType(current));
+        current.Clear();
+    }
+
+    /// <summary>The annotation after the colon, or ? when there is none.</summary>
+    private static string ScriptParameterType(List<CodeToken> parameter)
+    {
+        var colon = parameter.FindIndex(token => token.Text is ":");
+        return colon < 0 ? "?" : string.Concat(parameter.Skip(colon + 1).Select(token => token.Text));
+    }
+
+    /// <summary>The tokens before the name, without parameter modifiers.</summary>
+    private static string CSharpParameterType(List<CodeToken> parameter) =>
+        string.Concat(
+            parameter
+                .Take(parameter[^1].Kind is 'i' ? parameter.Count - 1 : parameter.Count)
+                .Where(token =>
+                    token.Kind is not 'i'
+                    || token.Text is not ("this" or "ref" or "out" or "in" or "params" or "scoped")
+                )
+                .Select(token => token.Text)
+        );
 }
