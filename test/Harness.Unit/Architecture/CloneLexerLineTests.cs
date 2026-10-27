@@ -4,7 +4,10 @@ using Xunit;
 
 namespace Harness.Unit.Architecture;
 
-/// <summary>Token lines after literals and comments, read back through the members' lines (TASK-0042).</summary>
+/// <summary>
+/// Token lines after literals and comments, read back through the members' lines (TASK-0042, TASK-0043), and
+/// continued strings as one token (TASK-0044).
+/// </summary>
 public sealed class CloneLexerLineTests
 {
     [Theory]
@@ -48,6 +51,51 @@ public sealed class CloneLexerLineTests
     public void LineContinuationsInStringsCountTheirLineBreak(string code)
     {
         LineOf("src/a.ts", code).Should().Be(ExpectedLine(code, "function y("));
+    }
+
+    [Theory]
+    [InlineData("const x = \"a\\\r\nb\";\r\nlet z = 1;\r\n", "\"a\\\r\nb\"")]
+    [InlineData("const x = 'a\\\r\nb';\r\nlet z = 1;\r\n", "'a\\\r\nb'")]
+    [InlineData("const x = 'a\\\nb';\nlet z = 1;\n", "'a\\\nb'")]
+    public void LineContinuationsStayOneStringToken(string code, string literal)
+    {
+        Tokens(code, "ts")
+            .Should()
+            .Equal(
+                ('i', "const", 1),
+                ('i', "x", 1),
+                ('p', "=", 1),
+                ('s', literal, 1),
+                ('p', ";", 2),
+                ('i', "let", 3),
+                ('i', "z", 3),
+                ('p', "=", 3),
+                ('n', "1", 3),
+                ('p', ";", 3)
+            );
+    }
+
+    /// <summary>The lexer's tokens, read by reflection: CloneLexer is internal to the infrastructure.</summary>
+    private static List<(char Kind, string Text, int Line)> Tokens(string source, string language)
+    {
+        var lexer = typeof(CloneExtractor).Assembly.GetType(
+            "Harness.Infrastructure.Architecture.Clones.CloneLexer",
+            throwOnError: true
+        )!;
+        var tokenize = lexer.GetMethod(
+            "Tokenize",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static
+        )!;
+        return ((System.Collections.IEnumerable)tokenize.Invoke(null, [source, language])!)
+            .Cast<object>()
+            .Select(token =>
+                (
+                    (char)token.GetType().GetProperty("Kind")!.GetValue(token)!,
+                    (string)token.GetType().GetProperty("Text")!.GetValue(token)!,
+                    (int)token.GetType().GetProperty("Line")!.GetValue(token)!
+                )
+            )
+            .ToList();
     }
 
     private static int LineOf(string path, string code)
