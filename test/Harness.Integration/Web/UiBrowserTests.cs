@@ -166,6 +166,65 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task ReadyTaskIsEditedWithTheProposalFormAndClaimedOneOffersNoEdit()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0001",
+                Title = "Ready task",
+                Acceptance = ["Old"],
+            },
+            "",
+            origin,
+            Token
+        );
+        tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "Claimed task" }, "", origin, Token);
+        tasks.Claim("UI-0002", new("claude"), cancellationToken: Token);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/UI-0001" }
+                );
+                await page.WaitAsync("[...document.querySelectorAll('button')].some(b => b.textContent === 'Edit…')");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Edit…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('input[aria-label=Title]')");
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Id]').disabled")).Should().Be("True");
+                (await ValueAsync(page, "document.querySelector('textarea[aria-label=\"Acceptance criteria\"]').value"))
+                    .Should()
+                    .Be("Old");
+                await page.EvaluateAsync(
+                    "document.querySelector('input[aria-label=Title]').value = 'Edited in the browser'"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Save the task').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.Get("UI-0001", Token).Definition.Title is "Edited in the browser"
+                );
+                tasks.Get("UI-0001", Token).Definition.Acceptance.Should().Equal("Old");
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/UI-0002'");
+                await page.WaitAsync("!!document.querySelector('#task-UI-0002 .tdetail')");
+                (await ValueAsync(page, "!!document.querySelector('#task-UI-0002 .tdetail .review')"))
+                    .Should()
+                    .Be("False");
+            }
+        );
+    }
+
+    [Fact]
     public async Task ComplexityGroupShowsItsWorstLevelFiltersByLevelAndDrawsTheDistribution()
     {
         var executable = Browser();

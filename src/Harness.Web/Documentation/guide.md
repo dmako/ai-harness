@@ -77,6 +77,11 @@ Work can also start without the backlog file:
   one, restating it first if you want, and the task is made with the agent
   named as its proposer; reject it and nothing changes.
 
+Until an agent claims a task, you can restate it in harness ui: Work ›
+Tasks, open the task, Edit…. The form is the one used to approve a
+proposal; the id, validation and notes stay. A task that is also in the
+backlog file is restated from the file again at its next import.
+
 ## Several checkouts of the same code
 
 - **Worktrees** (`git worktree add`) of one repository share one project:

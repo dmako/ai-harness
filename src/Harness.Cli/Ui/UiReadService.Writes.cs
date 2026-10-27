@@ -96,6 +96,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             "proposals/{pid}/approve" => ApproveMemory(store, route.Value("pid"), request.Body, token),
             "proposals/{pid}/reject" => RejectMemory(store, route.Value("pid"), request.Body, token),
             "tasks" => CreateTask(database, request.Body, token),
+            "tasks/{tid}/edit" => EditTask(database, request, token),
             "task-proposals/{pid}/approve" => ApproveTask(database, request, token),
             "task-proposals/{pid}/reject" => RejectTask(database, request, token),
             "findings/{action}" => await TriageProjectAsync(project, database, request, token),
@@ -260,6 +261,21 @@ internal sealed partial class UiReadService : IUiWriteApi
                         TaskForm(body),
                         Prefix(body),
                         new(HumanActor.Current(), "ui", "added in harness ui"),
+                        token
+                    )
+                ),
+            }
+        );
+
+    private static JsonNode? EditTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token) =>
+        UiJson.Node(
+            new JsonObjectMap
+            {
+                ["task"] = TaskViews.Task(
+                    new TaskStore(database).Edit(
+                        request.Route.Value("tid"),
+                        TaskForm(request.Body),
+                        HumanActor.Current(),
                         token
                     )
                 ),

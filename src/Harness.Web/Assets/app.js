@@ -3598,12 +3598,13 @@ async function viewArchProposals(p) {
 const TASK_TYPES = ["feature", "bug", "chore", "spike", "docs", "test", "process"];
 const PRIORITIES = ["low", "medium", "high", "critical"];
 
-// taskFields is the form for a task's definition (new, or a proposal
-// restated before it is approved); value() reads it back.
-function taskFields(p, init, milestones) {
+// taskFields is the form for a task's definition (new, a proposal
+// restated before it is approved, or an unclaimed task edited); value()
+// reads it back. An edited task keeps its id.
+function taskFields(p, init, milestones, keepId) {
   const lines = (v) => v.split("\n").map((x) => x.trim()).filter(Boolean);
   const commas = (v) => v.split(",").map((x) => x.trim()).filter(Boolean);
-  const id = h("input", { type: "text", value: init.id || "", placeholder: "next free id", "aria-label": "Id" });
+  const id = h("input", { type: "text", value: init.id || "", placeholder: "next free id", "aria-label": "Id", disabled: !!keepId });
   if (!init.id) api(projectAPI(p, "tasks-next-id")).then((r) => { id.placeholder = r.id; }).catch(() => {});
   const title = h("input", { type: "text", value: init.title || "", required: true, "aria-label": "Title" });
   const goal = h("textarea", { rows: 2, "aria-label": "Goal" }, init.goal || "");
@@ -3628,6 +3629,16 @@ function newTaskForm(p, panel, milestones) {
   const f = taskFields(p, {}, milestones);
   return writeForm(panel, "A new task: it starts in the backlog and is ready once its dependencies are done. 'harness tasks export' writes it into the backlog file.",
     [f.nodes], "Add the task", () => post(projectAPI(p, "tasks"), f.value()));
+}
+
+// editTaskForm restates a ready or backlog task with the same form; the
+// definition is fixed once an agent claims it.
+async function editTaskForm(p, panel, x) {
+  const ms = await api(projectAPI(p, "milestones")).then((r) => r.milestones || []).catch(() => []);
+  const init = { ...x, depends_on: (x.depends_on || []).map((d) => d.id), acceptance: (x.acceptance || []).map((c) => c.criterion) };
+  const f = taskFields(p, init, ms, true);
+  return writeForm(panel, `Edit ${x.id}? It can change until an agent claims it; its validation and notes stay as they are.`,
+    [f.nodes], "Save the task", () => post(projectAPI(p, `tasks/${enc(x.id)}/edit`), f.value()));
 }
 
 function taskProposalCard(p, x) {
@@ -3937,8 +3948,20 @@ function auditBlock(x) {
 function taskDetail(x, passed) {
   const acc = x.acceptance || [];
   const resIcon = { pass: "✓", fail: "✕", pending: "○", "n/a": "–" };
+  const panel = h("div", { class: "mpanel" });
+  const editable = x.status === "ready" || x.status === "backlog";
+  const edit = async () => {
+    const opening = h("div", { class: "aform" }, h("p", { class: "hint" }, "Loading task…"));
+    fill(panel, opening);
+    try {
+      const form = await editTaskForm({ id: route().id }, panel, x);
+      if (opening.parentNode === panel) fill(panel, form);
+    } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
+  };
   return h("div", { class: "tdetail" },
     h("div", { class: "tmain" },
+      editable && h("div", { class: "review" }, h("button", { class: "ghost", onclick: edit }, "Edit…")),
+      panel,
       x.blocked_reason && (x.status === "deferred"
         ? h("div", { class: "callout" }, h("b", {}, "Deferred: "), x.blocked_reason)
         : h("div", { class: "callout bad" }, h("b", {}, "Blocked: "), x.blocked_reason)),

@@ -60,7 +60,7 @@ public sealed partial class TaskStore
                         Insert(c, t, d, i, source, stamp, "imported", "import", source);
                         added.Add(d.Id);
                     }
-                    else if (UpdateDefinition(c, t, d, i, source, stamp))
+                    else if (UpdateDefinition(c, t, d, i, source, stamp, "import", "definition updated from " + source))
                     {
                         updated.Add(d.Id);
                     }
@@ -254,7 +254,9 @@ public sealed partial class TaskStore
         TaskDefinition d,
         int ordinal,
         string source,
-        string stamp
+        string stamp,
+        string actor,
+        string detail
     )
     {
         var cur = Get(c, t, d.Id);
@@ -323,8 +325,8 @@ public sealed partial class TaskStore
             "definition_updated",
             "",
             "",
-            "import",
-            "definition updated from " + source + (cur.Status is "done" ? " (task already done; completion kept)" : ""),
+            actor,
+            detail + (cur.Status is "done" ? " (task already done; completion kept)" : ""),
             stamp
         );
         return true;

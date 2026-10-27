@@ -225,6 +225,73 @@ public sealed class UiWriteTests
     }
 
     [Fact]
+    public async Task UnclaimedTasksCanBeEditedKeepingTheirIdValidationAndNotes()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        store.Create(new TaskDefinition { Id = "UI-0001", Title = "Dependency" }, "", origin, Token);
+        store.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0002",
+                Title = "Original title",
+                Goal = "Original goal",
+                Acceptance = ["Kept", "Dropped"],
+                Validation = ["dotnet test"],
+                Notes = "fixture notes",
+            },
+            "",
+            origin,
+            Token
+        );
+        store.Get("UI-0002", Token).Status.Should().Be("ready");
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}/tasks";
+        var edited = await PostAsync(
+            server.Client,
+            root + "/UI-0002/edit",
+            """{"id":"UI-0099","title":"Edited title","goal":"Edited goal","type":"bug","priority":"high","depends_on":["ui-0001"],"acceptance":["Kept","Added"],"scope":["src"]}"""
+        );
+        edited["task"]!["id"]!.GetValue<string>().Should().Be("UI-0002");
+        var task = store.Get("UI-0002", Token);
+        task.Status.Should().Be("backlog", "it now waits for its new dependency");
+        task.Definition.Title.Should().Be("Edited title");
+        task.Definition.Type.Should().Be("bug");
+        task.Definition.Priority.Should().Be("high");
+        task.Definition.DependsOn.Should().Equal("UI-0001");
+        task.Definition.Acceptance.Should().Equal("Kept", "Added");
+        task.Definition.Scope.Should().Equal("src");
+        task.Definition.Validation.Should().Equal("dotnet test");
+        task.Definition.Notes.Should().Be("fixture notes");
+        store
+            .Events("UI-0002", Token)
+            .Should()
+            .Contain(e => e.Event == "definition_updated" && e.Actor.StartsWith("human:", StringComparison.Ordinal));
+        foreach (
+            var body in new[]
+            {
+                """{"title":"Cycle","depends_on":["UI-0002"]}""",
+                """{"title":"Unknown","depends_on":["UI-0404"]}""",
+                """{"title":""}""",
+            }
+        )
+        {
+            using var request = Request(server.Client, root + "/UI-0001/edit", body);
+            using var response = await server.Client.SendAsync(request, Token);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+        }
+        store.Claim("UI-0001", new("claude"), cancellationToken: Token);
+        using (var claimed = Request(server.Client, root + "/UI-0001/edit", """{"title":"Too late"}"""))
+        {
+            using var response = await server.Client.SendAsync(claimed, Token);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        store.Get("UI-0001", Token).Definition.Title.Should().Be("Dependency");
+    }
+
+    [Fact]
     public async Task WorkspaceAndProjectEditsAndWiderKnowledgeRoundTrip()
     {
         using var fixture = await SyncFixture.CreateAsync();

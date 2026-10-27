@@ -15,6 +15,7 @@ public static class UiRoutes
         "/api/projects/{id}/findings/{action}",
         "/api/workspaces/{name}/findings/{action}",
         "/api/projects/{id}/tasks",
+        "/api/projects/{id}/tasks/{tid}/edit",
         "/api/projects/{id}/task-proposals/{pid}/approve",
         "/api/projects/{id}/task-proposals/{pid}/reject",
         "/api/projects/{id}/arch-proposals/{pid}/approve",

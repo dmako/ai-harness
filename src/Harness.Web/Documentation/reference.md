@@ -242,7 +242,9 @@ list` or in harness ui (Work).
 
 Each task's audit trail (`harness tasks show <id> --events`) says how it
 was made: imported, added with `harness tasks add`, added in harness ui, or
-proposed by an agent and approved by you.
+proposed by an agent and approved by you. A ready or backlog task can be
+edited in harness ui (Work › Tasks, Edit…); the edit is recorded as a
+`definition_updated` event with you as its actor.
 
 ## harness ui
 
