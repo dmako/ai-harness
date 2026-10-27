@@ -89,7 +89,7 @@ public sealed class MemoryMcpProcessTests
         }
         finally
         {
-            Directory.Delete(root, recursive: true);
+            TestDirectory.Delete(root);
         }
     }
 

@@ -87,7 +87,7 @@ public sealed class McpProcessTests
         }
         finally
         {
-            Directory.Delete(root, recursive: true);
+            TestDirectory.Delete(root);
         }
     }
 

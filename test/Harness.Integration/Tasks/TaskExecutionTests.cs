@@ -436,7 +436,7 @@ public sealed class TaskExecutionTests
         public void Dispose()
         {
             Database.Dispose();
-            System.IO.Directory.Delete(Directory, recursive: true);
+            TestDirectory.Delete(Directory);
         }
     }
 }
