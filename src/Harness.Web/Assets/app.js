@@ -3618,7 +3618,11 @@ function taskFields(p, init, blueprints, keepId) {
   const pick = (opts, cur, label) => h("select", { "aria-label": label }, opts.map(([v, t]) => h("option", { value: v, selected: v === cur }, t)));
   const type = pick(TASK_TYPES.map((t) => [t, t]), init.type || "feature", "Type");
   const prio = pick(PRIORITIES.map((t) => [t, t]), init.priority || "medium", "Priority");
-  const ms = pick([["", "none"], ...blueprints.map((m) => [m.id, m.title ? `${m.id} · ${m.title}` : m.id])], init.blueprint || "", "Blueprint");
+  // A blueprint named but not (yet) known, as a proposal may, stays
+  // chosen rather than falling back to none.
+  const known = blueprints.map((m) => [m.id, m.title ? `${m.id} · ${m.title}` : m.id]);
+  if (init.blueprint && !blueprints.some((m) => m.id === init.blueprint)) known.push([init.blueprint, `${init.blueprint} (new)`]);
+  const ms = pick([["", "none"], ...known], init.blueprint || "", "Blueprint");
   const deps = h("input", { type: "text", value: (init.depends_on || []).join(", "), placeholder: "TASK-0041, HAR-0109", "aria-label": "Depends on" });
   const acc = h("textarea", { rows: 3, placeholder: "one criterion per line, each one checkable", "aria-label": "Acceptance criteria" }, (init.acceptance || []).join("\n"));
   const scope = h("input", { type: "text", value: (init.scope || []).join(", "), placeholder: "internal/tasks, docs", "aria-label": "Scope" });

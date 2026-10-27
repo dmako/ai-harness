@@ -363,6 +363,68 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task ProposedTaskIsApprovedFromTheInboxIntoItsBlueprint()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        tasks.CreateBlueprint(new("M1", "Metrics"), "test", Token);
+        TaskProposal Propose(string blueprint) =>
+            tasks.Propose(
+                new TaskDefinition
+                {
+                    Title = "Into " + blueprint,
+                    Goal = "Belongs to a blueprint",
+                    Acceptance = ["Grouped"],
+                    Blueprint = blueprint,
+                },
+                "seen",
+                "codex",
+                Token
+            );
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/inbox" }
+                );
+                // A described blueprint, and one only named, which the form must not drop to none.
+                foreach (var blueprint in new[] { "M1", "M9" })
+                {
+                    var proposal = Propose(blueprint);
+                    await page.EvaluateAsync("location.reload()");
+                    await page.WaitAsync(
+                        "[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the task…')"
+                    );
+                    await page.EvaluateAsync(
+                        "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task…').click()"
+                    );
+                    await page.WaitAsync("!!document.querySelector('select[aria-label=Blueprint]')");
+                    (await ValueAsync(page, "document.querySelector('select[aria-label=Blueprint]').value"))
+                        .Should()
+                        .Be(blueprint);
+                    await page.EvaluateAsync(
+                        "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task').click()"
+                    );
+                    await ProviderFixture.EventuallyAsync(() =>
+                        tasks.GetProposal(proposal.Id, Token).Status is "approved"
+                    );
+                    tasks
+                        .Get(tasks.GetProposal(proposal.Id, Token).Result, Token)
+                        .Definition.Blueprint.Should()
+                        .Be(blueprint);
+                }
+            }
+        );
+    }
+
+    [Fact]
     public async Task ComplexityGroupShowsItsWorstLevelFiltersByLevelAndDrawsTheDistribution()
     {
         var executable = Browser();

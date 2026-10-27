@@ -29,7 +29,8 @@
         "description": "low, medium (default), high or critical"
       },
       "blueprint": {
-        "type": "string"
+        "type": "string",
+        "description": "the blueprint id (task_blueprints lists them); a title is matched to its blueprint"
       },
       "depends_on": {
         "type": [

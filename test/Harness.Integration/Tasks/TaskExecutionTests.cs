@@ -324,6 +324,49 @@ public sealed class TaskExecutionTests
     }
 
     [Fact]
+    public async Task ProposedTaskKeepsItsBlueprintNamedByIdIgnoringCaseOrByTitleOnceApproved()
+    {
+        using var state = new State();
+        state.Store.CreateBlueprint(new("M1", "Code metrics", Exit: []), "fixture", Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> ProposeAsync(string blueprint)
+        {
+            var result = await client.CallToolAsync(
+                "task_propose",
+                new Dictionary<string, object?>
+                {
+                    ["title"] = "Into " + blueprint,
+                    ["goal"] = "Belongs to a blueprint",
+                    ["acceptance"] = new[] { "Grouped" },
+                    ["blueprint"] = blueprint,
+                },
+                cancellationToken: Token
+            );
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value;
+        }
+
+        foreach (var named in new[] { "M1", "m1", "code METRICS" })
+        {
+            var proposed = await ProposeAsync(named);
+            proposed.GetProperty("note").GetString().Should().StartWith("Waiting for the user");
+            var id = proposed.GetProperty("proposal").GetProperty("id").GetString()!;
+            state.Store.Approve(id, null, "", "human", Token).Task.Definition.Blueprint.Should().Be("M1", named);
+        }
+
+        var unknown = await ProposeAsync("M9");
+        unknown.GetProperty("note").GetString().Should().StartWith("No blueprint M9 exists");
+        var created = state.Store.Approve(
+            unknown.GetProperty("proposal").GetProperty("id").GetString()!,
+            null,
+            "",
+            "human",
+            Token
+        );
+        created.Task.Definition.Blueprint.Should().Be("M9");
+    }
+
+    [Fact]
     public async Task McpTaskToolsTakeBlueprintsAndStillAcceptTheFormerMilestoneArgument()
     {
         using var state = new State();

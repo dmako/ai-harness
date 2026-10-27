@@ -82,7 +82,9 @@ Work can also start without the backlog file:
   proposes it (`task_propose`); it never creates tasks itself. Proposals
   wait in harness ui's Work › Inbox (or `harness tasks proposals`): approve
   one, restating it first if you want, and the task is made with the agent
-  named as its proposer; reject it and nothing changes.
+  named as its proposer; reject it and nothing changes. A proposal may name
+  its blueprint by id or by title; it keeps that blueprint when approved,
+  even one not described yet.
 
 Until an agent claims a task, you can restate it in harness ui: Work ›
 Tasks, open the task, Edit…. The form is the one used to approve a

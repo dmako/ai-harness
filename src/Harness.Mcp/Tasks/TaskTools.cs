@@ -306,13 +306,20 @@ internal static class TaskTools
             Scope = Strings(values, "scope"),
             DependsOn = Strings(values, "depends_on").Select(d => d.Trim().ToUpperInvariant()).ToArray(),
         };
+        var proposal = await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token);
+        var blueprint = proposal.Task.Blueprint;
+        var unknown =
+            blueprint.Length is not 0 && !(await session.BlueprintsAsync(token)).Any(b => b.Definition.Id == blueprint);
         return new JsonObjectMap
         {
-            ["proposal"] = TaskViews.Proposal(
-                await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token)
-            ),
+            ["proposal"] = TaskViews.Proposal(proposal),
             ["note"] =
-                "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
+                (
+                    unknown
+                        ? $"No blueprint {blueprint} exists (task_blueprints lists them); the task would start it. "
+                        : ""
+                )
+                + "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
         };
     }
 

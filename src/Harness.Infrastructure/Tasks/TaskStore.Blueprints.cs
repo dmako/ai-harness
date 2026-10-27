@@ -208,6 +208,38 @@ public sealed partial class TaskStore
         return ids;
     }
 
+    /// <summary>
+    /// The blueprint an agent named: its id, matched exactly, then ignoring case, then by title; a name that matches
+    /// none stays as given (the task starts that blueprint).
+    /// </summary>
+    private static string ResolveBlueprint(SqliteConnection c, SqliteTransaction t, string name)
+    {
+        name = name.Trim();
+        if (name.Length is 0)
+        {
+            return "";
+        }
+
+        var ids = BlueprintIds(c, t);
+        if (ids.Contains(name))
+        {
+            return name;
+        }
+
+        if (ids.Find(id => string.Equals(id, name, StringComparison.OrdinalIgnoreCase)) is { } id)
+        {
+            return id;
+        }
+
+        using var command = Command(
+            c,
+            t,
+            "SELECT id FROM blueprints WHERE title=$name COLLATE NOCASE ORDER BY ordinal,id LIMIT 1",
+            ("$name", name)
+        );
+        return command.ExecuteScalar() as string ?? name;
+    }
+
     /// <summary>Describes a new blueprint, placed after the others.</summary>
     public BlueprintDefinition CreateBlueprint(
         BlueprintDefinition definition,
