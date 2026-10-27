@@ -168,7 +168,7 @@ public sealed class UiTests
                 "memories",
                 "proposals",
                 "tasks",
-                "milestones",
+                "blueprints",
                 "tasks/TASK-9999/events",
                 "tasks-next-id",
                 "task-proposals",
@@ -264,7 +264,7 @@ public sealed class UiTests
     public async Task ExistingReadStateIsNotCreatedOrMigratedAndMachineMetadataExcludesTokens()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Sql("DELETE FROM schema_migrations WHERE version=19");
+        fixture.Sql("DELETE FROM schema_migrations WHERE version=20");
         await File.WriteAllTextAsync(
             Path.Combine(fixture.Global, "telemetry.json"),
             """{"enabled":true,"endpoint":"https://telemetry.invalid","token":"must-stay-private","projects":{}}""",
@@ -287,7 +287,7 @@ public sealed class UiTests
         Convert
             .ToInt32(await command.ExecuteScalarAsync(Token), System.Globalization.CultureInfo.InvariantCulture)
             .Should()
-            .Be(18);
+            .Be(19);
     }
 
     [Fact]

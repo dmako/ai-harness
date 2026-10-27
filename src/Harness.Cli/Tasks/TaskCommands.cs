@@ -3,13 +3,13 @@ namespace Harness.Cli.Tasks;
 internal sealed class TaskListSettings : InspectSettings
 {
     public string[] Status { get; init; } = [];
-    public string Milestone { get; init; } = "";
+    public string Blueprint { get; init; } = "";
     public bool All { get; init; }
 }
 
 internal sealed class TaskNextSettings : InspectSettings
 {
-    public string Milestone { get; init; } = "";
+    public string Blueprint { get; init; } = "";
 }
 
 internal class TaskIdSettings : InspectSettings
@@ -46,7 +46,7 @@ internal sealed class TaskAddSettings : InspectSettings
     public string Goal { get; init; } = "";
     public string Type { get; init; } = "feature";
     public string Priority { get; init; } = "medium";
-    public string Milestone { get; init; } = "";
+    public string Blueprint { get; init; } = "";
     public string[] Depends { get; init; } = [];
     public string[] Accept { get; init; } = [];
     public string[] Scope { get; init; } = [];
@@ -58,10 +58,10 @@ internal sealed class TaskListCommand(TaskCommandRunner runner)
         runner.RunAsync("list", settings, cancellationToken);
 }
 
-internal sealed class TaskMilestonesCommand(TaskCommandRunner runner)
+internal sealed class TaskBlueprintsCommand(TaskCommandRunner runner)
 {
     public Task<int> ExecuteAsync(InspectSettings settings, CancellationToken cancellationToken) =>
-        runner.RunAsync("milestones", settings, cancellationToken);
+        runner.RunAsync("blueprints", settings, cancellationToken);
 }
 
 internal sealed class TaskShowCommand(TaskCommandRunner runner)

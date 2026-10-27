@@ -81,7 +81,7 @@ public sealed class UiBrowserTests
                         window.taskRefreshWaiting = true;
                         await new Promise(resolve => { window.releaseTaskRefresh = resolve; });
                       }
-                      if (window.holdReviewRead && url.includes('/milestones')) {
+                      if (window.holdReviewRead && url.includes('/blueprints')) {
                         window.holdReviewRead = false;
                         window.reviewReadWaiting = true;
                         await new Promise(resolve => { window.releaseReviewRead = resolve; });
@@ -201,6 +201,16 @@ public sealed class UiBrowserTests
                     "[...document.querySelectorAll('button')].find(b => b.textContent === 'Edit…').click()"
                 );
                 await page.WaitAsync("!!document.querySelector('input[aria-label=Title]')");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('a')].some(a => a.textContent.startsWith('Blueprints'))"
+                            + " && !!document.querySelector('select[aria-label=Blueprint]')"
+                            + " && !/milestone/i.test(document.body.textContent)"
+                    )
+                )
+                    .Should()
+                    .Be("True");
                 (await ValueAsync(page, "document.querySelector('input[aria-label=Id]').disabled")).Should().Be("True");
                 (await ValueAsync(page, "document.querySelector('textarea[aria-label=\"Acceptance criteria\"]').value"))
                     .Should()

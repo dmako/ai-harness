@@ -321,12 +321,12 @@ internal static class CliCommands
         );
         Add(
             Group(root, groups, "tasks"),
-            "milestones",
+            "blueprints",
             null,
             CommandBindings.BindInspectSettings,
             (settings, token) =>
                 ActivatorUtilities
-                    .CreateInstance<Harness.Cli.Tasks.TaskMilestonesCommand>(services)
+                    .CreateInstance<Harness.Cli.Tasks.TaskBlueprintsCommand>(services)
                     .ExecuteAsync(settings, token)
         );
         Add(

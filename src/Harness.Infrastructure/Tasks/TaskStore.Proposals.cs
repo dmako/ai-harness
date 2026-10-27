@@ -151,7 +151,7 @@ public sealed partial class TaskStore
         {
             Id = Text("id"),
             Title = Text("title"),
-            Milestone = Text("milestone"),
+            Blueprint = Text("blueprint"),
             Goal = Text("goal"),
             Type = Text("type"),
             Priority = Text("priority"),

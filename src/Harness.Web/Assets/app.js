@@ -23,7 +23,7 @@ const state = {
   days: store.get("days", "30"),
   knowledge: { types: new Set(["goal", "constraint", "decision", "convention", "warning"]), q: "", inactive: false, scope: "" },
   proposals: { status: "pending" },
-  tasks: { statuses: new Set(["ready", "claimed", "in_progress", "review", "blocked"]), milestone: "", open: new Set(), collapsed: new Set() },
+  tasks: { statuses: new Set(["ready", "claimed", "in_progress", "review", "blocked"]), blueprint: "", open: new Set(), collapsed: new Set() },
   history: new Set(), // memories whose history panel is open
 };
 
@@ -592,10 +592,12 @@ async function projectView(p, view, item, opts) {
     case "overview": return viewOverview(p);
     case "architecture": return viewArchitecture(p);
     case "work": {
-      // one switch: Milestones, Tasks, Inbox; a task's id opens Tasks
-      const sec = ["milestones", "tasks", "inbox"].includes(item) ? item : item ? "tasks" : state.tasks.view || "milestones";
+      // one switch: Blueprints, Tasks, Inbox; a task's id opens Tasks
+      // blueprints were called milestones (TASK-0047): old links still open them
+      const named = item === "milestones" ? "blueprints" : item;
+      const sec = ["blueprints", "tasks", "inbox"].includes(named) ? named : named ? "tasks" : state.tasks.view || "blueprints";
       if (sec !== "inbox") state.tasks.view = sec;
-      const nav = subnav(base, [["milestones", "Milestones"], ["tasks", "Tasks"], ["inbox", "Inbox", (p.live.pending_arch_proposals || 0) + (p.live.pending_task_proposals || 0)]], sec);
+      const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", (p.live.pending_arch_proposals || 0) + (p.live.pending_task_proposals || 0)]], sec);
       return h("div", {}, nav, sec === "inbox" ? await viewArchProposals(p) : await viewTasks(p, opts, sec));
     }
     case "health": return viewHealth(p);
@@ -1787,8 +1789,8 @@ async function renderUserKnowledge(main) {
 
 // --- search ---
 // Results come from /api/search: projects, workspaces, memories (every
-// readable project and the wider levels), tasks and milestones.
-const SEARCH_KINDS = [["project", "Projects"], ["workspace", "Workspaces"], ["memory", "Memories"], ["task", "Tasks"], ["milestone", "Milestones"]];
+// readable project and the wider levels), tasks and blueprints.
+const SEARCH_KINDS = [["project", "Projects"], ["workspace", "Workspaces"], ["memory", "Memories"], ["task", "Tasks"], ["blueprint", "Blueprints"]];
 
 // hitHref is where a search result leads.
 function hitHref(x) {
@@ -1796,7 +1798,7 @@ function hitHref(x) {
     case "project": return projectHref(x.project_id, "overview");
     case "workspace": return workspaceHref(x.workspace);
     case "task": return projectHref(x.project_id, "work", x.ref);
-    case "milestone": return projectHref(x.project_id, "work");
+    case "blueprint": return projectHref(x.project_id, "work");
     case "memory":
       if (x.project_id) return projectHref(x.project_id, "knowledge");
       return x.workspace ? workspaceHref(x.workspace, "knowledge") : "#/knowledge";
@@ -1819,7 +1821,7 @@ function hitRow(x, onclick) {
 
 async function renderSearch(main, r) {
   const head = h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, r.q ? `Search: “${r.q}”` : "Search")),
-    h("p", { class: "path" }, "Projects, workspaces, memories, tasks and milestones across the machine. Code is searched by agents, with search_project."));
+    h("p", { class: "path" }, "Projects, workspaces, memories, tasks and blueprints across the machine. Code is searched by agents, with search_project."));
   if (r.q.length < 2) return fill(main, head, h("p", { class: "empty" }, "Type at least two characters in the search box above."));
   const res = await api(`/api/search?q=${enc(r.q)}`);
   const hits = res.hits || [];
@@ -3601,7 +3603,7 @@ const PRIORITIES = ["low", "medium", "high", "critical"];
 // taskFields is the form for a task's definition (new, a proposal
 // restated before it is approved, or an unclaimed task edited); value()
 // reads it back. An edited task keeps its id.
-function taskFields(p, init, milestones, keepId) {
+function taskFields(p, init, blueprints, keepId) {
   const lines = (v) => v.split("\n").map((x) => x.trim()).filter(Boolean);
   const commas = (v) => v.split(",").map((x) => x.trim()).filter(Boolean);
   const id = h("input", { type: "text", value: init.id || "", placeholder: "next free id", "aria-label": "Id", disabled: !!keepId });
@@ -3611,22 +3613,22 @@ function taskFields(p, init, milestones, keepId) {
   const pick = (opts, cur, label) => h("select", { "aria-label": label }, opts.map(([v, t]) => h("option", { value: v, selected: v === cur }, t)));
   const type = pick(TASK_TYPES.map((t) => [t, t]), init.type || "feature", "Type");
   const prio = pick(PRIORITIES.map((t) => [t, t]), init.priority || "medium", "Priority");
-  const ms = pick([["", "none"], ...milestones.map((m) => [m.id, m.title ? `${m.id} · ${m.title}` : m.id])], init.milestone || "", "Milestone");
+  const ms = pick([["", "none"], ...blueprints.map((m) => [m.id, m.title ? `${m.id} · ${m.title}` : m.id])], init.blueprint || "", "Blueprint");
   const deps = h("input", { type: "text", value: (init.depends_on || []).join(", "), placeholder: "TASK-0041, HAR-0109", "aria-label": "Depends on" });
   const acc = h("textarea", { rows: 3, placeholder: "one criterion per line, each one checkable", "aria-label": "Acceptance criteria" }, (init.acceptance || []).join("\n"));
   const scope = h("input", { type: "text", value: (init.scope || []).join(", "), placeholder: "internal/tasks, docs", "aria-label": "Scope" });
   const field = (label, el) => h("label", {}, h("span", {}, label), el);
   return {
     nodes: [field("Title", title), field("Goal: the outcome and why", goal),
-      h("div", { class: "frow" }, field("Type", type), field("Priority", prio), field("Milestone", ms), field("Id", id)),
+      h("div", { class: "frow" }, field("Type", type), field("Priority", prio), field("Blueprint", ms), field("Id", id)),
       field("Depends on", deps), field("Acceptance criteria", acc), field("Scope (paths it may touch)", scope)],
-    value: () => ({ id: id.value.trim(), title: title.value, goal: goal.value, type: type.value, priority: prio.value, milestone: ms.value,
+    value: () => ({ id: id.value.trim(), title: title.value, goal: goal.value, type: type.value, priority: prio.value, blueprint: ms.value,
       depends_on: commas(deps.value), acceptance: lines(acc.value), scope: commas(scope.value) }),
   };
 }
 
-function newTaskForm(p, panel, milestones) {
-  const f = taskFields(p, {}, milestones);
+function newTaskForm(p, panel, blueprints) {
+  const f = taskFields(p, {}, blueprints);
   return writeForm(panel, "A new task: it starts in the backlog and is ready once its dependencies are done. 'harness tasks export' writes it into the backlog file.",
     [f.nodes], "Add the task", () => post(projectAPI(p, "tasks"), f.value()));
 }
@@ -3634,7 +3636,7 @@ function newTaskForm(p, panel, milestones) {
 // editTaskForm restates a ready or backlog task with the same form; the
 // definition is fixed once an agent claims it.
 async function editTaskForm(p, panel, x) {
-  const ms = await api(projectAPI(p, "milestones")).then((r) => r.milestones || []).catch(() => []);
+  const ms = await api(projectAPI(p, "blueprints")).then((r) => r.blueprints || []).catch(() => []);
   const init = { ...x, depends_on: (x.depends_on || []).map((d) => d.id), acceptance: (x.acceptance || []).map((c) => c.criterion) };
   const f = taskFields(p, init, ms, true);
   return writeForm(panel, `Edit ${x.id}? It can change until an agent claims it; its validation and notes stay as they are.`,
@@ -3646,7 +3648,7 @@ function taskProposalCard(p, x) {
   const url = (what) => projectAPI(p, `task-proposals/${enc(x.id)}/${what}`);
   const d = x.task || {};
   const approveForm = async () => {
-    const ms = await api(projectAPI(p, "milestones")).then((r) => r.milestones || []).catch(() => []);
+    const ms = await api(projectAPI(p, "blueprints")).then((r) => r.blueprints || []).catch(() => []);
     const f = taskFields(p, d, ms);
     return writeForm(panel, `Create this task? ${x.proposed_by} is recorded as the proposer and you as the one who made it.`,
       [f.nodes], "Create the task", () => post(url("approve"), { task: f.value() }));
@@ -3658,7 +3660,7 @@ function taskProposalCard(p, x) {
   const acc = d.acceptance || [];
   return h("article", { class: "mem aprop" + (x.status === "rejected" ? " inactive" : "") },
     h("div", { class: "mtype" }, "Task", h("span", { class: "tag" }, `${d.type || "feature"} · ${d.priority || "medium"}`),
-      d.milestone && h("span", { class: "tag" }, d.milestone),
+      d.blueprint && h("span", { class: "tag" }, d.blueprint),
       x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
     h("div", { class: "content" }, d.title),
     d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
@@ -3725,40 +3727,40 @@ function archProposalCard(p, x) {
     panel);
 }
 
-// --- tasks: grouped by milestone, with progress ---
+// --- tasks: grouped by blueprint, with progress ---
 async function viewTasks(p, opts, sec) {
   const t = state.tasks;
-  const [res, mres] = await Promise.all([api(projectAPI(p, "tasks")), api(projectAPI(p, "milestones")).catch(() => ({ milestones: [] }))]);
+  const [res, mres] = await Promise.all([api(projectAPI(p, "tasks")), api(projectAPI(p, "blueprints")).catch(() => ({ blueprints: [] }))]);
   const all = res.tasks || [];
-  const info = Object.fromEntries((mres.milestones || []).map((m) => [m.id, m]));
+  const info = Object.fromEntries((mres.blueprints || []).map((m) => [m.id, m]));
   // #/<project>/tasks/<task id> opens that task, whatever the filters
   const linked = all.find((x) => x.id === route().item);
   if (linked) {
     t.open.add(linked.id);
-    t.collapsed.delete(linked.milestone || "—");
+    t.collapsed.delete(linked.blueprint || "—");
     if (!(opts && opts.live)) setTimeout(() => document.getElementById(`task-${linked.id}`)?.scrollIntoView({ block: "start" }), 0);
   }
   const counts = Object.fromEntries(TASK_STATUSES.map((s) => [s, all.filter((x) => x.status === s).length]));
-  const milestones = [...new Set([...(mres.milestones || []).map((m) => m.id), ...all.map((x) => x.milestone || "—")])];
+  const blueprints = [...new Set([...(mres.blueprints || []).map((m) => m.id), ...all.map((x) => x.blueprint || "—")])];
   const body = h("div", {});
   const list = h("div", {});
 
   function drawTasks() {
-    const shown = all.filter((x) => x === linked || (t.statuses.has(x.status) && (!t.milestone || (x.milestone || "—") === t.milestone)));
+    const shown = all.filter((x) => x === linked || (t.statuses.has(x.status) && (!t.blueprint || (x.blueprint || "—") === t.blueprint)));
     // Deferred tasks are set aside by a decision: unless asked for, each
-    // milestone shows them as one line per reason instead of one row each.
+    // blueprint shows them as one line per reason instead of one row each.
     const deferred = t.statuses.has("deferred") ? [] :
-      all.filter((x) => x.status === "deferred" && x !== linked && (!t.milestone || (x.milestone || "—") === t.milestone));
+      all.filter((x) => x.status === "deferred" && x !== linked && (!t.blueprint || (x.blueprint || "—") === t.blueprint));
     if (!shown.length && !deferred.length) {
       const hiddenDone = !t.statuses.has("done") && counts.done > 0;
       return fill(list, h("p", { class: "empty" },
         all.length && counts.done === all.length ? `No open tasks: all ${all.length} are done. ` : "No tasks match. ",
         hiddenDone && h("button", { onclick: () => { t.statuses.add("done"); renderMain(); } }, "Show done tasks")));
     }
-    const inM = (m) => (x) => (x.milestone || "—") === m;
-    // Milestones with something to work on first; those holding only
+    const inM = (m) => (x) => (x.blueprint || "—") === m;
+    // Blueprints with something to work on first; those holding only
     // deferred tasks after them.
-    const order = [...milestones.filter((m) => shown.some(inM(m))), ...milestones.filter((m) => !shown.some(inM(m)) && deferred.some(inM(m)))];
+    const order = [...blueprints.filter((m) => shown.some(inM(m))), ...blueprints.filter((m) => !shown.some(inM(m)) && deferred.some(inM(m)))];
     fill(list, ...order.map((m) => {
       const mine = all.filter(inM(m));
       const rows = shown.filter(inM(m));
@@ -3785,8 +3787,8 @@ async function viewTasks(p, opts, sec) {
     }));
   }
 
-  function drawMilestones() {
-    const ms = milestones.map((id) => info[id] || { id, title: "", goal: "", exit: [], tasks: {}, total: all.filter((x) => (x.milestone || "—") === id).length });
+  function drawBlueprints() {
+    const ms = blueprints.map((id) => info[id] || { id, title: "", goal: "", exit: [], tasks: {}, total: all.filter((x) => (x.blueprint || "—") === id).length });
     const stateOf = (m) => {
       const n = (s) => (m.tasks || {})[s] || 0;
       if (!m.total) return ["none", "○", "no tasks"];
@@ -3801,7 +3803,7 @@ async function viewTasks(p, opts, sec) {
     const kind = (m) => ({ done: "done", deferred: "deferred" })[stateOf(m)[0]] || "open";
     const shown = ms.filter((m) => filt === "all" || kind(m) === filt);
     const chips = [["open", "Open"], ["done", "Done"], ["deferred", "Deferred"], ["all", "All"]].map(([k, label]) => h("button", {
-      class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawMilestones(); },
+      class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawBlueprints(); },
     }, label, h("span", { class: "count" }, k === "all" ? ms.length : ms.filter((m) => kind(m) === k).length)));
     fill(body, h("div", { class: "filters" }, chips),
       shown.length ? h("div", { class: "mcards" }, shown.map((m) => {
@@ -3820,10 +3822,10 @@ async function viewTasks(p, opts, sec) {
           m.notes && h("p", { class: "mcnote" }, m.notes),
           m.total > 0 && h("button", {
             class: "mclink", onclick: () => {
-              t.milestone = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
+              t.blueprint = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
             },
           }, `Show its ${m.total} task(s) →`));
-      })) : h("p", { class: "empty" }, "No milestones match."));
+      })) : h("p", { class: "empty" }, "No blueprints match."));
   }
 
   const chips = TASK_STATUSES.map((s) => h("button", {
@@ -3834,16 +3836,16 @@ async function viewTasks(p, opts, sec) {
       drawTasks();
     },
   }, statusPill(s), h("span", { class: "count" }, counts[s])));
-  const msSel = h("select", { "aria-label": "Milestone", onchange: (ev) => { t.milestone = ev.target.value; drawTasks(); } },
-    h("option", { value: "" }, "all milestones"),
-    milestones.map((m) => h("option", { value: m, selected: m === t.milestone }, info[m] && info[m].title ? `${m} · ${info[m].title}` : m)));
+  const msSel = h("select", { "aria-label": "Blueprint", onchange: (ev) => { t.blueprint = ev.target.value; drawTasks(); } },
+    h("option", { value: "" }, "all blueprints"),
+    blueprints.map((m) => h("option", { value: m, selected: m === t.blueprint }, info[m] && info[m].title ? `${m} · ${info[m].title}` : m)));
   if (sec === "tasks") {
     const panel = h("div", { class: "mpanel" });
-    const add = h("button", { class: "primary newtask", onclick: () => fill(panel, newTaskForm(p, panel, mres.milestones || [])) }, "New task…");
+    const add = h("button", { class: "primary newtask", onclick: () => fill(panel, newTaskForm(p, panel, mres.blueprints || [])) }, "New task…");
     fill(body, h("div", { class: "filters" }, chips, msSel, add), panel, list);
     drawTasks();
   } else {
-    drawMilestones();
+    drawBlueprints();
   }
   const done = counts.done;
   const stuck = attention(p, all);
@@ -3981,7 +3983,7 @@ function taskDetail(x, passed) {
       ["Status", statusPill(x.status)],
       ["Priority", x.priority],
       ["Type", x.type],
-      ["Milestone", x.milestone],
+      ["Blueprint", x.blueprint],
       ["Depends on", (x.depends_on || []).map((d) => h("div", { class: "dep" }, h("code", {}, d.id), " ", statusPill(d.status)))],
       ["Scope", (x.scope || []).map((s) => h("div", {}, h("code", {}, s)))],
       ["Claimed by", x.claim && [x.claim.claimant,

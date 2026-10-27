@@ -40,9 +40,9 @@ public interface ITaskSession
 {
     Task<TaskRecord> ReadTaskAsync(string id, CancellationToken cancellationToken);
     Task<IReadOnlyList<TaskEvent>> TaskEventsAsync(string id, CancellationToken cancellationToken);
-    Task<TaskRecord?> NextTaskAsync(string milestone, CancellationToken cancellationToken);
+    Task<TaskRecord?> NextTaskAsync(string blueprint, CancellationToken cancellationToken);
     Task<TaskClaimResult?> ClaimNextTaskAsync(
-        string milestone,
+        string blueprint,
         TaskActor actor,
         TimeSpan lease,
         CancellationToken cancellationToken

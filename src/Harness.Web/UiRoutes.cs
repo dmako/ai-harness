@@ -38,7 +38,7 @@ public static class UiRoutes
         "/api/projects/{id}/memories",
         "/api/projects/{id}/tasks",
         "/api/projects/{id}/proposals",
-        "/api/projects/{id}/milestones",
+        "/api/projects/{id}/blueprints",
         "/api/projects/{id}/tasks/{tid}/events",
         "/api/projects/{id}/health",
         "/api/projects/{id}/architecture",

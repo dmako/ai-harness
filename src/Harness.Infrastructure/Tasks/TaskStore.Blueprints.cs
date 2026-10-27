@@ -5,8 +5,8 @@ namespace Harness.Infrastructure.Tasks;
 
 public sealed partial class TaskStore
 {
-    public int ImportMilestones(
-        IReadOnlyList<MilestoneDefinition> definitions,
+    public int ImportBlueprints(
+        IReadOnlyList<BlueprintDefinition> definitions,
         string source,
         bool dryRun = false,
         CancellationToken cancellationToken = default
@@ -24,14 +24,14 @@ public sealed partial class TaskStore
                 throw new ArgumentException(
                     string.Create(
                         System.Globalization.CultureInfo.InvariantCulture,
-                        $"milestone {i + 1}: id is required"
+                        $"blueprint {i + 1}: id is required"
                     )
                 );
             }
 
             if (!seen.Add(defs[i].Id))
             {
-                throw new ArgumentException($"milestone {defs[i].Id} is defined twice");
+                throw new ArgumentException($"blueprint {defs[i].Id} is defined twice");
             }
         }
         var changed = 0;
@@ -49,7 +49,7 @@ public sealed partial class TaskStore
                         var command = Command(
                             c,
                             t,
-                            "SELECT title,goal,exit,notes,ordinal FROM milestones WHERE id=$id",
+                            "SELECT title,goal,exit,notes,ordinal FROM blueprints WHERE id=$id",
                             ("$id", d.Id)
                         )
                     )
@@ -72,7 +72,7 @@ public sealed partial class TaskStore
                             Execute(
                                 c,
                                 t,
-                                "UPDATE milestones SET ordinal=$ordinal WHERE id=$id",
+                                "UPDATE blueprints SET ordinal=$ordinal WHERE id=$id",
                                 ("$ordinal", i),
                                 ("$id", d.Id)
                             );
@@ -85,7 +85,7 @@ public sealed partial class TaskStore
                         c,
                         t,
                         """
-                        INSERT INTO milestones(id,title,goal,exit,notes,source,ordinal,updated_at) VALUES($id,$title,$goal,$exit,$notes,$source,$ordinal,$stamp)
+                        INSERT INTO blueprints(id,title,goal,exit,notes,source,ordinal,updated_at) VALUES($id,$title,$goal,$exit,$notes,$source,$ordinal,$stamp)
                         ON CONFLICT(id) DO UPDATE SET title=excluded.title,goal=excluded.goal,exit=excluded.exit,notes=excluded.notes,source=excluded.source,ordinal=excluded.ordinal,updated_at=excluded.updated_at
                         """,
                         ("$id", d.Id),
@@ -105,21 +105,21 @@ public sealed partial class TaskStore
         );
     }
 
-    // Unlike task reads, milestone progress does not refresh leases or readiness.
-    public IReadOnlyList<MilestoneProgress> Milestones(CancellationToken cancellationToken = default) =>
+    // Unlike task reads, blueprint progress does not refresh leases or readiness.
+    public IReadOnlyList<BlueprintProgress> Blueprints(CancellationToken cancellationToken = default) =>
         database.ReadTransaction(
             (c, t) =>
             {
-                Dictionary<string, MilestoneProgress> byId = new(StringComparer.Ordinal);
+                Dictionary<string, BlueprintProgress> byId = new(StringComparer.Ordinal);
                 List<string> order = [];
                 using (
-                    var command = Command(c, t, "SELECT id,title,goal,exit,notes FROM milestones ORDER BY ordinal,id")
+                    var command = Command(c, t, "SELECT id,title,goal,exit,notes FROM blueprints ORDER BY ordinal,id")
                 )
                 using (var reader = command.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        var d = new MilestoneDefinition(
+                        var d = new BlueprintDefinition(
                             reader.GetString(0),
                             reader.GetString(1),
                             reader.GetString(2),
@@ -135,7 +135,7 @@ public sealed partial class TaskStore
                     var command = Command(
                         c,
                         t,
-                        "SELECT milestone,status,COUNT(*),MIN(ordinal) FROM tasks WHERE milestone<>'' GROUP BY milestone,status ORDER BY MIN(ordinal)"
+                        "SELECT blueprint,status,COUNT(*),MIN(ordinal) FROM tasks WHERE blueprint<>'' GROUP BY blueprint,status ORDER BY MIN(ordinal)"
                     )
                 )
                 using (var reader = command.ExecuteReader())
@@ -156,7 +156,7 @@ public sealed partial class TaskStore
                     }
                 }
 
-                return (IReadOnlyList<MilestoneProgress>)order.Select(id => byId[id]).ToArray();
+                return (IReadOnlyList<BlueprintProgress>)order.Select(id => byId[id]).ToArray();
             },
             cancellationToken
         );

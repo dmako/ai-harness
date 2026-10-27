@@ -8,7 +8,7 @@ namespace Harness.Core.Tasks;
 public sealed record TaskDefinition
 {
     public string Id { get; init; } = "";
-    public string Milestone { get; init; } = "";
+    public string Blueprint { get; init; } = "";
     public string Title { get; init; } = "";
     public string Type { get; init; } = "";
     public string Priority { get; init; } = "";
@@ -25,7 +25,7 @@ public sealed record TaskDefinition
         {
             Id = Id.Trim(),
             Title = Title.Trim(),
-            Milestone = Milestone.Trim(),
+            Blueprint = Blueprint.Trim(),
             Type = Type.Length is 0 ? "feature" : Type,
             Priority = Priority.Length is 0 ? "medium" : Priority,
             Scope = Scope.Where(p => p.Length is not 0).Distinct(StringComparer.Ordinal).ToArray(),
@@ -72,7 +72,7 @@ public sealed record TaskDefinition
     }
 }
 
-public sealed record MilestoneDefinition(
+public sealed record BlueprintDefinition(
     string Id,
     string Title,
     string Goal = "",
@@ -83,7 +83,7 @@ public sealed record MilestoneDefinition(
 public sealed record BacklogFile(
     int Version,
     IReadOnlyList<TaskDefinition> Tasks,
-    IReadOnlyList<MilestoneDefinition> Milestones
+    IReadOnlyList<BlueprintDefinition> Blueprints
 );
 
 public sealed record TaskDependency(string Id, string Status);
@@ -101,7 +101,7 @@ public sealed record TaskActor(string Name, string Token = "", bool Privileged =
 
 public sealed record TaskOrigin(string By, string Source, string Detail);
 
-public sealed record TaskFilter(IReadOnlyList<string>? Statuses = null, string Milestone = "", int Limit = 0);
+public sealed record TaskFilter(IReadOnlyList<string>? Statuses = null, string Blueprint = "", int Limit = 0);
 
 public sealed record TaskImportResult(
     IReadOnlyList<string> Added,
@@ -113,8 +113,8 @@ public sealed record TaskImportResult(
 
 public sealed record TaskExportResult(string Path, IReadOnlyList<string> Added, bool Created);
 
-public sealed record MilestoneProgress(
-    MilestoneDefinition Definition,
+public sealed record BlueprintProgress(
+    BlueprintDefinition Definition,
     bool Defined,
     IReadOnlyDictionary<string, int> Tasks
 )

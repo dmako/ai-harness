@@ -13,7 +13,7 @@ content hashes use stable Unicode case and word-character tables; nanosecond
 RFC3339 timestamps retain their precision. Third-party table attribution is retained in
 [the Unicode notice](../third-party-notices/unicode-BSD.txt).
 
-Task definitions include acceptance criteria, dependencies, scope and milestones.
+Task definitions include acceptance criteria, dependencies, scope and blueprints.
 Execution models distinguish claims, progress, review, blocking, deferral and
 completion. Proposal models keep agent suggestions pending until a human review.
 Services that need durable state are defined as interfaces here and implemented

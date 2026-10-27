@@ -236,7 +236,8 @@ list` or in harness ui (Work).
 
 | Command | What it does |
 |---|---|
-| `harness tasks add --title … [--goal --accept … --depends … --milestone --type --priority --scope --prefix --id]` | Adds a task by hand with the next free id of the prefix (default: the prefix of the backlog's newest task). harness ui: Work › Tasks › New task. |
+| `harness tasks add --title … [--goal --accept … --depends … --blueprint --type --priority --scope --prefix --id]` | Adds a task by hand with the next free id of the prefix (default: the prefix of the backlog's newest task). harness ui: Work › Tasks › New task. |
+| `harness tasks blueprints` | The blueprints (formerly milestones): what each group of tasks is for, its exit criteria and progress. `harness tasks list --blueprint M5` and the agents' `task_next` take one blueprint's tasks. The former names (`tasks milestones`, `--milestone`, the backlog keys `milestones:` and `milestone:`) are still accepted. harness ui: Work › Blueprints. |
 | `harness tasks export [file]` | Writes the tasks the backlog file lacks (added by hand, approved proposals, tasks made from findings) at the end of its `tasks:` list; the rest of the file is kept as it is. A missing file is written whole. |
 | `harness tasks proposals [--status]` | The tasks agents proposed. `harness tasks approve <id>` makes the task; `harness tasks reject <id> --note …` closes the proposal. harness ui: Work › Inbox. |
 

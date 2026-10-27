@@ -452,8 +452,8 @@ internal static class CommandBindings
             Arity = ArgumentArity.OneOrMore,
         };
         command.Options.Add(statusOption);
-        var milestoneOption = new Option<string>("--milestone") { DefaultValueFactory = _ => "", Description = null };
-        command.Options.Add(milestoneOption);
+        var blueprintOption = new Option<string>("--blueprint") { DefaultValueFactory = _ => "", Description = null };
+        command.Options.Add(blueprintOption);
         var allOption = new Option<bool>("--all") { DefaultValueFactory = _ => false, Description = null };
         command.Options.Add(allOption);
         return result => new Harness.Cli.Tasks.TaskListSettings
@@ -461,7 +461,7 @@ internal static class CommandBindings
             Project = result.GetValue(projectOption) ?? "",
             Json = result.GetValue(jsonOption),
             Status = result.GetValue(statusOption) ?? [],
-            Milestone = result.GetValue(milestoneOption) ?? "",
+            Blueprint = result.GetValue(blueprintOption) ?? "",
             All = result.GetValue(allOption),
         };
     }
@@ -528,13 +528,13 @@ internal static class CommandBindings
             Description = "Machine-readable output",
         };
         command.Options.Add(jsonOption);
-        var milestoneOption = new Option<string>("--milestone") { DefaultValueFactory = _ => "", Description = null };
-        command.Options.Add(milestoneOption);
+        var blueprintOption = new Option<string>("--blueprint") { DefaultValueFactory = _ => "", Description = null };
+        command.Options.Add(blueprintOption);
         return result => new Harness.Cli.Tasks.TaskNextSettings
         {
             Project = result.GetValue(projectOption) ?? "",
             Json = result.GetValue(jsonOption),
-            Milestone = result.GetValue(milestoneOption) ?? "",
+            Blueprint = result.GetValue(blueprintOption) ?? "",
         };
     }
 
@@ -600,8 +600,8 @@ internal static class CommandBindings
             Description = null,
         };
         command.Options.Add(priorityOption);
-        var milestoneOption = new Option<string>("--milestone") { DefaultValueFactory = _ => "", Description = null };
-        command.Options.Add(milestoneOption);
+        var blueprintOption = new Option<string>("--blueprint") { DefaultValueFactory = _ => "", Description = null };
+        command.Options.Add(blueprintOption);
         var dependsOption = new Option<string[]>("--depends")
         {
             DefaultValueFactory = _ => [],
@@ -636,7 +636,7 @@ internal static class CommandBindings
             Goal = result.GetValue(goalOption) ?? "",
             Type = result.GetValue(typeOption) ?? "",
             Priority = result.GetValue(priorityOption) ?? "",
-            Milestone = result.GetValue(milestoneOption) ?? "",
+            Blueprint = result.GetValue(blueprintOption) ?? "",
             Depends = result.GetValue(dependsOption) ?? [],
             Accept = result.GetValue(acceptOption) ?? [],
             Scope = result.GetValue(scopeOption) ?? [],

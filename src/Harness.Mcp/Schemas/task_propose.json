@@ -1,5 +1,5 @@
 {
-  "description": "Propose a task the user has not planned yet (work you found, a follow-up): title, goal (the outcome and why), acceptance criteria that can be checked, and optionally type, priority, milestone, depends_on and scope. Agents propose tasks, never create them (not in the backlog file either): it waits for the user in harness ui, Work › Inbox, who approves it (the task is made) or rejects it.",
+  "description": "Propose a task the user has not planned yet (work you found, a follow-up): title, goal (the outcome and why), acceptance criteria that can be checked, and optionally type, priority, blueprint, depends_on and scope. Agents propose tasks, never create them (not in the backlog file either): it waits for the user in harness ui, Work › Inbox, who approves it (the task is made) or rejects it.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -28,7 +28,7 @@
         "type": "string",
         "description": "low, medium (default), high or critical"
       },
-      "milestone": {
+      "blueprint": {
         "type": "string"
       },
       "depends_on": {
@@ -79,7 +79,7 @@
               "id": {
                 "type": "string"
               },
-              "milestone": {
+              "blueprint": {
                 "type": "string"
               },
               "title": {

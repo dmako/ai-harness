@@ -32,7 +32,7 @@
           "title": {
             "type": "string"
           },
-          "milestone": {
+          "blueprint": {
             "type": "string"
           },
           "status": {

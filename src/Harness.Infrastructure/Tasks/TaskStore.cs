@@ -46,19 +46,19 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
     public IReadOnlyList<TaskRecord> List(TaskFilter? filter = null, CancellationToken cancellationToken = default) =>
         Read((c, t) => List(c, t, filter ?? new()), cancellationToken);
 
-    public TaskRecord? Next(string milestone = "", CancellationToken cancellationToken = default) =>
-        Read((c, t) => Next(c, t, milestone), cancellationToken);
+    public TaskRecord? Next(string blueprint = "", CancellationToken cancellationToken = default) =>
+        Read((c, t) => Next(c, t, blueprint), cancellationToken);
 
-    private static TaskRecord? Next(SqliteConnection c, SqliteTransaction t, string milestone)
+    private static TaskRecord? Next(SqliteConnection c, SqliteTransaction t, string blueprint)
     {
         using var command = Command(
             c,
             t,
             """
-            SELECT id FROM tasks WHERE status='ready' AND ($milestone='' OR milestone=$milestone)
+            SELECT id FROM tasks WHERE status='ready' AND ($blueprint='' OR blueprint=$blueprint)
             ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,ordinal,id LIMIT 1
             """,
-            ("$milestone", milestone)
+            ("$blueprint", blueprint)
         );
         return command.ExecuteScalar() is string id ? Get(c, t, id) : null;
     }
@@ -249,10 +249,10 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
             sql += " AND status IN (SELECT value FROM json_each($statuses))";
             parameters.Add(("$statuses", Json(filter.Statuses)));
         }
-        if (filter.Milestone.Length is not 0)
+        if (filter.Blueprint.Length is not 0)
         {
-            sql += " AND milestone=$milestone";
-            parameters.Add(("$milestone", filter.Milestone));
+            sql += " AND blueprint=$blueprint";
+            parameters.Add(("$blueprint", filter.Blueprint));
         }
         sql += " ORDER BY ordinal,id";
         if (filter.Limit > 0)
@@ -281,7 +281,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
                 c,
                 t,
                 """
-                SELECT id,milestone,title,type,priority,status,goal,scope,validation,notes,
+                SELECT id,blueprint,title,type,priority,status,goal,scope,validation,notes,
                     blocked_reason,claimant,claim_token,claimed_at,lease_until,completion_summary,completion_commit,completion_checks,completed_by,completed_at,
                     source,ordinal,created_at,updated_at FROM tasks WHERE id=$id
                 """,
@@ -302,7 +302,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
                 Definition = new()
                 {
                     Id = Text(0),
-                    Milestone = Text(1),
+                    Blueprint = Text(1),
                     Title = Text(2),
                     Type = Text(3),
                     Priority = Text(4),
@@ -412,7 +412,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
 
     private static string? Null(string value) => value.Length is 0 ? null : value;
 
-    // Milestone exit JSON is compared byte-for-byte on reimport. Preserve canonical
+    // Blueprint exit JSON is compared byte-for-byte on reimport. Preserve canonical
     // UTF-8 strings, HTML escaping and supplementary runes rather than STJ's ASCII escaping.
     private static string Json(IReadOnlyList<string>? values)
     {

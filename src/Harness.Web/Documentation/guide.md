@@ -51,14 +51,17 @@ it to record them.
 
 ## How to define work
 
-Work is a list of tasks, grouped into milestones, kept in a backlog file
+Work is a list of tasks, grouped into blueprints, kept in a backlog file
 (`docs/backlog.yaml` by default) and loaded with `harness tasks import`.
 `harness tasks import --help` shows the format with an example.
 
 A good task names its goal (the outcome and why), its scope (the paths it
 may touch), its dependencies, and acceptance criteria that can be checked:
 the agent completes a task only by reporting every criterion with
-evidence. Milestones say what a group of tasks is for and when it is done.
+evidence. Blueprints say what a group of tasks is for and when it is done.
+They were called milestones: backlog files with `milestones:` and
+`milestone:` still import, and a project's database is migrated on first
+use.
 
 Agents take the next ready task (`task_next`), work on it and complete it
 (`task_complete`). You follow the queue in harness ui (Work) or with

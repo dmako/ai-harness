@@ -30,7 +30,7 @@ public sealed partial class TaskStore
         );
 
     public TaskClaimResult? ClaimNext(
-        string milestone,
+        string blueprint,
         TaskActor actor,
         TimeSpan lease = default,
         CancellationToken cancellationToken = default
@@ -39,7 +39,7 @@ public sealed partial class TaskStore
             (c, t) =>
             {
                 Refresh(c, t);
-                var next = Next(c, t, milestone);
+                var next = Next(c, t, blueprint);
                 return next is null ? null : Claim(c, t, next.Id, actor, lease);
             },
             cancellationToken

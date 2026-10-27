@@ -390,7 +390,7 @@ select { max-width: 100%; }
 }
 .task { scroll-margin-top: 70px; }
 
-/* --- milestones --- */
+/* --- blueprints --- */
 .mtitle { font-weight: 500; color: var(--ink-2); margin-left: 8px; }
 .mhead { grid-template-columns: 16px minmax(0, auto) 1fr minmax(160px, 280px); }
 .mname { overflow-wrap: anywhere; }

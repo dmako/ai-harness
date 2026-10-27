@@ -37,7 +37,7 @@ internal static class TaskTools
         };
     }
 
-    /// <summary>The next ready task in the milestone, claimed when asked to.</summary>
+    /// <summary>The next ready task in the blueprint, claimed when asked to.</summary>
     private static async Task<JsonObjectMap> NextAsync(
         JsonElement values,
         ITaskSession session,
@@ -45,13 +45,13 @@ internal static class TaskTools
         CancellationToken token
     )
     {
-        var milestone = Text(values, "milestone").Trim();
+        var blueprint = Text(values, "blueprint").Trim();
         if (values.TryGetProperty("claim", out var claim) && claim.GetBoolean())
         {
-            var next = await session.ClaimNextTaskAsync(milestone, actor, Lease(values), token);
+            var next = await session.ClaimNextTaskAsync(blueprint, actor, Lease(values), token);
             return next is null ? Empty() : Claimed(next);
         }
-        var ready = await session.NextTaskAsync(milestone, token);
+        var ready = await session.NextTaskAsync(blueprint, token);
         return ready is null
             ? Empty()
             : new JsonObjectMap
@@ -275,7 +275,7 @@ internal static class TaskTools
             Acceptance = Strings(values, "acceptance"),
             Type = Text(values, "type").Trim(),
             Priority = Text(values, "priority").Trim(),
-            Milestone = Text(values, "milestone"),
+            Blueprint = Text(values, "blueprint"),
             Scope = Strings(values, "scope"),
             DependsOn = Strings(values, "depends_on").Select(d => d.Trim().ToUpperInvariant()).ToArray(),
         };

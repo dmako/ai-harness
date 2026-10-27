@@ -1,6 +1,6 @@
 # Code metrics
 
-Cyclomatic complexity findings (milestone `Metrics`) come from two sources.
+Cyclomatic complexity findings (blueprint `Metrics`) come from two sources.
 Harness counts complexity lexically from the tokens its clone extractor already
 reads, on every sync. For .NET projects, a background worker can replace those
 counts with exact values from `Microsoft.CodeAnalysis.Metrics`. This page

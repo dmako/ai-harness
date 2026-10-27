@@ -29,7 +29,7 @@ public static class BacklogCodec
                 throw new InvalidDataException("unsupported backlog version 0 (want 1)");
             }
 
-            var root = Mapping(stream.Documents[0].RootNode, ["version", "milestones", "tasks"]);
+            var root = Mapping(stream.Documents[0].RootNode, ["version", "blueprints", "milestones", "tasks"]);
             var versionText = Scalar(root.GetValueOrDefault("version"));
             var version = versionText.Length is 0 ? 0 : int.Parse(versionText, CultureInfo.InvariantCulture);
             if (version is not 1)
@@ -44,6 +44,7 @@ public static class BacklogCodec
                         node,
                         [
                             "id",
+                            "blueprint",
                             "milestone",
                             "title",
                             "type",
@@ -60,7 +61,7 @@ public static class BacklogCodec
                     return new TaskDefinition
                     {
                         Id = Text(d, "id"),
-                        Milestone = Text(d, "milestone"),
+                        Blueprint = Scalar(Renamed(d, "blueprint", "milestone")),
                         Title = Text(d, "title"),
                         Type = Text(d, "type"),
                         Priority = Text(d, "priority"),
@@ -74,11 +75,11 @@ public static class BacklogCodec
                     };
                 })
                 .ToArray();
-            var milestones = Sequence(root.GetValueOrDefault("milestones"))
+            var blueprints = Sequence(Renamed(root, "blueprints", "milestones"))
                 .Select(node =>
                 {
                     var d = Mapping(node, ["id", "title", "goal", "exit", "notes"]);
-                    return new MilestoneDefinition(
+                    return new BlueprintDefinition(
                         Text(d, "id"),
                         Text(d, "title"),
                         Text(d, "goal"),
@@ -87,7 +88,7 @@ public static class BacklogCodec
                     );
                 })
                 .ToArray();
-            return new(version, tasks, milestones);
+            return new(version, tasks, blueprints);
         }
         catch (Exception exception)
             when (exception is YamlException or InvalidDataException or FormatException or OverflowException)
@@ -170,6 +171,12 @@ public static class BacklogCodec
             _ => throw new InvalidDataException("expected a sequence"),
         };
 
+    // Blueprints were called milestones (TASK-0047): older backlog files still read.
+    private static YamlNode? Renamed(Dictionary<string, YamlNode> d, string key, string former) =>
+        d.ContainsKey(key) && d.ContainsKey(former)
+            ? throw new InvalidDataException($"give '{key}' or its former name '{former}', not both")
+            : d.GetValueOrDefault(key) ?? d.GetValueOrDefault(former);
+
     private static string Text(Dictionary<string, YamlNode> d, string key) => Scalar(d.GetValueOrDefault(key));
 
     private static string[] Strings(Dictionary<string, YamlNode> d, string key) =>
@@ -179,9 +186,9 @@ public static class BacklogCodec
     {
         ArgumentNullException.ThrowIfNull(file);
         Dictionary<string, object> root = new() { ["version"] = file.Version };
-        if (file.Milestones.Count is not 0)
+        if (file.Blueprints.Count is not 0)
         {
-            root["milestones"] = file.Milestones.Select(MilestoneMap).ToArray();
+            root["blueprints"] = file.Blueprints.Select(BlueprintMap).ToArray();
         }
 
         root["tasks"] = file.Tasks.Select(DefinitionMap).ToArray();
@@ -214,7 +221,7 @@ public static class BacklogCodec
     private static Dictionary<string, object> DefinitionMap(TaskDefinition d)
     {
         Dictionary<string, object> map = new() { ["id"] = d.Id };
-        Add(map, "milestone", d.Milestone);
+        Add(map, "blueprint", d.Blueprint);
         map["title"] = d.Title;
         Add(map, "type", d.Type);
         Add(map, "priority", d.Priority);
@@ -228,7 +235,7 @@ public static class BacklogCodec
         return map;
     }
 
-    private static Dictionary<string, object> MilestoneMap(MilestoneDefinition d)
+    private static Dictionary<string, object> BlueprintMap(BlueprintDefinition d)
     {
         Dictionary<string, object> map = new() { ["id"] = d.Id, ["title"] = d.Title };
         Add(map, "goal", d.Goal);

@@ -280,7 +280,7 @@ internal sealed partial class UiReadService
         );
     }
 
-    /// <summary>A project's memories, tasks and milestones matching the query.</summary>
+    /// <summary>A project's memories, tasks and blueprints matching the query.</summary>
     [SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",
@@ -319,15 +319,15 @@ internal sealed partial class UiReadService
             }
         }
         command.CommandText =
-            "SELECT id,title FROM milestones WHERE lower(id) LIKE $q OR lower(title) LIKE $q UNION SELECT DISTINCT milestone,'' FROM tasks WHERE lower(milestone) LIKE $q AND milestone NOT IN (SELECT id FROM milestones) ORDER BY 1 LIMIT 5";
-        using var milestones = await command.ExecuteReaderAsync(token);
-        while (await milestones.ReadAsync(token))
+            "SELECT id,title FROM blueprints WHERE lower(id) LIKE $q OR lower(title) LIKE $q UNION SELECT DISTINCT blueprint,'' FROM tasks WHERE lower(blueprint) LIKE $q AND blueprint NOT IN (SELECT id FROM blueprints) ORDER BY 1 LIMIT 5";
+        using var blueprints = await command.ExecuteReaderAsync(token);
+        while (await blueprints.ReadAsync(token))
         {
             hits.Add(
-                "milestone",
-                (milestones.GetString(0) + " " + milestones.GetString(1)).Trim(),
+                "blueprint",
+                (blueprints.GetString(0) + " " + blueprints.GetString(1)).Trim(),
                 project: project,
-                reference: milestones.GetString(0)
+                reference: blueprints.GetString(0)
             );
         }
     }

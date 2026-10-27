@@ -211,6 +211,43 @@ public sealed class TaskExecutionTests
     }
 
     [Fact]
+    public async Task McpTaskToolsTakeBlueprintsAndStillAcceptTheFormerMilestoneArgument()
+    {
+        using var state = new State();
+        state.Store.Import([Definition("T-1") with { Blueprint = "M1" }], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> NextAsync(Dictionary<string, object?> arguments)
+        {
+            var result = await client.CallToolAsync("task_next", arguments, cancellationToken: Token);
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value.GetProperty("task");
+        }
+
+        (await NextAsync(new() { ["blueprint"] = "M1" })).GetProperty("blueprint").GetString().Should().Be("M1");
+        (await NextAsync(new() { ["milestone"] = "M1" })).GetProperty("id").GetString().Should().Be("T-1");
+        (await NextAsync(new() { ["milestone"] = "M2" })).ValueKind.Should().Be(JsonValueKind.Null);
+        var both = await client.CallToolAsync(
+            "task_next",
+            new Dictionary<string, object?> { ["blueprint"] = "M1", ["milestone"] = "M1" },
+            cancellationToken: Token
+        );
+        both.IsError.Should().BeTrue();
+        var proposed = await client.CallToolAsync(
+            "task_propose",
+            new Dictionary<string, object?>
+            {
+                ["title"] = "Proposed",
+                ["goal"] = "Former argument name",
+                ["acceptance"] = new[] { "Kept" },
+                ["milestone"] = "M1",
+            },
+            cancellationToken: Token
+        );
+        proposed.IsError.Should().NotBe(true);
+        state.Store.Proposals(cancellationToken: Token).Should().ContainSingle().Which.Task.Blueprint.Should().Be("M1");
+    }
+
+    [Fact]
     public async Task IndependentMcpProcessesCompeteForOneClaimAndAtomicallyDrainNextTasks()
     {
         using var state = new State();

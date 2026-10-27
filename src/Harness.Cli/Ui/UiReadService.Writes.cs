@@ -222,7 +222,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             "goal",
             "type",
             "priority",
-            "milestone",
+            "blueprint",
             "depends_on",
             "acceptance",
             "scope"
@@ -234,7 +234,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             Goal = fields.Text("goal").Trim(),
             Type = fields.Text("type").Trim(),
             Priority = fields.Text("priority").Trim(),
-            Milestone = fields.Text("milestone").Trim(),
+            Blueprint = fields.Text("blueprint").Trim(),
             DependsOn = fields
                 .List("depends_on")
                 .Select(s => s.Trim().ToUpperInvariant())

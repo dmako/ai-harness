@@ -69,7 +69,7 @@ public sealed class KnowledgeLevelTests
         var path = levels.KnowledgePath(workspaces, MemoryScope.Parse("workspace:home"));
         using (var workspace = HarnessDatabase.Open(path, cancellationToken: Token))
         {
-            workspace.SchemaVersion().Should().Be(19);
+            workspace.SchemaVersion().Should().Be(20);
         }
 
         Directory.CreateDirectory(Path.Combine(directory.Path, "knowledge", "user.db"));
