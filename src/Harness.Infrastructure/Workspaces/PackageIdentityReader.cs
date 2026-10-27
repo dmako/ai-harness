@@ -6,18 +6,14 @@ using Harness.Infrastructure.Retrieval;
 namespace Harness.Infrastructure.Workspaces;
 
 /// <summary>Reads package identity without loading MSBuild, SDKs, targets or user code.</summary>
-internal sealed class PackageIdentityReader(string root, RetrievalFileReader reader)
+internal sealed partial class PackageIdentityReader(string root, RetrievalFileReader reader)
 {
-    private static readonly Regex Property = new(
-        @"\$\(([A-Za-z_][\w.]*)\)",
-        RegexOptions.NonBacktracking,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex Comparison = new(
-        "\\A['\"]([^'\"]*)['\"]\\s*(==|!=)\\s*['\"]([^'\"]*)['\"]\\z",
-        RegexOptions.NonBacktracking,
-        TimeSpan.FromSeconds(1)
-    );
+    [GeneratedRegex(@"\$\(([A-Za-z_][\w.]*)\)", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex Property { get; }
+
+    [GeneratedRegex("\\A['\"]([^'\"]*)['\"]\\s*(==|!=)\\s*['\"]([^'\"]*)['\"]\\z", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex Comparison { get; }
+
     private readonly HashSet<string> _seen = new(
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal
     );

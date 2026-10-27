@@ -26,19 +26,42 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
     private readonly Dictionary<(string From, string To, string Style), SystemLink> _links = [];
     private readonly Dictionary<string, List<(string Member, string At)>> _databases = new(StringComparer.Ordinal);
     private readonly List<SystemContract> _contracts = [];
-    private static readonly Regex Interface = Rx(@"\binterface\s+(I\w+)");
-    private static readonly Regex Class = Rx(@"\bclass\s+(\w+)[^{;:]*?:\s*([^{;]+)");
-    private static readonly Regex ClassWord = Rx(@"\bclass\s+\w+");
-    private static readonly Regex Proto = Rx(@"^\s*service\s+(\w+)\s*\{");
-    private static readonly Regex ContextBase = Rx(@"(?:^|\.)\w*(?:DbContext|Context)\b");
-    private static readonly Regex DatabaseWords = Rx(
-        @"^(?:Base|Migration|Migrated|Runtime|Design|Pooled)|(?:Base|Migration|Migrated|Runtime|Design|Pooled)$"
-    );
-    private static readonly Regex ConnectionKey = Rx("GetConnectionString\\(\\s*\"(\\w+)\"");
-    private static readonly Regex Plumbing = Rx(
-        @"keycloak|auth|issuer|authority|oidc|openid|kestrel|swagger|openapi|sentry|logging|serilog|otel|telemetry|redirect|callback|cors|origins|detailsurl|frontend|appurl|rooturl|publicurl|selfurl|baseurlpath"
-    );
-    private static readonly Regex UrlHost = Rx(@"^[a-z][a-z0-9+.-]*://([^/:?#]+)");
+
+    [GeneratedRegex(@"\binterface\s+(I\w+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Interface { get; }
+
+    [GeneratedRegex(@"\bclass\s+(\w+)[^{;:]*?:\s*([^{;]+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Class { get; }
+
+    [GeneratedRegex(@"\bclass\s+\w+", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex ClassWord { get; }
+
+    [GeneratedRegex(@"^\s*service\s+(\w+)\s*\{", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Proto { get; }
+
+    [GeneratedRegex(@"(?:^|\.)\w*(?:DbContext|Context)\b", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex ContextBase { get; }
+
+    [GeneratedRegex(
+        @"^(?:Base|Migration|Migrated|Runtime|Design|Pooled)|(?:Base|Migration|Migrated|Runtime|Design|Pooled)$",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex DatabaseWords { get; }
+
+    [GeneratedRegex("GetConnectionString\\(\\s*\"(\\w+)\"", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex ConnectionKey { get; }
+
+    [GeneratedRegex(
+        @"keycloak|auth|issuer|authority|oidc|openid|kestrel|swagger|openapi|sentry|logging|serilog|otel|telemetry|redirect|callback|cors|origins|detailsurl|frontend|appurl|rooturl|publicurl|selfurl|baseurlpath",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex Plumbing { get; }
+
+    [GeneratedRegex(@"^[a-z][a-z0-9+.-]*://([^/:?#]+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex UrlHost { get; }
+
     private static readonly string[] Suffixes =
     [
         "webapi",
@@ -159,7 +182,7 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         public Dictionary<string, (string Owner, string At)> Declarations { get; } = declarations;
 
         public Regex Word { get; } =
-            Rx(
+            EcosystemReader.Rx(
                 @"\b("
                     + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape))
                     + @")\b"
@@ -517,8 +540,6 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
     }
 
     private static string At(string file, int line) => file + ":" + line.ToString(CultureInfo.InvariantCulture);
-
-    private static Regex Rx(string pattern) => EcosystemReader.Rx(pattern);
 
     private static string First(Regex regex, string text) =>
         regex.Match(text) is { Success: true } match ? match.Groups[1].Value.Trim() : "";

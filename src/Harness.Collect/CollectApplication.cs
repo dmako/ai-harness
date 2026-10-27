@@ -16,7 +16,7 @@ public static partial class CollectApplication
     public const int MaxBody = 1 << 20;
 
     [GeneratedRegex("^m_[0-9a-f]{16}$", RegexOptions.CultureInvariant)]
-    private static partial Regex MachineId();
+    private static partial Regex MachineId { get; }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Reliability",
@@ -73,7 +73,7 @@ public static partial class CollectApplication
                     || version is not 1
                     || obj["machine"] is not JsonValue machine
                     || !machine.TryGetValue<string>(out var id)
-                    || !MachineId().IsMatch(id)
+                    || !MachineId.IsMatch(id)
                 )
                 {
                     return Results.Text("not a harness report (schema 1 with a machine id)\n", statusCode: 400);
@@ -120,7 +120,7 @@ public static partial class CollectApplication
                 id = id.EndsWith(".json", StringComparison.Ordinal) ? id[..^5] : id;
                 var file = Path.Combine(directory, id, "latest.json");
                 return
-                    MachineId().IsMatch(id)
+                    MachineId.IsMatch(id)
                     && File.Exists(file)
                     && !IsLink(file)
                     && !IsLink(Path.GetDirectoryName(file)!)
@@ -146,7 +146,7 @@ public static partial class CollectApplication
         foreach (
             var dir in Directory
                 .EnumerateDirectories(directory)
-                .Where(d => MachineId().IsMatch(Path.GetFileName(d)) && !IsLink(d))
+                .Where(d => MachineId.IsMatch(Path.GetFileName(d)) && !IsLink(d))
                 .OrderByDescending(d => File.GetLastWriteTimeUtc(Path.Combine(d, "latest.json")))
         )
         {

@@ -25,18 +25,18 @@ public sealed class ExportState
 }
 
 /// <summary>Explicit, aggregate-only export. This class never starts providers or reads source files.</summary>
-public sealed class DeveloperExport(string directory)
+public sealed partial class DeveloperExport(string directory)
 {
-    private static readonly Regex Paths = new(
+    [GeneratedRegex(
         @"(?:[A-Za-z]:)?(?:[~.]?[A-Za-z0-9_@.\-]*[/\\])+[A-Za-z0-9_@.\-]*[A-Za-z_][A-Za-z0-9_@.\-]*|[a-z]+://\S+",
         RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex Ids = new(
-        @"\b(?:prj|mem|clm|wt|pp)_[0-9a-f]{8,}\b",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
+        1000
+    )]
+    private static partial Regex Paths { get; }
+
+    [GeneratedRegex(@"\b(?:prj|mem|clm|wt|pp)_[0-9a-f]{8,}\b", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex Ids { get; }
+
     public string StatePath => Path.Combine(directory, "telemetry.json");
     public string LogPath => Path.Combine(directory, "telemetry.log");
 

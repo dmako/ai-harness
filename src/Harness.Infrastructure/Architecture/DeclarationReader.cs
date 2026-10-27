@@ -4,19 +4,34 @@ using Harness.Core.Workspaces;
 
 namespace Harness.Infrastructure.Architecture;
 
-public static class DeclarationReader
+public static partial class DeclarationReader
 {
-    private static readonly Regex CSharp = EcosystemReader.Rx(
-        @"^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly|ref)\s+)*(record\s+struct|record\s+class|class|interface|record|struct|enum)\s+([A-Za-z_]\w*)"
-    );
-    private static readonly Regex Go = EcosystemReader.Rx(@"^(?:type\s+([A-Z]\w*)|func\s+([A-Z]\w*)\s*[\[(])");
-    private static readonly Regex TypeScript = EcosystemReader.Rx(
-        @"^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(class|interface|function|type|enum|const)\s+([A-Za-z_$][\w$]*)"
-    );
-    private static readonly Regex CSharpBases = EcosystemReader.Rx(
-        @"^\s*(?:<[^>{]*>)?\s*(?:\([^){]*\))?\s*:\s*([^{]+?)\s*(?:\bwhere\b|\{|$)"
-    );
-    private static readonly Regex TypeScriptBases = EcosystemReader.Rx(@"\b(?:extends|implements)\s+([^{]+)");
+    [GeneratedRegex(
+        @"^\s*public\s+(?:(?:sealed|static|abstract|partial|readonly|ref)\s+)*(record\s+struct|record\s+class|class|interface|record|struct|enum)\s+([A-Za-z_]\w*)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex CSharp { get; }
+
+    [GeneratedRegex(@"^(?:type\s+([A-Z]\w*)|func\s+([A-Z]\w*)\s*[\[(])", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Go { get; }
+
+    [GeneratedRegex(
+        @"^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(class|interface|function|type|enum|const)\s+([A-Za-z_$][\w$]*)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex TypeScript { get; }
+
+    [GeneratedRegex(
+        @"^\s*(?:<[^>{]*>)?\s*(?:\([^){]*\))?\s*:\s*([^{]+?)\s*(?:\bwhere\b|\{|$)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex CSharpBases { get; }
+
+    [GeneratedRegex(@"\b(?:extends|implements)\s+([^{]+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex TypeScriptBases { get; }
 
     public static IReadOnlyList<DeclaredType> Read(AnalysisRepository repository)
     {

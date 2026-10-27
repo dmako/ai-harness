@@ -9,11 +9,19 @@ public sealed record BoundaryGroup(string Name, string[] Patterns, RuleReference
 public sealed record BoundaryRuleError(RuleReference Reference, string Error);
 
 /// <summary>Recorded groups and rules, collected from narrow to wide scope. Prose is ignored.</summary>
-public sealed class BoundaryRules
+public sealed partial class BoundaryRules
 {
-    private static readonly Regex Start = Rx(@"(?i)^(group\s|layers\s*:|forbid\s*:|only\s*:)");
-    private static readonly Regex GroupLine = Rx(@"(?i)^group\s+([A-Za-z][\w-]*)\s*=\s*(.+)$");
-    private static readonly Regex Identifier = Rx(@"^[A-Za-z][\w-]*$");
+    private const RegexOptions Options = RegexOptions.CultureInvariant | RegexOptions.ECMAScript;
+
+    [GeneratedRegex(@"(?i)^(group\s|layers\s*:|forbid\s*:|only\s*:)", Options, 1000)]
+    private static partial Regex Start { get; }
+
+    [GeneratedRegex(@"(?i)^group\s+([A-Za-z][\w-]*)\s*=\s*(.+)$", Options, 1000)]
+    private static partial Regex GroupLine { get; }
+
+    [GeneratedRegex(@"^[A-Za-z][\w-]*$", Options, 1000)]
+    private static partial Regex Identifier { get; }
+
     private readonly Dictionary<string, Regex> _patterns = new(StringComparer.Ordinal);
     public List<BoundaryGroup> Groups { get; } = [];
     public List<BoundaryRule> Rules { get; } = [];
@@ -240,6 +248,5 @@ public sealed class BoundaryRules
             .Where(word => word.Length > 0)
             .ToArray();
 
-    private static Regex Rx(string pattern) =>
-        new(pattern, RegexOptions.CultureInvariant | RegexOptions.ECMAScript, TimeSpan.FromSeconds(1));
+    private static Regex Rx(string pattern) => new(pattern, Options, TimeSpan.FromSeconds(1));
 }

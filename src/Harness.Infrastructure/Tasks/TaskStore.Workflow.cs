@@ -87,7 +87,7 @@ public sealed partial class TaskStore
             );
             prefix = latest.ExecuteScalar() is string id ? id.Split('-')[0] : "TASK";
         }
-        if (!PrefixPattern().IsMatch(prefix))
+        if (!PrefixPattern.IsMatch(prefix))
         {
             throw new ArgumentException(
                 $"invalid id prefix {TaskWorkflow.Quote(prefix)} (want capital letters and digits, e.g. TASK)"
@@ -269,5 +269,5 @@ public sealed partial class TaskStore
     }
 
     [GeneratedRegex(@"\A[A-Z][A-Z0-9]*\z", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex PrefixPattern();
+    private static partial Regex PrefixPattern { get; }
 }

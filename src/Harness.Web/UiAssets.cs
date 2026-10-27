@@ -116,10 +116,10 @@ public static partial class UiAssets
     }
 
     private static string Slug(string title) =>
-        SlugCharacters().Replace(title.Trim().ToLowerInvariant(), "").Replace(' ', '-');
+        SlugCharacters.Replace(title.Trim().ToLowerInvariant(), "").Replace(' ', '-');
 
     [GeneratedRegex("[^a-z0-9 -]", RegexOptions.NonBacktracking)]
-    private static partial Regex SlugCharacters();
+    private static partial Regex SlugCharacters { get; }
 
     private static List<UiSection> ReadSections()
     {

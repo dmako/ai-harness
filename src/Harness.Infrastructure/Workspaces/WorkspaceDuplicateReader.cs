@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Harness.Core.Architecture;
 using Harness.Core.Retrieval;
 using Harness.Core.Workspaces;
@@ -15,11 +16,19 @@ public sealed partial class WorkspaceDuplicateReader(
 {
     private readonly WorkspaceEvidenceReader _evidence = evidence ?? new(members);
     private readonly Dictionary<(string Member, string Path), string[]> _normalized = [];
-    private static readonly System.Text.RegularExpressions.Regex Comment = EcosystemReader.Rx(@"^\s*(//|#|\*|/\*)");
-    private static readonly System.Text.RegularExpressions.Regex Import = EcosystemReader.Rx(
-        @"^\s*(using\s|import\s|package\s|namespace\s|from\s|require\(|#include)"
-    );
-    private static readonly System.Text.RegularExpressions.Regex Space = EcosystemReader.Rx(@"\s+");
+
+    [GeneratedRegex(@"^\s*(//|#|\*|/\*)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Comment { get; }
+
+    [GeneratedRegex(
+        @"^\s*(using\s|import\s|package\s|namespace\s|from\s|require\(|#include)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex Import { get; }
+
+    [GeneratedRegex(@"\s+", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Space { get; }
 
     /// <summary>
     /// What the members hold: declared types by name, normalized code files by content hash, and notes

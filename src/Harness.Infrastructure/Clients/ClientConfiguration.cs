@@ -63,13 +63,11 @@ public interface IAgentClient
     string Missing(ClientTarget target);
 }
 
-public sealed class ClientConfiguration(ClientPaths paths)
+public sealed partial class ClientConfiguration(ClientPaths paths)
 {
-    private static readonly Regex Variables = new(
-        @"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
+    [GeneratedRegex(@"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex Variables { get; }
+
     public IReadOnlyList<IAgentClient> All { get; } = [new ClaudeClient(paths), new CodexClient(paths)];
 
     public IAgentClient Get(string id) =>

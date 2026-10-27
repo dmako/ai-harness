@@ -1,13 +1,14 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Harness.Core.Projects;
 using Harness.Core.Serialization;
 using Harness.Infrastructure.Storage;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed class MachineRegistry(string path)
+public sealed partial class MachineRegistry(string path)
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
@@ -114,17 +115,15 @@ public sealed class MachineRegistry(string path)
             token
         );
 
+    [GeneratedRegex(@"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex ProjectName { get; }
+
     public async Task<JsonObject> RenameAsync(string id, string? name, string? title, CancellationToken token = default)
     {
         name = name?.Trim();
         if (
             name is { Length: > 0 }
-            && !System.Text.RegularExpressions.Regex.IsMatch(
-                name,
-                @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z",
-                System.Text.RegularExpressions.RegexOptions.NonBacktracking,
-                TimeSpan.FromSeconds(1)
-            )
+            && !ProjectName.IsMatch(name)
         )
         {
             throw new InvalidOperationException(

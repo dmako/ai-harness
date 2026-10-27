@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Harness.Core.Graphify;
 using Harness.Infrastructure.Graphify;
 using Harness.Providers.Graphify;
@@ -7,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Harness.Graphify;
 
-public static class GraphifyApplication
+public static partial class GraphifyApplication
 {
     public static async Task<int> RunAsync(
         string[] args,
@@ -123,6 +124,9 @@ public static class GraphifyApplication
         return (options, clean, false);
     }
 
+    [GeneratedRegex(@"^(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex DurationPart { get; }
+
     private static TimeSpan Duration(string value)
     {
         var sign = value.StartsWith('-') ? -1 : 1;
@@ -140,12 +144,7 @@ public static class GraphifyApplication
         decimal nanoseconds = 0;
         while (remaining.Length > 0)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(
-                remaining,
-                @"^(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)",
-                System.Text.RegularExpressions.RegexOptions.NonBacktracking,
-                TimeSpan.FromSeconds(1)
-            );
+            var match = DurationPart.Match(remaining);
             if (
                 !match.Success
                 || !decimal.TryParse(

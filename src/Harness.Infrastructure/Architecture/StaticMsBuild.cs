@@ -9,10 +9,16 @@ namespace Harness.Infrastructure.Architecture;
 /// <summary>Bounded property/item evaluation; never loads MSBuild or executes project code.</summary>
 public sealed partial class StaticMsBuild(AnalysisRepository repository)
 {
-    private static readonly Regex Property = Rx(@"\$\(([A-Za-z_][\w.]*)\)");
-    private static readonly Regex Above = Rx(
-        @"(?i)^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?([^',)]+)'?\s*(?:,\s*'?([^')]*)'?\s*)?\)\)$"
-    );
+    [GeneratedRegex(@"\$\(([A-Za-z_][\w.]*)\)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Property { get; }
+
+    [GeneratedRegex(
+        @"(?i)^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?([^',)]+)'?\s*(?:,\s*'?([^')]*)'?\s*)?\)\)$",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex Above { get; }
+
     private readonly Dictionary<string, XElement?> _xml = new(StringComparer.Ordinal);
 
     private sealed class Context
@@ -500,7 +506,4 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             .FirstOrDefault(attribute => attribute.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))
             ?.Value
         ?? "";
-
-    private static Regex Rx(string pattern) =>
-        new(pattern, RegexOptions.ECMAScript | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 }

@@ -167,7 +167,7 @@ public static partial class TaskWorkflow
     public static IReadOnlyList<string> Types { get; } =
     ["feature", "bug", "chore", "spike", "docs", "test", "process"];
 
-    public static bool ValidId(string id) => IdPattern().IsMatch(id);
+    public static bool ValidId(string id) => IdPattern.IsMatch(id);
 
     public static string ParseStatus(string value)
     {
@@ -213,5 +213,5 @@ public static partial class TaskWorkflow
     };
 
     [GeneratedRegex(@"\A[A-Z][A-Z0-9]*-[0-9A-Za-z][0-9A-Za-z._-]*\z", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex IdPattern();
+    private static partial Regex IdPattern { get; }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using Harness.Core.Architecture;
@@ -8,10 +9,15 @@ namespace Harness.Infrastructure.Architecture;
 
 public sealed partial class BuildReader(AnalysisRepository repository, EcosystemReader ecosystem)
 {
-    private static readonly System.Text.RegularExpressions.Regex SolutionProject = EcosystemReader.Rx(
-        "^Project\\(\"\\{[^}]+\\}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]+)\""
-    );
-    private static readonly System.Text.RegularExpressions.Regex GoImport = EcosystemReader.Rx("\"([^\"]+)\"");
+    [GeneratedRegex(
+        "^Project\\(\"\\{[^}]+\\}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]+)\"",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex SolutionProject { get; }
+
+    [GeneratedRegex("\"([^\"]+)\"", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex GoImport { get; }
 
     public ProjectBuild? Read()
     {
