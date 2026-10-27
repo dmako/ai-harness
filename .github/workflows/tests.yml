@@ -33,6 +33,7 @@ jobs:
         if: always()
         with:
           name: tests-${{ matrix.os }}
+          retention-days: 7
           path: |
             artifacts/tests
             artifacts/**/*.binlog
