@@ -60,36 +60,72 @@ internal static class MemoryArguments
     {
         if (schema.TryGetProperty("anyOf", out var variants))
         {
-            List<string> errors = [];
-            var index = 0;
-            foreach (var variant in variants.EnumerateArray())
-            {
-                var error = Check(
-                    variant,
-                    value,
-                    path + "/anyOf/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                );
-                if (error is null)
-                {
-                    return null;
-                }
-
-                errors.Add(error);
-                index++;
-            }
-            return "validating "
-                + path
-                + ": anyOf: did not validate against any of ["
-                + string.Join(" ", Enumerable.Repeat("<anonymous schema>", errors.Count))
-                + "]:\n"
-                + string.Join("\n", errors);
+            return CheckAnyOf(variants, value, path);
         }
+
+        return CheckType(schema, value, path)
+            ?? value.ValueKind switch
+            {
+                JsonValueKind.Array => CheckItems(schema, value, path),
+                JsonValueKind.Object => CheckObject(schema, value, path),
+                _ => null,
+            };
+    }
+
+    /// <summary>Null when the value matches a variant, else every variant's error.</summary>
+    private static string? CheckAnyOf(JsonElement variants, JsonElement value, string path)
+    {
+        List<string> errors = [];
+        var index = 0;
+        foreach (var variant in variants.EnumerateArray())
+        {
+            var error = Check(
+                variant,
+                value,
+                path + "/anyOf/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            );
+            if (error is null)
+            {
+                return null;
+            }
+
+            errors.Add(error);
+            index++;
+        }
+        return "validating "
+            + path
+            + ": anyOf: did not validate against any of ["
+            + string.Join(" ", Enumerable.Repeat("<anonymous schema>", errors.Count))
+            + "]:\n"
+            + string.Join("\n", errors);
+    }
+
+    /// <summary>The error when the value's JSON type is not one the schema allows; an integer is a number.</summary>
+    private static string? CheckType(JsonElement schema, JsonElement value, string path)
+    {
         var type = schema.GetProperty("type");
         var allowed =
             type.ValueKind is JsonValueKind.Array
                 ? type.EnumerateArray().Select(item => item.GetString()).ToArray()
                 : [type.GetString()];
-        var actual = value.ValueKind switch
+        var actual = JsonType(value);
+        if (
+            allowed.Contains(actual, StringComparer.Ordinal)
+            || actual is "integer" && allowed.Contains("number", StringComparer.Ordinal)
+        )
+        {
+            return null;
+        }
+
+        var display = value.ValueKind is JsonValueKind.Null ? "<invalid reflect.Value>" : Display(value);
+        var want = allowed.Length is 1
+            ? HarnessJson.Serialize(allowed[0])
+            : "one of " + HarnessJson.Serialize(string.Join(", ", allowed));
+        return $"validating {path}: type: {display} has type \"{actual}\", want {want}";
+    }
+
+    private static string JsonType(JsonElement value) =>
+        value.ValueKind switch
         {
             JsonValueKind.String => "string",
             JsonValueKind.True or JsonValueKind.False => "boolean",
@@ -100,55 +136,47 @@ internal static class MemoryArguments
             JsonValueKind.Array => "array",
             _ => "object",
         };
-        if (
-            !allowed.Contains(actual, StringComparer.Ordinal)
-            && !(actual is "integer" && allowed.Contains("number", StringComparer.Ordinal))
-        )
+
+    private static string? CheckItems(JsonElement schema, JsonElement value, string path)
+    {
+        foreach (var item in value.EnumerateArray())
         {
-            var display = value.ValueKind is JsonValueKind.Null ? "<invalid reflect.Value>" : Display(value);
-            var want = allowed.Length is 1
-                ? HarnessJson.Serialize(allowed[0])
-                : "one of " + HarnessJson.Serialize(string.Join(", ", allowed));
-            return $"validating {path}: type: {display} has type \"{actual}\", want {want}";
-        }
-        if (value.ValueKind is JsonValueKind.Array)
-        {
-            foreach (var item in value.EnumerateArray())
+            var error = Check(schema.GetProperty("items"), item, path + "/items");
+            if (error is not null)
             {
-                var error = Check(schema.GetProperty("items"), item, path + "/items");
-                if (error is not null)
-                {
-                    return "validating " + path + ": " + error;
-                }
+                return "validating " + path + ": " + error;
             }
         }
-        if (value.ValueKind is JsonValueKind.Object)
+        return null;
+    }
+
+    /// <summary>Required and unexpected fields, then each field against its property schema.</summary>
+    private static string? CheckObject(JsonElement schema, JsonElement value, string path)
+    {
+        var required = schema.TryGetProperty("required", out var requiredSchema)
+            ? requiredSchema.EnumerateArray().Select(x => x.GetString()).Order(StringComparer.Ordinal).ToArray()
+            : [];
+        var fields = value.EnumerateObject().Select(x => x.Name).ToArray();
+        var missing = required.Except(fields, StringComparer.Ordinal).ToArray();
+        if (missing.Length is not 0)
         {
-            var required = schema.TryGetProperty("required", out var requiredSchema)
-                ? requiredSchema.EnumerateArray().Select(x => x.GetString()).Order(StringComparer.Ordinal).ToArray()
-                : [];
-            var fields = value.EnumerateObject().Select(x => x.Name).ToArray();
-            var missing = required.Except(fields, StringComparer.Ordinal).ToArray();
-            if (missing.Length is not 0)
-            {
-                return $"validating {path}: required: missing properties: {HarnessJson.Serialize(missing)}";
-            }
+            return $"validating {path}: required: missing properties: {HarnessJson.Serialize(missing)}";
+        }
 
-            var properties = schema.GetProperty("properties");
-            var allowedNames = properties.EnumerateObject().Select(p => p.Name).ToArray();
-            var extra = fields.Except(allowedNames, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-            if (extra.Length is not 0)
-            {
-                return $"validating {path}: unexpected additional properties {HarnessJson.Serialize(extra)}";
-            }
+        var properties = schema.GetProperty("properties");
+        var allowedNames = properties.EnumerateObject().Select(p => p.Name).ToArray();
+        var extra = fields.Except(allowedNames, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        if (extra.Length is not 0)
+        {
+            return $"validating {path}: unexpected additional properties {HarnessJson.Serialize(extra)}";
+        }
 
-            foreach (var name in fields.Order(StringComparer.Ordinal))
+        foreach (var name in fields.Order(StringComparer.Ordinal))
+        {
+            var error = Check(properties.GetProperty(name), value.GetProperty(name), path + "/properties/" + name);
+            if (error is not null)
             {
-                var error = Check(properties.GetProperty(name), value.GetProperty(name), path + "/properties/" + name);
-                if (error is not null)
-                {
-                    return "validating " + path + ": " + error;
-                }
+                return "validating " + path + ": " + error;
             }
         }
         return null;
