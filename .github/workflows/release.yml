@@ -79,3 +79,54 @@ jobs:
             artifacts/container-smoke.log
             artifacts/tests
             artifacts/**/*.binlog
+  draft:
+    # Runs only when every qualify job succeeded.
+    needs: qualify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: qualified
+      - name: Collect release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          archives=(-type f \( -name 'harness-*.zip' -o -name 'harness-*.tar.gz' \))
+          # Main archives keep their name: harness-<version>-<os>-<arch>.
+          find qualified "${archives[@]}" -not -path '*/developer-tools/*' -exec cp -n {} assets/ \;
+          # A developer archive has the same name under developer-tools/; publish it as
+          # harness-devtools-<version>-<os>-<arch>.
+          while IFS= read -r -d '' archive; do
+            cp -n "$archive" "assets/harness-devtools-$(basename "$archive" | sed 's/^harness-//')"
+          done < <(find qualified "${archives[@]}" -path '*/developer-tools/*' -print0)
+          count=$(find assets -maxdepth 1 -type f | wc -l)
+          if [ "$count" -ne 8 ]; then
+            echo "expected 8 archives (main and devtools for 4 runtimes), found $count" >&2
+            ls -l assets >&2
+            exit 1
+          fi
+          (cd assets && sha256sum harness-* > SHA256SUMS)
+          ls -l assets
+      - name: Create or refresh the draft release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          if gh release view "$tag" --json isDraft --jq .isDraft > draft.txt 2>/dev/null; then
+            if [ "$(cat draft.txt)" != "true" ]; then
+              echo "release $tag is already published; not replacing its assets" >&2
+              exit 1
+            fi
+            gh release upload "$tag" assets/* --clobber
+          else
+            gh release create "$tag" assets/* --draft --target "$GITHUB_SHA" --title "Harness $RELEASE_VERSION" --generate-notes
+          fi
