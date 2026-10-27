@@ -120,11 +120,12 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
         }
 
         var evaluated = ecosystem.Build.Evaluate(file);
+        
         if (
             host is 0
-            && evaluated
-                .Properties.GetValueOrDefault("OutputType", "")
-                .Equals("exe", StringComparison.OrdinalIgnoreCase)
+            && (evaluated.PropertyLocations.GetValueOrDefault("OutputType") is string outputType
+                && (outputType.Equals("exe", StringComparison.OrdinalIgnoreCase) || outputType.Equals("winexe", StringComparison.OrdinalIgnoreCase))
+            )
         )
         {
             host = 1;
