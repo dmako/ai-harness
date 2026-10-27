@@ -70,8 +70,10 @@ public sealed class EcosystemReader(AnalysisRepository repository)
                 package.Name.Equals("Microsoft.NET.Test.Sdk", StringComparison.OrdinalIgnoreCase)
             )
             || TaskParsing.IsTestFile(path) && Prop("PackageId").Length is 0;
+        var outputType = Prop("OutputType");
         var executable =
-            Prop("OutputType").Equals("exe", StringComparison.OrdinalIgnoreCase)
+            outputType.Equals("exe", StringComparison.OrdinalIgnoreCase)
+            || outputType.Equals("winexe", StringComparison.OrdinalIgnoreCase)
             || sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase)
             || sdk.Equals("Microsoft.NET.Sdk.Worker", StringComparison.OrdinalIgnoreCase);
         var id = new[] { Prop("PackageId"), Prop("AssemblyName"), name }.First(value => value.Length > 0);

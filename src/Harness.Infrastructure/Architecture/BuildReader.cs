@@ -193,8 +193,10 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
     /// <summary>A test project, an entry (an exe, web or worker project), or a library.</summary>
     private string DotnetKind(string file, string sdk, EvaluatedProject evaluated)
     {
+        var outputType = Property(evaluated, "OutputType");
         var executable =
-            Property(evaluated, "OutputType").Equals("exe", StringComparison.OrdinalIgnoreCase)
+            outputType.Equals("exe", StringComparison.OrdinalIgnoreCase)
+            || outputType.Equals("winexe", StringComparison.OrdinalIgnoreCase)
             || sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase)
             || sdk.Equals("Microsoft.NET.Sdk.Worker", StringComparison.OrdinalIgnoreCase);
         return (ecosystem.DotnetTest(file), executable) switch
