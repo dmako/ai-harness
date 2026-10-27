@@ -71,6 +71,7 @@ jobs:
         if: always()
         with:
           name: release-${{ matrix.rid }}
+          retention-days: 7
           path: |
             artifacts/package
             artifacts/native-smoke.*
