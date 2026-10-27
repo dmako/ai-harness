@@ -19,7 +19,8 @@ public sealed record TaskCompletion(
 
 public sealed record TaskClaimResult(TaskRecord Task, string Token);
 
-public sealed record TaskCompletionResult(TaskRecord Task, IReadOnlyList<string> Unlocked);
+/// <summary>A completed task; <paramref name="ReviewSkipped"/> when it was completed without being in review.</summary>
+public sealed record TaskCompletionResult(TaskRecord Task, IReadOnlyList<string> Unlocked, bool ReviewSkipped = false);
 
 public sealed record TaskProposal(
     string Id,

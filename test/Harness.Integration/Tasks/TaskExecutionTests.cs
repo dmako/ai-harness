@@ -106,6 +106,7 @@ public sealed class TaskExecutionTests
         );
         complete.Task.Status.Should().Be("done");
         complete.Unlocked.Should().Equal("T-2");
+        complete.ReviewSkipped.Should().BeTrue();
         complete.Task.CompletedBy.Should().Be("codex");
         complete.Task.ClaimedAt.Should().Be(claim.Task.ClaimedAt);
         complete.Task.ClaimToken.Should().Be("");
@@ -260,6 +261,66 @@ public sealed class TaskExecutionTests
         pending.Should().HaveCount(3);
         pending.Should().OnlyContain(p => p.ProposedBy.StartsWith("codex", StringComparison.Ordinal));
         pending[^1].Definition.Notes.Should().Be("former argument");
+    }
+
+    [Fact]
+    public async Task McpHintsLeadThroughInProgressAndReviewAndRecordASkippedReview()
+    {
+        using var state = new State();
+        state.Store.Import([Definition("T-1"), Definition("T-2")], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> CallAsync(string tool, Dictionary<string, object?> arguments)
+        {
+            var result = await client.CallToolAsync(tool, arguments, cancellationToken: Token);
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value;
+        }
+
+        Dictionary<string, object?> Completion(string id, string token) =>
+            new()
+            {
+                ["id"] = id,
+                ["claim_token"] = token,
+                ["summary"] = "done",
+                ["acceptance"] = new[]
+                {
+                    new Dictionary<string, object?> { ["index"] = 1, ["result"] = "pass" },
+                    new Dictionary<string, object?> { ["index"] = 2, ["result"] = "pass" },
+                },
+            };
+
+        var claimed = await CallAsync("task_claim", new() { ["id"] = "T-1" });
+        claimed.GetProperty("hint").GetString().Should().Contain("in_progress").And.Contain("review");
+        var token = claimed.GetProperty("claim_token").GetString()!;
+        foreach (var (status, next) in new[] { ("in_progress", "status review"), ("review", "task_complete") })
+        {
+            var updated = await CallAsync(
+                "task_update",
+                new()
+                {
+                    ["id"] = "T-1",
+                    ["claim_token"] = token,
+                    ["status"] = status,
+                }
+            );
+            updated.GetProperty("task").GetProperty("status").GetString().Should().Be(status);
+            updated.GetProperty("hint").GetString().Should().Contain(next);
+        }
+
+        var reviewed = await CallAsync("task_complete", Completion("T-1", token));
+        reviewed.GetProperty("hint").GetString().Should().NotContain("skipped review");
+        state.Store.Events("T-1", Token).Should().NotContain(e => e.Event == "review_skipped");
+
+        token = (await CallAsync("task_claim", new() { ["id"] = "T-2" })).GetProperty("claim_token").GetString()!;
+        var skipped = await CallAsync("task_complete", Completion("T-2", token));
+        skipped.GetProperty("task").GetProperty("status").GetString().Should().Be("done");
+        skipped.GetProperty("hint").GetString().Should().StartWith("This task skipped review");
+        state
+            .Store.Events("T-2", Token)
+            .Should()
+            .ContainSingle(e => e.Event == "review_skipped")
+            .Which.Detail.Should()
+            .Be("completed from claimed without a review step");
     }
 
     [Fact]

@@ -9,7 +9,13 @@ namespace Harness.Mcp.Tasks;
 internal static class TaskTools
 {
     private const string ClaimHint =
-        "Keep claim_token; pass it to task_update and task_complete. Implement only the stated scope, run the validation, then complete with every acceptance criterion.";
+        "Keep claim_token; pass it to task_update and task_complete. Analyse and clarify while the task is claimed; "
+        + "task_update it to in_progress when you start changing code, implement only the stated scope, then to review "
+        + "while you check the acceptance criteria, constraints and validation, and complete with every acceptance criterion.";
+
+    private const string ReviewSkippedHint =
+        "This task skipped review (recorded in its audit trail): next time, task_update it to in_progress when you "
+        + "start changing code and to review while you check the acceptance criteria before task_complete. ";
 
     public static async Task<object> CallAsync(
         string name,
@@ -97,23 +103,38 @@ internal static class TaskTools
     )
     {
         var status = Text(values, "status");
-        return new JsonObjectMap
-        {
-            ["task"] = TaskViews.Task(
-                await session.UpdateTaskAsync(
-                    id,
-                    actor,
-                    new(
-                        status.Length is 0 ? null : TaskWorkflow.ParseStatus(status),
-                        Text(values, "note"),
-                        Text(values, "reason"),
-                        Reports(values)
-                    ),
-                    token
-                )
+        var task = await session.UpdateTaskAsync(
+            id,
+            actor,
+            new(
+                status.Length is 0 ? null : TaskWorkflow.ParseStatus(status),
+                Text(values, "note"),
+                Text(values, "reason"),
+                Reports(values)
             ),
-        };
+            token
+        );
+        JsonObjectMap result = new() { ["task"] = TaskViews.Task(task) };
+        var hint = UpdateHint(task.Status);
+        if (hint.Length is not 0)
+        {
+            result["hint"] = hint;
+        }
+
+        return result;
     }
+
+    /// <summary>The next step of the claimed, in progress, review, done path after an update.</summary>
+    private static string UpdateHint(string status) =>
+        status switch
+        {
+            "claimed" => "Set status in_progress when you start changing code.",
+            "in_progress" =>
+                "Set status review when the changes are made and you check the acceptance criteria, constraints and validation.",
+            "review" =>
+                "Complete with task_complete once every acceptance criterion passes; set status in_progress again if something needs fixing.",
+            _ => "",
+        };
 
     /// <summary>Completes the task, then proposes the memories it reports (best effort, errors listed).</summary>
     private static async Task<Dictionary<string, object?>> CompleteAsync(
@@ -131,7 +152,8 @@ internal static class TaskTools
         {
             ["task"] = TaskViews.Task(completed.Task),
             ["hint"] =
-                "Record durable decisions from this task with memory_put, then take the next task with task_next.",
+                (completed.ReviewSkipped ? ReviewSkippedHint : "")
+                + "Record durable decisions from this task with memory_put, then take the next task with task_next.",
         };
         if (completed.Unlocked.Count > 0)
         {

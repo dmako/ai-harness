@@ -64,8 +64,12 @@ They were called milestones: backlog files with `milestones:` and
 use.
 
 Agents take the next ready task (`task_next`), work on it and complete it
-(`task_complete`). You follow the queue in harness ui (Work) or with
-`harness tasks list`.
+(`task_complete`). A claimed task stays claimed while the agent analyses it
+and asks you what is unclear; the agent moves it to in progress when it
+starts changing code and to review while it checks the acceptance criteria
+and validation, then completes it. A task completed without a review step
+says so in its audit trail (review skipped). You follow the queue in harness
+ui (Work) or with `harness tasks list`.
 
 Work can also start without the backlog file:
 

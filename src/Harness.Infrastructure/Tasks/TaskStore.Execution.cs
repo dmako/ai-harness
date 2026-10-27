@@ -258,9 +258,25 @@ public sealed partial class TaskStore
                     ("$stamp", stamp),
                     ("$id", id)
                 );
+                var reviewSkipped = current.Status is not "review";
+                if (reviewSkipped)
+                {
+                    AddEvent(
+                        c,
+                        t,
+                        id,
+                        "review_skipped",
+                        current.Status,
+                        "done",
+                        actor.AuditName,
+                        $"completed from {current.Status.Replace('_', ' ')} without a review step",
+                        stamp
+                    );
+                }
+
                 AddEvent(c, t, id, "completed", current.Status, "done", actor.AuditName, input.Summary.Trim(), stamp);
                 var unlocked = RecomputeReadiness(c, t);
-                return new TaskCompletionResult(Get(c, t, id), unlocked);
+                return new TaskCompletionResult(Get(c, t, id), unlocked, reviewSkipped);
             },
             cancellationToken
         );
