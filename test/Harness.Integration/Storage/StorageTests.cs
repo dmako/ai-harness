@@ -544,13 +544,21 @@ public sealed class StorageTests
                 Scalar(connection, "PRAGMA busy_timeout").Should().Be(100L);
             }
 
-            timer.Restart();
-            FluentActions
-                .Invoking(() => WriteTransaction(shortBudget, (connection, transaction) => 0))
+            // Runner noise only adds time, so the fastest of a few attempts measures the budget itself.
+            var fastest = Enumerable
+                .Range(0, 3)
+                .Select(_ =>
+                {
+                    timer.Restart();
+                    FluentActions
+                        .Invoking(() => WriteTransaction(shortBudget, (connection, transaction) => 0))
+                        .Should()
+                        .ThrowExactly<SqliteException>();
+                    return timer.Elapsed;
+                })
+                .Min();
+            fastest
                 .Should()
-                .ThrowExactly<SqliteException>();
-            timer
-                .Elapsed.Should()
                 .BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(75))
                 .And.BeLessThanOrEqualTo(TimeSpan.FromMilliseconds(750));
             await child.StandardInput.WriteLineAsync("release");

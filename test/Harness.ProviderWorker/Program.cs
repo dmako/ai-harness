@@ -15,7 +15,10 @@ if (Environment.GetEnvironmentVariable("HARNESS_FAKE_GRAPHIFY") is { Length: > 0
 var mode = args.FirstOrDefault() ?? "normal";
 if (mode is "descendant")
 {
-    await File.WriteAllTextAsync(args[1], Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+    // Renamed into place: waiters poll File.Exists and must never read a created but still empty file.
+    var pending = args[1] + ".tmp";
+    await File.WriteAllTextAsync(pending, Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+    File.Move(pending, args[1]);
     await Task.Delay(Timeout.InfiniteTimeSpan, CancellationToken.None);
     return;
 }
