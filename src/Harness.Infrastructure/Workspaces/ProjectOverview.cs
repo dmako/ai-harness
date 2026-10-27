@@ -28,6 +28,7 @@ public static class ProjectOverview
             ["pending_proposals"] = 0,
             ["pending_arch_proposals"] = 0,
             ["pending_task_proposals"] = 0,
+            ["pending_blueprint_proposals"] = 0,
             ["checks_failed"] = 0,
             ["checks_warned"] = 0,
         };
@@ -116,13 +117,15 @@ public static class ProjectOverview
         command.CommandText = """
             SELECT (SELECT COUNT(*) FROM memory_proposals WHERE status='pending'),
                    (SELECT COUNT(*) FROM finding_proposals WHERE status='pending'),
-                   (SELECT COUNT(*) FROM task_proposals WHERE status='pending')
+                   (SELECT COUNT(*) FROM task_proposals WHERE status='pending'),
+                   (SELECT COUNT(*) FROM blueprint_proposals WHERE status='pending')
             """;
         using var counts = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         await counts.ReadAsync(token).ConfigureAwait(false);
         live["pending_proposals"] = counts.GetInt32(0);
         live["pending_arch_proposals"] = counts.GetInt32(1);
         live["pending_task_proposals"] = counts.GetInt32(2);
+        live["pending_blueprint_proposals"] = counts.GetInt32(3);
     }
 
     /// <summary>The last 30 days' context answers and their mean hit rate over changed non-test files.</summary>

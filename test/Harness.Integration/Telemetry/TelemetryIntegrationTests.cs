@@ -203,14 +203,14 @@ public sealed class TelemetryIntegrationTests
     public async Task WriterErrorsAreContainedAndOldSchemasAreNotMigrated()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Sql("DELETE FROM schema_migrations WHERE version=20; DROP TABLE tool_calls");
+        fixture.Sql("DELETE FROM schema_migrations WHERE version=21; DROP TABLE tool_calls");
         var recorder = new TelemetryRecorder(fixture.DatabasePath, 0);
         recorder.Observe(new ToolObservation(DateTimeOffset.UtcNow, "ping", "", "codex", 1, 1, false));
         await recorder.DisposeAsync();
         recorder.Failures.Should().Be(1);
         recorder.Observe(new ToolObservation(DateTimeOffset.UtcNow, "ping", "", "codex", 1, 1, false));
         using var database = HarnessDatabase.OpenReadOnly(fixture.DatabasePath);
-        database.SchemaVersion().Should().Be(19);
+        database.SchemaVersion().Should().Be(20);
     }
 
     [Fact]

@@ -52,6 +52,23 @@ internal sealed class TaskAddSettings : InspectSettings
     public string[] Scope { get; init; } = [];
 }
 
+/// <summary>A blueprint added or edited; on an edit, null keeps the current value.</summary>
+internal sealed class BlueprintSaveSettings : InspectSettings
+{
+    public string Id { get; init; } = "";
+    public string? Title { get; init; }
+    public string? Goal { get; init; }
+    public string[]? Exit { get; init; }
+    public string? Notes { get; init; }
+}
+
+internal sealed class BlueprintRemoveSettings : InspectSettings
+{
+    public string Id { get; init; } = "";
+    public string Tasks { get; init; } = "";
+    public string To { get; init; } = "";
+}
+
 internal sealed class TaskListCommand(TaskCommandRunner runner)
 {
     public Task<int> ExecuteAsync(TaskListSettings settings, CancellationToken cancellationToken) =>
@@ -62,6 +79,24 @@ internal sealed class TaskBlueprintsCommand(TaskCommandRunner runner)
 {
     public Task<int> ExecuteAsync(InspectSettings settings, CancellationToken cancellationToken) =>
         runner.RunAsync("blueprints", settings, cancellationToken);
+}
+
+internal sealed class TaskBlueprintAddCommand(TaskCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(BlueprintSaveSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("blueprints add", settings, cancellationToken);
+}
+
+internal sealed class TaskBlueprintEditCommand(TaskCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(BlueprintSaveSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("blueprints edit", settings, cancellationToken);
+}
+
+internal sealed class TaskBlueprintRemoveCommand(TaskCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(BlueprintRemoveSettings settings, CancellationToken cancellationToken) =>
+        runner.RunAsync("blueprints remove", settings, cancellationToken);
 }
 
 internal sealed class TaskShowCommand(TaskCommandRunner runner)

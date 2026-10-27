@@ -352,6 +352,38 @@ public sealed class UiWriteTests
     }
 
     [Fact]
+    public async Task BlueprintProposalsAreListedApprovedAsRestatedAndRejected()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        var created = store.ProposeBlueprint("", new("", "Proposed", "Its goal"), "why", "agent", Token);
+        var rejected = store.ProposeBlueprint("", new("", "Not this", "goal"), "", "agent", Token);
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+        var listed = await UiTests.ReadAsync(server.Client, root + "/blueprint-proposals?status=pending");
+        listed["proposals"]!.AsArray().Should().HaveCount(2);
+        var projects = await UiTests.ReadAsync(server.Client, "/api/projects");
+        projects["projects"]![0]!["live"]!["pending_blueprint_proposals"]!.GetValue<int>().Should().Be(2);
+
+        var approved = await PostAsync(
+            server.Client,
+            $"{root}/blueprint-proposals/{created.Id}/approve",
+            """{"edit":{"id":"M5","title":"Restated","goal":"Its goal","exit":["done"],"notes":""}}"""
+        );
+        approved["blueprint"]!.GetValue<string>().Should().Be("M5");
+        var blueprint = store.Blueprints(Token).Single().Definition;
+        (blueprint.Id, blueprint.Title).Should().Be(("M5", "Restated"));
+        blueprint.Exit.Should().Equal("done");
+        store.GetBlueprintProposal(created.Id, Token).DecidedBy.Should().StartWith("human:");
+        await PostAsync(server.Client, $"{root}/blueprint-proposals/{rejected.Id}/reject", """{"note":"no"}""");
+        store.GetBlueprintProposal(rejected.Id, Token).Status.Should().Be("rejected");
+        using var again = Request(server.Client, $"{root}/blueprint-proposals/{created.Id}/approve", "{}");
+        using var response = await server.Client.SendAsync(again, Token);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task WorkspaceAndProjectEditsAndWiderKnowledgeRoundTrip()
     {
         using var fixture = await SyncFixture.CreateAsync();

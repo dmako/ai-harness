@@ -32,7 +32,7 @@ internal sealed class UiWriteBody
         || (
             name.ToUpperInvariant() switch
             {
-                "TASK" => value is JsonObject,
+                "TASK" or "EDIT" => value is JsonObject,
                 "PROJECT_IDS" or "DEPENDS_ON" or "ACCEPTANCE" or "SCOPE" or "SUPERSEDES" or "EXIT" => value
                     is JsonArray items
                     && items.All(item => item is null || item is JsonValue scalar && scalar.TryGetValue<string>(out _)),

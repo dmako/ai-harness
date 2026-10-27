@@ -33,6 +33,11 @@ internal static class TaskTools
             "task_update" => await UpdateAsync(values, id, actor, session, token),
             "task_complete" => await CompleteAsync(values, id, actor, session, memory, caller, token),
             "task_propose" => await ProposeAsync(values, session, caller, token),
+            "task_blueprints" => new JsonObjectMap
+            {
+                ["blueprints"] = (await session.BlueprintsAsync(token)).Select(TaskViews.Blueprint).ToArray(),
+            },
+            "task_blueprint_propose" => await ProposeBlueprintAsync(values, session, caller, token),
             _ => throw new InvalidOperationException("Unknown task tool."),
         };
     }
@@ -286,6 +291,44 @@ internal static class TaskTools
             ),
             ["note"] =
                 "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
+        };
+    }
+
+    /// <summary>
+    /// A new blueprint as given, or a change to one: the fields left out keep their current value, so the proposal
+    /// holds the whole blueprint as it would be.
+    /// </summary>
+    private static async Task<JsonObjectMap> ProposeBlueprintAsync(
+        JsonElement values,
+        ITaskSession session,
+        string caller,
+        CancellationToken token
+    )
+    {
+        var target = Text(values, "blueprint").Trim();
+        var current = new BlueprintDefinition(target, "");
+        if (target.Length is not 0)
+        {
+            current =
+                (await session.BlueprintsAsync(token)).FirstOrDefault(b => b.Definition.Id == target)?.Definition
+                ?? throw new ArgumentException($"unknown blueprint {target}");
+        }
+
+        string Given(string key, string now) => values.TryGetProperty(key, out _) ? Text(values, key) : now;
+        var definition = new BlueprintDefinition(
+            target,
+            Given("title", current.Title),
+            Given("goal", current.Goal),
+            values.TryGetProperty("exit", out _) ? Strings(values, "exit") : current.Exit,
+            Given("notes", current.Notes)
+        );
+        return new JsonObjectMap
+        {
+            ["proposal"] = TaskViews.BlueprintProposal(
+                await session.ProposeBlueprintAsync(target, definition, Text(values, "reason"), caller, token)
+            ),
+            ["note"] =
+                "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not use it until it is approved.",
         };
     }
 

@@ -211,6 +211,58 @@ public sealed class TaskExecutionTests
     }
 
     [Fact]
+    public async Task McpListsBlueprintsAndOnlyProposesNewOrChangedOnes()
+    {
+        using var state = new State();
+        state.Store.ImportBlueprints(
+            [new("M1", "One", "First goal", ["tested"], "kept")],
+            "fixture",
+            cancellationToken: Token
+        );
+        state.Store.Import([Definition("T-1") with { Blueprint = "M1" }], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        var listed = await client.CallToolAsync("task_blueprints", cancellationToken: Token);
+        listed.IsError.Should().NotBe(true);
+        var one = listed.StructuredContent!.Value.GetProperty("blueprints").EnumerateArray().Single();
+        one.GetProperty("id").GetString().Should().Be("M1");
+        one.GetProperty("total").GetInt32().Should().Be(1);
+        one.GetProperty("exit")[0].GetString().Should().Be("tested");
+
+        async Task<CallToolResult> ProposeAsync(Dictionary<string, object?> arguments) =>
+            await client.CallToolAsync("task_blueprint_propose", arguments, cancellationToken: Token);
+        var created = await ProposeAsync(
+            new()
+            {
+                ["title"] = "Two",
+                ["goal"] = "Second goal",
+                ["exit"] = new[] { "shipped" },
+                ["reason"] = "why",
+            }
+        );
+        created.IsError.Should().NotBe(true);
+        var proposal = created.StructuredContent!.Value.GetProperty("proposal");
+        proposal.GetProperty("id").GetString().Should().StartWith("bpr_");
+        proposal.TryGetProperty("changes", out _).Should().BeFalse();
+        var changed = await ProposeAsync(new() { ["blueprint"] = "M1", ["goal"] = "Restated goal" });
+        changed.IsError.Should().NotBe(true);
+        var restated = changed.StructuredContent!.Value.GetProperty("proposal");
+        restated.GetProperty("changes").GetString().Should().Be("M1");
+        restated.GetProperty("blueprint").GetProperty("title").GetString().Should().Be("One", "left out, it stays");
+        restated.GetProperty("blueprint").GetProperty("notes").GetString().Should().Be("kept");
+        (await ProposeAsync(new() { ["title"] = "No goal" })).IsError.Should().BeTrue();
+        (await ProposeAsync(new() { ["blueprint"] = "M404", ["title"] = "x" })).IsError.Should().BeTrue();
+        (await ProposeAsync(new() { ["milestone"] = "M1", ["notes"] = "former argument" }))
+            .IsError.Should()
+            .NotBe(true);
+
+        state.Store.Blueprints(Token).Single().Definition.Goal.Should().Be("First goal", "agents only propose");
+        var pending = state.Store.BlueprintProposals("pending", Token);
+        pending.Should().HaveCount(3);
+        pending.Should().OnlyContain(p => p.ProposedBy.StartsWith("codex", StringComparison.Ordinal));
+        pending[^1].Definition.Notes.Should().Be("former argument");
+    }
+
+    [Fact]
     public async Task McpTaskToolsTakeBlueprintsAndStillAcceptTheFormerMilestoneArgument()
     {
         using var state = new State();

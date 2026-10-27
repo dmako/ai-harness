@@ -36,6 +36,23 @@ public sealed record TaskProposal(
 
 public sealed record TaskApproval(TaskProposal Proposal, TaskRecord Task);
 
+/// <summary>A blueprint an agent proposed: a new one (Blueprint is empty) or a change to Blueprint.</summary>
+public sealed record BlueprintProposal(
+    string Id,
+    string Blueprint,
+    BlueprintDefinition Definition,
+    string Reason,
+    string Status,
+    string ProposedBy,
+    string ProposedAt,
+    string DecidedBy = "",
+    string DecidedAt = "",
+    string Note = "",
+    string Result = ""
+);
+
+public sealed record BlueprintApproval(BlueprintProposal Proposal, BlueprintDefinition Blueprint);
+
 public interface ITaskSession
 {
     Task<TaskRecord> ReadTaskAsync(string id, CancellationToken cancellationToken);
@@ -62,6 +79,14 @@ public interface ITaskSession
     );
     Task<TaskProposal> ProposeTaskAsync(
         TaskDefinition definition,
+        string reason,
+        string by,
+        CancellationToken cancellationToken
+    );
+    Task<IReadOnlyList<BlueprintProgress>> BlueprintsAsync(CancellationToken cancellationToken);
+    Task<BlueprintProposal> ProposeBlueprintAsync(
+        string blueprint,
+        BlueprintDefinition definition,
         string reason,
         string by,
         CancellationToken cancellationToken

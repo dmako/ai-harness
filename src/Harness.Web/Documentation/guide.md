@@ -95,6 +95,14 @@ a task elsewhere that depended on a deleted one loses that dependency. A
 blueprint or task still in the backlog file comes back at its next import:
 remove it there as well.
 
+The same is done on the command line: `harness tasks blueprints add`,
+`edit <id>` (what you do not give stays) and `remove <id>` (with
+`--tasks move [--to <blueprint>]` or `--tasks delete` when it has tasks).
+Agents read the blueprints (`task_blueprints`) but do not change them: they
+propose a new blueprint or a change to one (`task_blueprint_propose`), and
+the proposal waits in Work › Inbox, or `harness tasks proposals`, beside the
+proposed tasks.
+
 ## Several checkouts of the same code
 
 - **Worktrees** (`git worktree add`) of one repository share one project:

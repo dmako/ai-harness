@@ -43,7 +43,7 @@ public sealed class CouplingProcessTests
             cancellationToken: Token
         );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
-        tools.Should().HaveCount(30);
+        tools.Should().HaveCount(32);
         ToolSchema.AssertMatches(tools.Single(tool => tool.Name == "change_coupling"));
         var file = await CallAsync(new() { ["file"] = "./a.cs", ["check"] = true });
         file.TryGetProperty("changed", out _).Should().BeFalse();

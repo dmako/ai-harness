@@ -369,6 +369,69 @@ public sealed class TaskStoreTests
     }
 
     [Fact]
+    public void BlueprintProposalsCreateOrRestateABlueprintOnlyOnceApproved()
+    {
+        using var s = new State();
+        s.Store.ImportBlueprints([new("M1", "One", "goal")], "fixture", cancellationToken: Token);
+        FluentActions
+            .Invoking(() => s.Store.ProposeBlueprint("", new("", "No goal"), "", "agent", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.ProposeBlueprint("M404", new("", "x"), "", "agent", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        var created = s.Store.ProposeBlueprint(
+            "",
+            new("ignored", " Two ", "Second", [" a ", ""]),
+            " why ",
+            "agent",
+            Token
+        );
+        created.Definition.Should().BeEquivalentTo(new BlueprintDefinition("", "Two", "Second", ["a"], ""));
+        created.Reason.Should().Be("why");
+        var changed = s.Store.ProposeBlueprint("M1", new("", "One restated", "goal"), "", "agent", Token);
+        var rejected = s.Store.ProposeBlueprint("M1", new("", "Never"), "", "agent", Token);
+        s.Store.Blueprints(Token).Should().ContainSingle("nothing changes while proposed");
+        s.Store.BlueprintProposals("pending", Token)
+            .Select(p => p.Id)
+            .Should()
+            .Equal(created.Id, changed.Id, rejected.Id);
+
+        var approved = s.Store.ApproveBlueprint(created.Id, null, "human", Token);
+        approved.Blueprint.Id.Should().Be("M2", "a new one gets the next free id");
+        approved.Proposal.Result.Should().Be("M2");
+        s.Store.ApproveBlueprint(changed.Id, new("", "Restated by the author", "goal"), "human", Token)
+            .Blueprint.Id.Should()
+            .Be("M1");
+        s.Store.Blueprints(Token)
+            .Select(b => (b.Definition.Id, b.Definition.Title))
+            .Should()
+            .Equal(("M1", "Restated by the author"), ("M2", "Two"));
+        s.Store.RejectBlueprint(rejected.Id, " not now ", "human", Token).Note.Should().Be("not now");
+        FluentActions
+            .Invoking(() => s.Store.ApproveBlueprint(rejected.Id, null, "human", Token))
+            .Should()
+            .Throw<InvalidOperationException>();
+        FluentActions
+            .Invoking(() => s.Store.GetBlueprintProposal("bpr_missing", Token))
+            .Should()
+            .Throw<KeyNotFoundException>();
+        s.Store.BlueprintProposals("pending", Token).Should().BeEmpty();
+        s.Store.BlueprintProposals("all", Token)
+            .Select(p => p.Status)
+            .Should()
+            .BeEquivalentTo("approved", "approved", "rejected");
+
+        var gone = s.Store.ProposeBlueprint("M2", new("", "Late"), "", "agent", Token);
+        s.Store.RemoveBlueprint("M2", BlueprintTasks.Keep, "", "human", Token);
+        FluentActions
+            .Invoking(() => s.Store.ApproveBlueprint(gone.Id, null, "human", Token))
+            .Should()
+            .Throw<ArgumentException>("its blueprint was removed meanwhile");
+    }
+
+    [Fact]
     public void MilestonesOfEarlierSchemasMigrateToBlueprints()
     {
         using var s = new State();
@@ -395,7 +458,7 @@ public sealed class TaskStoreTests
         }
 
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
-        database.SchemaVersion().Should().Be(20);
+        database.SchemaVersion().Should().Be(21);
         var store = new TaskStore(database);
         var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
         blueprint.Id.Should().Be("M1");
@@ -435,6 +498,7 @@ public sealed class TaskStoreTests
     [InlineData(13)]
     [InlineData(19)]
     [InlineData(20)]
+    [InlineData(21)]
     public void HistoricalSchemasRetainTaskStateThroughExportImport(int version)
     {
         using var s = new State();

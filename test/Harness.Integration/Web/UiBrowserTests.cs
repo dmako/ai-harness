@@ -318,6 +318,51 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task ProposedBlueprintIsCreatedFromTheInbox()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var proposal = tasks.ProposeBlueprint("", new("", "Agent idea", "Its goal"), "seen", "codex", Token);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/inbox" }
+                );
+                await page.WaitAsync($"!!document.querySelector('[data-proposal=\"{proposal.Id}\"]')");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('h3.inboxhead')].some(x => x.textContent === 'Blueprints')"
+                    )
+                )
+                    .Should()
+                    .Be("True");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint…').click()"
+                );
+                await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Name]').value"))
+                    .Should()
+                    .Be("Agent idea");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.GetBlueprintProposal(proposal.Id, Token).Status is "approved"
+                );
+                tasks.Blueprints(Token).Single().Definition.Title.Should().Be("Agent idea");
+            }
+        );
+    }
+
+    [Fact]
     public async Task ComplexityGroupShowsItsWorstLevelFiltersByLevelAndDrawsTheDistribution()
     {
         var executable = Browser();

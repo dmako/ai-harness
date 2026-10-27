@@ -10,7 +10,7 @@ using Harness.Infrastructure.Tasks;
 
 namespace Harness.Cli.Tasks;
 
-internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error)
+internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -55,6 +55,18 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                         cancellationToken
                     ),
                     "proposals" => ListProposalsAsync((TaskProposalListSettings)settings, store, cancellationToken),
+                    "approve" when IsBlueprintProposal(settings) => ApproveBlueprintAsync(
+                        (TaskIdSettings)settings,
+                        store,
+                        actor,
+                        cancellationToken
+                    ),
+                    "reject" when IsBlueprintProposal(settings) => RejectBlueprintAsync(
+                        (TaskReadySettings)settings,
+                        store,
+                        actor,
+                        cancellationToken
+                    ),
                     "approve" => ApproveAsync((TaskApproveSettings)settings, store, actor, cancellationToken),
                     "reject" => RejectAsync((TaskReadySettings)settings, store, actor, cancellationToken),
                     "import" or "export" => FileAsync(
@@ -66,6 +78,18 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                     ),
                     "list" => ListAsync((TaskListSettings)settings, store, cancellationToken),
                     "blueprints" => BlueprintsAsync(settings, store, cancellationToken),
+                    "blueprints add" or "blueprints edit" => SaveBlueprintAsync(
+                        (BlueprintSaveSettings)settings,
+                        store,
+                        verb is "blueprints add",
+                        cancellationToken
+                    ),
+                    "blueprints remove" => RemoveBlueprintAsync(
+                        (BlueprintRemoveSettings)settings,
+                        store,
+                        actor,
+                        cancellationToken
+                    ),
                     "next" => NextAsync((TaskNextSettings)settings, store, cancellationToken),
                     "show" => ShowAsync((TaskShowSettings)settings, store, cancellationToken),
                     "add" => AddAsync((TaskAddSettings)settings, store, actor, cancellationToken),
@@ -194,13 +218,20 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
     {
         var proposalStatus = settings.Status;
         var proposals = store.Proposals(proposalStatus, cancellationToken);
+        var blueprints = store.BlueprintProposals(proposalStatus, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new JsonObjectMap { ["proposals"] = proposals.Select(TaskViews.Proposal).ToArray() });
+            await JsonAsync(
+                new JsonObjectMap
+                {
+                    ["proposals"] = proposals.Select(TaskViews.Proposal).ToArray(),
+                    ["blueprint_proposals"] = blueprints.Select(TaskViews.BlueprintProposal).ToArray(),
+                }
+            );
         }
-        else if (proposals.Count is 0)
+        else if (proposals.Count is 0 && blueprints.Count is 0)
         {
-            await output.WriteLineAsync($"No {proposalStatus} task proposals.");
+            await output.WriteLineAsync($"No {proposalStatus} task or blueprint proposals.");
         }
         else
         {
@@ -232,10 +263,11 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                 }
             }
 
+            await PrintBlueprintProposalsAsync(blueprints);
             if (proposalStatus is "pending")
             {
                 await output.WriteLineAsync(
-                    "\nharness tasks approve <id> creates the task; harness tasks reject <id> --note \"why\" closes it."
+                    "\nharness tasks approve <id> creates the task or blueprint; harness tasks reject <id> --note \"why\" closes it."
                 );
             }
         }

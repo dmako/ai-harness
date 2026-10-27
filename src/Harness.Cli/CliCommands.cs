@@ -329,6 +329,38 @@ internal static class CliCommands
                     .CreateInstance<Harness.Cli.Tasks.TaskBlueprintsCommand>(services)
                     .ExecuteAsync(settings, token)
         );
+        // 'tasks blueprints' lists them and holds the commands that change them
+        groups["tasks blueprints"] = Group(root, groups, "tasks").Subcommands.Single(c => c.Name is "blueprints");
+        Add(
+            Group(root, groups, "tasks blueprints"),
+            "add",
+            "Add a blueprint: the next free id and a placeholder name unless given",
+            CommandBindings.BindBlueprintAddSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Tasks.TaskBlueprintAddCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            Group(root, groups, "tasks blueprints"),
+            "edit",
+            "Change a blueprint's title, goal, exit criteria or notes; what is not given stays",
+            CommandBindings.BindBlueprintEditSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Tasks.TaskBlueprintEditCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            Group(root, groups, "tasks blueprints"),
+            "remove",
+            "Remove a blueprint; one with tasks needs --tasks move (with --to, or to none) or --tasks delete",
+            CommandBindings.BindBlueprintRemoveSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Tasks.TaskBlueprintRemoveCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
         Add(
             Group(root, groups, "tasks"),
             "show",

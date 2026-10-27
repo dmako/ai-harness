@@ -213,24 +213,27 @@ public sealed partial class TaskStore
         BlueprintDefinition definition,
         string source,
         CancellationToken cancellationToken = default
-    ) =>
-        database.WithTransaction(
-            (c, t) =>
-            {
-                var d = CleanBlueprint(definition);
-                using (var exists = Command(c, t, "SELECT 1 FROM blueprints WHERE id=$id", ("$id", d.Id)))
-                {
-                    if (exists.ExecuteScalar() is not null)
-                    {
-                        throw new InvalidOperationException($"blueprint {d.Id} already exists");
-                    }
-                }
+    ) => database.WithTransaction((c, t) => CreateBlueprint(c, t, definition, source), cancellationToken);
 
-                SaveBlueprint(c, t, d, source);
-                return d;
-            },
-            cancellationToken
-        );
+    private BlueprintDefinition CreateBlueprint(
+        SqliteConnection c,
+        SqliteTransaction t,
+        BlueprintDefinition definition,
+        string source
+    )
+    {
+        var d = CleanBlueprint(definition);
+        using (var exists = Command(c, t, "SELECT 1 FROM blueprints WHERE id=$id", ("$id", d.Id)))
+        {
+            if (exists.ExecuteScalar() is not null)
+            {
+                throw new InvalidOperationException($"blueprint {d.Id} already exists");
+            }
+        }
+
+        SaveBlueprint(c, t, d, source);
+        return d;
+    }
 
     /// <summary>
     /// Restates a blueprint's title, goal, exit criteria and notes; its id stays. A blueprint only tasks named
@@ -241,21 +244,25 @@ public sealed partial class TaskStore
         BlueprintDefinition definition,
         string source,
         CancellationToken cancellationToken = default
-    ) =>
-        database.WithTransaction(
-            (c, t) =>
-            {
-                var d = CleanBlueprint(definition with { Id = id });
-                if (!BlueprintIds(c, t).Contains(d.Id))
-                {
-                    throw new ArgumentException($"unknown blueprint {d.Id}");
-                }
+    ) => database.WithTransaction((c, t) => EditBlueprint(c, t, id, definition, source), cancellationToken);
 
-                SaveBlueprint(c, t, d, source);
-                return d;
-            },
-            cancellationToken
-        );
+    private BlueprintDefinition EditBlueprint(
+        SqliteConnection c,
+        SqliteTransaction t,
+        string id,
+        BlueprintDefinition definition,
+        string source
+    )
+    {
+        var d = CleanBlueprint(definition with { Id = id });
+        if (!BlueprintIds(c, t).Contains(d.Id))
+        {
+            throw new ArgumentException($"unknown blueprint {d.Id}");
+        }
+
+        SaveBlueprint(c, t, d, source);
+        return d;
+    }
 
     private static BlueprintDefinition CleanBlueprint(BlueprintDefinition d)
     {

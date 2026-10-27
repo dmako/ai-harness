@@ -45,7 +45,7 @@ public sealed class StorageTests
         using var directory = new TestDirectory();
         using (var database = Open(directory.DatabasePath))
         {
-            database.SchemaVersion().Should().Be(20);
+            database.SchemaVersion().Should().Be(21);
             DatabaseBackups.List(directory.DatabasePath).Should().BeEmpty();
             using var connection = database.OpenConnection();
             Scalar(connection, "PRAGMA journal_mode").Should().Be("wal");
@@ -76,20 +76,21 @@ public sealed class StorageTests
     [InlineData(13)]
     [InlineData(19)]
     [InlineData(20)]
+    [InlineData(21)]
     public void HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(int version)
     {
         using var directory = new TestDirectory();
         CreateHistoricalDatabase(directory.DatabasePath, version);
         using (var database = Open(directory.DatabasePath))
         {
-            database.SchemaVersion().Should().Be(20);
+            database.SchemaVersion().Should().Be(21);
             database.GetDiagnostic("fixture").Should().Be("žluťoučký 🧪");
             using var connection = database.OpenConnection();
             Scalar(connection, "PRAGMA integrity_check").Should().Be("ok");
         }
 
         var backups = DatabaseBackups.List(directory.DatabasePath);
-        if (version == 20)
+        if (version == 21)
         {
             backups.Should().BeEmpty();
             return;
@@ -105,7 +106,7 @@ public sealed class StorageTests
         var restoredPath = Path.Combine(directory.Path, "restored.db");
         File.Copy(backup, restoredPath);
         using var restored = Open(restoredPath);
-        restored.SchemaVersion().Should().Be(20);
+        restored.SchemaVersion().Should().Be(21);
         restored.GetDiagnostic("fixture").Should().Be("žluťoučký 🧪");
     }
 
@@ -225,7 +226,7 @@ public sealed class StorageTests
     }
 
     [Theory]
-    [InlineData("INSERT INTO schema_migrations VALUES (21, '0021_future', 'now')", true)]
+    [InlineData("INSERT INTO schema_migrations VALUES (22, '0022_future', 'now')", true)]
     [InlineData("UPDATE schema_migrations SET name = '0001_wrong' WHERE version = 1", false)]
     [InlineData("INSERT INTO schema_migrations VALUES (0, '0000_invalid', 'now')", false)]
     public void InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(string mutation, bool newer)
@@ -486,7 +487,7 @@ public sealed class StorageTests
 
         using var database = HarnessDatabase.OpenReadOnly(directory.DatabasePath);
         using var connection = database.OpenConnection();
-        Scalar(connection, "SELECT COUNT(*) FROM schema_migrations").Should().Be(20L);
+        Scalar(connection, "SELECT COUNT(*) FROM schema_migrations").Should().Be(21L);
         Scalar(connection, "SELECT COUNT(*) FROM diagnostics").Should().Be(4L);
         Scalar(connection, "PRAGMA integrity_check").Should().Be("ok");
     }
@@ -497,7 +498,7 @@ public sealed class StorageTests
         using var directory = new TestDirectory();
         using (var created = Open(directory.DatabasePath))
         {
-            created.SchemaVersion().Should().Be(20);
+            created.SchemaVersion().Should().Be(21);
         }
 
         using var child = StartWorker("hold", directory.DatabasePath);
@@ -524,7 +525,7 @@ public sealed class StorageTests
                         )
                 )
                 .Should()
-                .Be(20);
+                .Be(21);
             var timer = Stopwatch.StartNew();
             var locked = FluentActions
                 .Invoking(() => WriteTransaction(current, (connection, transaction) => 0))

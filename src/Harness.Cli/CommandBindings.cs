@@ -670,6 +670,111 @@ internal static class CommandBindings
         };
     }
 
+    internal static Func<ParseResult, Harness.Cli.Tasks.BlueprintSaveSettings> BindBlueprintAddSettings(Command command)
+    {
+        var idOption = new Option<string>("--id")
+        {
+            DefaultValueFactory = _ => "",
+            Description = "Its id (default: the next free one, e.g. M17 after M16)",
+        };
+        command.Options.Add(idOption);
+        var read = BindBlueprintFields(command);
+        return result => read(result, result.GetValue(idOption) ?? "");
+    }
+
+    internal static Func<ParseResult, Harness.Cli.Tasks.BlueprintSaveSettings> BindBlueprintEditSettings(
+        Command command
+    )
+    {
+        var idArgument = new Argument<string>("id") { Arity = ArgumentArity.ExactlyOne, Description = null };
+        command.Arguments.Add(idArgument);
+        var read = BindBlueprintFields(command);
+        return result => read(result, result.GetValue(idArgument) ?? "");
+    }
+
+    // The fields of an added or edited blueprint; one not given reads as null.
+    private static Func<ParseResult, string, Harness.Cli.Tasks.BlueprintSaveSettings> BindBlueprintFields(
+        Command command
+    )
+    {
+        var projectOption = new Option<string>("--project")
+        {
+            DefaultValueFactory = _ => ".",
+            Description = "Directory inside the repository",
+        };
+        command.Options.Add(projectOption);
+        var jsonOption = new Option<bool>("--json")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "Machine-readable output",
+        };
+        command.Options.Add(jsonOption);
+        var titleOption = new Option<string>("--title") { Description = "Its name" };
+        command.Options.Add(titleOption);
+        var goalOption = new Option<string>("--goal") { Description = "What its tasks are for" };
+        command.Options.Add(goalOption);
+        var exitOption = new Option<string[]>("--exit")
+        {
+            Description = "When it is done: one criterion per --exit; --exit \"\" clears them",
+            AllowMultipleArgumentsPerToken = false,
+            Arity = ArgumentArity.OneOrMore,
+        };
+        command.Options.Add(exitOption);
+        var notesOption = new Option<string>("--notes") { Description = null };
+        command.Options.Add(notesOption);
+        return (result, id) =>
+            new Harness.Cli.Tasks.BlueprintSaveSettings
+            {
+                Project = result.GetValue(projectOption) ?? "",
+                Json = result.GetValue(jsonOption),
+                Id = id,
+                Title = result.GetResult(titleOption) is null ? null : result.GetValue(titleOption) ?? "",
+                Goal = result.GetResult(goalOption) is null ? null : result.GetValue(goalOption) ?? "",
+                Exit = result.GetResult(exitOption) is null ? null : result.GetValue(exitOption) ?? [],
+                Notes = result.GetResult(notesOption) is null ? null : result.GetValue(notesOption) ?? "",
+            };
+    }
+
+    internal static Func<ParseResult, Harness.Cli.Tasks.BlueprintRemoveSettings> BindBlueprintRemoveSettings(
+        Command command
+    )
+    {
+        var projectOption = new Option<string>("--project")
+        {
+            DefaultValueFactory = _ => ".",
+            Description = "Directory inside the repository",
+        };
+        command.Options.Add(projectOption);
+        var jsonOption = new Option<bool>("--json")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "Machine-readable output",
+        };
+        command.Options.Add(jsonOption);
+        var idArgument = new Argument<string>("id") { Arity = ArgumentArity.ExactlyOne, Description = null };
+        command.Arguments.Add(idArgument);
+        var tasksOption = new Option<string>("--tasks")
+        {
+            DefaultValueFactory = _ => "",
+            Description = "What happens to its tasks: move (to --to, or to no blueprint) or delete",
+        };
+        command.Options.Add(tasksOption);
+        var toOption = new Option<string>("--to")
+        {
+            DefaultValueFactory = _ => "",
+            Description = "The blueprint its tasks move to",
+        };
+        command.Options.Add(toOption);
+        return result => new Harness.Cli.Tasks.BlueprintRemoveSettings
+        {
+            Project = result.GetValue(projectOption) ?? "",
+            Json = result.GetValue(jsonOption),
+            Id = result.GetValue(idArgument) ?? "",
+            Tasks = result.GetValue(tasksOption) ?? "",
+            To = result.GetValue(toOption) ?? "",
+        };
+    }
+
     internal static Func<ParseResult, Harness.Cli.Tasks.TaskReadySettings> BindTaskReadySettings(Command command)
     {
         var projectOption = new Option<string>("--project")

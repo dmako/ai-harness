@@ -190,6 +190,9 @@ async function post(path, body) {
   return out;
 }
 const projectAPI = (p, what) => `/api/projects/${encodeURIComponent(p.id)}/${what}`;
+// workInbox counts what waits in Work › Inbox: proposed tasks, blueprints
+// and architectural tasks or marks.
+const workInbox = (l) => (l.pending_arch_proposals || 0) + (l.pending_task_proposals || 0) + (l.pending_blueprint_proposals || 0);
 
 // chevron is the open/closed marker of anything that expands: drawn in
 // CSS so it reads the same size in every font.
@@ -555,7 +558,7 @@ function projectHead(p) {
     facts.length > 0 && h("p", { class: "metaline" }, facts),
     l.detail && h("p", { class: "detail" }, l.detail),
     l.stale && h("p", { class: "detail" }, l.stale));
-  const badges = { knowledge: l.pending_proposals, work: (l.pending_arch_proposals || 0) + (l.pending_task_proposals || 0), health: l.checks_failed };
+  const badges = { knowledge: l.pending_proposals, work: workInbox(l), health: l.checks_failed };
   const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Views" },
     PROJECT_VIEWS.map(([v, label]) => h("a", { href: projectHref(id, v), role: "tab", "aria-selected": String(v === view) },
       label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
@@ -597,7 +600,7 @@ async function projectView(p, view, item, opts) {
       const named = item === "milestones" ? "blueprints" : item;
       const sec = ["blueprints", "tasks", "inbox"].includes(named) ? named : named ? "tasks" : state.tasks.view || "blueprints";
       if (sec !== "inbox") state.tasks.view = sec;
-      const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", (p.live.pending_arch_proposals || 0) + (p.live.pending_task_proposals || 0)]], sec);
+      const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", workInbox(p.live)]], sec);
       return h("div", {}, nav, sec === "inbox" ? await viewArchProposals(p) : await viewTasks(p, opts, sec));
     }
     case "health": return viewHealth(p);
@@ -3572,10 +3575,12 @@ async function viewArchProposals(p) {
   async function load() {
     fill(list, h("p", { class: "empty" }, "Loading…"));
     try {
-      const [tres, res] = await Promise.all([api(projectAPI(p, `task-proposals?status=${st.status}`)), api(projectAPI(p, `arch-proposals?status=${st.status}`))]);
-      const ts = tres.proposals || [], ps = res.proposals || [];
-      fill(list, ...(ts.length || ps.length ? [
+      const [tres, bres, res] = await Promise.all([api(projectAPI(p, `task-proposals?status=${st.status}`)),
+        api(projectAPI(p, `blueprint-proposals?status=${st.status}`)), api(projectAPI(p, `arch-proposals?status=${st.status}`))]);
+      const ts = tres.proposals || [], bs = bres.proposals || [], ps = res.proposals || [];
+      fill(list, ...(ts.length || bs.length || ps.length ? [
         ts.length > 0 && h("h3", { class: "inboxhead" }, "Tasks"), ...ts.map((x) => taskProposalCard(p, x)),
+        bs.length > 0 && h("h3", { class: "inboxhead" }, "Blueprints"), ...bs.map((x) => blueprintProposalCard(p, x)),
         ps.length > 0 && h("h3", { class: "inboxhead" }, "Architecture"), ...ps.map((x) => archProposalCard(p, x)),
       ] : [h("p", { class: "empty" }, `No ${st.status === "all" ? "" : st.status + " "}proposals.`)]));
     } catch (e) {
@@ -3592,7 +3597,7 @@ async function viewArchProposals(p) {
   }, s));
   await load();
   return h("div", {},
-    h("p", { class: "hint" }, "Tasks, architectural tasks and by-design marks agents proposed. Nothing changes until you approve one (it creates the task or the mark) or reject it. Agents are told not to create these themselves; that is steered, not enforced: one editing a backlog file still could."),
+    h("p", { class: "hint" }, "Tasks, blueprints, architectural tasks and by-design marks agents proposed. Nothing changes until you approve one (it creates the task, the blueprint or the mark, or restates the blueprint) or reject it. Agents are told not to create these themselves; that is steered, not enforced: one editing a backlog file still could."),
     h("div", { class: "filters" }, chips), list);
 }
 
@@ -3683,6 +3688,43 @@ function taskProposalCard(p, x) {
           if (opening.parentNode === panel) fill(panel, form);
         } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
       } }, "Create the task…"),
+      h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
+    panel);
+}
+
+// blueprintProposalCard is an agent's new blueprint or change to one
+// (TASK-0049): approved as proposed or restated first, or rejected.
+function blueprintProposalCard(p, x) {
+  const panel = h("div", { class: "mpanel" });
+  const url = (what) => projectAPI(p, `blueprint-proposals/${enc(x.id)}/${what}`);
+  const d = x.blueprint || {};
+  const isNew = !x.changes;
+  const approveForm = () => {
+    const f = blueprintFields(p, d, isNew);
+    return writeForm(panel, isNew ? `Create this blueprint? ${x.proposed_by} is recorded as the proposer.` : `Restate ${x.changes} like this? Its id and tasks stay.`,
+      [f.nodes], isNew ? "Create the blueprint" : "Save the blueprint", () => post(url("approve"), { edit: f.value() }));
+  };
+  const rejectForm = () => {
+    const note = h("textarea", { rows: 2, placeholder: "Why not (optional)" });
+    return writeForm(panel, "Reject it?", [note], "Reject", () => post(url("reject"), { note: note.value }));
+  };
+  const exit = d.exit || [];
+  return h("article", { class: "mem aprop" + (x.status === "rejected" ? " inactive" : ""), "data-proposal": x.id },
+    h("div", { class: "mtype" }, isNew ? "New blueprint" : "Blueprint change", !isNew && h("span", { class: "tag" }, x.changes),
+      x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
+    h("div", { class: "content" }, d.title),
+    d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
+    x.reason && h("p", { class: "why" }, h("b", {}, "Why proposed: "), x.reason),
+    exit.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Done when (${exit.length})`), h("ul", { class: "evlist" }, exit.map((e) => h("li", {}, e)))),
+    d.notes && h("p", { class: "why" }, h("b", {}, "Notes: "), d.notes),
+    h("div", { class: "prov" },
+      h("span", {}, h("b", {}, "proposed by "), x.proposed_by || "unknown"),
+      h("span", { title: x.proposed_at }, ago(x.proposed_at)),
+      x.decided_by && h("span", {}, h("b", {}, `${x.status} by `), x.decided_by),
+      x.note && h("span", {}, h("b", {}, "note "), x.note),
+      h("code", { class: "id" }, x.id)),
+    x.status === "pending" && h("div", { class: "review" },
+      h("button", { class: "primary", onclick: () => fill(panel, approveForm()) }, isNew ? "Create the blueprint…" : "Apply the change…"),
       h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
     panel);
 }

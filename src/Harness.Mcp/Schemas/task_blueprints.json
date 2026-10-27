@@ -1,0 +1,69 @@
+{
+  "description": "List the blueprints: what each group of tasks is for (goal), when it is done (exit criteria), notes, and its tasks' progress by status. task_next takes one blueprint's tasks; propose new or changed blueprints with task_blueprint_propose.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "name": "task_blueprints",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "blueprints": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "defined": {
+              "type": "boolean",
+              "description": "false: only tasks name it, it has no description"
+            },
+            "tasks": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "description": "task count by status"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "goal": {
+              "type": "string"
+            },
+            "exit": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "notes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "defined",
+            "tasks",
+            "total"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "blueprints"
+    ],
+    "additionalProperties": false
+  }
+}
