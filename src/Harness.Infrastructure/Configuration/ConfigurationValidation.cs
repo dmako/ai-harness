@@ -56,7 +56,15 @@ internal static class ConfigurationValidation
             configuration.Log.Level is "debug" or "info" or "warn" or "error",
             "log.level must be debug, info, warn or error"
         );
-        var complexity = configuration.Architecture.Complexity;
+        ValidateComplexity(configuration.Architecture.Complexity);
+        foreach (var (name, provider) in configuration.Providers.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            ValidateProvider($"providers.{name}", provider);
+        }
+    }
+
+    private static void ValidateComplexity(ComplexityConfiguration complexity)
+    {
         foreach (var language in complexity.Languages)
         {
             Require(
@@ -73,76 +81,80 @@ internal static class ConfigurationValidation
                 $"architecture.complexity ({language}) must satisfy 1 <= note <= warn <= problem"
             );
         }
-        foreach (var (name, provider) in configuration.Providers.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+    }
+
+    private static void ValidateProvider(string key, ProviderConfiguration provider)
+    {
+        Require(provider.Type is "mcp" or "harness", $"{key}: set pack, type = \"mcp\" or type = \"harness\"");
+        Require(provider.Dir is "" or "project", $"{key}.dir must be project or empty");
+        Require(!provider.IsEnabled() || !string.IsNullOrWhiteSpace(provider.Command), $"{key}.command is required");
+        Require(provider.TimeoutMs >= 0, $"{key}.timeout_ms must be >= 0");
+        Require(
+            provider.Only.All(capability => Capabilities.Contains(capability, StringComparer.Ordinal)),
+            $"{key}.only: unknown capability"
+        );
+        Require(
+            provider.Languages.All(language => Languages.Contains(language, StringComparer.Ordinal)),
+            $"{key}.languages: unknown language"
+        );
+        if (provider.Type == "harness")
         {
-            var key = $"providers.{name}";
-            Require(provider.Type is "mcp" or "harness", $"{key}: set pack, type = \"mcp\" or type = \"harness\"");
-            Require(provider.Dir is "" or "project", $"{key}.dir must be project or empty");
             Require(
-                !provider.IsEnabled() || !string.IsNullOrWhiteSpace(provider.Command),
-                $"{key}.command is required"
+                provider.Capabilities.Count == 0
+                    && provider.Freshness.Length == 0
+                    && provider.Refresh is null
+                    && provider.Resolve is null
+                    && !provider.IndexWorktrees,
+                $"{key}: harness providers report capabilities, freshness and refresh themselves"
             );
-            Require(provider.TimeoutMs >= 0, $"{key}.timeout_ms must be >= 0");
-            Require(
-                provider.Only.All(capability => Capabilities.Contains(capability, StringComparer.Ordinal)),
-                $"{key}.only: unknown capability"
-            );
-            Require(
-                provider.Languages.All(language => Languages.Contains(language, StringComparer.Ordinal)),
-                $"{key}.languages: unknown language"
-            );
-            if (provider.Type == "harness")
-            {
-                Require(
-                    provider.Capabilities.Count == 0
-                        && provider.Freshness.Length == 0
-                        && provider.Refresh is null
-                        && provider.Resolve is null
-                        && !provider.IndexWorktrees,
-                    $"{key}: harness providers report capabilities, freshness and refresh themselves"
-                );
-                continue;
-            }
+            return;
+        }
 
-            Require(provider.Capabilities.Count > 0, $"{key}.capabilities: map at least one capability to a tool");
-            Require(provider.Freshness is "" or "live" or "indexed", $"{key}.freshness must be live or indexed");
+        ValidateMcpProvider(key, provider);
+    }
+
+    private static void ValidateMcpProvider(string key, ProviderConfiguration provider)
+    {
+        Require(provider.Capabilities.Count > 0, $"{key}.capabilities: map at least one capability to a tool");
+        Require(provider.Freshness is "" or "live" or "indexed", $"{key}.freshness must be live or indexed");
+        Require(
+            !provider.IndexWorktrees || provider.Refresh is not null && provider.Resolve is not null,
+            $"{key}.index_worktrees needs refresh and resolve"
+        );
+        if (provider.Resolve is { } resolve)
+        {
             Require(
-                !provider.IndexWorktrees || provider.Refresh is not null && provider.Resolve is not null,
-                $"{key}.index_worktrees needs refresh and resolve"
+                !string.IsNullOrWhiteSpace(resolve.Tool)
+                    && !string.IsNullOrWhiteSpace(resolve.Match)
+                    && !string.IsNullOrWhiteSpace(resolve.Value),
+                $"{key}.resolve: tool, match and value are required"
             );
-            if (provider.Resolve is { } resolve)
-            {
-                Require(
-                    !string.IsNullOrWhiteSpace(resolve.Tool)
-                        && !string.IsNullOrWhiteSpace(resolve.Match)
-                        && !string.IsNullOrWhiteSpace(resolve.Value),
-                    $"{key}.resolve: tool, match and value are required"
-                );
-            }
+        }
 
-            if (provider.Refresh is { } refresh)
-            {
-                Require(!string.IsNullOrWhiteSpace(refresh.Tool), $"{key}.refresh.tool is required");
-                CheckRegex(refresh.Skip, $"{key}.refresh.skip");
-            }
+        if (provider.Refresh is { } refresh)
+        {
+            Require(!string.IsNullOrWhiteSpace(refresh.Tool), $"{key}.refresh.tool is required");
+            CheckRegex(refresh.Skip, $"{key}.refresh.skip");
+        }
 
-            foreach (
-                var (capability, mapping) in provider.Capabilities.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-            )
-            {
-                var mappingKey = $"{key}.capabilities.{capability}";
-                Require(Capabilities.Contains(capability, StringComparer.Ordinal), $"{mappingKey}: unknown capability");
-                CheckCall(mapping, mappingKey, capability);
-                Require(mapping.Combine is "" or "first" or "all", $"{mappingKey}.combine must be first or all");
-                foreach (var call in mapping.Chain)
-                {
-                    Require(
-                        call.Chain.Length == 0 && call.Combine.Length == 0,
-                        $"{mappingKey}.chain: nested chain/combine is not allowed"
-                    );
-                    CheckCall(call, $"{mappingKey}.chain", capability);
-                }
-            }
+        foreach (var (capability, mapping) in provider.Capabilities.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            ValidateMapping($"{key}.capabilities.{capability}", capability, mapping);
+        }
+    }
+
+    private static void ValidateMapping(string key, string capability, CapabilityMapping mapping)
+    {
+        Require(Capabilities.Contains(capability, StringComparer.Ordinal), $"{key}: unknown capability");
+        CheckCall(mapping, key, capability);
+        Require(mapping.Combine is "" or "first" or "all", $"{key}.combine must be first or all");
+        foreach (var call in mapping.Chain)
+        {
+            Require(
+                call.Chain.Length == 0 && call.Combine.Length == 0,
+                $"{key}.chain: nested chain/combine is not allowed"
+            );
+            CheckCall(call, $"{key}.chain", capability);
         }
     }
 
