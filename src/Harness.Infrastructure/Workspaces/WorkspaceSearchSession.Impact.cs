@@ -10,6 +10,12 @@ namespace Harness.Infrastructure.Workspaces;
 
 public sealed partial class WorkspaceSearchSession
 {
+    [GeneratedRegex(@"(?m)^[\t\r\n ]*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex NamespaceDeclaration { get; }
+
+    [GeneratedRegex(@"(?m)^module\s+([^\s]+)", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex GoModuleLine { get; }
+
     public async Task<WorkspaceImpact> ImpactAsync(
         string query,
         int limit,
@@ -122,13 +128,8 @@ public sealed partial class WorkspaceSearchSession
         var ns = "";
         try
         {
-            ns = Regex
-                .Match(
-                    await reader.ReadBodyAsync(best.Path!, 1, int.MaxValue, token).ConfigureAwait(false),
-                    @"(?m)^[\t\r\n ]*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)",
-                    RegexOptions.NonBacktracking,
-                    TimeSpan.FromSeconds(1)
-                )
+            ns = NamespaceDeclaration
+                .Match(await reader.ReadBodyAsync(best.Path!, 1, int.MaxValue, token).ConfigureAwait(false))
                 .Groups[1]
                 .Value;
         }
@@ -206,10 +207,7 @@ public sealed partial class WorkspaceSearchSession
                     var text = await reader
                         .ReadBodyAsync(Path.GetRelativePath(root, go), 1, int.MaxValue, token)
                         .ConfigureAwait(false);
-                    var module = Regex
-                        .Match(text, @"(?m)^module\s+([^\s]+)", RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1))
-                        .Groups[1]
-                        .Value.Trim('"');
+                    var module = GoModuleLine.Match(text).Groups[1].Value.Trim('"');
                     if (module.Length > 0)
                     {
                         var fileDirectory = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(root, path)))!;

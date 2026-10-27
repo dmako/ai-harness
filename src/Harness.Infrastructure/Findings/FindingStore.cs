@@ -20,7 +20,9 @@ public sealed partial class FindingStore(HarnessDatabase database, TimeProvider?
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
-    private static readonly Regex LineNumber = new(@":\d+\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    [GeneratedRegex(@":\d+\b", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex LineNumber { get; }
 
     private string Stamp() => _clock.GetUtcNow().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 

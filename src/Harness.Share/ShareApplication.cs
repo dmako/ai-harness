@@ -24,7 +24,7 @@ public static partial class ShareApplication
         @"^harness-(.+)-(darwin|linux|windows|freebsd)-(amd64|arm64)\.(tar\.gz|zip)$",
         RegexOptions.CultureInvariant
     )]
-    private static partial Regex ArchiveName();
+    private static partial Regex ArchiveName { get; }
 
     public static SharedRelease Load(string directory)
     {
@@ -56,7 +56,7 @@ public static partial class ShareApplication
                 extra.Add(name);
                 continue;
             }
-            var match = ArchiveName().Match(name);
+            var match = ArchiveName.Match(name);
             if (!match.Success || name.Any(c => c is < ' ' or > '~' or '"' or '<' or '>'))
             {
                 continue;

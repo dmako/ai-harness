@@ -8,33 +8,31 @@ namespace Harness.Core.Retrieval;
     "CA1308:Normalize strings to uppercase",
     Justification = "The pinned retrieval contract emits lowercase content words and naming variants."
 )]
-public static class TaskParsing
+public static partial class TaskParsing
 {
-    private static readonly Regex Identifier = new(
-        @"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*",
-        RegexOptions.NonBacktracking,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex Issue = new(
-        @"\A[A-Z][A-Z0-9]*-[0-9]",
-        RegexOptions.NonBacktracking,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex Abbreviation = new(
+    [GeneratedRegex(@"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex Identifier { get; }
+
+    [GeneratedRegex(@"\A[A-Z][A-Z0-9]*-[0-9]", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex Issue { get; }
+
+    [GeneratedRegex(
         @"\A[a-z]{1,2}(\.[a-z]{1,2})+\z",
         RegexOptions.NonBacktracking | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex Word = new(
-        @"[A-Za-z][A-Za-z0-9]+",
-        RegexOptions.NonBacktracking,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex TestWord = new(
+        1000
+    )]
+    private static partial Regex Abbreviation { get; }
+
+    [GeneratedRegex(@"[A-Za-z][A-Za-z0-9]+", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex Word { get; }
+
+    [GeneratedRegex(
         @"(?:\A|[^A-Za-z0-9_])(?:tests?|testing|spec)(?:\z|[^A-Za-z0-9_])|_test(?:\z|[^A-Za-z0-9_])",
         RegexOptions.NonBacktracking | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
+        1000
+    )]
+    private static partial Regex TestWord { get; }
+
     private static readonly HashSet<string> Stopwords = new(
         (
             "this that these those with from into onto over under about when while then than "

@@ -221,14 +221,12 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
             return (count, namespaces, imports);
         }
 
-        var import = EcosystemReader.Rx(
-            ecosystem switch
-            {
-                "NuGet" => @"using\s+(?:static\s+)?([A-Za-z_][\w.]*)",
-                "Go modules" => "\"([^\"]+)\"",
-                _ => "['\"]([^'\"]+)['\"]",
-            }
-        );
+        var import = ecosystem switch
+        {
+            "NuGet" => UsingImport,
+            "Go modules" => QuotedImport,
+            _ => ScriptImport,
+        };
         foreach (
             var file in repository.Files.Where(file => CodeFile(file, ecosystem) && !EcosystemReader.Vendored(file))
         )
@@ -286,6 +284,15 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
         };
 
     private static IReadOnlyList<T>? NullIfEmpty<T>(IReadOnlyList<T> items) => items.Count is 0 ? null : items;
+
+    [GeneratedRegex(@"using\s+(?:static\s+)?([A-Za-z_][\w.]*)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex UsingImport { get; }
+
+    [GeneratedRegex("\"([^\"]+)\"", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex QuotedImport { get; }
+
+    [GeneratedRegex("['\"]([^'\"]+)['\"]", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex ScriptImport { get; }
 
     internal static bool ReadError(Exception error) =>
         error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException;

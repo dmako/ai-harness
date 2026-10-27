@@ -10,7 +10,7 @@ using Harness.Core.Serialization;
 namespace Harness.Providers.Graphify;
 
 /// <summary>Semantic queries come exclusively from an external warm graphify-csharp session.</summary>
-public sealed class GraphifyProvider : IProvider
+public sealed partial class GraphifyProvider : IProvider
 {
     public const string ProviderName = "graphify-csharp";
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -770,6 +770,9 @@ public sealed class GraphifyProvider : IProvider
             _ => ((int)span.TotalSeconds).ToString(CultureInfo.InvariantCulture) + "s",
         };
 
+    [GeneratedRegex(@"([\w.\-]+\.(?:targets|props))'", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex MSBuildFile { get; }
+
     public static string DiscoveryReason(IEnumerable<string> diagnostics)
     {
         var diagnostic = diagnostics.FirstOrDefault(text =>
@@ -781,12 +784,7 @@ public sealed class GraphifyProvider : IProvider
             return "graphify gave no reason";
         }
 
-        var match = Regex.Match(
-            diagnostic,
-            @"([\w.\-]+\.(?:targets|props))'",
-            RegexOptions.NonBacktracking,
-            TimeSpan.FromSeconds(1)
-        );
+        var match = MSBuildFile.Match(diagnostic);
         if (match.Success)
         {
             return match.Groups[1].Value + " adds items graphify cannot trace";

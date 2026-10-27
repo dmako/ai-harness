@@ -51,13 +51,13 @@ public sealed partial class TaskStore
                 return result;
             }
 
-            var key = TasksKey().Match(text);
+            var key = TasksKey.Match(text);
             if (!key.Success)
             {
                 throw new InvalidDataException($"{path}: no top-level 'tasks:' list to append to");
             }
 
-            var item = ListItem().Match(text, key.Index + key.Length);
+            var item = ListItem.Match(text, key.Index + key.Length);
             var indent = item.Success ? item.Groups[1].Value : "  ";
             content = key.Groups[1].Success ? text[..key.Index] + "tasks:" + text[(key.Index + key.Length)..] : text;
             if (!content.EndsWith('\n'))
@@ -142,8 +142,8 @@ public sealed partial class TaskStore
     }
 
     [GeneratedRegex(@"(?m)^tasks:[ \t]*(\[\])?[ \t]*\r?$", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex TasksKey();
+    private static partial Regex TasksKey { get; }
 
     [GeneratedRegex(@"(?m)^([ \t]*)- ", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex ListItem();
+    private static partial Regex ListItem { get; }
 }

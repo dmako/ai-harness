@@ -6,13 +6,23 @@ namespace Harness.Infrastructure.Architecture;
 
 public sealed partial class SystemReader
 {
-    private static readonly Regex Database = Rx(@"(?i)(?:^|;)\s*(?:database|initial catalog)\s*=\s*([^;]+)");
-    private static readonly Regex EnvironmentUrl = Rx(
-        "^\\s*(?:export\\s+)?((?:VITE|REACT_APP|NEXT_PUBLIC|NUXT_PUBLIC|PUBLIC)_[A-Z0-9_]*(?:URL|HOST|ENDPOINT|ADDRESS|API)[A-Z0-9_]*)\\s*=\\s*['\"]?([^'\"#\\s]+)"
-    );
-    private static readonly Regex Topic = Rx(
-        "\\.(?:subscribe|publish|Subscribe|Publish|SubscribeAsync|PublishAsync)\\(\\s*['\"]([^'\"]+)['\"]"
-    );
+    [GeneratedRegex(@"(?i)(?:^|;)\s*(?:database|initial catalog)\s*=\s*([^;]+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Database { get; }
+
+    [GeneratedRegex(
+        "^\\s*(?:export\\s+)?((?:VITE|REACT_APP|NEXT_PUBLIC|NUXT_PUBLIC|PUBLIC)_[A-Z0-9_]*(?:URL|HOST|ENDPOINT|ADDRESS|API)[A-Z0-9_]*)\\s*=\\s*['\"]?([^'\"#\\s]+)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex EnvironmentUrl { get; }
+
+    [GeneratedRegex(
+        "\\.(?:subscribe|publish|Subscribe|Publish|SubscribeAsync|PublishAsync)\\(\\s*['\"]([^'\"]+)['\"]",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex Topic { get; }
+
     private static readonly (string Match, string Broker)[] Brokers =
     [
         ("masstransit", "message bus"),

@@ -5,16 +5,12 @@ namespace Harness.Infrastructure.Git;
 
 public sealed partial record GitRepository
 {
-    private static readonly Regex Hunk = new(
-        @"^@@ [^@]* @@ ?(.*)$",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex Callable = new(
-        @"([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^()<>]*>)?\s*\(",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
+    [GeneratedRegex(@"^@@ [^@]* @@ ?(.*)$", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex Hunk { get; }
+
+    [GeneratedRegex(@"([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^()<>]*>)?\s*\(", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex Callable { get; }
+
     private static readonly HashSet<string> NotNames = new(
         "func function def if for foreach while switch catch using return new lock fn".Split(' '),
         StringComparer.Ordinal

@@ -274,7 +274,7 @@ public sealed partial class TaskStore
             problems.Add("summary is required");
         }
 
-        if (input.Commit.Length is not 0 && !CommitPattern().IsMatch(input.Commit))
+        if (input.Commit.Length is not 0 && !CommitPattern.IsMatch(input.Commit))
         {
             problems.Add($"commit {TaskWorkflow.Quote(input.Commit)} is not a hex commit id");
         }
@@ -399,5 +399,5 @@ public sealed partial class TaskStore
     }
 
     [GeneratedRegex(@"\A[0-9a-f]{7,64}\z", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex CommitPattern();
+    private static partial Regex CommitPattern { get; }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
 using Harness.Core.Retrieval;
@@ -11,6 +12,9 @@ namespace Harness.Infrastructure.Workspaces;
 
 public sealed partial class WorkspaceSearchSession
 {
+    [GeneratedRegex("[A-Za-z][A-Za-z0-9]*", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex ConcernWord { get; }
+
     private static readonly HashSet<string> ConcernStop = new(
         "the and for with how any all our from into that this are its use using handling logic code implementation support".Split(
             ' '
@@ -28,8 +32,7 @@ public sealed partial class WorkspaceSearchSession
     )]
     public async Task<SimilarConcerns> ConcernAsync(string concern, bool deep, CancellationToken cancellationToken)
     {
-        var words = EcosystemReader
-            .Rx("[A-Za-z][A-Za-z0-9]*")
+        var words = ConcernWord
             .Matches(concern)
             .Select(match => Lower(match.Value))
             .Where(word => word.Length >= 3 && !ConcernStop.Contains(word))

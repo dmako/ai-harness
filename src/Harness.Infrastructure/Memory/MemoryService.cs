@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Harness.Core.Memory;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
@@ -17,7 +18,7 @@ public sealed record MemoryPromotion(
 }
 
 /// <summary>Knowledge operations shared by MCP and CLI. The project database factory remains caller-owned.</summary>
-public sealed class MemoryService(
+public sealed partial class MemoryService(
     Func<CancellationToken, Task<HarnessDatabase>> existingDatabase,
     KnowledgeLevels levels,
     Func<CancellationToken, Task<string>> branch,
@@ -395,15 +396,13 @@ public sealed class MemoryService(
         StringComparer.Ordinal
     );
 
+    [GeneratedRegex("[A-Za-z][A-Za-z0-9]+", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
+    private static partial Regex ConventionWord { get; }
+
     private static string ConventionWords(string text)
     {
-        var words = System
-            .Text.RegularExpressions.Regex.Matches(
-                text,
-                "[A-Za-z][A-Za-z0-9]+",
-                System.Text.RegularExpressions.RegexOptions.CultureInvariant
-                    | System.Text.RegularExpressions.RegexOptions.NonBacktracking
-            )
+        var words = ConventionWord
+            .Matches(text)
             .Select(match => MemoryText.Normalize(match.Value))
             .Where(word => word.Length >= 4 && !ConventionStopwords.Contains(word))
             .Distinct(StringComparer.Ordinal);

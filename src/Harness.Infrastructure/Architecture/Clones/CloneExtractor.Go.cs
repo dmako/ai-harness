@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Harness.Core.Architecture;
 
 namespace Harness.Infrastructure.Architecture.Clones;
@@ -344,16 +345,17 @@ public sealed partial class CloneExtractor
         }
     }
 
+    [GeneratedRegex(@"\b[A-Za-z_]\w*\b", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex GoTypeName { get; }
+
     private static string QualifyGoType(string path, string type, HashSet<string> types) =>
-        EcosystemReader
-            .Rx(@"\b[A-Za-z_]\w*\b")
-            .Replace(
-                type,
-                match =>
-                    types.Contains(match.Value) && (match.Index is 0 || type[match.Index - 1] is not '.')
-                        ? Directory(path) + "." + match.Value
-                        : match.Value
-            );
+        GoTypeName.Replace(
+            type,
+            match =>
+                types.Contains(match.Value) && (match.Index is 0 || type[match.Index - 1] is not '.')
+                    ? Directory(path) + "." + match.Value
+                    : match.Value
+        );
 
     private sealed record GoBodyForms(
         List<string> Canonical,

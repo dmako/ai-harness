@@ -9,17 +9,15 @@ using Harness.Infrastructure.Projects;
 
 namespace Harness.Infrastructure.Workspaces;
 
-public sealed class WorkspaceStore(string globalConfigurationPath, MachineRegistry registry)
+public sealed partial class WorkspaceStore(string globalConfigurationPath, MachineRegistry registry)
 {
     private readonly string _path = Path.Combine(
         Path.GetDirectoryName(Path.GetFullPath(globalConfigurationPath))!,
         "workspaces.json"
     );
-    private static readonly Regex Name = new(
-        @"\A[a-z0-9][a-z0-9._-]{0,63}\z",
-        RegexOptions.NonBacktracking,
-        TimeSpan.FromSeconds(1)
-    );
+
+    [GeneratedRegex(@"\A[a-z0-9][a-z0-9._-]{0,63}\z", RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex Name { get; }
 
     private JsonObject LoadFile() =>
         AtomicMachineFile.Load(_path, () => new() { ["version"] = 1, ["workspaces"] = new JsonArray() });

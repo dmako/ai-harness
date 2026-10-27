@@ -10,14 +10,12 @@ using Tomlyn.Model;
 namespace Harness.Infrastructure.Telemetry;
 
 /// <summary>Read command identities only; never start a client or provider.</summary>
-public static class ProviderServerMap
+public static partial class ProviderServerMap
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
-    private static readonly Regex Variable = new(
-        @"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
+
+    [GeneratedRegex(@"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex Variable { get; }
 
     public static IReadOnlyDictionary<string, string> Read(
         string root,

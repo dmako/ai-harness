@@ -6,23 +6,17 @@ using Harness.Infrastructure.Architecture;
 
 namespace Harness.Infrastructure.Findings;
 
-public static class KnowledgeDrift
+public static partial class KnowledgeDrift
 {
-    private static readonly Regex Backticked = new(
-        "`([^`\\n]{2,120})`",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex PathLike = new(
-        "(?:^|[\\s(\\[“\"'])((?:[\\w.-]+/)+[\\w.-]+)",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
-    private static readonly Regex CodeName = new(
-        @"\A[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*(?:\(\))?\z",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1)
-    );
+    [GeneratedRegex("`([^`\\n]{2,120})`", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex Backticked { get; }
+
+    [GeneratedRegex("(?:^|[\\s(\\[“\"'])((?:[\\w.-]+/)+[\\w.-]+)", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex PathLike { get; }
+
+    [GeneratedRegex(@"\A[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*(?:\(\))?\z", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex CodeName { get; }
+
     private static readonly HashSet<string> SourceExtensions = new(
         ".cs .go .ts .tsx .js .jsx .py .java .kt .rs .dart .csproj .sln .slnx .proto .sql .md .yaml .yml .toml .props .razor .vue".Split(
             ' '

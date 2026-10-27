@@ -6,9 +6,12 @@ namespace Harness.Infrastructure.Storage;
 
 internal sealed record Migration(int Version, string Name, string Sql);
 
-internal static class MigrationCatalog
+internal static partial class MigrationCatalog
 {
     private static readonly Lazy<IReadOnlyList<Migration>> Embedded = new(LoadEmbedded);
+
+    [GeneratedRegex(@"\A[0-9]{4}_[a-z0-9_]+\.sql\z", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
+    private static partial Regex FileName { get; }
 
     internal static IReadOnlyList<Migration> All => Embedded.Value;
 
@@ -17,13 +20,7 @@ internal static class MigrationCatalog
         var migrations = new List<Migration>();
         foreach (var (fileName, sql) in files)
         {
-            if (
-                !Regex.IsMatch(
-                    fileName,
-                    @"\A[0-9]{4}_[a-z0-9_]+\.sql\z",
-                    RegexOptions.CultureInvariant | RegexOptions.NonBacktracking
-                )
-            )
+            if (!FileName.IsMatch(fileName))
             {
                 throw new InvalidDataException($"Unexpected migration file '{fileName}' (want NNNN_name.sql).");
             }

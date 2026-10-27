@@ -1,14 +1,18 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using Harness.Core.Architecture;
 
 namespace Harness.Infrastructure.Architecture;
 
-public static class EvidenceSnippets
+public static partial class EvidenceSnippets
 {
-    private static readonly System.Text.RegularExpressions.Regex Site = EcosystemReader.Rx(
-        @"^(?:([^\s/:]+): )?([^\s:()]+?)(?::(\d+))?(?: \(([^()]+)\))?(?:: .*)?$"
-    );
+    [GeneratedRegex(
+        @"^(?:([^\s/:]+): )?([^\s:()]+?)(?::(\d+))?(?: \(([^()]+)\))?(?:: .*)?$",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex Site { get; }
 
     public static EvidenceSite? Parse(string evidence)
     {

@@ -122,7 +122,7 @@ internal static partial class TaskCliInput
 
         var negative = value.StartsWith('-');
         var input = negative || value.StartsWith('+') ? value[1..] : value;
-        var matches = DurationPattern().Matches(input);
+        var matches = DurationPattern.Matches(input);
         if (matches.Count is 0 || string.Concat(matches.Select(m => m.Value)) != input)
         {
             throw new TaskUsageException($"invalid value {TaskWorkflow.Quote(value)} for flag -lease: parse error");
@@ -151,5 +151,5 @@ internal static partial class TaskCliInput
     }
 
     [GeneratedRegex(@"([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(ns|us|µs|μs|ms|s|m|h)", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex DurationPattern();
+    private static partial Regex DurationPattern { get; }
 }

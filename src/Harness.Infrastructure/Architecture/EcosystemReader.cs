@@ -6,12 +6,20 @@ using Harness.Infrastructure.Workspaces;
 
 namespace Harness.Infrastructure.Architecture;
 
-public sealed class EcosystemReader(AnalysisRepository repository)
+public sealed partial class EcosystemReader(AnalysisRepository repository)
 {
-    private static readonly Regex Namespace = Rx(@"(?m)^\s*namespace\s+([A-Za-z_][\w.]*)");
-    private static readonly Regex GoModule = Rx(@"(?m)^module\s+(\S+)");
-    private static readonly Regex GoRequire = Rx(@"^\s*(?:require\s+)?([\w.-]+\.[\w./-]+)\s+(v\d\S*)");
-    private static readonly Regex NpmVersion = Rx(@"^[~^]?\d");
+    [GeneratedRegex(@"(?m)^\s*namespace\s+([A-Za-z_][\w.]*)", RxOptions, 1000)]
+    private static partial Regex Namespace { get; }
+
+    [GeneratedRegex(@"(?m)^module\s+(\S+)", RxOptions, 1000)]
+    private static partial Regex GoModule { get; }
+
+    [GeneratedRegex(@"^\s*(?:require\s+)?([\w.-]+\.[\w./-]+)\s+(v\d\S*)", RxOptions, 1000)]
+    private static partial Regex GoRequire { get; }
+
+    [GeneratedRegex(@"^[~^]?\d", RxOptions, 1000)]
+    private static partial Regex NpmVersion { get; }
+
     private readonly Dictionary<string, IReadOnlyList<ManifestDependency>> _dependencies = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OfferedPackage> _packages = new(StringComparer.Ordinal);
     public StaticMsBuild Build { get; } = new(repository);
@@ -257,6 +265,9 @@ public sealed class EcosystemReader(AnalysisRepository repository)
     }
 
     public static string CSharpNamespace(string text) => Namespace.Match(text).Groups[1].Value;
+
+    /// <summary>The options of the architecture readers' patterns: ECMAScript classes, culture-invariant.</summary>
+    internal const RegexOptions RxOptions = RegexOptions.ECMAScript | RegexOptions.CultureInvariant;
 
     internal static Regex Rx(string pattern) =>
         new(pattern, RegexOptions.ECMAScript | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));

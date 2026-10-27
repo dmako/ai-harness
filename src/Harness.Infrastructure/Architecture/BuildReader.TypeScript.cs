@@ -21,12 +21,20 @@ public sealed partial class BuildReader
         ["node_modules", "dist", "build", "out", ".next", "coverage", "storybook-static", ".turbo", ".vercel"],
         StringComparer.Ordinal
     );
-    private static readonly Regex Imports = EcosystemReader.Rx(
-        "(?:\\bfrom\\s*|\\bimport\\s*\\(?\\s*|\\brequire\\(\\s*)['\"]([^'\"]+)['\"]"
-    );
-    private static readonly Regex ViteAlias = EcosystemReader.Rx(
-        "['\"]?([@~#$\\w/-]+)['\"]?\\s*:\\s*(?:path\\.)?(?:resolve|join)\\([^,]*,\\s*['\"]\\.?/?([^'\"]+)['\"]\\)"
-    );
+
+    [GeneratedRegex(
+        "(?:\\bfrom\\s*|\\bimport\\s*\\(?\\s*|\\brequire\\(\\s*)['\"]([^'\"]+)['\"]",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex Imports { get; }
+
+    [GeneratedRegex(
+        "['\"]?([@~#$\\w/-]+)['\"]?\\s*:\\s*(?:path\\.)?(?:resolve|join)\\([^,]*,\\s*['\"]\\.?/?([^'\"]+)['\"]\\)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
+    private static partial Regex ViteAlias { get; }
 
     internal sealed record PackageInfo(
         string Name,

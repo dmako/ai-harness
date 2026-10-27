@@ -7,13 +7,23 @@ using Harness.Infrastructure.Workspaces;
 
 namespace Harness.Infrastructure.Architecture;
 
-public sealed class StackReader(AnalysisRepository repository, EcosystemReader ecosystem)
+public sealed partial class StackReader(AnalysisRepository repository, EcosystemReader ecosystem)
 {
-    private static readonly Regex Number = EcosystemReader.Rx(@"\d+(?:\.\d+){0,2}");
-    private static readonly Regex SdkAttribute = EcosystemReader.Rx("<Project\\s+Sdk=\"([^\"]+)\"");
-    private static readonly Regex DockerArgument = EcosystemReader.Rx(@"^\s*ARG\s+(\w+)\s*=\s*(\S+)");
-    private static readonly Regex DockerFromNode = EcosystemReader.Rx(@"^\s*FROM\s+(?:--\S+\s+)?node:(\S+)");
-    private static readonly Regex EnvironmentVariable = EcosystemReader.Rx(@"\$\{([^}]+)\}|\$([A-Za-z_]\w*)");
+    [GeneratedRegex(@"\d+(?:\.\d+){0,2}", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex Number { get; }
+
+    [GeneratedRegex("<Project\\s+Sdk=\"([^\"]+)\"", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex SdkAttribute { get; }
+
+    [GeneratedRegex(@"^\s*ARG\s+(\w+)\s*=\s*(\S+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex DockerArgument { get; }
+
+    [GeneratedRegex(@"^\s*FROM\s+(?:--\S+\s+)?node:(\S+)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex DockerFromNode { get; }
+
+    [GeneratedRegex(@"\$\{([^}]+)\}|\$([A-Za-z_]\w*)", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex EnvironmentVariable { get; }
+
     private static readonly (string Package, string Name)[] DotnetFrameworks =
     [
         ("Microsoft.AspNetCore", "ASP.NET Core"),
@@ -80,8 +90,11 @@ public sealed class StackReader(AnalysisRepository repository, EcosystemReader e
     /// </summary>
     private readonly record struct DotnetTarget(string Framework, string At, int Host);
 
-    private static readonly Regex NetFramework = EcosystemReader.Rx(@"^net(\d+)\.(\d+)$");
-    private static readonly Regex NetStandard = EcosystemReader.Rx(@"^netstandard(\d+\.\d+)$");
+    [GeneratedRegex(@"^net(\d+)\.(\d+)$", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex NetFramework { get; }
+
+    [GeneratedRegex(@"^netstandard(\d+\.\d+)$", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex NetStandard { get; }
 
     private ProjectStack Dotnet(IReadOnlyList<string> files)
     {
