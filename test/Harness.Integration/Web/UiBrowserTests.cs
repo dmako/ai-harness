@@ -166,7 +166,7 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
-    public async Task ReadyTaskIsEditedWithTheProposalFormAndClaimedOneOffersNoEdit()
+    public async Task ReadyTaskIsEditedFromItsHeaderAndClaimedOneHasEditDisabled()
     {
         var executable = Browser();
         using var fixture = await SyncFixture.CreateAsync();
@@ -196,11 +196,13 @@ public sealed class UiBrowserTests
                     "Page.navigate",
                     new { url = server.Client.BaseAddress + "#/p/" + id + "/work/UI-0001" }
                 );
-                await page.WaitAsync("[...document.querySelectorAll('button')].some(b => b.textContent === 'Edit…')");
-                await page.EvaluateAsync(
-                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Edit…').click()"
-                );
-                await page.WaitAsync("!!document.querySelector('input[aria-label=Title]')");
+                // Edit… sits in the task's header, after its status
+                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .trow .pill + button.tedit')");
+                (await ValueAsync(page, "document.querySelector('#task-UI-0002 .trow .tedit').disabled"))
+                    .Should()
+                    .Be("True");
+                await page.EvaluateAsync("document.querySelector('#task-UI-0001 .tedit').click()");
+                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .tdetail input[aria-label=Title]')");
                 (
                     await ValueAsync(
                         page,
@@ -227,7 +229,8 @@ public sealed class UiBrowserTests
                 tasks.Get("UI-0001", Token).Definition.Acceptance.Should().Equal("Old");
                 await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/UI-0002'");
                 await page.WaitAsync("!!document.querySelector('#task-UI-0002 .tdetail')");
-                (await ValueAsync(page, "!!document.querySelector('#task-UI-0002 .tdetail .review')"))
+                (await ValueAsync(page, "document.querySelector('#task-UI-0002 .tedit').disabled")).Should().Be("True");
+                (await ValueAsync(page, "!!document.querySelector('#task-UI-0002 .tdetail form')"))
                     .Should()
                     .Be("False");
             }
@@ -235,7 +238,7 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
-    public async Task BlueprintsAreCreatedEditedAndRemovedAskingOnlyWhenTheyHoldTasks()
+    public async Task BlueprintsAreCreatedEditedAndRemovedOnceConfirmedAskingAboutTheirTasks()
     {
         var executable = Browser();
         using var fixture = await SyncFixture.CreateAsync();
@@ -280,10 +283,14 @@ public sealed class UiBrowserTests
                     tasks.Blueprints(Token).Single(b => b.Definition.Id == "BP-001").Definition.Goal is "Edited goal"
                 );
 
-                // no tasks: removed at once, nothing asked
+                // no tasks: removed once confirmed, nothing else asked
                 await page.EvaluateAsync(
-                    $"[...{Card("EMPTY")}.querySelectorAll('button')].find(b => b.textContent === 'Remove').click()"
+                    $"[...{Card("EMPTY")}.querySelectorAll('button')].find(b => b.textContent === 'Remove…').click()"
                 );
+                await page.WaitAsync($"!!{Card("EMPTY")}.querySelector('form.aform')");
+                (await ValueAsync(page, $"!!{Card("EMPTY")}.querySelector('input[type=radio]')")).Should().Be("False");
+                tasks.Blueprints(Token).Should().HaveCount(2, "nothing is removed before it is confirmed");
+                await page.EvaluateAsync(Click("Remove the blueprint"));
                 await page.WaitAsync($"!{Card("EMPTY")}");
                 tasks.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("BP-001");
 
@@ -309,6 +316,22 @@ public sealed class UiBrowserTests
                 (await ValueAsync(page, "document.querySelector('.aform .hint').textContent"))
                     .Should()
                     .Contain("1 task(s)");
+                // each radio button sits at the start of its line, its text right beside it
+                (
+                    await ValueAsync(
+                        page,
+                        """
+                        [...document.querySelectorAll('.aform label.choice')].every(l => {
+                          const r = l.querySelector('input[type=radio]').getBoundingClientRect();
+                          const t = l.querySelector('span').getBoundingClientRect();
+                          return r.width < 30 && r.left - l.getBoundingClientRect().left < 4
+                            && t.left - r.right < 16 && Math.abs((t.top + t.bottom) - (r.top + r.bottom)) < 12;
+                        })
+                        """
+                    )
+                )
+                    .Should()
+                    .Be("True");
                 await page.EvaluateAsync(Click("Remove the blueprint"));
                 await page.WaitAsync($"!{Card("BP-001")}");
                 tasks.Get("UI-0001", Token).Definition.Blueprint.Should().BeEmpty("moved to no blueprint");

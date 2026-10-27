@@ -87,15 +87,16 @@ Work can also start without the backlog file:
   even one not described yet.
 
 Until an agent claims a task, you can restate it in harness ui: Work ›
-Tasks, open the task, Edit…. The form is the one used to approve a
-proposal; the id, validation and notes stay. A task that is also in the
-backlog file is restated from the file again at its next import.
+Tasks, Edit… in the task's row (disabled once an agent claims it). The
+form is the one used to approve a proposal; the id, validation and notes
+stay. A task that is also in the backlog file is restated from the file
+again at its next import.
 
 Blueprints are kept in harness ui too: Work › Blueprints › New blueprint
 starts with the next free id (M17 after M16, or BP-001) and a placeholder
 name; Edit… changes its name, goal, exit criteria and notes, not its id.
-Remove takes an empty blueprint at once. One with tasks asks what happens
-to them: moved to another blueprint (or to none), or deleted with their
+Remove… asks you to confirm; for a blueprint with tasks it also asks what
+happens to them: moved to another blueprint (or to none), or deleted with their
 audit trail. Deleting is refused while an agent holds one of the tasks, and
 a task elsewhere that depended on a deleted one loses that dependency. A
 blueprint or task still in the backlog file comes back at its next import:

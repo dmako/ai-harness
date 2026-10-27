@@ -23,7 +23,7 @@ const state = {
   days: store.get("days", "30"),
   knowledge: { types: new Set(["goal", "constraint", "decision", "convention", "warning"]), q: "", inactive: false, scope: "" },
   proposals: { status: "pending" },
-  tasks: { statuses: new Set(["ready", "claimed", "in_progress", "review", "blocked"]), blueprint: "", open: new Set(), collapsed: new Set() },
+  tasks: { statuses: new Set(["ready", "claimed", "in_progress", "review", "blocked"]), blueprint: "", open: new Set(), collapsed: new Set(), editing: "" },
   history: new Set(), // memories whose history panel is open
 };
 
@@ -3804,9 +3804,14 @@ function editBlueprintForm(p, panel, m) {
     [f.nodes], "Save the blueprint", () => post(projectAPI(p, `blueprints/${enc(m.id)}/edit`), f.value()));
 }
 
-// removeBlueprintForm asks what happens to the tasks of a blueprint that
-// has some: moved to another blueprint (or none), or deleted with it.
+// removeBlueprintForm confirms removing a blueprint and, when it has
+// tasks, asks what happens to them: moved to another blueprint (or none),
+// or deleted with it.
 function removeBlueprintForm(p, panel, m, others) {
+  const url = projectAPI(p, `blueprints/${enc(m.id)}/remove`);
+  if (!m.total) {
+    return writeForm(panel, `Remove ${m.id}? It has no tasks.`, [], "Remove the blueprint", () => post(url, {}));
+  }
   const name = "bprm-" + m.id;
   const move = h("input", { type: "radio", name, value: "move", checked: true, "aria-label": "Move the tasks" });
   const del = h("input", { type: "radio", name, value: "delete", "aria-label": "Delete the tasks" });
@@ -3817,8 +3822,7 @@ function removeBlueprintForm(p, panel, m, others) {
     [h("label", { class: "choice" }, move, h("span", {}, "Move them to "), to),
       h("label", { class: "choice" }, del, h("span", {}, "Delete them, with their audit trail")),
       h("p", { class: "muted small" }, "Deleting is refused while an agent holds one of them; tasks elsewhere that depend on a deleted one lose that dependency.")],
-    "Remove the blueprint", () => post(projectAPI(p, `blueprints/${enc(m.id)}/remove`),
-      del.checked ? { tasks: "delete" } : { tasks: "move", move_to: to.value }));
+    "Remove the blueprint", () => post(url, del.checked ? { tasks: "delete" } : { tasks: "move", move_to: to.value }));
 }
 
 // --- tasks: grouped by blueprint, with progress ---
@@ -3909,13 +3913,6 @@ async function viewTasks(p, opts, sec) {
         const own = m.id !== "—";
         const panel = h("div", { class: "mpanel" });
         const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
-        const remove = async (ev) => {
-          if (m.total) return fill(panel, removeBlueprintForm(p, panel, m, others));
-          const btn = ev.currentTarget;
-          btn.disabled = true;
-          try { await post(projectAPI(p, `blueprints/${enc(m.id)}/remove`), {}); await afterWrite(); }
-          catch (e) { btn.disabled = false; fill(panel, h("p", { class: "error" }, e.message)); }
-        };
         return h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
             h("span", { class: "mid" }, m.id),
@@ -3923,7 +3920,7 @@ async function viewTasks(p, opts, sec) {
             h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
             own && h("span", { class: "mcacts" },
               h("button", { class: "ghost", onclick: () => fill(panel, editBlueprintForm(p, panel, m)) }, m.title ? "Edit…" : "Describe…"),
-              h("button", { class: "ghost", onclick: remove }, m.total ? "Remove…" : "Remove"))),
+              h("button", { class: "ghost", onclick: () => fill(panel, removeBlueprintForm(p, panel, m, others)) }, "Remove…"))),
           panel,
           m.goal && h("p", { class: "mcgoal" }, m.goal),
           m.total > 0 && h("div", { class: "mcprog" }, meter(n("done"), m.total, `${n("done")} of ${m.total} tasks done`),
@@ -4018,6 +4015,16 @@ function taskRow(x, redraw) {
   const acc = x.acceptance || [];
   const passed = acc.filter((c) => c.result === "pass" || c.result === "n/a").length;
   const toggle = () => { open ? t.open.delete(x.id) : t.open.add(x.id); redraw(); };
+  // Edit… is always in the header; only a ready or backlog task can be
+  // restated, so for the others it stays disabled. It opens the task with
+  // its form.
+  const editable = taskEditable(x);
+  const edit = h("button", {
+    class: "ghost tedit", disabled: !editable,
+    title: editable ? "Restate this task" : "Only a ready or backlog task can be edited: once claimed, its definition is fixed",
+    onclick: (ev) => { ev.stopPropagation(); t.open.add(x.id); t.editing = x.id; redraw(); },
+    onkeydown: (ev) => ev.stopPropagation(),
+  }, "Edit…");
   const row = h("div", {
     class: "trow" + (open ? " open" : ""), role: "button", tabindex: "0", "aria-expanded": String(open),
     onclick: toggle, onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } },
@@ -4031,8 +4038,13 @@ function taskRow(x, redraw) {
     // Always present (empty without criteria) so the columns line up.
     h("span", { class: "tacc", title: acc.length ? "acceptance criteria met" : "" }, acc.length ? `${passed}/${acc.length}` : ""),
     h("span", { class: `prio p-${x.priority}` }, x.priority),
-    statusPill(x.status));
+    statusPill(x.status),
+    edit);
   return h("div", { class: "task" + (open ? " open" : ""), id: `task-${x.id}` }, row, open && taskDetail(x, passed));
+}
+
+function taskEditable(x) {
+  return x.status === "ready" || x.status === "backlog";
 }
 
 // auditBlock loads a task's audit trail on request (harness tasks show --events).
@@ -4062,7 +4074,6 @@ function taskDetail(x, passed) {
   const acc = x.acceptance || [];
   const resIcon = { pass: "✓", fail: "✕", pending: "○", "n/a": "–" };
   const panel = h("div", { class: "mpanel" });
-  const editable = x.status === "ready" || x.status === "backlog";
   const edit = async () => {
     const opening = h("div", { class: "aform" }, h("p", { class: "hint" }, "Loading task…"));
     fill(panel, opening);
@@ -4071,9 +4082,13 @@ function taskDetail(x, passed) {
       if (opening.parentNode === panel) fill(panel, form);
     } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
   };
+  // Opened by the header's Edit…: show the form once.
+  if (state.tasks.editing === x.id) {
+    state.tasks.editing = "";
+    if (taskEditable(x)) edit();
+  }
   return h("div", { class: "tdetail" },
     h("div", { class: "tmain" },
-      editable && h("div", { class: "review" }, h("button", { class: "ghost", onclick: edit }, "Edit…")),
       panel,
       x.blocked_reason && (x.status === "deferred"
         ? h("div", { class: "callout" }, h("b", {}, "Deferred: "), x.blocked_reason)
