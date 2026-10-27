@@ -302,16 +302,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            var matched = call.Miss?.IsMatch(error.Message) is true;
-            return new(
-                new()
-                {
-                    Error = Failure(mapping.Tool, error.Message, inner: error),
-                    TimedOut = error is TimeoutException,
-                },
-                matched,
-                matched
-            );
+            return CallFailed(call, error);
         }
         var text = McpMapping.Text(result);
         var output = new ProviderResult { Bytes = Encoding.UTF8.GetByteCount(text) };
@@ -343,12 +334,10 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
 
         try
         {
-            IReadOnlyList<McpMapping.Entry> entries;
-            var fields = mapping;
             if (call.Extraction is { } pattern)
             {
-                entries = McpMapping.PatternEntries(pattern, text).ToArray();
-                fields = new()
+                var entries = McpMapping.PatternEntries(pattern, text).ToArray();
+                var fields = new CapabilityMapping
                 {
                     Fields = pattern
                         .GetGroupNames()
@@ -357,87 +346,115 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
                     Kind = mapping.Kind,
                 };
                 output = output with { Truncated = call.Truncated?.IsMatch(text) is true };
+                return Items(request, call, entries, fields, output, limit);
             }
-            else
-            {
-                var body = McpMapping.Body(result);
-                if (request.Capability is Core.Providers.Capabilities.Overview)
-                {
-                    return new(
-                        output with
-                        {
-                            Summary =
-                                body.ValueKind is JsonValueKind.Object
-                                    ? body.EnumerateObject()
-                                        .ToDictionary(
-                                            property => property.Name,
-                                            property => property.Value.Clone(),
-                                            StringComparer.Ordinal
-                                        )
-                                    : new Dictionary<string, JsonElement> { ["result"] = body },
-                        }
-                    );
-                }
 
-                var message = mapping.Error.Length > 0 ? McpMapping.String(McpMapping.Lookup(body, mapping.Error)) : "";
-                if (message.Length > 0)
-                {
-                    return new(output with { Error = Failure(mapping.Tool, message) });
-                }
-
-                output = output with
-                {
-                    Truncated =
-                        mapping.Truncated.Length > 0
-                        && McpMapping.Lookup(body, mapping.Truncated).ValueKind is JsonValueKind.True,
-                };
-                var collected = McpMapping.Collect(body, mapping.Items);
-                if (!collected.Found)
-                {
-                    return new(
-                        output with
-                        {
-                            Error = Failure(
-                                mapping.Tool,
-                                $"response has no list at \"{mapping.Items}\" (check providers.{Name}.capabilities.{request.Capability}.items)"
-                            ),
-                        }
-                    );
-                }
-
-                entries = collected.Entries;
-            }
-            var items = new List<ProviderItem>();
-            foreach (var entry in entries)
-            {
-                if (call.Extraction is null && !McpMapping.Matches(entry, mapping.Where))
-                {
-                    continue;
-                }
-
-                var item = McpMapping.Item(entry, fields, request.Capability, _root) with
-                {
-                    Provider = Name,
-                    Tool = mapping.Tool,
-                };
-                if (!request.Covers(item.Path ?? ""))
-                {
-                    continue;
-                }
-
-                if (items.Count == limit)
-                {
-                    return new(output with { Items = items, Truncated = true });
-                }
-
-                items.Add(item);
-            }
-            return new(output with { Items = items });
+            return BodyPart(request, call, McpMapping.Body(result), output, limit);
         }
         catch (Exception error) when (error is JsonException or InvalidDataException or RegexMatchTimeoutException)
         {
             return new(output with { Error = Failure(mapping.Tool, error.Message, inner: error) });
         }
+    }
+
+    /// <summary>A call that threw; it missed when its message matches the miss pattern.</summary>
+    private Part CallFailed(Call call, Exception error)
+    {
+        var matched = call.Miss?.IsMatch(error.Message) is true;
+        return new(
+            new()
+            {
+                Error = Failure(call.Mapping.Tool, error.Message, inner: error),
+                TimedOut = error is TimeoutException,
+            },
+            matched,
+            matched
+        );
+    }
+
+    /// <summary>An overview's summary, the body's error field, or the items listed at the mapped path.</summary>
+    private Part BodyPart(ProviderRequest request, Call call, JsonElement body, ProviderResult output, int limit)
+    {
+        var mapping = call.Mapping;
+        if (request.Capability is Core.Providers.Capabilities.Overview)
+        {
+            return new(output with { Summary = Summary(body) });
+        }
+
+        var message = mapping.Error.Length > 0 ? McpMapping.String(McpMapping.Lookup(body, mapping.Error)) : "";
+        if (message.Length > 0)
+        {
+            return new(output with { Error = Failure(mapping.Tool, message) });
+        }
+
+        output = output with
+        {
+            Truncated =
+                mapping.Truncated.Length > 0
+                && McpMapping.Lookup(body, mapping.Truncated).ValueKind is JsonValueKind.True,
+        };
+        var collected = McpMapping.Collect(body, mapping.Items);
+        if (!collected.Found)
+        {
+            return new(
+                output with
+                {
+                    Error = Failure(
+                        mapping.Tool,
+                        $"response has no list at \"{mapping.Items}\" (check providers.{Name}.capabilities.{request.Capability}.items)"
+                    ),
+                }
+            );
+        }
+
+        return Items(request, call, collected.Entries, mapping, output, limit);
+    }
+
+    private static Dictionary<string, JsonElement> Summary(JsonElement body) =>
+        body.ValueKind is JsonValueKind.Object
+            ? body.EnumerateObject()
+                .ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal)
+            : new Dictionary<string, JsonElement> { ["result"] = body };
+
+    /// <summary>
+    /// The entries as items within the request's path, up to limit (one more marks it truncated); mapped entries
+    /// must match the where filter.
+    /// </summary>
+    private Part Items(
+        ProviderRequest request,
+        Call call,
+        IReadOnlyList<McpMapping.Entry> entries,
+        CapabilityMapping fields,
+        ProviderResult output,
+        int limit
+    )
+    {
+        var items = new List<ProviderItem>();
+        foreach (var entry in entries)
+        {
+            if (call.Extraction is null && !McpMapping.Matches(entry, call.Mapping.Where))
+            {
+                continue;
+            }
+
+            var item = McpMapping.Item(entry, fields, request.Capability, _root) with
+            {
+                Provider = Name,
+                Tool = call.Mapping.Tool,
+            };
+            if (!request.Covers(item.Path ?? ""))
+            {
+                continue;
+            }
+
+            if (items.Count == limit)
+            {
+                return new(output with { Items = items, Truncated = true });
+            }
+
+            items.Add(item);
+        }
+        return new(output with { Items = items });
     }
 
     private Dictionary<string, string> Values(ProviderRequest request, int limit)
