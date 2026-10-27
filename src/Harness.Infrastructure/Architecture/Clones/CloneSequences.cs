@@ -26,6 +26,31 @@ public static class CloneSequences
     )
     {
         options ??= new();
+        var sequences = StatementIds(functions);
+        var growth = new Growth(functions, sequences, Groups(copies, templates), options);
+        foreach (
+            var seed in Seeds(functions, sequences)
+                .Where(pair =>
+                    pair.Value.Count >= 2
+                    && pair.Value.Count <= options.MaxSeed
+                    && LeftMaximal(functions, sequences, pair.Value)
+                )
+                .OrderBy(pair => pair.Key.First)
+                .ThenBy(pair => pair.Key.Second)
+        )
+        {
+            Grow(growth, seed.Value, 2, 0);
+        }
+
+        return Widest(growth.Found);
+    }
+
+    /// <summary>Each copied function's copy group ("c" + index), else its template group ("t" + index).</summary>
+    private static Dictionary<string, string> Groups(
+        IReadOnlyList<CloneCopy> copies,
+        IReadOnlyList<CloneTemplate> templates
+    )
+    {
         Dictionary<string, string> groups = new(StringComparer.Ordinal);
         for (var index = 0; index < copies.Count; index++)
         {
@@ -42,9 +67,14 @@ public static class CloneSequences
                 groups.TryAdd(function.Id, "t" + index.ToString(CultureInfo.InvariantCulture));
             }
         }
+        return groups;
+    }
 
+    /// <summary>Each function's statements as ids, equal statements sharing one.</summary>
+    private static int[][] StatementIds(IReadOnlyList<CloneFunction> functions)
+    {
         Dictionary<string, int> ids = new(StringComparer.Ordinal);
-        var sequences = functions
+        return functions
             .Select(function =>
                 function
                     .Statements.Select(unit =>
@@ -59,6 +89,14 @@ public static class CloneSequences
                     .ToArray()
             )
             .ToArray();
+    }
+
+    /// <summary>Where each pair of adjacent statements starts, unless the first is an idiom.</summary>
+    private static Dictionary<(int First, int Second), List<Position>> Seeds(
+        IReadOnlyList<CloneFunction> functions,
+        int[][] sequences
+    )
+    {
         Dictionary<(int First, int Second), List<Position>> seeds = [];
         for (var number = 0; number < functions.Count; number++)
         {
@@ -77,50 +115,59 @@ public static class CloneSequences
                 positions.Add(new(number, unit));
             }
         }
+        return seeds;
+    }
 
-        List<CloneSequence> found = [];
-        HashSet<string> seen = new(StringComparer.Ordinal);
-        void Grow(List<Position> positions, int length, int parent)
+    /// <summary>What growing shared runs reads, and the sequences it found.</summary>
+    private sealed record Growth(
+        IReadOnlyList<CloneFunction> Functions,
+        int[][] Sequences,
+        Dictionary<string, string> CopyGroups,
+        SequenceOptions Options
+    )
+    {
+        internal HashSet<string> Seen { get; } = new(StringComparer.Ordinal);
+        internal List<CloneSequence> Found { get; } = [];
+    }
+
+    /// <summary>
+    /// Reports the runs of length at positions once no single next statement continues them all, unless a
+    /// parent run of at least half their length was reported; then grows each shared continuation.
+    /// </summary>
+    private static void Grow(Growth growth, List<Position> positions, int length, int parent)
+    {
+        var next = positions
+            .Where(position => position.Unit + length < growth.Sequences[position.Function].Length)
+            .GroupBy(position => growth.Sequences[position.Function][position.Unit + length])
+            .Select(group => group.ToList())
+            .ToArray();
+        var reported = parent;
+        if (!next.Any(group => group.Count == positions.Count))
         {
-            var next = positions
-                .Where(position => position.Unit + length < sequences[position.Function].Length)
-                .GroupBy(position => sequences[position.Function][position.Unit + length])
-                .Select(group => group.ToList())
-                .ToArray();
-            var reported = parent;
-            if (!next.Any(group => group.Count == positions.Count))
+            foreach (var sequence in Runs(growth.Functions, positions, length, growth.CopyGroups, growth.Options))
             {
-                foreach (var sequence in Runs(functions, positions, length, groups, options))
+                if (parent > 0 && sequence.Statements < 2 * parent || !growth.Seen.Add(sequence.Key))
                 {
-                    if (parent > 0 && sequence.Statements < 2 * parent || !seen.Add(sequence.Key))
-                    {
-                        continue;
-                    }
-
-                    found.Add(sequence);
-                    reported = Math.Max(reported, sequence.Statements);
+                    continue;
                 }
-            }
 
-            foreach (var group in next.Where(group => group.Count >= 2))
-            {
-                Grow(group, length + 1, reported);
+                growth.Found.Add(sequence);
+                reported = Math.Max(reported, sequence.Statements);
             }
         }
-        foreach (
-            var seed in seeds
-                .Where(pair =>
-                    pair.Value.Count >= 2
-                    && pair.Value.Count <= options.MaxSeed
-                    && LeftMaximal(functions, sequences, pair.Value)
-                )
-                .OrderBy(pair => pair.Key.First)
-                .ThenBy(pair => pair.Key.Second)
-        )
+
+        foreach (var group in next.Where(group => group.Count >= 2))
         {
-            Grow(seed.Value, 2, 0);
+            Grow(growth, group, length + 1, reported);
         }
+    }
 
+    /// <summary>
+    /// The sequences, widest first, without one less than twice as long as a kept one whose functions it
+    /// is inside; ordered by size.
+    /// </summary>
+    private static CloneSequence[] Widest(List<CloneSequence> found)
+    {
         List<CloneSequence> output = [];
         List<HashSet<string>> sets = [];
         foreach (
