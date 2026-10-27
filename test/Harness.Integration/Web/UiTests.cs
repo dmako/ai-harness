@@ -171,6 +171,7 @@ public sealed class UiTests
                 "blueprints",
                 "tasks/TASK-9999/events",
                 "tasks-next-id",
+                "blueprints-next-id",
                 "task-proposals",
                 "arch-proposals",
                 "applies",

@@ -288,6 +288,87 @@ public sealed class TaskStoreTests
     }
 
     [Fact]
+    public void BlueprintsAreCreatedEditedAndRemovedWithTheirTasksMovedOrDeleted()
+    {
+        using var s = new State();
+        s.Store.NextBlueprintId(Token).Should().Be("BP-001");
+        s.Store.ImportBlueprints([new("M9", "Nine"), new("CHK-A", "Check")], "fixture", cancellationToken: Token);
+        s.Store.NextBlueprintId(Token).Should().Be("M10", "the last numbered blueprint gives the prefix");
+        s.Store.CreateBlueprint(new(" M10 ", " Ten ", Exit: [" done ", ""]), "ui", Token);
+        FluentActions
+            .Invoking(() => s.Store.CreateBlueprint(new("M10", "Again"), "ui", Token))
+            .Should()
+            .Throw<InvalidOperationException>();
+        FluentActions
+            .Invoking(() => s.Store.CreateBlueprint(new("M11", " "), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.CreateBlueprint(new("M 11", "x"), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        s.Store.EditBlueprint("M10", new("ignored", "Ten edited", "Goal", ["exit"], "Notes"), "ui", Token);
+        var ten = s.Store.Blueprints(Token).Single(b => b.Definition.Id == "M10").Definition;
+        (ten.Title, ten.Goal, ten.Notes).Should().Be(("Ten edited", "Goal", "Notes"));
+        ten.Exit.Should().Equal("exit");
+        s.Store.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("M9", "CHK-A", "M10");
+        FluentActions
+            .Invoking(() => s.Store.EditBlueprint("M404", new("", "x"), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>();
+
+        // M1 is only named by tasks: it can be described, and removed with them
+        s.Store.Import(
+            [Definition("T-1"), Definition("T-2", "T-1"), Definition("T-3", "T-1") with { Blueprint = "M9" }],
+            "fixture",
+            cancellationToken: Token
+        );
+        s.Store.EditBlueprint("M1", new("", "One"), "ui", Token);
+        s.Store.RemoveBlueprint("CHK-A", BlueprintTasks.Keep, "", "human", Token).Deleted.Should().BeEmpty();
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Keep, "", "human", Token))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*2 task(s)*");
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Move, "M1", "human", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Move, "CHK-A", "human", Token))
+            .Should()
+            .Throw<ArgumentException>("CHK-A is gone");
+
+        var moved = s.Store.RemoveBlueprint("M10", BlueprintTasks.Move, "", "human", Token);
+        moved.Moved.Should().BeEmpty("M10 had no tasks");
+        var claim = s.Store.Claim("T-1", new("agent"), cancellationToken: Token);
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Delete, "", "human", Token))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("T-1 is claimed*");
+        s.Store.Release("T-1", new("agent", claim.Token), "", Token);
+        var deleted = s.Store.RemoveBlueprint("M1", BlueprintTasks.Delete, "", "human", Token);
+        deleted.Deleted.Should().Equal("T-1", "T-2");
+        deleted.Unlinked.Should().Equal("T-3");
+        s.Store.List(cancellationToken: Token).Select(x => x.Id).Should().Equal("T-3");
+        var three = s.Store.Get("T-3", Token);
+        three.Status.Should().Be("ready", "its only dependency was deleted");
+        three.Dependencies.Should().BeEmpty();
+        s.Store.Events("T-3", Token).Should().Contain(e => e.Event == "dependency removed" && e.Detail.Contains("T-1"));
+        s.Store.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("M9");
+
+        s.Store.CreateBlueprint(new("M2", "Two"), "ui", Token);
+        var toTwo = s.Store.RemoveBlueprint("M9", BlueprintTasks.Move, "M2", "human", Token);
+        toTwo.Moved.Should().Equal("T-3");
+        s.Store.Get("T-3", Token).Definition.Blueprint.Should().Be("M2");
+        s.Store.RemoveBlueprint("M2", BlueprintTasks.Move, "", "human", Token);
+        s.Store.Get("T-3", Token).Definition.Blueprint.Should().BeEmpty();
+        s.Store.Events("T-3", Token).Where(e => e.Event == "moved").Should().HaveCount(2);
+        s.Store.Blueprints(Token).Should().BeEmpty();
+    }
+
+    [Fact]
     public void MilestonesOfEarlierSchemasMigrateToBlueprints()
     {
         using var s = new State();

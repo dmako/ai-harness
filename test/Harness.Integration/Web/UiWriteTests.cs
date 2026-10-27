@@ -292,6 +292,66 @@ public sealed class UiWriteTests
     }
 
     [Fact]
+    public async Task BlueprintsAreCreatedEditedAndRemovedOverTheUiApi()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+        (await UiTests.ReadAsync(server.Client, root + "/blueprints-next-id"))["id"]!
+            .GetValue<string>()
+            .Should()
+            .Be("BP-001");
+        await PostAsync(
+            server.Client,
+            root + "/blueprints",
+            """{"id":"BP-001","title":"First","goal":"Why","exit":["one",""],"notes":"n"}"""
+        );
+        (await UiTests.ReadAsync(server.Client, root + "/blueprints-next-id"))["id"]!
+            .GetValue<string>()
+            .Should()
+            .Be("BP-002");
+        await PostAsync(server.Client, root + "/blueprints/BP-001/edit", """{"title":"First edited","exit":[]}""");
+        var first = store.Blueprints(Token).Single().Definition;
+        (first.Title, first.Goal, first.Notes).Should().Be(("First edited", "", ""));
+        first.Exit.Should().BeEmpty();
+        store.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0001",
+                Title = "Inside",
+                Blueprint = "BP-001",
+            },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        foreach (
+            var (path, body, status) in new[]
+            {
+                ("/blueprints", """{"id":"BP-001","title":"Twice"}""", HttpStatusCode.BadRequest),
+                ("/blueprints", """{"id":"BP-002","title":"","bogus":1}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-404/edit", """{"title":"x"}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/edit", """{"id":"BP-009","title":"x"}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/remove", "{}", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/remove", """{"tasks":"keep"}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/remove", """{"tasks":"move","move_to":"BP-404"}""", HttpStatusCode.BadRequest),
+            }
+        )
+        {
+            using var request = Request(server.Client, root + path, body);
+            using var response = await server.Client.SendAsync(request, Token);
+            response.StatusCode.Should().Be(status, path + " " + body);
+        }
+
+        var removed = await PostAsync(server.Client, root + "/blueprints/BP-001/remove", """{"tasks":"delete"}""");
+        removed["deleted"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Equal("UI-0001");
+        store.List(cancellationToken: Token).Should().BeEmpty();
+        store.Blueprints(Token).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task WorkspaceAndProjectEditsAndWiderKnowledgeRoundTrip()
     {
         using var fixture = await SyncFixture.CreateAsync();

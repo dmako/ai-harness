@@ -59,6 +59,7 @@ internal sealed partial class UiReadService
             "tasks/{tid}/events" => UiJson.Node(
                 new JsonObjectMap { ["events"] = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }
             ),
+            "blueprints-next-id" => UiJson.Node(new JsonObjectMap { ["id"] = tasks.NextBlueprintId(token) }),
             "tasks-next-id" => UiJson.Node(
                 new JsonObjectMap { ["id"] = tasks.NextId(request.Parameter("prefix"), token) }
             ),

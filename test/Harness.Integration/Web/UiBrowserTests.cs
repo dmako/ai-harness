@@ -235,6 +235,89 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task BlueprintsAreCreatedEditedAndRemovedAskingOnlyWhenTheyHoldTasks()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        tasks.CreateBlueprint(new("EMPTY", "Nothing in it"), "test", Token);
+        static string Click(string text) =>
+            $"[...document.querySelectorAll('button')].find(b => b.textContent === '{text}').click()";
+        static string Card(string id) => $"document.querySelector('.mcard[data-blueprint=\"{id}\"]')";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/blueprints" }
+                );
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'New blueprint…')"
+                );
+                await page.EvaluateAsync(Click("New blueprint…"));
+                await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Name]').value"))
+                    .Should()
+                    .Be("New blueprint");
+                await page.EvaluateAsync("document.querySelector('input[aria-label=Name]').value = 'From the browser'");
+                await page.EvaluateAsync(Click("Add the blueprint"));
+                await page.WaitAsync($"!!{Card("BP-001")}");
+                tasks.Blueprints(Token).Select(b => b.Definition.Title).Should().Contain("From the browser");
+
+                await page.EvaluateAsync(
+                    $"[...{Card("BP-001")}.querySelectorAll('button')].find(b => b.textContent === 'Edit…').click()"
+                );
+                await page.WaitAsync($"!!{Card("BP-001")}.querySelector('textarea[aria-label=Goal]')");
+                await page.EvaluateAsync(
+                    $"{Card("BP-001")}.querySelector('textarea[aria-label=Goal]').value = 'Edited goal'"
+                );
+                await page.EvaluateAsync(Click("Save the blueprint"));
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.Blueprints(Token).Single(b => b.Definition.Id == "BP-001").Definition.Goal is "Edited goal"
+                );
+
+                // no tasks: removed at once, nothing asked
+                await page.EvaluateAsync(
+                    $"[...{Card("EMPTY")}.querySelectorAll('button')].find(b => b.textContent === 'Remove').click()"
+                );
+                await page.WaitAsync($"!{Card("EMPTY")}");
+                tasks.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("BP-001");
+
+                tasks.Create(
+                    new TaskDefinition
+                    {
+                        Id = "UI-0001",
+                        Title = "In the blueprint",
+                        Blueprint = "BP-001",
+                    },
+                    "",
+                    new("test", "test", "fixture"),
+                    Token
+                );
+                await page.EvaluateAsync("location.reload()");
+                await page.WaitAsync(
+                    $"[...({Card("BP-001")}?.querySelectorAll('button') || [])].some(b => b.textContent === 'Remove…')"
+                );
+                await page.EvaluateAsync(
+                    $"[...{Card("BP-001")}.querySelectorAll('button')].find(b => b.textContent === 'Remove…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('select[aria-label=\"Move to\"]')");
+                (await ValueAsync(page, "document.querySelector('.aform .hint').textContent"))
+                    .Should()
+                    .Contain("1 task(s)");
+                await page.EvaluateAsync(Click("Remove the blueprint"));
+                await page.WaitAsync($"!{Card("BP-001")}");
+                tasks.Get("UI-0001", Token).Definition.Blueprint.Should().BeEmpty("moved to no blueprint");
+                tasks.Blueprints(Token).Should().BeEmpty();
+            }
+        );
+    }
+
+    [Fact]
     public async Task ComplexityGroupShowsItsWorstLevelFiltersByLevelAndDrawsTheDistribution()
     {
         var executable = Browser();

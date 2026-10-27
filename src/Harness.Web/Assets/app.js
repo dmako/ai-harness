@@ -3727,6 +3727,54 @@ function archProposalCard(p, x) {
     panel);
 }
 
+// --- blueprints by hand (TASK-0048) ---
+// blueprintFields is the form for a blueprint's description, new or
+// edited; a new one starts with the next free id and a placeholder title.
+function blueprintFields(p, init, isNew) {
+  const lines = (v) => v.split("\n").map((x) => x.trim()).filter(Boolean);
+  const id = isNew && h("input", { type: "text", value: "", required: true, "aria-label": "Id" });
+  if (isNew) api(projectAPI(p, "blueprints-next-id")).then((r) => { if (!id.value) id.value = r.id; }).catch(() => {});
+  const title = h("input", { type: "text", value: init.title || (isNew ? "New blueprint" : ""), required: true, "aria-label": "Name" });
+  const goal = h("textarea", { rows: 2, "aria-label": "Goal" }, init.goal || "");
+  const exit = h("textarea", { rows: 3, placeholder: "one criterion per line", "aria-label": "Done when" }, (init.exit || []).join("\n"));
+  const notes = h("textarea", { rows: 2, "aria-label": "Notes" }, init.notes || "");
+  const field = (label, el) => h("label", {}, h("span", {}, label), el);
+  return {
+    nodes: [isNew ? h("div", { class: "frow" }, field("Name", title), field("Id", id)) : field("Name", title),
+      field("Goal: what it is for", goal), field("Done when", exit), field("Notes", notes)],
+    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value, goal: goal.value, exit: lines(exit.value), notes: notes.value }),
+  };
+}
+
+function newBlueprintForm(p, panel) {
+  const f = blueprintFields(p, {}, true);
+  return writeForm(panel, "A new blueprint: group tasks under it by choosing it in their Blueprint field.",
+    [f.nodes], "Add the blueprint", () => post(projectAPI(p, "blueprints"), f.value()));
+}
+
+function editBlueprintForm(p, panel, m) {
+  const f = blueprintFields(p, m, false);
+  return writeForm(panel, `Edit ${m.id}? Its id stays.`,
+    [f.nodes], "Save the blueprint", () => post(projectAPI(p, `blueprints/${enc(m.id)}/edit`), f.value()));
+}
+
+// removeBlueprintForm asks what happens to the tasks of a blueprint that
+// has some: moved to another blueprint (or none), or deleted with it.
+function removeBlueprintForm(p, panel, m, others) {
+  const name = "bprm-" + m.id;
+  const move = h("input", { type: "radio", name, value: "move", checked: true, "aria-label": "Move the tasks" });
+  const del = h("input", { type: "radio", name, value: "delete", "aria-label": "Delete the tasks" });
+  const to = h("select", { "aria-label": "Move to", onchange: () => { move.checked = true; } },
+    h("option", { value: "" }, "no blueprint"),
+    others.map((o) => h("option", { value: o.id }, o.title ? `${o.id} · ${o.title}` : o.id)));
+  return writeForm(panel, `${m.id} has ${m.total} task(s). What happens to them?`,
+    [h("label", { class: "choice" }, move, h("span", {}, "Move them to "), to),
+      h("label", { class: "choice" }, del, h("span", {}, "Delete them, with their audit trail")),
+      h("p", { class: "muted small" }, "Deleting is refused while an agent holds one of them; tasks elsewhere that depend on a deleted one lose that dependency.")],
+    "Remove the blueprint", () => post(projectAPI(p, `blueprints/${enc(m.id)}/remove`),
+      del.checked ? { tasks: "delete" } : { tasks: "move", move_to: to.value }));
+}
+
 // --- tasks: grouped by blueprint, with progress ---
 async function viewTasks(p, opts, sec) {
   const t = state.tasks;
@@ -3805,15 +3853,32 @@ async function viewTasks(p, opts, sec) {
     const chips = [["open", "Open"], ["done", "Done"], ["deferred", "Deferred"], ["all", "All"]].map(([k, label]) => h("button", {
       class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawBlueprints(); },
     }, label, h("span", { class: "count" }, k === "all" ? ms.length : ms.filter((m) => kind(m) === k).length)));
-    fill(body, h("div", { class: "filters" }, chips),
+    const newPanel = h("div", { class: "mpanel" });
+    const add = h("button", { class: "primary newtask", onclick: () => fill(newPanel, newBlueprintForm(p, newPanel)) }, "New blueprint…");
+    fill(body, h("div", { class: "filters" }, chips, add), newPanel,
       shown.length ? h("div", { class: "mcards" }, shown.map((m) => {
         const [cls, ico, label] = stateOf(m);
         const n = (s) => (m.tasks || {})[s] || 0;
-        return h("article", { class: `mcard ms-${cls}` },
+        // "—" gathers the tasks without a blueprint: nothing to edit there
+        const own = m.id !== "—";
+        const panel = h("div", { class: "mpanel" });
+        const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
+        const remove = async (ev) => {
+          if (m.total) return fill(panel, removeBlueprintForm(p, panel, m, others));
+          const btn = ev.currentTarget;
+          btn.disabled = true;
+          try { await post(projectAPI(p, `blueprints/${enc(m.id)}/remove`), {}); await afterWrite(); }
+          catch (e) { btn.disabled = false; fill(panel, h("p", { class: "error" }, e.message)); }
+        };
+        return h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
             h("span", { class: "mid" }, m.id),
-            h("h3", {}, m.title || h("span", { class: "muted" }, "(not described in the backlog)")),
-            h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label)),
+            h("h3", {}, m.title || h("span", { class: "muted" }, own ? "(not described yet)" : "(tasks without a blueprint)")),
+            h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
+            own && h("span", { class: "mcacts" },
+              h("button", { class: "ghost", onclick: () => fill(panel, editBlueprintForm(p, panel, m)) }, m.title ? "Edit…" : "Describe…"),
+              h("button", { class: "ghost", onclick: remove }, m.total ? "Remove…" : "Remove"))),
+          panel,
           m.goal && h("p", { class: "mcgoal" }, m.goal),
           m.total > 0 && h("div", { class: "mcprog" }, meter(n("done"), m.total, `${n("done")} of ${m.total} tasks done`),
             h("span", { class: "counts" }, ["ready", "in_progress", "review", "blocked", "backlog", "deferred"].filter((s) => n(s)).map((s) => [statusPill(s), " ", n(s), " "]))),

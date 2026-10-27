@@ -80,6 +80,23 @@ public sealed record BlueprintDefinition(
     string Notes = ""
 );
 
+/// <summary>What removing a blueprint did to its tasks: moved to another (or none), or deleted, and the outside tasks
+/// that lost a dependency on a deleted one.</summary>
+public sealed record BlueprintRemoval(
+    string Id,
+    IReadOnlyList<string> Moved,
+    IReadOnlyList<string> Deleted,
+    IReadOnlyList<string> Unlinked
+);
+
+/// <summary>What happens to a removed blueprint's tasks; Keep removes only a blueprint that has none.</summary>
+public enum BlueprintTasks
+{
+    Keep,
+    Move,
+    Delete,
+}
+
 public sealed record BacklogFile(
     int Version,
     IReadOnlyList<TaskDefinition> Tasks,
