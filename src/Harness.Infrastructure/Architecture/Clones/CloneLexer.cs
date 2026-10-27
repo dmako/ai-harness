@@ -224,7 +224,7 @@ internal static class CloneLexer
 
         /// <summary>
         /// Reads past the closing quote; an ordinary string also stops before a line break, leaving it
-        /// unread.
+        /// unread and uncounted: the whitespace step counts it.
         /// </summary>
         private void ReadQuoted(char quote, bool verbatim)
         {
@@ -233,11 +233,12 @@ internal static class CloneLexer
             while (_index < source.Length)
             {
                 var character = source[_index];
-                CountLine(character);
                 if (character is '\n' && escapes)
                 {
                     return;
                 }
+
+                CountLine(character);
 
                 if (character is '\\' && escapes)
                 {
