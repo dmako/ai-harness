@@ -323,12 +323,19 @@ public sealed class UiTests
         languages.Select(language => language!["language"]!.GetValue<string>()).Should().Equal("csharp", "typescript");
         var csharp = languages[0]!;
         csharp["thresholds"]!.ToJsonString().Should().Be("""{"note":11,"warn":21,"problem":51}""");
-        csharp["members"]!.GetValue<int>().Should().Be(3);
+        csharp["functions"]!.GetValue<int>().Should().Be(3);
+        csharp["max"]!.GetValue<int>().Should().Be(14);
         csharp["measured"]!.GetValue<int>().Should().Be(0);
-        csharp["counts"]!.ToJsonString().Should().Be("[[1,2],[14,1]]");
+        csharp["bins"]!
+            .ToJsonString()
+            .Should()
+            .Be("""[{"from":1,"to":5,"count":2},{"from":6,"to":10,"count":0},{"from":11,"to":15,"count":1}]""");
+        csharp["top"]![0]!["complexity"]!.GetValue<int>().Should().Be(14);
+        csharp["files"]!.AsObject().Should().NotBeEmpty();
         var script = languages[1]!;
         script["thresholds"]!["warn"]!.GetValue<int>().Should().Be(31);
-        script["counts"]!.ToJsonString().Should().Be("[[3,1]]");
+        script["bins"]!.ToJsonString().Should().Be("""[{"from":1,"to":5,"count":1}]""");
+        script["files"]!["web/app.ts"]!.GetValue<int>().Should().Be(3);
     }
 
     [Fact]

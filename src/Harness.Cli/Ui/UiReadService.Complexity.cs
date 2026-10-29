@@ -43,31 +43,84 @@ internal sealed partial class UiReadService
                 continue;
             }
 
-            JsonArray counts = [];
-            foreach (var group in own.GroupBy(value => value.Member.Complexity).OrderBy(group => group.Key))
-            {
-                counts.Add((JsonNode)new JsonArray(group.Key, group.Count()));
-            }
-
-            output.Add(
-                (JsonNode)
-                    new JsonObject
-                    {
-                        ["language"] = language,
-                        ["thresholds"] = new JsonObject
-                        {
-                            ["note"] = thresholds.Note,
-                            ["warn"] = thresholds.Warn,
-                            ["problem"] = thresholds.Problem,
-                        },
-                        ["members"] = own.Length,
-                        ["measured"] = own.Count(value => value.Measured),
-                        ["counts"] = counts,
-                    }
-            );
+            output.Add((JsonNode)Distribution(language, thresholds, own));
         }
 
-        return new JsonObject { ["languages"] = output };
+        return new JsonObject { ["languages"] = output, ["bin_width"] = BinWidth };
+    }
+
+    private const int BinWidth = 5;
+    private const int TopFunctions = 5;
+
+    /// <summary>
+    /// One language's functions in bins of five from 1 to the most complex (every bin, empty ones too), its most
+    /// complex functions and each file's most complex one, as harness ui draws them beside the change coupling.
+    /// </summary>
+    private static JsonObject Distribution(
+        string language,
+        ComplexityThresholds thresholds,
+        (ComplexityMember Member, bool Measured)[] own
+    )
+    {
+        var max = own.Max(value => value.Member.Complexity);
+        var counts = new int[Math.Max(1, (max - 1) / BinWidth + 1)];
+        foreach (var (member, _) in own)
+        {
+            counts[Math.Max(0, member.Complexity - 1) / BinWidth]++;
+        }
+
+        JsonObject files = [];
+        foreach (
+            var file in own.GroupBy(value => value.Member.Path).OrderBy(group => group.Key, StringComparer.Ordinal)
+        )
+        {
+            files[file.Key] = file.Max(value => value.Member.Complexity);
+        }
+
+        return new JsonObject
+        {
+            ["language"] = language,
+            ["thresholds"] = new JsonObject
+            {
+                ["note"] = thresholds.Note,
+                ["warn"] = thresholds.Warn,
+                ["problem"] = thresholds.Problem,
+            },
+            ["functions"] = own.Length,
+            ["max"] = max,
+            ["measured"] = own.Count(value => value.Measured),
+            ["bins"] = new JsonArray(
+                counts
+                    .Select(
+                        (count, index) =>
+                            (JsonNode)
+                                new JsonObject
+                                {
+                                    ["from"] = index * BinWidth + 1,
+                                    ["to"] = (index + 1) * BinWidth,
+                                    ["count"] = count,
+                                }
+                    )
+                    .ToArray()
+            ),
+            ["top"] = new JsonArray(
+                own.Select(value => value.Member)
+                    .OrderByDescending(member => member.Complexity)
+                    .Take(TopFunctions)
+                    .Select(member =>
+                        (JsonNode)
+                            new JsonObject
+                            {
+                                ["name"] = member.Name,
+                                ["path"] = member.Path,
+                                ["line"] = member.Line,
+                                ["complexity"] = member.Complexity,
+                            }
+                    )
+                    .ToArray()
+            ),
+            ["files"] = files,
+        };
     }
 
     private async Task<IReadOnlyList<MeasuredMember>?> ExactAsync(string root, string id, CancellationToken token)
