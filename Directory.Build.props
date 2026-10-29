@@ -56,7 +56,7 @@
 
   <PropertyGroup Label="File and Assembly metadata">
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.3.0-localbuild</Version>
+    <Version>0.4.0-localbuild</Version>
     <Version Condition=" $(VERSION_LABEL) != '' ">$(VERSION_LABEL)</Version>
     <Company>Matus Zakarovsky, David Makovsky</Company>
     <Copyright>Copyright © 2026 Matus Zakarovsky, David Makovsky</Copyright>

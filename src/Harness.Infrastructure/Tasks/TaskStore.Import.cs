@@ -60,7 +60,7 @@ public sealed partial class TaskStore
                         Insert(c, t, d, i, source, stamp, "imported", "import", source);
                         added.Add(d.Id);
                     }
-                    else if (UpdateDefinition(c, t, d, i, source, stamp))
+                    else if (UpdateDefinition(c, t, d, i, source, stamp, "import", "definition updated from " + source))
                     {
                         updated.Add(d.Id);
                     }
@@ -191,11 +191,11 @@ public sealed partial class TaskStore
             c,
             t,
             """
-            INSERT INTO tasks(id,milestone,title,type,priority,status,goal,scope,validation,notes,blocked_reason,completion_summary,completed_by,completed_at,source,ordinal,created_at,updated_at)
-            VALUES($id,$milestone,$title,$type,$priority,$status,$goal,$scope,$validation,$notes,$blocked,$summary,$by,$done,$source,$ordinal,$stamp,$stamp)
+            INSERT INTO tasks(id,blueprint,title,type,priority,status,goal,scope,validation,notes,blocked_reason,completion_summary,completed_by,completed_at,source,ordinal,created_at,updated_at)
+            VALUES($id,$blueprint,$title,$type,$priority,$status,$goal,$scope,$validation,$notes,$blocked,$summary,$by,$done,$source,$ordinal,$stamp,$stamp)
             """,
             ("$id", d.Id),
-            ("$milestone", d.Milestone),
+            ("$blueprint", d.Blueprint),
             ("$title", d.Title),
             ("$type", d.Type),
             ("$priority", d.Priority),
@@ -254,13 +254,15 @@ public sealed partial class TaskStore
         TaskDefinition d,
         int ordinal,
         string source,
-        string stamp
+        string stamp,
+        string actor,
+        string detail
     )
     {
         var cur = Get(c, t, d.Id);
         var old = cur.Definition;
         var same =
-            old.Milestone == d.Milestone
+            old.Blueprint == d.Blueprint
             && old.Title == d.Title
             && old.Type == d.Type
             && old.Priority == d.Priority
@@ -282,9 +284,9 @@ public sealed partial class TaskStore
             c,
             t,
             """
-            UPDATE tasks SET milestone=$milestone,title=$title,type=$type,priority=$priority,goal=$goal,scope=$scope,validation=$validation,source=$source,ordinal=$ordinal,updated_at=$stamp WHERE id=$id
+            UPDATE tasks SET blueprint=$blueprint,title=$title,type=$type,priority=$priority,goal=$goal,scope=$scope,validation=$validation,source=$source,ordinal=$ordinal,updated_at=$stamp WHERE id=$id
             """,
-            ("$milestone", d.Milestone),
+            ("$blueprint", d.Blueprint),
             ("$title", d.Title),
             ("$type", d.Type),
             ("$priority", d.Priority),
@@ -323,8 +325,8 @@ public sealed partial class TaskStore
             "definition_updated",
             "",
             "",
-            "import",
-            "definition updated from " + source + (cur.Status is "done" ? " (task already done; completion kept)" : ""),
+            actor,
+            detail + (cur.Status is "done" ? " (task already done; completion kept)" : ""),
             stamp
         );
         return true;

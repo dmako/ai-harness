@@ -10,7 +10,7 @@ using Harness.Infrastructure.Tasks;
 
 namespace Harness.Cli.Tasks;
 
-internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error)
+internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter output, CliErrorOutput error)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -55,6 +55,18 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                         cancellationToken
                     ),
                     "proposals" => ListProposalsAsync((TaskProposalListSettings)settings, store, cancellationToken),
+                    "approve" when IsBlueprintProposal(settings) => ApproveBlueprintAsync(
+                        (TaskIdSettings)settings,
+                        store,
+                        actor,
+                        cancellationToken
+                    ),
+                    "reject" when IsBlueprintProposal(settings) => RejectBlueprintAsync(
+                        (TaskReadySettings)settings,
+                        store,
+                        actor,
+                        cancellationToken
+                    ),
                     "approve" => ApproveAsync((TaskApproveSettings)settings, store, actor, cancellationToken),
                     "reject" => RejectAsync((TaskReadySettings)settings, store, actor, cancellationToken),
                     "import" or "export" => FileAsync(
@@ -65,7 +77,19 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                         cancellationToken
                     ),
                     "list" => ListAsync((TaskListSettings)settings, store, cancellationToken),
-                    "milestones" => MilestonesAsync(settings, store, cancellationToken),
+                    "blueprints" => BlueprintsAsync(settings, store, cancellationToken),
+                    "blueprints add" or "blueprints edit" => SaveBlueprintAsync(
+                        (BlueprintSaveSettings)settings,
+                        store,
+                        verb is "blueprints add",
+                        cancellationToken
+                    ),
+                    "blueprints remove" => RemoveBlueprintAsync(
+                        (BlueprintRemoveSettings)settings,
+                        store,
+                        actor,
+                        cancellationToken
+                    ),
                     "next" => NextAsync((TaskNextSettings)settings, store, cancellationToken),
                     "show" => ShowAsync((TaskShowSettings)settings, store, cancellationToken),
                     "add" => AddAsync((TaskAddSettings)settings, store, actor, cancellationToken),
@@ -194,13 +218,20 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
     {
         var proposalStatus = settings.Status;
         var proposals = store.Proposals(proposalStatus, cancellationToken);
+        var blueprints = store.BlueprintProposals(proposalStatus, cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new JsonObjectMap { ["proposals"] = proposals.Select(TaskViews.Proposal).ToArray() });
+            await JsonAsync(
+                new JsonObjectMap
+                {
+                    ["proposals"] = proposals.Select(TaskViews.Proposal).ToArray(),
+                    ["blueprint_proposals"] = blueprints.Select(TaskViews.BlueprintProposal).ToArray(),
+                }
+            );
         }
-        else if (proposals.Count is 0)
+        else if (proposals.Count is 0 && blueprints.Count is 0)
         {
-            await output.WriteLineAsync($"No {proposalStatus} task proposals.");
+            await output.WriteLineAsync($"No {proposalStatus} task or blueprint proposals.");
         }
         else
         {
@@ -232,10 +263,11 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                 }
             }
 
+            await PrintBlueprintProposalsAsync(blueprints);
             if (proposalStatus is "pending")
             {
                 await output.WriteLineAsync(
-                    "\nharness tasks approve <id> creates the task; harness tasks reject <id> --note \"why\" closes it."
+                    "\nharness tasks approve <id> creates the task or blueprint; harness tasks reject <id> --note \"why\" closes it."
                 );
             }
         }
@@ -302,7 +334,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
             statuses = ["backlog", "ready", "claimed", "in_progress", "review", "blocked"];
         }
 
-        var tasks = store.List(new(statuses, settings.Milestone), cancellationToken);
+        var tasks = store.List(new(statuses, settings.Blueprint), cancellationToken);
         if (settings.Json)
         {
             await JsonAsync(new JsonObjectMap { ["tasks"] = tasks.Select(TaskViews.Task).ToArray() });
@@ -323,24 +355,24 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                     _ => "",
                 };
                 await output.WriteLineAsync(
-                    $"{t.Id, -10} {t.Status, -11} {t.Definition.Milestone, -6} {t.Definition.Priority, -8} {t.Definition.Title}{extra}"
+                    $"{t.Id, -10} {t.Status, -11} {t.Definition.Blueprint, -6} {t.Definition.Priority, -8} {t.Definition.Title}{extra}"
                 );
             }
         }
     }
 
-    private async Task MilestonesAsync(InspectSettings settings, TaskStore store, CancellationToken cancellationToken)
+    private async Task BlueprintsAsync(InspectSettings settings, TaskStore store, CancellationToken cancellationToken)
     {
-        var milestones = store.Milestones(cancellationToken);
+        var blueprints = store.Blueprints(cancellationToken);
         if (settings.Json)
         {
-            await JsonAsync(new JsonObjectMap { ["milestones"] = milestones.Select(TaskViews.Milestone).ToArray() });
+            await JsonAsync(new JsonObjectMap { ["blueprints"] = blueprints.Select(TaskViews.Blueprint).ToArray() });
         }
         else
         {
-            for (var i = 0; i < milestones.Count; i++)
+            for (var i = 0; i < blueprints.Count; i++)
             {
-                var m = milestones[i];
+                var m = blueprints[i];
                 var d = m.Definition;
                 if (i > 0)
                 {
@@ -373,7 +405,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
 
     private async Task NextAsync(TaskNextSettings settings, TaskStore store, CancellationToken cancellationToken)
     {
-        var next = store.Next(settings.Milestone, cancellationToken);
+        var next = store.Next(settings.Blueprint, cancellationToken);
         if (settings.Json)
         {
             await JsonAsync(new JsonObjectMap { ["task"] = next is null ? null : TaskViews.Task(next) });
@@ -438,7 +470,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                 Goal = settings.Goal.Trim(),
                 Type = settings.Type,
                 Priority = settings.Priority,
-                Milestone = settings.Milestone,
+                Blueprint = settings.Blueprint,
                 DependsOn = Split(settings.Depends).Select(dependency => dependency.ToUpperInvariant()).ToArray(),
                 Scope = Split(settings.Scope),
                 Acceptance = settings
@@ -550,7 +582,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         var relative = Path.GetRelativePath(root, Path.GetFullPath(file));
         var source = relative.StartsWith("..", StringComparison.Ordinal) ? file : relative;
         var imported = store.Import(backlog.Tasks, source, settings.DryRun, cancellationToken);
-        var milestones = store.ImportMilestones(backlog.Milestones, source, settings.DryRun, cancellationToken);
+        var blueprints = store.ImportBlueprints(backlog.Blueprints, source, settings.DryRun, cancellationToken);
         if (settings.Json)
         {
             await JsonAsync(
@@ -562,7 +594,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                     ["unchanged"] = imported.Unchanged.Count,
                     ["orphaned"] = Nil(imported.Orphaned),
                     ["unlocked"] = Nil(imported.Unlocked),
-                    ["milestones_changed"] = milestones,
+                    ["blueprints_changed"] = blueprints,
                 }
             );
         }
@@ -574,12 +606,12 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
                     $"{(settings.DryRun ? "Would import" : "Imported")} {source}: {imported.Added.Count} added, {imported.Updated.Count} updated, {imported.Unchanged.Count} unchanged."
                 )
             );
-            if (milestones > 0)
+            if (blueprints > 0)
             {
                 await output.WriteLineAsync(
                     string.Create(
                         System.Globalization.CultureInfo.InvariantCulture,
-                        $"Milestones added or changed: {milestones}"
+                        $"Blueprints added or changed: {blueprints}"
                     )
                 );
             }
@@ -623,7 +655,7 @@ internal sealed class TaskCommandRunner(ProjectLifecycle lifecycle, TextWriter o
         await output.WriteLineAsync(
             $"  status:     {t.Status}{(t.BlockedReason.Length is 0 ? "" : " (" + t.BlockedReason + ")")}"
         );
-        await output.WriteLineAsync($"  milestone:  {d.Milestone}   priority: {d.Priority}   type: {d.Type}");
+        await output.WriteLineAsync($"  blueprint:  {d.Blueprint}   priority: {d.Priority}   type: {d.Type}");
         if (d.Goal.Length is not 0)
         {
             await output.WriteLineAsync("  goal:       " + d.Goal);

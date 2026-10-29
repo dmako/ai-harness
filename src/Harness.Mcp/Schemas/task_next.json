@@ -3,9 +3,9 @@
   "inputSchema": {
     "type": "object",
     "properties": {
-      "milestone": {
+      "blueprint": {
         "type": "string",
-        "description": "only tasks in this milestone, e.g. M5"
+        "description": "only tasks in this blueprint, e.g. M5"
       },
       "claim": {
         "type": "boolean",
@@ -34,7 +34,7 @@
           "title": {
             "type": "string"
           },
-          "milestone": {
+          "blueprint": {
             "type": "string"
           },
           "status": {

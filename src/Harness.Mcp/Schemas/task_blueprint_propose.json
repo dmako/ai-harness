@@ -1,0 +1,125 @@
+{
+  "description": "Propose a new blueprint (a group of tasks: title, goal, exit criteria, notes), or a change to one (name it in blueprint; fields you leave out keep their current value). Agents propose blueprints, never create or change them: it waits for the user in harness ui, Work › Inbox, who approves it (the blueprint is made or restated) or rejects it.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "blueprint": {
+        "type": "string",
+        "description": "the id of the blueprint to change; leave out to propose a new one"
+      },
+      "title": {
+        "type": "string",
+        "description": "its name (required for a new blueprint)"
+      },
+      "goal": {
+        "type": "string",
+        "description": "what its tasks are for (required for a new blueprint)"
+      },
+      "exit": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "when it is done: criteria that can be checked, one per entry"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "reason": {
+        "type": "string",
+        "description": "why you propose it: what you saw, where"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "task_blueprint_propose",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "proposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "blueprint": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "exit": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "notes": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          "changes": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "proposed_by": {
+            "type": "string"
+          },
+          "proposed_at": {
+            "type": "string"
+          },
+          "decided_by": {
+            "type": "string"
+          },
+          "decided_at": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "blueprint",
+          "status",
+          "proposed_by",
+          "proposed_at"
+        ],
+        "additionalProperties": false
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "proposal",
+      "note"
+    ],
+    "additionalProperties": false
+  }
+}

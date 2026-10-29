@@ -53,14 +53,23 @@ internal sealed partial class UiReadService
             "applies" => Applying(project, database, request, token),
             "proposals" => Proposals(database, request, token),
             "tasks" => Tasks(tasks, request, token),
-            "milestones" => UiJson.Node(
-                new JsonObjectMap { ["milestones"] = tasks.Milestones(token).Select(TaskViews.Milestone) }
+            "blueprints" => UiJson.Node(
+                new JsonObjectMap { ["blueprints"] = tasks.Blueprints(token).Select(TaskViews.Blueprint) }
             ),
             "tasks/{tid}/events" => UiJson.Node(
                 new JsonObjectMap { ["events"] = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }
             ),
+            "blueprints-next-id" => UiJson.Node(new JsonObjectMap { ["id"] = tasks.NextBlueprintId(token) }),
             "tasks-next-id" => UiJson.Node(
                 new JsonObjectMap { ["id"] = tasks.NextId(request.Parameter("prefix"), token) }
+            ),
+            "blueprint-proposals" => UiJson.Node(
+                new JsonObjectMap
+                {
+                    ["proposals"] = tasks
+                        .BlueprintProposals(request.Parameter("status"), token)
+                        .Select(TaskViews.BlueprintProposal),
+                }
             ),
             "task-proposals" => UiJson.Node(
                 new JsonObjectMap
@@ -198,7 +207,7 @@ internal sealed partial class UiReadService
             new JsonObjectMap
             {
                 ["tasks"] = store
-                    .List(new() { Milestone = request.Parameter("milestone"), Statuses = statuses }, token)
+                    .List(new() { Blueprint = request.Parameter("blueprint"), Statuses = statuses }, token)
                     .Select(TaskViews.Task),
             }
         );

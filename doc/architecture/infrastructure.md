@@ -37,7 +37,7 @@ preserving provenance. Failed or missing wider stores remain unknown/missing
 instead of silently creating new storage.
 
 Task stores implement dependency readiness, lease ownership, rejected-write
-atomicity, milestones, proposals and completion validation. YAML backlogs have
+atomicity, blueprints, proposals and completion validation. YAML backlogs have
 strict fields and explicitly written representation nodes. Export checks for
 concurrent file edits; re-import updates definitions without replacing execution
 history.

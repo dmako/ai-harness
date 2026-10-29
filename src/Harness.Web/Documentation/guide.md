@@ -51,18 +51,25 @@ it to record them.
 
 ## How to define work
 
-Work is a list of tasks, grouped into milestones, kept in a backlog file
+Work is a list of tasks, grouped into blueprints, kept in a backlog file
 (`docs/backlog.yaml` by default) and loaded with `harness tasks import`.
 `harness tasks import --help` shows the format with an example.
 
 A good task names its goal (the outcome and why), its scope (the paths it
 may touch), its dependencies, and acceptance criteria that can be checked:
 the agent completes a task only by reporting every criterion with
-evidence. Milestones say what a group of tasks is for and when it is done.
+evidence. Blueprints say what a group of tasks is for and when it is done.
+They were called milestones: backlog files with `milestones:` and
+`milestone:` still import, and a project's database is migrated on first
+use.
 
 Agents take the next ready task (`task_next`), work on it and complete it
-(`task_complete`). You follow the queue in harness ui (Work) or with
-`harness tasks list`.
+(`task_complete`). A claimed task stays claimed while the agent analyses it
+and asks you what is unclear; the agent moves it to in progress when it
+starts changing code and to review while it checks the acceptance criteria
+and validation, then completes it. A task completed without a review step
+says so in its audit trail (review skipped). You follow the queue in harness
+ui (Work) or with `harness tasks list`.
 
 Work can also start without the backlog file:
 
@@ -75,7 +82,33 @@ Work can also start without the backlog file:
   proposes it (`task_propose`); it never creates tasks itself. Proposals
   wait in harness ui's Work › Inbox (or `harness tasks proposals`): approve
   one, restating it first if you want, and the task is made with the agent
-  named as its proposer; reject it and nothing changes.
+  named as its proposer; reject it and nothing changes. A proposal may name
+  its blueprint by id or by title; it keeps that blueprint when approved,
+  even one not described yet.
+
+Until an agent claims a task, you can restate it in harness ui: Work ›
+Tasks, Edit… in the task's row (disabled once an agent claims it). The
+form is the one used to approve a proposal; the id, validation and notes
+stay. A task that is also in the backlog file is restated from the file
+again at its next import.
+
+Blueprints are kept in harness ui too: Work › Blueprints › New blueprint
+starts with the next free id (M17 after M16, or BP-001) and a placeholder
+name; Edit… changes its name, goal, exit criteria and notes, not its id.
+Remove… asks you to confirm; for a blueprint with tasks it also asks what
+happens to them: moved to another blueprint (or to none), or deleted with their
+audit trail. Deleting is refused while an agent holds one of the tasks, and
+a task elsewhere that depended on a deleted one loses that dependency. A
+blueprint or task still in the backlog file comes back at its next import:
+remove it there as well.
+
+The same is done on the command line: `harness tasks blueprints add`,
+`edit <id>` (what you do not give stays) and `remove <id>` (with
+`--tasks move [--to <blueprint>]` or `--tasks delete` when it has tasks).
+Agents read the blueprints (`task_blueprints`) but do not change them: they
+propose a new blueprint or a change to one (`task_blueprint_propose`), and
+the proposal waits in Work › Inbox, or `harness tasks proposals`, beside the
+proposed tasks.
 
 ## Several checkouts of the same code
 

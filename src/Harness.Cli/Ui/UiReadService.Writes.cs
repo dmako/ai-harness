@@ -96,6 +96,24 @@ internal sealed partial class UiReadService : IUiWriteApi
             "proposals/{pid}/approve" => ApproveMemory(store, route.Value("pid"), request.Body, token),
             "proposals/{pid}/reject" => RejectMemory(store, route.Value("pid"), request.Body, token),
             "tasks" => CreateTask(database, request.Body, token),
+            "tasks/{tid}/edit" => EditTask(database, request, token),
+            "blueprints" => SaveBlueprint(database, null, request.Body, token),
+            "blueprints/{bid}/edit" => SaveBlueprint(database, route.Value("bid"), request.Body, token),
+            "blueprints/{bid}/remove" => RemoveBlueprint(database, request, token),
+            "blueprint-proposals/{pid}/approve" => ApproveBlueprint(database, request, token),
+            "blueprint-proposals/{pid}/reject" => UiJson.Node(
+                new JsonObjectMap
+                {
+                    ["proposal"] = TaskViews.BlueprintProposal(
+                        new TaskStore(database).RejectBlueprint(
+                            route.Value("pid"),
+                            new UiWriteBody(request.Body, "note").Text("note"),
+                            human,
+                            token
+                        )
+                    ),
+                }
+            ),
             "task-proposals/{pid}/approve" => ApproveTask(database, request, token),
             "task-proposals/{pid}/reject" => RejectTask(database, request, token),
             "findings/{action}" => await TriageProjectAsync(project, database, request, token),
@@ -221,7 +239,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             "goal",
             "type",
             "priority",
-            "milestone",
+            "blueprint",
             "depends_on",
             "acceptance",
             "scope"
@@ -233,7 +251,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             Goal = fields.Text("goal").Trim(),
             Type = fields.Text("type").Trim(),
             Priority = fields.Text("priority").Trim(),
-            Milestone = fields.Text("milestone").Trim(),
+            Blueprint = fields.Text("blueprint").Trim(),
             DependsOn = fields
                 .List("depends_on")
                 .Select(s => s.Trim().ToUpperInvariant())
@@ -265,6 +283,107 @@ internal sealed partial class UiReadService : IUiWriteApi
                 ),
             }
         );
+
+    private static JsonNode? EditTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token) =>
+        UiJson.Node(
+            new JsonObjectMap
+            {
+                ["task"] = TaskViews.Task(
+                    new TaskStore(database).Edit(
+                        request.Route.Value("tid"),
+                        TaskForm(request.Body),
+                        HumanActor.Current(),
+                        token
+                    )
+                ),
+            }
+        );
+
+    // A new blueprint (id null) gives its id; an edited one keeps it.
+    private static JsonNode? SaveBlueprint(
+        HarnessDatabase database,
+        string? id,
+        JsonObject body,
+        CancellationToken token
+    )
+    {
+        var fields = id is null
+            ? new UiWriteBody(body, "id", "title", "goal", "exit", "notes")
+            : new UiWriteBody(body, "title", "goal", "exit", "notes");
+        BlueprintDefinition definition = new(
+            id ?? fields.Text("id"),
+            fields.Text("title"),
+            fields.Text("goal"),
+            Clean(fields.List("exit")),
+            fields.Text("notes")
+        );
+        var store = new TaskStore(database);
+        var saved = id is null
+            ? store.CreateBlueprint(definition, "ui", token)
+            : store.EditBlueprint(id, definition, "ui", token);
+        return UiJson.Node(new JsonObjectMap { ["blueprint"] = saved.Id });
+    }
+
+    // The proposed blueprint as proposed, or as the author restated it ("edit": id for a new one, title, goal,
+    // exit, notes).
+    private static JsonNode? ApproveBlueprint(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
+    {
+        var edit = new UiWriteBody(request.Body, "edit").Object("edit");
+        BlueprintDefinition? definition = null;
+        if (edit is not null)
+        {
+            var fields = new UiWriteBody(edit, "id", "title", "goal", "exit", "notes");
+            definition = new(
+                fields.Text("id"),
+                fields.Text("title"),
+                fields.Text("goal"),
+                Clean(fields.List("exit")),
+                fields.Text("notes")
+            );
+        }
+
+        var approved = new TaskStore(database).ApproveBlueprint(
+            request.Route.Value("pid"),
+            definition,
+            HumanActor.Current(),
+            token
+        );
+        return UiJson.Node(
+            new JsonObjectMap
+            {
+                ["proposal"] = TaskViews.BlueprintProposal(approved.Proposal),
+                ["blueprint"] = approved.Blueprint.Id,
+            }
+        );
+    }
+
+    private static JsonNode? RemoveBlueprint(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
+    {
+        var fields = new UiWriteBody(request.Body, "tasks", "move_to");
+        var tasks = fields.Text("tasks") switch
+        {
+            "" => BlueprintTasks.Keep,
+            "move" => BlueprintTasks.Move,
+            "delete" => BlueprintTasks.Delete,
+            var other => throw new UiRequestException(400, "tasks must be move or delete, not " + other),
+        };
+        var removed = new TaskStore(database).RemoveBlueprint(
+            request.Route.Value("bid"),
+            tasks,
+            fields.Text("move_to"),
+            HumanActor.Current(),
+            token
+        );
+        return UiJson.Node(
+            new JsonObjectMap
+            {
+                ["blueprint"] = removed.Id,
+                ["moved"] = removed.Moved,
+                ["deleted"] = removed.Deleted,
+                ["unlinked"] = removed.Unlinked,
+            }
+        );
+    }
 
     private static JsonNode? ApproveTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
     {

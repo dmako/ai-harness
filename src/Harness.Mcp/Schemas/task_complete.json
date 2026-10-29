@@ -1,5 +1,5 @@
 {
-  "description": "Complete a claimed task. Report EVERY acceptance criterion (pass, or n/a with an explanation) and the validation commands you ran. Rejected if anything is missing or failing; nothing changes then.",
+  "description": "Complete a claimed task, normally from review (completing without it is recorded as review_skipped). Report EVERY acceptance criterion (pass, or n/a with an explanation) and the validation commands you ran. Rejected if anything is missing or failing; nothing changes then.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -147,7 +147,7 @@
           "title": {
             "type": "string"
           },
-          "milestone": {
+          "blueprint": {
             "type": "string"
           },
           "status": {

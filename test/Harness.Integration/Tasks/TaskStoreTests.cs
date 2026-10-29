@@ -21,14 +21,14 @@ public sealed class TaskStoreTests
             Title = id,
             DependsOn = dependencies,
             Acceptance = ["build", "check"],
-            Milestone = "M1",
+            Blueprint = "M1",
         };
 
     [Fact]
-    public void ImportsNormalizeDefinitionsRankReadyTasksAndCountMilestones()
+    public void ImportsNormalizeDefinitionsRankReadyTasksAndCountBlueprints()
     {
         using var s = new State();
-        s.Store.ImportMilestones(
+        s.Store.ImportBlueprints(
             [new(" M1 ", " Foundation ", "ship", ["verified", "Žluťoučký 🧪 <&>\u2028"]), new("M0", "Empty")],
             "fixture",
             cancellationToken: Token
@@ -36,7 +36,7 @@ public sealed class TaskStoreTests
         using (var connection = s.Database.OpenConnection())
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT exit FROM milestones WHERE id='M1'";
+            command.CommandText = "SELECT exit FROM blueprints WHERE id='M1'";
             command.ExecuteScalar().Should().Be("""["verified","Žluťoučký 🧪 \u003c\u0026\u003e\u2028"]""");
         }
         var result = s.Store.Import(
@@ -51,7 +51,7 @@ public sealed class TaskStoreTests
                 {
                     Priority = "critical",
                     Scope = ["src", "", "src", "test"],
-                    Milestone = "implicit",
+                    Blueprint = "implicit",
                 },
             ],
             "fixture",
@@ -62,7 +62,7 @@ public sealed class TaskStoreTests
         s.Store.Next("M1", Token)!.Id.Should().Be("T-2");
         s.Store.Get("T-4", Token).Definition.Scope.Should().Equal("src", "test");
         s.Store.Get("T-3", Token).Status.Should().Be("backlog");
-        var ms = s.Store.Milestones(Token);
+        var ms = s.Store.Blueprints(Token);
         ms.Select(m => m.Definition.Id).Should().Equal("M1", "M0", "implicit");
         ms[0].Total.Should().Be(3);
         ms[0].Tasks["done"].Should().Be(1);
@@ -77,7 +77,7 @@ public sealed class TaskStoreTests
         s.Store.Import([Definition("T-1"), Definition("T-2", "T-1")], "fixture", cancellationToken: Token);
         var before = Snapshot(s.Database);
         s.Store.Import([Definition("T-3")], "dry", true, Token).Added.Should().ContainSingle();
-        s.Store.ImportMilestones([new("M9", "dry")], "dry", true, Token).Should().Be(1);
+        s.Store.ImportBlueprints([new("M9", "dry")], "dry", true, Token).Should().Be(1);
         Snapshot(s.Database).Should().Be(before);
         FluentActions
             .Invoking(() => s.Store.Import([Definition("bad")], "bad", cancellationToken: Token))
@@ -102,12 +102,12 @@ public sealed class TaskStoreTests
             .Which;
         cycle.Message.Should().Be("dependency cycle: T-1 -> T-2 -> T-1");
         FluentActions
-            .Invoking(() => s.Store.ImportMilestones([new("", "invalid")], "bad", cancellationToken: Token))
+            .Invoking(() => s.Store.ImportBlueprints([new("", "invalid")], "bad", cancellationToken: Token))
             .Should()
             .ThrowExactly<ArgumentException>();
         FluentActions
             .Invoking(() =>
-                s.Store.ImportMilestones([new("M1", "first"), new("M1", "second")], "bad", cancellationToken: Token)
+                s.Store.ImportBlueprints([new("M1", "first"), new("M1", "second")], "bad", cancellationToken: Token)
             )
             .Should()
             .ThrowExactly<ArgumentException>();
@@ -219,7 +219,7 @@ public sealed class TaskStoreTests
         s.Store.Get("T-1", Token).Id.Should().Be("T-1");
         s.Store.List(cancellationToken: Token).Should().ContainSingle();
         s.Store.Next(cancellationToken: Token)!.Id.Should().Be("T-1");
-        s.Store.Milestones(Token).Should().ContainSingle();
+        s.Store.Blueprints(Token).Should().ContainSingle();
     }
 
     [Fact]
@@ -248,12 +248,12 @@ public sealed class TaskStoreTests
         var appended = File.ReadAllBytes(path);
         s.Store.Export(path, cancellationToken: Token).Added.Should().BeEmpty();
         File.ReadAllBytes(path).Should().Equal(appended);
-        File.WriteAllText(path, "version: 1\ntasks: []\nmilestones: []\n");
+        File.WriteAllText(path, "version: 1\ntasks: []\nblueprints: []\n");
         FluentActions
             .Invoking(() => s.Store.Export(path, cancellationToken: Token))
             .Should()
             .ThrowExactly<InvalidDataException>();
-        File.ReadAllText(path).Should().Be("version: 1\ntasks: []\nmilestones: []\n");
+        File.ReadAllText(path).Should().Be("version: 1\ntasks: []\nblueprints: []\n");
         File.WriteAllText(path, "version: 1\ntasks: []\n");
         s.Store.Export(path, cancellationToken: Token);
         BacklogCodec.Read(path).Tasks.Count.Should().Be(2);
@@ -265,15 +265,221 @@ public sealed class TaskStoreTests
     [InlineData("version: 1\ntasks: [{id: T-1, title: a, claimant: x}]")]
     [InlineData("version: 1\ntasks: [{id: T-1, title: a, scope: wrong}]")]
     [InlineData("version: 1\ntasks: [{id: T-1, id: T-2}]")]
-    [InlineData("version: 1\nmilestones: [{id: M1, mystery: x}]")]
+    [InlineData("version: 1\nblueprints: [{id: M1, mystery: x}]")]
+    [InlineData("version: 1\nblueprints: []\nmilestones: []\ntasks: []")]
+    [InlineData("version: 1\ntasks: [{id: T-1, title: a, blueprint: M1, milestone: M1}]")]
     public void StrictFormatRejectsUnknownDuplicateAndInvalidShapes(string yaml) =>
         FluentActions.Invoking(() => BacklogCodec.Parse(yaml)).Should().ThrowExactly<InvalidDataException>();
+
+    [Fact]
+    public void FormerMilestoneKeysReadAsBlueprintsAndWriteAsBlueprints()
+    {
+        var parsed = BacklogCodec.Parse(
+            "version: 1\nmilestones: [{id: M1, title: phase, exit: [tested]}]\ntasks: [{id: T-1, title: a, milestone: M1}]\n"
+        );
+        parsed.Blueprints.Should().ContainSingle().Which.Exit.Should().Equal("tested");
+        parsed.Tasks.Should().ContainSingle().Which.Blueprint.Should().Be("M1");
+        BacklogCodec
+            .Write(parsed)
+            .Should()
+            .Contain("blueprints:")
+            .And.Contain("blueprint: \"M1\"")
+            .And.NotContain("milestone");
+    }
+
+    [Fact]
+    public void BlueprintsAreCreatedEditedAndRemovedWithTheirTasksMovedOrDeleted()
+    {
+        using var s = new State();
+        s.Store.NextBlueprintId(Token).Should().Be("BP-001");
+        s.Store.ImportBlueprints([new("M9", "Nine"), new("CHK-A", "Check")], "fixture", cancellationToken: Token);
+        s.Store.NextBlueprintId(Token).Should().Be("M10", "the last numbered blueprint gives the prefix");
+        s.Store.CreateBlueprint(new(" M10 ", " Ten ", Exit: [" done ", ""]), "ui", Token);
+        FluentActions
+            .Invoking(() => s.Store.CreateBlueprint(new("M10", "Again"), "ui", Token))
+            .Should()
+            .Throw<InvalidOperationException>();
+        FluentActions
+            .Invoking(() => s.Store.CreateBlueprint(new("M11", " "), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.CreateBlueprint(new("M 11", "x"), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        s.Store.EditBlueprint("M10", new("ignored", "Ten edited", "Goal", ["exit"], "Notes"), "ui", Token);
+        var ten = s.Store.Blueprints(Token).Single(b => b.Definition.Id == "M10").Definition;
+        (ten.Title, ten.Goal, ten.Notes).Should().Be(("Ten edited", "Goal", "Notes"));
+        ten.Exit.Should().Equal("exit");
+        s.Store.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("M9", "CHK-A", "M10");
+        FluentActions
+            .Invoking(() => s.Store.EditBlueprint("M404", new("", "x"), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>();
+
+        // M1 is only named by tasks: it can be described, and removed with them
+        s.Store.Import(
+            [Definition("T-1"), Definition("T-2", "T-1"), Definition("T-3", "T-1") with { Blueprint = "M9" }],
+            "fixture",
+            cancellationToken: Token
+        );
+        s.Store.EditBlueprint("M1", new("", "One"), "ui", Token);
+        s.Store.RemoveBlueprint("CHK-A", BlueprintTasks.Keep, "", "human", Token).Deleted.Should().BeEmpty();
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Keep, "", "human", Token))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*2 task(s)*");
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Move, "M1", "human", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Move, "CHK-A", "human", Token))
+            .Should()
+            .Throw<ArgumentException>("CHK-A is gone");
+
+        var moved = s.Store.RemoveBlueprint("M10", BlueprintTasks.Move, "", "human", Token);
+        moved.Moved.Should().BeEmpty("M10 had no tasks");
+        var claim = s.Store.Claim("T-1", new("agent"), cancellationToken: Token);
+        FluentActions
+            .Invoking(() => s.Store.RemoveBlueprint("M1", BlueprintTasks.Delete, "", "human", Token))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("T-1 is claimed*");
+        s.Store.Release("T-1", new("agent", claim.Token), "", Token);
+        var deleted = s.Store.RemoveBlueprint("M1", BlueprintTasks.Delete, "", "human", Token);
+        deleted.Deleted.Should().Equal("T-1", "T-2");
+        deleted.Unlinked.Should().Equal("T-3");
+        s.Store.List(cancellationToken: Token).Select(x => x.Id).Should().Equal("T-3");
+        var three = s.Store.Get("T-3", Token);
+        three.Status.Should().Be("ready", "its only dependency was deleted");
+        three.Dependencies.Should().BeEmpty();
+        s.Store.Events("T-3", Token).Should().Contain(e => e.Event == "dependency removed" && e.Detail.Contains("T-1"));
+        s.Store.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("M9");
+
+        s.Store.CreateBlueprint(new("M2", "Two"), "ui", Token);
+        var toTwo = s.Store.RemoveBlueprint("M9", BlueprintTasks.Move, "M2", "human", Token);
+        toTwo.Moved.Should().Equal("T-3");
+        s.Store.Get("T-3", Token).Definition.Blueprint.Should().Be("M2");
+        s.Store.RemoveBlueprint("M2", BlueprintTasks.Move, "", "human", Token);
+        s.Store.Get("T-3", Token).Definition.Blueprint.Should().BeEmpty();
+        s.Store.Events("T-3", Token).Where(e => e.Event == "moved").Should().HaveCount(2);
+        s.Store.Blueprints(Token).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void BlueprintProposalsCreateOrRestateABlueprintOnlyOnceApproved()
+    {
+        using var s = new State();
+        s.Store.ImportBlueprints([new("M1", "One", "goal")], "fixture", cancellationToken: Token);
+        FluentActions
+            .Invoking(() => s.Store.ProposeBlueprint("", new("", "No goal"), "", "agent", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        FluentActions
+            .Invoking(() => s.Store.ProposeBlueprint("M404", new("", "x"), "", "agent", Token))
+            .Should()
+            .Throw<ArgumentException>();
+        var created = s.Store.ProposeBlueprint(
+            "",
+            new("ignored", " Two ", "Second", [" a ", ""]),
+            " why ",
+            "agent",
+            Token
+        );
+        created.Definition.Should().BeEquivalentTo(new BlueprintDefinition("", "Two", "Second", ["a"], ""));
+        created.Reason.Should().Be("why");
+        var changed = s.Store.ProposeBlueprint("M1", new("", "One restated", "goal"), "", "agent", Token);
+        var rejected = s.Store.ProposeBlueprint("M1", new("", "Never"), "", "agent", Token);
+        s.Store.Blueprints(Token).Should().ContainSingle("nothing changes while proposed");
+        s.Store.BlueprintProposals("pending", Token)
+            .Select(p => p.Id)
+            .Should()
+            .Equal(created.Id, changed.Id, rejected.Id);
+
+        var approved = s.Store.ApproveBlueprint(created.Id, null, "human", Token);
+        approved.Blueprint.Id.Should().Be("M2", "a new one gets the next free id");
+        approved.Proposal.Result.Should().Be("M2");
+        s.Store.ApproveBlueprint(changed.Id, new("", "Restated by the author", "goal"), "human", Token)
+            .Blueprint.Id.Should()
+            .Be("M1");
+        s.Store.Blueprints(Token)
+            .Select(b => (b.Definition.Id, b.Definition.Title))
+            .Should()
+            .Equal(("M1", "Restated by the author"), ("M2", "Two"));
+        s.Store.RejectBlueprint(rejected.Id, " not now ", "human", Token).Note.Should().Be("not now");
+        FluentActions
+            .Invoking(() => s.Store.ApproveBlueprint(rejected.Id, null, "human", Token))
+            .Should()
+            .Throw<InvalidOperationException>();
+        FluentActions
+            .Invoking(() => s.Store.GetBlueprintProposal("bpr_missing", Token))
+            .Should()
+            .Throw<KeyNotFoundException>();
+        s.Store.BlueprintProposals("pending", Token).Should().BeEmpty();
+        s.Store.BlueprintProposals("all", Token)
+            .Select(p => p.Status)
+            .Should()
+            .BeEquivalentTo("approved", "approved", "rejected");
+
+        var gone = s.Store.ProposeBlueprint("M2", new("", "Late"), "", "agent", Token);
+        s.Store.RemoveBlueprint("M2", BlueprintTasks.Keep, "", "human", Token);
+        FluentActions
+            .Invoking(() => s.Store.ApproveBlueprint(gone.Id, null, "human", Token))
+            .Should()
+            .Throw<ArgumentException>("its blueprint was removed meanwhile");
+    }
+
+    [Fact]
+    public void MilestonesOfEarlierSchemasMigrateToBlueprints()
+    {
+        using var s = new State();
+        var path = Path.Combine(s.Directory, "milestones.db");
+        using (
+            var historical = HarnessDatabase.Open(
+                path,
+                new StorageOptions(),
+                MigrationCatalog.All.Take(19).ToArray(),
+                Token
+            )
+        )
+        {
+            using var c = historical.OpenConnection();
+            using var command = c.CreateCommand();
+            command.CommandText = """
+                INSERT INTO milestones(id,title,exit,updated_at) VALUES('M1','phase','["tested"]','2026-01-01T00:00:00Z');
+                INSERT INTO tasks(id,milestone,title,status,created_at,updated_at) VALUES('T-1','M1','first','ready','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
+                INSERT INTO task_proposals(id,definition,status,proposed_by,proposed_at)
+                VALUES('tpr_1','{"title":"proposed","milestone":"M1","goal":"g"}','pending','agent','2026-01-01T00:00:00Z'),
+                      ('tpr_2','{"title":"plain","goal":"g"}','pending','agent','2026-01-01T00:00:00Z');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        using var database = HarnessDatabase.Open(path, cancellationToken: Token);
+        database.SchemaVersion().Should().Be(21);
+        var store = new TaskStore(database);
+        var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
+        blueprint.Id.Should().Be("M1");
+        blueprint.Title.Should().Be("phase");
+        blueprint.Exit.Should().Equal("tested");
+        store.Get("T-1", Token).Definition.Blueprint.Should().Be("M1");
+        store.List(new(Blueprint: "M1"), Token).Should().ContainSingle();
+        store.GetProposal("tpr_1", Token).Task.Blueprint.Should().Be("M1");
+        store.GetProposal("tpr_2", Token).Task.Blueprint.Should().BeEmpty();
+        using var connection = database.OpenConnection();
+        using var leftovers = connection.CreateCommand();
+        leftovers.CommandText =
+            "SELECT COUNT(*) FROM sqlite_schema WHERE name LIKE '%milestone%' OR sql LIKE '%milestone%'";
+        leftovers.ExecuteScalar().Should().Be(0L);
+    }
 
     [Fact]
     public void JsonYamlAliasesAndMultilinePlanningRoundTrip()
     {
         var parsed = BacklogCodec.Parse(
-            "version: 1\nmilestones: [{id: M1, title: phase, exit: [tested]}]\ntasks:\n  - id: T-1\n    title: 'null'\n    scope: &paths [src, test]\n    goal: |\n      Line one\n      Line two\n  - id: T-2\n    title: second\n    scope: *paths\n---\nignored: true\n"
+            "version: 1\nblueprints: [{id: M1, title: phase, exit: [tested]}]\ntasks:\n  - id: T-1\n    title: 'null'\n    scope: &paths [src, test]\n    goal: |\n      Line one\n      Line two\n  - id: T-2\n    title: second\n    scope: *paths\n---\nignored: true\n"
         );
         parsed.Tasks[0].Title.Should().Be("null");
         parsed.Tasks[1].Scope.Should().Equal("src", "test");
@@ -291,6 +497,8 @@ public sealed class TaskStoreTests
     [InlineData(5)]
     [InlineData(13)]
     [InlineData(19)]
+    [InlineData(20)]
+    [InlineData(21)]
     public void HistoricalSchemasRetainTaskStateThroughExportImport(int version)
     {
         using var s = new State();
@@ -313,7 +521,7 @@ public sealed class TaskStoreTests
             "fixture",
             cancellationToken: Token
         );
-        store.ImportMilestones([new("M1", "Migrated", "ship", ["verified"])], "fixture", cancellationToken: Token);
+        store.ImportBlueprints([new("M1", "Migrated", "ship", ["verified"])], "fixture", cancellationToken: Token);
         var yaml = Path.Combine(s.Directory, "export.yaml");
         store.Export(yaml, cancellationToken: Token).Created.Should().BeTrue();
         var exported = BacklogCodec.Read(yaml);
@@ -321,7 +529,7 @@ public sealed class TaskStoreTests
         var res = store.Import(exported.Tasks, "export", cancellationToken: Token);
         res.Updated.Should().BeEmpty();
         res.Unchanged.Count.Should().Be(2);
-        store.ImportMilestones(exported.Milestones, "export", cancellationToken: Token).Should().Be(0);
+        store.ImportBlueprints(exported.Blueprints, "export", cancellationToken: Token).Should().Be(0);
         Snapshot(database).Should().Be(before);
         store.Get("T-42", Token).Status.Should().Be("ready");
     }
@@ -362,7 +570,7 @@ public sealed class TaskStoreTests
                 "SELECT * FROM task_dependencies ORDER BY task_id,depends_on",
                 "SELECT * FROM task_acceptance ORDER BY task_id,idx",
                 "SELECT * FROM task_events ORDER BY id",
-                "SELECT * FROM milestones ORDER BY id",
+                "SELECT * FROM blueprints ORDER BY id",
             }
         )
         {

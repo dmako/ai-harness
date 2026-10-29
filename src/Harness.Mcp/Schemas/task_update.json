@@ -1,5 +1,5 @@
 {
-  "description": "Report progress on a claimed task: status (in_progress, review, blocked with reason, or ready to release the claim), a note, and/or partial acceptance results. Renews the lease.",
+  "description": "Report progress on a claimed task: status (in_progress when you start changing code, review while you check the acceptance criteria and validation, blocked with reason, or ready to release the claim), a note, and/or partial acceptance results. Renews the lease.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -11,7 +11,7 @@
       },
       "status": {
         "type": "string",
-        "description": "in_progress, review, blocked (needs reason) or ready (releases the claim)"
+        "description": "in_progress (changing code), review (checking acceptance, constraints and validation; back to in_progress if something fails), blocked (needs reason) or ready (releases the claim)"
       },
       "reason": {
         "type": "string",
@@ -72,7 +72,7 @@
           "title": {
             "type": "string"
           },
-          "milestone": {
+          "blueprint": {
             "type": "string"
           },
           "status": {

@@ -29,4 +29,32 @@ public sealed class CommandBindingTests
         root.Parse([.. prefix, flag]).Errors.Should().NotBeEmpty();
         root.Parse([.. prefix, flag, "first", "second"]).Errors.Should().NotBeEmpty();
     }
+
+    [Theory]
+    [InlineData("tasks", "milestones", "--help")]
+    [InlineData("task", "milestones", "--help")]
+    [InlineData("tasks", "list", "--milestone", "M1", "--help")]
+    [InlineData("tasks", "list", "-milestone=M1", "--help")]
+    public async Task FormerMilestoneNamesStillRunAsBlueprints(params string[] args)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        (await CliApplication.RunAsync(args, output, error, TestContext.Current.CancellationToken))
+            .Should()
+            .Be(0, error.ToString());
+        output.ToString().Should().Contain(args[1] is "milestones" ? "tasks blueprints" : "--blueprint");
+    }
+
+    [Fact]
+    public async Task HelpNamesBlueprintsOnly()
+    {
+        using var output = new StringWriter();
+        await CliApplication.RunAsync(
+            ["tasks", "--help"],
+            output,
+            TextWriter.Null,
+            TestContext.Current.CancellationToken
+        );
+        output.ToString().Should().Contain("blueprints").And.NotContain("milestone");
+    }
 }

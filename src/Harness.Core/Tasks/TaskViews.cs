@@ -7,7 +7,7 @@ public static class TaskViews
     public static Dictionary<string, object?> Definition(TaskDefinition d)
     {
         Dictionary<string, object?> view = new() { ["id"] = d.Id, ["title"] = d.Title };
-        Add(view, "milestone", d.Milestone);
+        Add(view, "blueprint", d.Blueprint);
         Add(view, "type", d.Type);
         Add(view, "priority", d.Priority);
         Add(view, "goal", d.Goal);
@@ -49,7 +49,7 @@ public static class TaskViews
             ["priority"] = d.Priority,
             ["type"] = d.Type,
         };
-        Add(view, "milestone", d.Milestone);
+        Add(view, "blueprint", d.Blueprint);
         Add(view, "goal", d.Goal);
         Add(view, "scope", d.Scope);
         Add(view, "validation", d.Validation);
@@ -126,7 +126,37 @@ public static class TaskViews
         return view;
     }
 
-    public static Dictionary<string, object?> Milestone(MilestoneProgress m)
+    /// <summary>A blueprint's description as proposed; the id only when it has one.</summary>
+    public static Dictionary<string, object?> BlueprintDefinition(BlueprintDefinition d)
+    {
+        Dictionary<string, object?> view = new() { ["title"] = d.Title };
+        Add(view, "id", d.Id);
+        Add(view, "goal", d.Goal);
+        Add(view, "exit", d.Exit ?? []);
+        Add(view, "notes", d.Notes);
+        return view;
+    }
+
+    public static Dictionary<string, object?> BlueprintProposal(BlueprintProposal p)
+    {
+        Dictionary<string, object?> view = new()
+        {
+            ["id"] = p.Id,
+            ["blueprint"] = BlueprintDefinition(p.Definition),
+            ["status"] = p.Status,
+            ["proposed_by"] = p.ProposedBy,
+            ["proposed_at"] = p.ProposedAt,
+        };
+        Add(view, "changes", p.Blueprint);
+        Add(view, "reason", p.Reason);
+        Add(view, "decided_by", p.DecidedBy);
+        Add(view, "decided_at", p.DecidedAt);
+        Add(view, "note", p.Note);
+        Add(view, "result", p.Result);
+        return view;
+    }
+
+    public static Dictionary<string, object?> Blueprint(BlueprintProgress m)
     {
         Dictionary<string, object?> view = new()
         {

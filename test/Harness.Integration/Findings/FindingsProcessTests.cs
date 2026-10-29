@@ -75,7 +75,7 @@ public sealed class FindingsProcessTests
             cancellationToken: Token
         );
         var tools = await client.ListToolsAsync(cancellationToken: Token);
-        tools.Should().HaveCount(30);
+        tools.Should().HaveCount(32);
         foreach (var name in new[] { "architecture_findings", "architecture_propose" })
         {
             ToolSchema.AssertMatches(tools.Single(tool => tool.Name == name));

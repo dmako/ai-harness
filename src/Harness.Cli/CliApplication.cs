@@ -143,7 +143,7 @@ public static class CliApplication
             return ["--help"];
         }
 
-        var normalized = WithDefaultCommands(NormalizeLegacyFlags(args));
+        var normalized = WithDefaultCommands(WithFormerCommands(NormalizeLegacyFlags(args)));
         return normalized[0] switch
         {
             "-v" or "--version" => ["version", .. normalized[1..]],
@@ -151,6 +151,12 @@ public static class CliApplication
             _ => normalized,
         };
     }
+
+    /// <summary>Blueprints were called milestones (TASK-0047): tasks milestones still lists them.</summary>
+    private static string[] WithFormerCommands(string[] args) =>
+        args.Length > 1 && args[0] is "tasks" or "task" && args[1] is "milestones"
+            ? [args[0], "blueprints", .. args[2..]]
+            : args;
 
     /// <summary>A command group named without a subcommand runs its default one.</summary>
     private static string[] WithDefaultCommands(string[] args)
@@ -226,7 +232,9 @@ public static class CliApplication
                 "-note" => "--note",
                 "-supersede" => "--supersede",
                 "-keep-both" => "--keep-both",
-                "-milestone" => "--milestone",
+                "-blueprint" => "--blueprint",
+                // Blueprints were called milestones (TASK-0047).
+                "-milestone" or "--milestone" => "--blueprint",
                 "-events" => "--events",
                 "-id" => "--id",
                 "-prefix" => "--prefix",
@@ -270,7 +278,7 @@ public static class CliApplication
                         or "--content"
                         or "--note"
                         or "--supersede"
-                        or "--milestone"
+                        or "--blueprint"
                         or "--id"
                         or "--prefix"
                         or "--title"

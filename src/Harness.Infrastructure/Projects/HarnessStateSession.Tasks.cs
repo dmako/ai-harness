@@ -25,15 +25,15 @@ public sealed partial class HarnessStateSession
     public Task<IReadOnlyList<TaskEvent>> TaskEventsAsync(string id, CancellationToken cancellationToken) =>
         TaskOperationAsync(s => s.Events(id, cancellationToken), cancellationToken);
 
-    public Task<TaskRecord?> NextTaskAsync(string milestone, CancellationToken cancellationToken) =>
-        TaskOperationAsync(s => s.Next(milestone, cancellationToken), cancellationToken);
+    public Task<TaskRecord?> NextTaskAsync(string blueprint, CancellationToken cancellationToken) =>
+        TaskOperationAsync(s => s.Next(blueprint, cancellationToken), cancellationToken);
 
     public Task<TaskClaimResult?> ClaimNextTaskAsync(
-        string milestone,
+        string blueprint,
         TaskActor actor,
         TimeSpan lease,
         CancellationToken cancellationToken
-    ) => TaskOperationAsync(s => s.ClaimNext(milestone, actor, lease, cancellationToken), cancellationToken);
+    ) => TaskOperationAsync(s => s.ClaimNext(blueprint, actor, lease, cancellationToken), cancellationToken);
 
     public Task<TaskClaimResult> ClaimTaskAsync(
         string id,
@@ -86,4 +86,19 @@ public sealed partial class HarnessStateSession
         string by,
         CancellationToken cancellationToken
     ) => TaskOperationAsync(s => s.Propose(definition, reason, by, cancellationToken), cancellationToken);
+
+    public Task<IReadOnlyList<BlueprintProgress>> BlueprintsAsync(CancellationToken cancellationToken) =>
+        TaskOperationAsync(s => s.Blueprints(cancellationToken), cancellationToken);
+
+    public Task<BlueprintProposal> ProposeBlueprintAsync(
+        string blueprint,
+        BlueprintDefinition definition,
+        string reason,
+        string by,
+        CancellationToken cancellationToken
+    ) =>
+        TaskOperationAsync(
+            s => s.ProposeBlueprint(blueprint, definition, reason, by, cancellationToken),
+            cancellationToken
+        );
 }

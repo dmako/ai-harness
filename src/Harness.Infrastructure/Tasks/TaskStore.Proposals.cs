@@ -51,7 +51,10 @@ public sealed partial class TaskStore
 
                 var proposal = new TaskProposal(
                     "tpr_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)),
-                    d,
+                    d with
+                    {
+                        Blueprint = ResolveBlueprint(c, t, d.Blueprint),
+                    },
                     reason.Trim(),
                     "pending",
                     by,
@@ -62,7 +65,7 @@ public sealed partial class TaskStore
                     t,
                     "INSERT INTO task_proposals(id,definition,reason,status,proposed_by,proposed_at) VALUES($id,$definition,$reason,'pending',$by,$at)",
                     ("$id", proposal.Id),
-                    ("$definition", HarnessJson.Serialize(TaskViews.Definition(d), JsonOptions)),
+                    ("$definition", HarnessJson.Serialize(TaskViews.Definition(proposal.Task), JsonOptions)),
                     ("$reason", proposal.Reason),
                     ("$by", by),
                     ("$at", proposal.ProposedAt)
@@ -151,7 +154,7 @@ public sealed partial class TaskStore
         {
             Id = Text("id"),
             Title = Text("title"),
-            Milestone = Text("milestone"),
+            Blueprint = Text("blueprint"),
             Goal = Text("goal"),
             Type = Text("type"),
             Priority = Text("priority"),

@@ -225,6 +225,165 @@ public sealed class UiWriteTests
     }
 
     [Fact]
+    public async Task UnclaimedTasksCanBeEditedKeepingTheirIdValidationAndNotes()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        store.Create(new TaskDefinition { Id = "UI-0001", Title = "Dependency" }, "", origin, Token);
+        store.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0002",
+                Title = "Original title",
+                Goal = "Original goal",
+                Acceptance = ["Kept", "Dropped"],
+                Validation = ["dotnet test"],
+                Notes = "fixture notes",
+            },
+            "",
+            origin,
+            Token
+        );
+        store.Get("UI-0002", Token).Status.Should().Be("ready");
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}/tasks";
+        var edited = await PostAsync(
+            server.Client,
+            root + "/UI-0002/edit",
+            """{"id":"UI-0099","title":"Edited title","goal":"Edited goal","type":"bug","priority":"high","depends_on":["ui-0001"],"acceptance":["Kept","Added"],"scope":["src"]}"""
+        );
+        edited["task"]!["id"]!.GetValue<string>().Should().Be("UI-0002");
+        var task = store.Get("UI-0002", Token);
+        task.Status.Should().Be("backlog", "it now waits for its new dependency");
+        task.Definition.Title.Should().Be("Edited title");
+        task.Definition.Type.Should().Be("bug");
+        task.Definition.Priority.Should().Be("high");
+        task.Definition.DependsOn.Should().Equal("UI-0001");
+        task.Definition.Acceptance.Should().Equal("Kept", "Added");
+        task.Definition.Scope.Should().Equal("src");
+        task.Definition.Validation.Should().Equal("dotnet test");
+        task.Definition.Notes.Should().Be("fixture notes");
+        store
+            .Events("UI-0002", Token)
+            .Should()
+            .Contain(e => e.Event == "definition_updated" && e.Actor.StartsWith("human:", StringComparison.Ordinal));
+        foreach (
+            var body in new[]
+            {
+                """{"title":"Cycle","depends_on":["UI-0002"]}""",
+                """{"title":"Unknown","depends_on":["UI-0404"]}""",
+                """{"title":""}""",
+            }
+        )
+        {
+            using var request = Request(server.Client, root + "/UI-0001/edit", body);
+            using var response = await server.Client.SendAsync(request, Token);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+        }
+        store.Claim("UI-0001", new("claude"), cancellationToken: Token);
+        using (var claimed = Request(server.Client, root + "/UI-0001/edit", """{"title":"Too late"}"""))
+        {
+            using var response = await server.Client.SendAsync(claimed, Token);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        store.Get("UI-0001", Token).Definition.Title.Should().Be("Dependency");
+    }
+
+    [Fact]
+    public async Task BlueprintsAreCreatedEditedAndRemovedOverTheUiApi()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+        (await UiTests.ReadAsync(server.Client, root + "/blueprints-next-id"))["id"]!
+            .GetValue<string>()
+            .Should()
+            .Be("BP-001");
+        await PostAsync(
+            server.Client,
+            root + "/blueprints",
+            """{"id":"BP-001","title":"First","goal":"Why","exit":["one",""],"notes":"n"}"""
+        );
+        (await UiTests.ReadAsync(server.Client, root + "/blueprints-next-id"))["id"]!
+            .GetValue<string>()
+            .Should()
+            .Be("BP-002");
+        await PostAsync(server.Client, root + "/blueprints/BP-001/edit", """{"title":"First edited","exit":[]}""");
+        var first = store.Blueprints(Token).Single().Definition;
+        (first.Title, first.Goal, first.Notes).Should().Be(("First edited", "", ""));
+        first.Exit.Should().BeEmpty();
+        store.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0001",
+                Title = "Inside",
+                Blueprint = "BP-001",
+            },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        foreach (
+            var (path, body, status) in new[]
+            {
+                ("/blueprints", """{"id":"BP-001","title":"Twice"}""", HttpStatusCode.BadRequest),
+                ("/blueprints", """{"id":"BP-002","title":"","bogus":1}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-404/edit", """{"title":"x"}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/edit", """{"id":"BP-009","title":"x"}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/remove", "{}", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/remove", """{"tasks":"keep"}""", HttpStatusCode.BadRequest),
+                ("/blueprints/BP-001/remove", """{"tasks":"move","move_to":"BP-404"}""", HttpStatusCode.BadRequest),
+            }
+        )
+        {
+            using var request = Request(server.Client, root + path, body);
+            using var response = await server.Client.SendAsync(request, Token);
+            response.StatusCode.Should().Be(status, path + " " + body);
+        }
+
+        var removed = await PostAsync(server.Client, root + "/blueprints/BP-001/remove", """{"tasks":"delete"}""");
+        removed["deleted"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Equal("UI-0001");
+        store.List(cancellationToken: Token).Should().BeEmpty();
+        store.Blueprints(Token).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task BlueprintProposalsAreListedApprovedAsRestatedAndRejected()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        var created = store.ProposeBlueprint("", new("", "Proposed", "Its goal"), "why", "agent", Token);
+        var rejected = store.ProposeBlueprint("", new("", "Not this", "goal"), "", "agent", Token);
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+        var listed = await UiTests.ReadAsync(server.Client, root + "/blueprint-proposals?status=pending");
+        listed["proposals"]!.AsArray().Should().HaveCount(2);
+        var projects = await UiTests.ReadAsync(server.Client, "/api/projects");
+        projects["projects"]![0]!["live"]!["pending_blueprint_proposals"]!.GetValue<int>().Should().Be(2);
+
+        var approved = await PostAsync(
+            server.Client,
+            $"{root}/blueprint-proposals/{created.Id}/approve",
+            """{"edit":{"id":"M5","title":"Restated","goal":"Its goal","exit":["done"],"notes":""}}"""
+        );
+        approved["blueprint"]!.GetValue<string>().Should().Be("M5");
+        var blueprint = store.Blueprints(Token).Single().Definition;
+        (blueprint.Id, blueprint.Title).Should().Be(("M5", "Restated"));
+        blueprint.Exit.Should().Equal("done");
+        store.GetBlueprintProposal(created.Id, Token).DecidedBy.Should().StartWith("human:");
+        await PostAsync(server.Client, $"{root}/blueprint-proposals/{rejected.Id}/reject", """{"note":"no"}""");
+        store.GetBlueprintProposal(rejected.Id, Token).Status.Should().Be("rejected");
+        using var again = Request(server.Client, $"{root}/blueprint-proposals/{created.Id}/approve", "{}");
+        using var response = await server.Client.SendAsync(again, Token);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task WorkspaceAndProjectEditsAndWiderKnowledgeRoundTrip()
     {
         using var fixture = await SyncFixture.CreateAsync();

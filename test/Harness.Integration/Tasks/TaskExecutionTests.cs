@@ -106,6 +106,7 @@ public sealed class TaskExecutionTests
         );
         complete.Task.Status.Should().Be("done");
         complete.Unlocked.Should().Equal("T-2");
+        complete.ReviewSkipped.Should().BeTrue();
         complete.Task.CompletedBy.Should().Be("codex");
         complete.Task.ClaimedAt.Should().Be(claim.Task.ClaimedAt);
         complete.Task.ClaimToken.Should().Be("");
@@ -208,6 +209,198 @@ public sealed class TaskExecutionTests
         state.Store.Reject(rejection.Id, " no ", "human", Token).Status.Should().Be("rejected");
         state.Store.GetProposal(rejection.Id, Token).Note.Should().Be("no");
         state.Store.List(cancellationToken: Token).Count.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task McpListsBlueprintsAndOnlyProposesNewOrChangedOnes()
+    {
+        using var state = new State();
+        state.Store.ImportBlueprints(
+            [new("M1", "One", "First goal", ["tested"], "kept")],
+            "fixture",
+            cancellationToken: Token
+        );
+        state.Store.Import([Definition("T-1") with { Blueprint = "M1" }], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        var listed = await client.CallToolAsync("task_blueprints", cancellationToken: Token);
+        listed.IsError.Should().NotBe(true);
+        var one = listed.StructuredContent!.Value.GetProperty("blueprints").EnumerateArray().Single();
+        one.GetProperty("id").GetString().Should().Be("M1");
+        one.GetProperty("total").GetInt32().Should().Be(1);
+        one.GetProperty("exit")[0].GetString().Should().Be("tested");
+
+        async Task<CallToolResult> ProposeAsync(Dictionary<string, object?> arguments) =>
+            await client.CallToolAsync("task_blueprint_propose", arguments, cancellationToken: Token);
+        var created = await ProposeAsync(
+            new()
+            {
+                ["title"] = "Two",
+                ["goal"] = "Second goal",
+                ["exit"] = new[] { "shipped" },
+                ["reason"] = "why",
+            }
+        );
+        created.IsError.Should().NotBe(true);
+        var proposal = created.StructuredContent!.Value.GetProperty("proposal");
+        proposal.GetProperty("id").GetString().Should().StartWith("bpr_");
+        proposal.TryGetProperty("changes", out _).Should().BeFalse();
+        var changed = await ProposeAsync(new() { ["blueprint"] = "M1", ["goal"] = "Restated goal" });
+        changed.IsError.Should().NotBe(true);
+        var restated = changed.StructuredContent!.Value.GetProperty("proposal");
+        restated.GetProperty("changes").GetString().Should().Be("M1");
+        restated.GetProperty("blueprint").GetProperty("title").GetString().Should().Be("One", "left out, it stays");
+        restated.GetProperty("blueprint").GetProperty("notes").GetString().Should().Be("kept");
+        (await ProposeAsync(new() { ["title"] = "No goal" })).IsError.Should().BeTrue();
+        (await ProposeAsync(new() { ["blueprint"] = "M404", ["title"] = "x" })).IsError.Should().BeTrue();
+        (await ProposeAsync(new() { ["milestone"] = "M1", ["notes"] = "former argument" }))
+            .IsError.Should()
+            .NotBe(true);
+
+        state.Store.Blueprints(Token).Single().Definition.Goal.Should().Be("First goal", "agents only propose");
+        var pending = state.Store.BlueprintProposals("pending", Token);
+        pending.Should().HaveCount(3);
+        pending.Should().OnlyContain(p => p.ProposedBy.StartsWith("codex", StringComparison.Ordinal));
+        pending[^1].Definition.Notes.Should().Be("former argument");
+    }
+
+    [Fact]
+    public async Task McpHintsLeadThroughInProgressAndReviewAndRecordASkippedReview()
+    {
+        using var state = new State();
+        state.Store.Import([Definition("T-1"), Definition("T-2")], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> CallAsync(string tool, Dictionary<string, object?> arguments)
+        {
+            var result = await client.CallToolAsync(tool, arguments, cancellationToken: Token);
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value;
+        }
+
+        Dictionary<string, object?> Completion(string id, string token) =>
+            new()
+            {
+                ["id"] = id,
+                ["claim_token"] = token,
+                ["summary"] = "done",
+                ["acceptance"] = new[]
+                {
+                    new Dictionary<string, object?> { ["index"] = 1, ["result"] = "pass" },
+                    new Dictionary<string, object?> { ["index"] = 2, ["result"] = "pass" },
+                },
+            };
+
+        var claimed = await CallAsync("task_claim", new() { ["id"] = "T-1" });
+        claimed.GetProperty("hint").GetString().Should().Contain("in_progress").And.Contain("review");
+        var token = claimed.GetProperty("claim_token").GetString()!;
+        foreach (var (status, next) in new[] { ("in_progress", "status review"), ("review", "task_complete") })
+        {
+            var updated = await CallAsync(
+                "task_update",
+                new()
+                {
+                    ["id"] = "T-1",
+                    ["claim_token"] = token,
+                    ["status"] = status,
+                }
+            );
+            updated.GetProperty("task").GetProperty("status").GetString().Should().Be(status);
+            updated.GetProperty("hint").GetString().Should().Contain(next);
+        }
+
+        var reviewed = await CallAsync("task_complete", Completion("T-1", token));
+        reviewed.GetProperty("hint").GetString().Should().NotContain("skipped review");
+        state.Store.Events("T-1", Token).Should().NotContain(e => e.Event == "review_skipped");
+
+        token = (await CallAsync("task_claim", new() { ["id"] = "T-2" })).GetProperty("claim_token").GetString()!;
+        var skipped = await CallAsync("task_complete", Completion("T-2", token));
+        skipped.GetProperty("task").GetProperty("status").GetString().Should().Be("done");
+        skipped.GetProperty("hint").GetString().Should().StartWith("This task skipped review");
+        state
+            .Store.Events("T-2", Token)
+            .Should()
+            .ContainSingle(e => e.Event == "review_skipped")
+            .Which.Detail.Should()
+            .Be("completed from claimed without a review step");
+    }
+
+    [Fact]
+    public async Task ProposedTaskKeepsItsBlueprintNamedByIdIgnoringCaseOrByTitleOnceApproved()
+    {
+        using var state = new State();
+        state.Store.CreateBlueprint(new("M1", "Code metrics", Exit: []), "fixture", Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> ProposeAsync(string blueprint)
+        {
+            var result = await client.CallToolAsync(
+                "task_propose",
+                new Dictionary<string, object?>
+                {
+                    ["title"] = "Into " + blueprint,
+                    ["goal"] = "Belongs to a blueprint",
+                    ["acceptance"] = new[] { "Grouped" },
+                    ["blueprint"] = blueprint,
+                },
+                cancellationToken: Token
+            );
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value;
+        }
+
+        foreach (var named in new[] { "M1", "m1", "code METRICS" })
+        {
+            var proposed = await ProposeAsync(named);
+            proposed.GetProperty("note").GetString().Should().StartWith("Waiting for the user");
+            var id = proposed.GetProperty("proposal").GetProperty("id").GetString()!;
+            state.Store.Approve(id, null, "", "human", Token).Task.Definition.Blueprint.Should().Be("M1", named);
+        }
+
+        var unknown = await ProposeAsync("M9");
+        unknown.GetProperty("note").GetString().Should().StartWith("No blueprint M9 exists");
+        var created = state.Store.Approve(
+            unknown.GetProperty("proposal").GetProperty("id").GetString()!,
+            null,
+            "",
+            "human",
+            Token
+        );
+        created.Task.Definition.Blueprint.Should().Be("M9");
+    }
+
+    [Fact]
+    public async Task McpTaskToolsTakeBlueprintsAndStillAcceptTheFormerMilestoneArgument()
+    {
+        using var state = new State();
+        state.Store.Import([Definition("T-1") with { Blueprint = "M1" }], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> NextAsync(Dictionary<string, object?> arguments)
+        {
+            var result = await client.CallToolAsync("task_next", arguments, cancellationToken: Token);
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value.GetProperty("task");
+        }
+
+        (await NextAsync(new() { ["blueprint"] = "M1" })).GetProperty("blueprint").GetString().Should().Be("M1");
+        (await NextAsync(new() { ["milestone"] = "M1" })).GetProperty("id").GetString().Should().Be("T-1");
+        (await NextAsync(new() { ["milestone"] = "M2" })).ValueKind.Should().Be(JsonValueKind.Null);
+        var both = await client.CallToolAsync(
+            "task_next",
+            new Dictionary<string, object?> { ["blueprint"] = "M1", ["milestone"] = "M1" },
+            cancellationToken: Token
+        );
+        both.IsError.Should().BeTrue();
+        var proposed = await client.CallToolAsync(
+            "task_propose",
+            new Dictionary<string, object?>
+            {
+                ["title"] = "Proposed",
+                ["goal"] = "Former argument name",
+                ["acceptance"] = new[] { "Kept" },
+                ["milestone"] = "M1",
+            },
+            cancellationToken: Token
+        );
+        proposed.IsError.Should().NotBe(true);
+        state.Store.Proposals(cancellationToken: Token).Should().ContainSingle().Which.Task.Blueprint.Should().Be("M1");
     }
 
     [Fact]

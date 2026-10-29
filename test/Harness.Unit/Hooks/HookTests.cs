@@ -116,7 +116,7 @@ public sealed class HookTests
     }
 
     [Theory]
-    [InlineData("tasks", "list", "--milestone", "")]
+    [InlineData("tasks", "list", "--blueprint", "")]
     [InlineData("nonexistent", "")]
     public async Task CompletionDoesNotOfferFlagValuesOrUnknownCommands(params string[] words)
     {

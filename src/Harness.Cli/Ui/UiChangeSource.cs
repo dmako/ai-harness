@@ -14,9 +14,9 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
 {
     private static readonly (string Kind, string[] Tables, bool AppendOnly)[] Kinds =
     [
-        ("tasks", ["tasks", "task_events", "task_dependencies", "task_acceptance", "milestones"], false),
+        ("tasks", ["tasks", "task_events", "task_dependencies", "task_acceptance", "blueprints"], false),
         ("knowledge", ["memories", "memory_events"], false),
-        ("proposals", ["memory_proposals", "finding_proposals", "task_proposals"], false),
+        ("proposals", ["memory_proposals", "finding_proposals", "task_proposals", "blueprint_proposals"], false),
         ("findings", ["findings", "finding_snapshots", "finding_marks"], false),
         ("activity", ["tool_calls", "provider_calls", "context_calls", "context_outcomes", "tool_events"], true),
         ("sync", ["sync_state", "sync_runs", "files", "worktrees"], false),

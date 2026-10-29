@@ -170,6 +170,7 @@ public static class HarnessMcpServer
                 $"unknown tool {HarnessJson.Serialize(parameters.Name)}",
                 McpErrorCode.InvalidParams
             );
+        parameters.Arguments = FormerNames(tool, parameters.Arguments);
         if (ValidateArguments(tool, parameters.Arguments) is { } error)
         {
             return Error(error);
@@ -436,6 +437,25 @@ public static class HarnessMcpServer
             safe = "request rejected: diagnostic redaction timed out";
         }
         return new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = safe }] };
+    }
+
+    /// <summary>Blueprints were called milestones (TASK-0047): older agent instructions may still say milestone.</summary>
+    private static IDictionary<string, JsonElement>? FormerNames(Tool tool, IDictionary<string, JsonElement>? arguments)
+    {
+        if (
+            arguments is null
+            || !arguments.TryGetValue("milestone", out var former)
+            || arguments.ContainsKey("blueprint")
+            || !tool.InputSchema.TryGetProperty("properties", out var properties)
+            || !properties.TryGetProperty("blueprint", out _)
+        )
+        {
+            return arguments;
+        }
+
+        Dictionary<string, JsonElement> renamed = new(arguments, StringComparer.Ordinal) { ["blueprint"] = former };
+        renamed.Remove("milestone");
+        return renamed;
     }
 
     private static string? ValidateArguments(Tool tool, IDictionary<string, JsonElement>? arguments) =>

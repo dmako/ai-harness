@@ -66,6 +66,64 @@ public sealed partial class TaskStore
         return Get(c, t, d.Id);
     }
 
+    /// <summary>
+    /// Restates an unclaimed (ready or backlog) task's definition. Its id, validation and notes stay; once claimed,
+    /// the definition is what the claimant works to.
+    /// </summary>
+    public TaskRecord Edit(
+        string id,
+        TaskDefinition definition,
+        string by,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        return database.WithTransaction(
+            (c, t) =>
+            {
+                Refresh(c, t);
+                var current = Get(c, t, id);
+                if (current.Status is not ("ready" or "backlog"))
+                {
+                    throw new InvalidOperationException(
+                        $"{current.Id}: only a ready or backlog task can be edited (status {current.Status})"
+                    );
+                }
+
+                var d = (
+                    definition with
+                    {
+                        Id = current.Id,
+                        Validation = current.Definition.Validation,
+                        Notes = current.Definition.Notes,
+                        Status = "",
+                    }
+                ).Normalize();
+                d.Validate();
+                var (existing, edges) = LoadGraph(c, t);
+                if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+                {
+                    throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
+                }
+
+                edges[d.Id] = d.DependsOn;
+                if (FindCycle(edges) is { } cycle)
+                {
+                    throw new ArgumentException("dependency cycle: " + string.Join(" -> ", cycle));
+                }
+
+                if (UpdateDefinition(c, t, d, current.Ordinal, current.Source, Stamp(), by, "definition edited"))
+                {
+                    ReplaceDependencies(c, t, d);
+                    RecomputeReadiness(c, t);
+                }
+
+                return Get(c, t, id);
+            },
+            cancellationToken
+        );
+    }
+
     public string NextId(string prefix = "", CancellationToken cancellationToken = default) =>
         database.WithTransaction((c, t) => NextId(c, t, prefix), cancellationToken);
 

@@ -81,7 +81,7 @@ public sealed class UiBrowserTests
                         window.taskRefreshWaiting = true;
                         await new Promise(resolve => { window.releaseTaskRefresh = resolve; });
                       }
-                      if (window.holdReviewRead && url.includes('/milestones')) {
+                      if (window.holdReviewRead && url.includes('/blueprints')) {
                         window.holdReviewRead = false;
                         window.reviewReadWaiting = true;
                         await new Promise(resolve => { window.releaseReviewRead = resolve; });
@@ -161,6 +161,288 @@ public sealed class UiBrowserTests
                 await page.CommandAsync("Network.setBlockedURLs", new { urls = Array.Empty<string>() });
                 await page.CommandAsync("Page.reload", new { ignoreCache = true });
                 await page.WaitAsync("!!document.querySelector('.live.on')");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task ReadyTaskIsEditedFromItsHeaderAndClaimedOneHasEditDisabled()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0001",
+                Title = "Ready task",
+                Acceptance = ["Old"],
+            },
+            "",
+            origin,
+            Token
+        );
+        tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "Claimed task" }, "", origin, Token);
+        tasks.Claim("UI-0002", new("claude"), cancellationToken: Token);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/UI-0001" }
+                );
+                // Edit… sits in the task's header, after its status
+                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .trow .pill + button.tedit')");
+                (await ValueAsync(page, "document.querySelector('#task-UI-0002 .trow .tedit').disabled"))
+                    .Should()
+                    .Be("True");
+                await page.EvaluateAsync("document.querySelector('#task-UI-0001 .tedit').click()");
+                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .tdetail input[aria-label=Title]')");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('a')].some(a => a.textContent.startsWith('Blueprints'))"
+                            + " && !!document.querySelector('select[aria-label=Blueprint]')"
+                            + " && !/milestone/i.test(document.body.textContent)"
+                    )
+                )
+                    .Should()
+                    .Be("True");
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Id]').disabled")).Should().Be("True");
+                (await ValueAsync(page, "document.querySelector('textarea[aria-label=\"Acceptance criteria\"]').value"))
+                    .Should()
+                    .Be("Old");
+                await page.EvaluateAsync(
+                    "document.querySelector('input[aria-label=Title]').value = 'Edited in the browser'"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Save the task').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.Get("UI-0001", Token).Definition.Title is "Edited in the browser"
+                );
+                tasks.Get("UI-0001", Token).Definition.Acceptance.Should().Equal("Old");
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/UI-0002'");
+                await page.WaitAsync("!!document.querySelector('#task-UI-0002 .tdetail')");
+                (await ValueAsync(page, "document.querySelector('#task-UI-0002 .tedit').disabled")).Should().Be("True");
+                (await ValueAsync(page, "!!document.querySelector('#task-UI-0002 .tdetail form')"))
+                    .Should()
+                    .Be("False");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task BlueprintsAreCreatedEditedAndRemovedOnceConfirmedAskingAboutTheirTasks()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        tasks.CreateBlueprint(new("EMPTY", "Nothing in it"), "test", Token);
+        static string Click(string text) =>
+            $"[...document.querySelectorAll('button')].find(b => b.textContent === '{text}').click()";
+        static string Card(string id) => $"document.querySelector('.mcard[data-blueprint=\"{id}\"]')";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/blueprints" }
+                );
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'New blueprint…')"
+                );
+                await page.EvaluateAsync(Click("New blueprint…"));
+                await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Name]').value"))
+                    .Should()
+                    .Be("New blueprint");
+                await page.EvaluateAsync("document.querySelector('input[aria-label=Name]').value = 'From the browser'");
+                await page.EvaluateAsync(Click("Add the blueprint"));
+                await page.WaitAsync($"!!{Card("BP-001")}");
+                tasks.Blueprints(Token).Select(b => b.Definition.Title).Should().Contain("From the browser");
+
+                await page.EvaluateAsync(
+                    $"[...{Card("BP-001")}.querySelectorAll('button')].find(b => b.textContent === 'Edit…').click()"
+                );
+                await page.WaitAsync($"!!{Card("BP-001")}.querySelector('textarea[aria-label=Goal]')");
+                await page.EvaluateAsync(
+                    $"{Card("BP-001")}.querySelector('textarea[aria-label=Goal]').value = 'Edited goal'"
+                );
+                await page.EvaluateAsync(Click("Save the blueprint"));
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.Blueprints(Token).Single(b => b.Definition.Id == "BP-001").Definition.Goal is "Edited goal"
+                );
+
+                // no tasks: removed once confirmed, nothing else asked
+                await page.EvaluateAsync(
+                    $"[...{Card("EMPTY")}.querySelectorAll('button')].find(b => b.textContent === 'Remove…').click()"
+                );
+                await page.WaitAsync($"!!{Card("EMPTY")}.querySelector('form.aform')");
+                (await ValueAsync(page, $"!!{Card("EMPTY")}.querySelector('input[type=radio]')")).Should().Be("False");
+                tasks.Blueprints(Token).Should().HaveCount(2, "nothing is removed before it is confirmed");
+                await page.EvaluateAsync(Click("Remove the blueprint"));
+                await page.WaitAsync($"!{Card("EMPTY")}");
+                tasks.Blueprints(Token).Select(b => b.Definition.Id).Should().Equal("BP-001");
+
+                tasks.Create(
+                    new TaskDefinition
+                    {
+                        Id = "UI-0001",
+                        Title = "In the blueprint",
+                        Blueprint = "BP-001",
+                    },
+                    "",
+                    new("test", "test", "fixture"),
+                    Token
+                );
+                await page.EvaluateAsync("location.reload()");
+                await page.WaitAsync(
+                    $"[...({Card("BP-001")}?.querySelectorAll('button') || [])].some(b => b.textContent === 'Remove…')"
+                );
+                await page.EvaluateAsync(
+                    $"[...{Card("BP-001")}.querySelectorAll('button')].find(b => b.textContent === 'Remove…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('select[aria-label=\"Move to\"]')");
+                (await ValueAsync(page, "document.querySelector('.aform .hint').textContent"))
+                    .Should()
+                    .Contain("1 task(s)");
+                // each radio button sits at the start of its line, its text right beside it
+                (
+                    await ValueAsync(
+                        page,
+                        """
+                        [...document.querySelectorAll('.aform label.choice')].every(l => {
+                          const r = l.querySelector('input[type=radio]').getBoundingClientRect();
+                          const t = l.querySelector('span').getBoundingClientRect();
+                          return r.width < 30 && r.left - l.getBoundingClientRect().left < 4
+                            && t.left - r.right < 16 && Math.abs((t.top + t.bottom) - (r.top + r.bottom)) < 12;
+                        })
+                        """
+                    )
+                )
+                    .Should()
+                    .Be("True");
+                await page.EvaluateAsync(Click("Remove the blueprint"));
+                await page.WaitAsync($"!{Card("BP-001")}");
+                tasks.Get("UI-0001", Token).Definition.Blueprint.Should().BeEmpty("moved to no blueprint");
+                tasks.Blueprints(Token).Should().BeEmpty();
+            }
+        );
+    }
+
+    [Fact]
+    public async Task ProposedBlueprintIsCreatedFromTheInbox()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var proposal = tasks.ProposeBlueprint("", new("", "Agent idea", "Its goal"), "seen", "codex", Token);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/inbox" }
+                );
+                await page.WaitAsync($"!!document.querySelector('[data-proposal=\"{proposal.Id}\"]')");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('h3.inboxhead')].some(x => x.textContent === 'Blueprints')"
+                    )
+                )
+                    .Should()
+                    .Be("True");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint…').click()"
+                );
+                await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Name]').value"))
+                    .Should()
+                    .Be("Agent idea");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.GetBlueprintProposal(proposal.Id, Token).Status is "approved"
+                );
+                tasks.Blueprints(Token).Single().Definition.Title.Should().Be("Agent idea");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task ProposedTaskIsApprovedFromTheInboxIntoItsBlueprint()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        tasks.CreateBlueprint(new("M1", "Metrics"), "test", Token);
+        TaskProposal Propose(string blueprint) =>
+            tasks.Propose(
+                new TaskDefinition
+                {
+                    Title = "Into " + blueprint,
+                    Goal = "Belongs to a blueprint",
+                    Acceptance = ["Grouped"],
+                    Blueprint = blueprint,
+                },
+                "seen",
+                "codex",
+                Token
+            );
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/inbox" }
+                );
+                // A described blueprint, and one only named, which the form must not drop to none.
+                foreach (var blueprint in new[] { "M1", "M9" })
+                {
+                    var proposal = Propose(blueprint);
+                    await page.EvaluateAsync("location.reload()");
+                    await page.WaitAsync(
+                        "[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the task…')"
+                    );
+                    await page.EvaluateAsync(
+                        "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task…').click()"
+                    );
+                    await page.WaitAsync("!!document.querySelector('select[aria-label=Blueprint]')");
+                    (await ValueAsync(page, "document.querySelector('select[aria-label=Blueprint]').value"))
+                        .Should()
+                        .Be(blueprint);
+                    await page.EvaluateAsync(
+                        "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task').click()"
+                    );
+                    await ProviderFixture.EventuallyAsync(() =>
+                        tasks.GetProposal(proposal.Id, Token).Status is "approved"
+                    );
+                    tasks
+                        .Get(tasks.GetProposal(proposal.Id, Token).Result, Token)
+                        .Definition.Blueprint.Should()
+                        .Be(blueprint);
+                }
             }
         );
     }

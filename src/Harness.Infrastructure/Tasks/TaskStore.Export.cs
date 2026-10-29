@@ -37,7 +37,7 @@ public sealed partial class TaskStore
                 new(
                     1,
                     definitions,
-                    Milestones(cancellationToken)
+                    Blueprints(cancellationToken)
                         .Where(m => m.Definition.Title.Length is not 0)
                         .Select(m => m.Definition)
                         .ToArray()

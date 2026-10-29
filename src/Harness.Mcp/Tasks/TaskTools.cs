@@ -9,7 +9,13 @@ namespace Harness.Mcp.Tasks;
 internal static class TaskTools
 {
     private const string ClaimHint =
-        "Keep claim_token; pass it to task_update and task_complete. Implement only the stated scope, run the validation, then complete with every acceptance criterion.";
+        "Keep claim_token; pass it to task_update and task_complete. Analyse and clarify while the task is claimed; "
+        + "task_update it to in_progress when you start changing code, implement only the stated scope, then to review "
+        + "while you check the acceptance criteria, constraints and validation, and complete with every acceptance criterion.";
+
+    private const string ReviewSkippedHint =
+        "This task skipped review (recorded in its audit trail): next time, task_update it to in_progress when you "
+        + "start changing code and to review while you check the acceptance criteria before task_complete. ";
 
     public static async Task<object> CallAsync(
         string name,
@@ -33,11 +39,16 @@ internal static class TaskTools
             "task_update" => await UpdateAsync(values, id, actor, session, token),
             "task_complete" => await CompleteAsync(values, id, actor, session, memory, caller, token),
             "task_propose" => await ProposeAsync(values, session, caller, token),
+            "task_blueprints" => new JsonObjectMap
+            {
+                ["blueprints"] = (await session.BlueprintsAsync(token)).Select(TaskViews.Blueprint).ToArray(),
+            },
+            "task_blueprint_propose" => await ProposeBlueprintAsync(values, session, caller, token),
             _ => throw new InvalidOperationException("Unknown task tool."),
         };
     }
 
-    /// <summary>The next ready task in the milestone, claimed when asked to.</summary>
+    /// <summary>The next ready task in the blueprint, claimed when asked to.</summary>
     private static async Task<JsonObjectMap> NextAsync(
         JsonElement values,
         ITaskSession session,
@@ -45,13 +56,13 @@ internal static class TaskTools
         CancellationToken token
     )
     {
-        var milestone = Text(values, "milestone").Trim();
+        var blueprint = Text(values, "blueprint").Trim();
         if (values.TryGetProperty("claim", out var claim) && claim.GetBoolean())
         {
-            var next = await session.ClaimNextTaskAsync(milestone, actor, Lease(values), token);
+            var next = await session.ClaimNextTaskAsync(blueprint, actor, Lease(values), token);
             return next is null ? Empty() : Claimed(next);
         }
-        var ready = await session.NextTaskAsync(milestone, token);
+        var ready = await session.NextTaskAsync(blueprint, token);
         return ready is null
             ? Empty()
             : new JsonObjectMap
@@ -92,23 +103,38 @@ internal static class TaskTools
     )
     {
         var status = Text(values, "status");
-        return new JsonObjectMap
-        {
-            ["task"] = TaskViews.Task(
-                await session.UpdateTaskAsync(
-                    id,
-                    actor,
-                    new(
-                        status.Length is 0 ? null : TaskWorkflow.ParseStatus(status),
-                        Text(values, "note"),
-                        Text(values, "reason"),
-                        Reports(values)
-                    ),
-                    token
-                )
+        var task = await session.UpdateTaskAsync(
+            id,
+            actor,
+            new(
+                status.Length is 0 ? null : TaskWorkflow.ParseStatus(status),
+                Text(values, "note"),
+                Text(values, "reason"),
+                Reports(values)
             ),
-        };
+            token
+        );
+        JsonObjectMap result = new() { ["task"] = TaskViews.Task(task) };
+        var hint = UpdateHint(task.Status);
+        if (hint.Length is not 0)
+        {
+            result["hint"] = hint;
+        }
+
+        return result;
     }
+
+    /// <summary>The next step of the claimed, in progress, review, done path after an update.</summary>
+    private static string UpdateHint(string status) =>
+        status switch
+        {
+            "claimed" => "Set status in_progress when you start changing code.",
+            "in_progress" =>
+                "Set status review when the changes are made and you check the acceptance criteria, constraints and validation.",
+            "review" =>
+                "Complete with task_complete once every acceptance criterion passes; set status in_progress again if something needs fixing.",
+            _ => "",
+        };
 
     /// <summary>Completes the task, then proposes the memories it reports (best effort, errors listed).</summary>
     private static async Task<Dictionary<string, object?>> CompleteAsync(
@@ -126,7 +152,8 @@ internal static class TaskTools
         {
             ["task"] = TaskViews.Task(completed.Task),
             ["hint"] =
-                "Record durable decisions from this task with memory_put, then take the next task with task_next.",
+                (completed.ReviewSkipped ? ReviewSkippedHint : "")
+                + "Record durable decisions from this task with memory_put, then take the next task with task_next.",
         };
         if (completed.Unlocked.Count > 0)
         {
@@ -275,17 +302,62 @@ internal static class TaskTools
             Acceptance = Strings(values, "acceptance"),
             Type = Text(values, "type").Trim(),
             Priority = Text(values, "priority").Trim(),
-            Milestone = Text(values, "milestone"),
+            Blueprint = Text(values, "blueprint"),
             Scope = Strings(values, "scope"),
             DependsOn = Strings(values, "depends_on").Select(d => d.Trim().ToUpperInvariant()).ToArray(),
         };
+        var proposal = await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token);
+        var blueprint = proposal.Task.Blueprint;
+        var unknown =
+            blueprint.Length is not 0 && !(await session.BlueprintsAsync(token)).Any(b => b.Definition.Id == blueprint);
         return new JsonObjectMap
         {
-            ["proposal"] = TaskViews.Proposal(
-                await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token)
+            ["proposal"] = TaskViews.Proposal(proposal),
+            ["note"] =
+                (
+                    unknown
+                        ? $"No blueprint {blueprint} exists (task_blueprints lists them); the task would start it. "
+                        : ""
+                )
+                + "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
+        };
+    }
+
+    /// <summary>
+    /// A new blueprint as given, or a change to one: the fields left out keep their current value, so the proposal
+    /// holds the whole blueprint as it would be.
+    /// </summary>
+    private static async Task<JsonObjectMap> ProposeBlueprintAsync(
+        JsonElement values,
+        ITaskSession session,
+        string caller,
+        CancellationToken token
+    )
+    {
+        var target = Text(values, "blueprint").Trim();
+        var current = new BlueprintDefinition(target, "");
+        if (target.Length is not 0)
+        {
+            current =
+                (await session.BlueprintsAsync(token)).FirstOrDefault(b => b.Definition.Id == target)?.Definition
+                ?? throw new ArgumentException($"unknown blueprint {target}");
+        }
+
+        string Given(string key, string now) => values.TryGetProperty(key, out _) ? Text(values, key) : now;
+        var definition = new BlueprintDefinition(
+            target,
+            Given("title", current.Title),
+            Given("goal", current.Goal),
+            values.TryGetProperty("exit", out _) ? Strings(values, "exit") : current.Exit,
+            Given("notes", current.Notes)
+        );
+        return new JsonObjectMap
+        {
+            ["proposal"] = TaskViews.BlueprintProposal(
+                await session.ProposeBlueprintAsync(target, definition, Text(values, "reason"), caller, token)
             ),
             ["note"] =
-                "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",
+                "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not use it until it is approved.",
         };
     }
 
