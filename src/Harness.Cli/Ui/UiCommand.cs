@@ -9,7 +9,7 @@ namespace Harness.Cli.Ui;
 
 internal sealed class UiSettings
 {
-    public string Address { get; init; } = UiHost.DefaultAddress;
+    public string Address { get; init; } = UiHost.ConfiguredAddress;
     public bool NoOpen { get; init; }
 }
 

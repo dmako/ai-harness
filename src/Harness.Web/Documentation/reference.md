@@ -255,7 +255,7 @@ deleted with it; the deleted tasks' own trails go with them.
 
 ## harness ui
 
-The default listener is `127.0.0.1:17477`. Use `--addr` to override it and `--no-open` to leave the browser closed.
+The default listener is `127.0.0.1:17477`, or `HARNESS_UI_ADDR` when that is set (a loopback address, as for `--addr`). Use `--addr` to override it and `--no-open` to leave the browser closed.
 
 `harness ui` opens a local page (loopback only, nothing leaves the machine)
 over every project on this machine: overview, knowledge (with the Inbox of

@@ -1,5 +1,5 @@
 using System.Net;
-using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
@@ -62,15 +62,22 @@ public sealed class UiTests
     }
 
     [Fact]
-    public async Task DefaultListenerPortBindsWhenItIsAvailable()
+    public async Task WithoutAddrTheListenerBindsTheConfiguredDefault()
     {
-        if (IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(endpoint => endpoint.Port is 17477))
+        // A free port of its own through HARNESS_UI_ADDR: the developer's harness ui keeps 17477.
+        int port;
+        using (var probe = new TcpListener(IPAddress.Loopback, 0))
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Port 17477 is already used by another local application.");
+            probe.Start();
+            port = ((IPEndPoint)probe.LocalEndpoint).Port;
         }
         using var fixture = await SyncFixture.CreateAsync();
-        await using var server = await UiFixture.StartAsync(fixture, address: null);
-        server.Client.BaseAddress!.Port.Should().Be(17477);
+        await using var server = await UiFixture.StartAsync(
+            fixture,
+            address: null,
+            environment: new Dictionary<string, string> { [UiHost.AddressVariable] = "127.0.0.1:" + port }
+        );
+        server.Client.BaseAddress!.Port.Should().Be(port);
         using var response = await server.Client.GetAsync("/", Token);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
