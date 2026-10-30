@@ -340,7 +340,7 @@ public static class RetrievalGatherer
         private async Task MemoriesAsync(CancellationToken token)
         {
             Dictionary<string, int> seen = new(StringComparer.Ordinal);
-            string[] types = ["decision", "convention", "warning", "constraint"];
+            var types = MemoryText.ContextTypes;
             foreach (var path in Paths(10))
             {
                 foreach (

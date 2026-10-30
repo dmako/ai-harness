@@ -227,6 +227,51 @@ public sealed class GatheringTests
     }
 
     [Fact]
+    public async Task FactsAndOpenQuestionsComeWithTheCodeAnOpenQuestionBesideTheRules()
+    {
+        await using var registry = new ProviderRegistry();
+        registry.Register(
+            new Fake(
+                "code",
+                request =>
+                    request.Capability is Capabilities.SymbolSearch
+                        ? [new ProviderItem { Name = "Router", Path = "src/router.cs" }]
+                        : []
+            )
+        );
+        var queries = new List<MemoryQuery>();
+        var gathered = await RetrievalGatherer.GatherAsync(
+            new(
+                registry,
+                (query, _) =>
+                {
+                    queries.Add(query);
+                    MemoryRecord[] found = query.Types.Contains("goal", StringComparer.Ordinal)
+                        ? []
+                        : [Memory("f1", "fact", new("path", "src")), Memory("q1", "open_question", new("path", "src"))];
+                    return Task.FromResult(new RetrievalMemories(found));
+                },
+                (_, _, _) => Task.FromResult<IReadOnlyList<RetrievalCommit>>([]),
+                "main"
+            ),
+            new("change Router"),
+            Token
+        );
+
+        queries
+            .Where(q => !q.Types.Contains("goal", StringComparer.Ordinal))
+            .Should()
+            .NotBeEmpty()
+            .And.OnlyContain(q => q.Types.SequenceEqual(MemoryText.ContextTypes));
+        MemoryText.ContextTypes.Should().Contain(["fact", "open_question", "constraint"]);
+        var memories = RetrievalRanker
+            .Rank(gathered.Candidates.Where(c => c.Source is "memory"))
+            .Select(r => r.Candidate.Id)
+            .ToArray();
+        memories.Should().Equal("memory:q1", "memory:f1");
+    }
+
+    [Fact]
     public async Task BroadPhraseHitsLoseBoostAndHeadNounFallbackFindsFiles()
     {
         await using var registry = new ProviderRegistry();

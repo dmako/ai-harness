@@ -9,6 +9,16 @@ public static class MemoryText
     public const int MaxContentBytes = 4000;
     public const double SimilarThreshold = 0.5;
 
+    /// <summary>What decisions_for returns: an area's rules with its constraints, the type never to miss.</summary>
+    public static IReadOnlyList<string> AreaTypes { get; } = ["constraint", "decision", "convention", "warning"];
+
+    /// <summary>
+    /// What get_context brings with the code: the rules shaping how it may change, and the facts the code does not
+    /// show and the questions still open there, so an agent does not settle one unknowingly.
+    /// </summary>
+    public static IReadOnlyList<string> ContextTypes { get; } =
+    ["constraint", "decision", "convention", "warning", "fact", "open_question"];
+
     private static readonly HashSet<string> Types = new(StringComparer.Ordinal)
     {
         "goal",

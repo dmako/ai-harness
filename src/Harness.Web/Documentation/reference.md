@@ -216,6 +216,26 @@ timeout_ms = 600000                   # a longer run fails and keeps the counted
 Providers belong in the global file (executable paths are machine
 specific). `harness doctor` prints which files were read.
 
+## Knowledge types
+
+Knowledge is one statement with a type and a scope (the project, a path,
+a subsystem, a branch; wider: a workspace or the user). Agents record it
+(`memory_put`, or `memory_propose` for you to approve); you add, correct,
+retire or promote it in harness ui (a project's Knowledge, Your knowledge,
+a workspace's Knowledge). The type says how it binds an agent:
+
+| Type | What it is | Example | Reaches agents |
+|---|---|---|---|
+| goal | What the work is for: an outcome to optimize toward. | Optimize code intelligence for C#/.NET first. | `goals_current`; the top goals in every `get_context` |
+| constraint | A hard limit set from outside: what must or must not happen, not ours to change. | Keycloak must not be changed for now. | `get_context`, `decisions_for`, `constraints_current` |
+| decision | A choice made between alternatives, with its reason. | Live updates use Server-Sent Events, not WebSocket. | `get_context`, `decisions_for` |
+| convention | How code and work are done here, in every new change. | CancellationToken is always the last parameter. | `get_context`, `decisions_for`; offered to other projects |
+| warning | A trap: what breaks or misleads, and how to avoid it. | graphify-csharp ignores SIGTERM: stop sessions by id. | `get_context`, `decisions_for` |
+| fact | Something true that the code does not show. | Tenant GUIDs originate in a Confluence table. | `get_context` where it applies or matches the task; `memory_search` |
+| open_question | Not decided yet: what is open and what it waits for. | Do roles exist on the organization server? | `get_context` where it applies or matches the task (agents ask rather than decide it); `memory_search` |
+
+History (what was added when) belongs in Git, not in knowledge.
+
 ## Workspaces
 
 A workspace groups repositories that belong together (services and the
