@@ -58,16 +58,24 @@ internal static class MigrationRunner
             return; // Current databases need no write lock, even while another process is writing.
         }
 
-        Execute(
-            connection,
-            """
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                version INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                applied_at TEXT NOT NULL
-            ) STRICT
-            """
-        );
+        // In an immediate transaction, as each migration: an autocommit statement reads before it writes, and when
+        // another process commits in between (one migrating the same new database) WAL fails it at once with
+        // "database is locked" instead of waiting out the busy timeout. Taking the write lock first waits.
+        using (var ledger = connection.BeginTransaction(deferred: false))
+        {
+            Execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at TEXT NOT NULL
+                ) STRICT
+                """,
+                ledger
+            );
+            ledger.Commit();
+        }
         CheckApplied(connection, migrations);
         var applied = Version(connection);
         var saved =
