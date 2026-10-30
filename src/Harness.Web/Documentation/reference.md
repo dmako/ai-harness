@@ -279,10 +279,13 @@ The default listener is `127.0.0.1:17477`, or `HARNESS_UI_ADDR` when that is set
 
 `harness ui` opens a local page (loopback only, nothing leaves the machine)
 over every project on this machine: overview, knowledge (with the Inbox of
-proposals to approve), work, the agents' tool use and `get_context` quality,
-architecture findings, and the Docs. Changes made there (approving
-proposals, marking findings, workspace membership, graphify sessions) are
-recorded as yours.
+proposals to approve), work, how harness serves the agents and what to
+change so it serves them better, architecture findings, health, and the
+Docs. How harness itself performs (relevance per provider, latency) is the
+harness developer's, from opt-in telemetry, and not part of harness ui.
+Changes made there (approving proposals, adding knowledge, creating,
+editing, moving or deleting tasks and blueprints, marking findings,
+workspace membership, graphify sessions, Fix it) are recorded as yours.
 
 ## Troubleshooting
 
