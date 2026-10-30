@@ -167,35 +167,38 @@ public sealed class TelemetryIntegrationTests
                 .BeTrue();
         }
         // Transport EOF drains the independent server recorder before process exit; the CLI read retries only process shutdown.
-        var metrics = await fixture.CliAsync("metrics", "--json");
-        metrics.Code.Should().Be(0, metrics.Error);
-        using var parsed = JsonDocument.Parse(metrics.Output);
-        parsed
-            .RootElement.GetProperty("tools")
+        // the tools' calls and errors are the developer's numbers: they reach only the telemetry payload
+        var preview = await fixture.ProcessAsync(
+            "dotnet",
+            [Harness.Integration.Web.UiFixture.CliPath, "telemetry", "preview"]
+        );
+        preview.Code.Should().Be(0, preview.Error);
+        using var parsed = JsonDocument.Parse(preview.Output);
+        var project = parsed.RootElement.GetProperty("projects")[0];
+        project.GetProperty("tools").EnumerateArray().Sum(t => t.GetProperty("calls").GetInt32()).Should().Be(3);
+        project.GetProperty("tools").EnumerateArray().Sum(t => t.GetProperty("errors").GetInt32()).Should().Be(1);
+        project.GetProperty("context").GetProperty("answers").GetInt32().Should().Be(0);
+        project
+            .GetProperty("findings")
             .EnumerateArray()
-            .Sum(t => t.GetProperty("calls").GetInt32())
             .Should()
-            .Be(3);
-        parsed
-            .RootElement.GetProperty("tools")
-            .EnumerateArray()
-            .Sum(t => t.GetProperty("errors").GetInt32())
-            .Should()
-            .Be(1);
-        var stats = await fixture.CliAsync("context", "stats", "--json");
-        stats.Code.Should().Be(0, stats.Error);
-        using var context = JsonDocument.Parse(stats.Output);
-        context.RootElement.GetProperty("calls").GetInt32().Should().Be(0);
+            .Contain(f => f.GetProperty("audience").GetString() == "developer");
         var report = await fixture.CliAsync("report", "--json");
         report.Code.Should().Be(0, report.Error);
         using var reports = JsonDocument.Parse(report.Output);
-        reports
-            .RootElement.GetProperty("projects")[0]
-            .GetProperty("findings")
-            .GetArrayLength()
-            .Should()
-            .BeGreaterThan(0);
-        (await fixture.CliAsync("metrics")).Output.Should().Contain("MCP tools over the last 30 days");
+        var findings = reports.RootElement.GetProperty("projects")[0].GetProperty("findings");
+        findings.GetArrayLength().Should().BeGreaterThan(0);
+        findings.EnumerateArray().Should().OnlyContain(f => f.GetProperty("audience").GetString() == "user");
+        var context = reports.RootElement.GetProperty("projects")[0].GetProperty("context");
+        context
+            .GetProperty("by_provider")
+            .ValueKind.Should()
+            .Be(JsonValueKind.Null, "the developer's relevance rows stay out");
+        context
+            .GetProperty("top_misses")
+            .ValueKind.Should()
+            .Be(JsonValueKind.Null, "the files no answer held stay out");
+        (await fixture.CliAsync("metrics")).Code.Should().NotBe(0, "harness metrics is gone");
         (await fixture.CliAsync("report", "--all", "--json")).Code.Should().Be(0);
     }
 

@@ -167,8 +167,6 @@ public sealed class UiTests
             {
                 "summary",
                 "health",
-                "metrics",
-                "context",
                 "report",
                 "providers",
                 "hooks",
@@ -232,7 +230,7 @@ public sealed class UiTests
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             response.Dispose();
         }
-        using var invalidDays = await server.Client.GetAsync($"/api/projects/{id}/metrics?days=0", Token);
+        using var invalidDays = await server.Client.GetAsync($"/api/projects/{id}/report?days=0", Token);
         invalidDays.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 

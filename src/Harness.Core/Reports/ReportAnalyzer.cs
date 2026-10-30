@@ -53,10 +53,11 @@ public static class ReportAnalyzer
     private static void Add(
         List<ReportFinding> result,
         string level,
+        string audience,
         string area,
         string action,
         FormattableString message
-    ) => result.Add(new(level, area, FormattableString.Invariant(message), action));
+    ) => result.Add(new(level, audience, area, FormattableString.Invariant(message), action));
 
     /// <summary>Too few scored get_context answers or a low hit rate, and languages it rarely surfaces.</summary>
     private static void ContextFindings(List<ReportFinding> result, LocalReport report)
@@ -67,6 +68,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "info",
+                ReportAudience.Developer,
                 "context",
                 "keep using get_context; answers are scored when HEAD moves on (harness sync)",
                 $"only {st.Calls} get_context answer(s) scored in {report.Days} days: too few to judge relevance"
@@ -77,8 +79,9 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "warn",
+                ReportAudience.Developer,
                 "context",
-                "look at the never-surfaced files in harness context stats and improve gathering for them",
+                "improve gathering for the files agents change that no answer held",
                 $"get_context hit rate {Percent(st.HitRate)} per answer ({st.Hits} of {st.Changed} changed code files, tests apart) over {st.Calls} answers"
             );
         }
@@ -90,6 +93,7 @@ public static class ReportAnalyzer
                 Add(
                     result,
                     "warn",
+                    ReportAudience.User,
                     "context",
                     "check which provider serves " + language + " (routing) or add a language-specific one",
                     $"{language} files are rarely in get_context: {pair[0]} of {pair[1]} changed ({Percent((double)pair[0] / pair[1])})"
@@ -113,6 +117,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "warn",
+                ReportAudience.Developer,
                 "context",
                 "build code.callees (HAR-0145): expanding context to callees would find these",
                 $"{st.CalleeMisses} of {misses} misses ({Percent(share)}) changed a function the returned code calls"
@@ -123,6 +128,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "info",
+                ReportAudience.Developer,
                 "context",
                 "keep HAR-0145 (code.callees) waiting",
                 $"callee misses are {Percent(share)} of misses ({st.CalleeMisses} of {misses}), below the {Percent(.15)} that would justify code.callees"
@@ -138,6 +144,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "info",
+                ReportAudience.User,
                 "hooks",
                 "harness hooks install --kind claude-code,codex (or run 'harness hooks')",
                 $"no client hook events: read-after-context relevance and provider bypasses are not measured"
@@ -148,8 +155,9 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "warn",
+                ReportAudience.Developer,
                 "context",
-                "compare what agents read after get_context with what it returned (harness context stats)",
+                "compare what agents read after get_context with what it returned",
                 $"read after context {Percent(ar.HitRate)}: of {ar.Touched} files agents read or edited after an answer, {ar.Hits} were in it"
             );
         }
@@ -165,8 +173,9 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "warn",
+                ReportAudience.Developer,
                 "tools",
-                "look at the tool's errors in harness metrics (bad arguments or a failing provider)",
+                "look at the tool's errors (bad arguments or a failing provider)",
                 $"{tool.Tool} fails {Percent(tool.ErrorRate)} of {tool.Calls} calls"
             );
         }
@@ -176,6 +185,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "warn",
+                ReportAudience.User,
                 "tools",
                 "regenerate the agent instructions (harness instructions): deep is for when the user asks for compiler-exact cross-project answers",
                 $"agents asked for depth deep in {deep} of {workspace} workspace calls: deep starts heavy providers in every member"
@@ -208,6 +218,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "info",
+                ReportAudience.Developer,
                 "tools",
                 "check the agent instructions mention them, or drop tools nobody needs",
                 $"unused for {report.Days} days while agents made {total} tool calls: {string.Join(", ", unused)}"
@@ -222,6 +233,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 bypass.Calls >= 5 ? "warn" : "info",
+                ReportAudience.User,
                 "bypass",
                 "candidate capability: map "
                     + bypass.Tool
@@ -239,6 +251,7 @@ public static class ReportAnalyzer
             Add(
                 result,
                 "warn",
+                ReportAudience.User,
                 "knowledge",
                 "check that agent instructions ask for decisions_for before changing an area",
                 $"agents made {total} tool calls but never read harness knowledge (decisions_for, goals_current, memory_search...)"
@@ -257,6 +270,7 @@ public static class ReportAnalyzer
         Add(
             result,
             knowledge.OldestPending is not null && days > 7 ? "warn" : "info",
+            ReportAudience.User,
             "knowledge",
             "review them: harness proposals list, or the GUI's Proposals tab",
             $"{knowledge.Pending} memory proposal(s) waiting for review{age}"
@@ -297,6 +311,7 @@ public static class ReportAnalyzer
             result.Add(
                 new(
                     "info",
+                    ReportAudience.User,
                     "providers",
                     string.Create(
                         CultureInfo.InvariantCulture,
@@ -370,7 +385,7 @@ public static class ReportAnalyzer
         var message = name + " " + problem.What;
         if (trend is null)
         {
-            return new(problem.Level, "providers", message, problem.Action, history, trend);
+            return new(problem.Level, ReportAudience.User, "providers", message, problem.Action, history, trend);
         }
 
         var (last, after) = (problem.Last, problem.After);
@@ -380,7 +395,7 @@ public static class ReportAnalyzer
                 CultureInfo.InvariantCulture,
                 $", but not in the {after} calls since {Day(last)}: resolved"
             );
-            return new("info", "providers", message, "nothing to do while it stays clean", history, trend);
+            return new("info", ReportAudience.User, "providers", message, "nothing to do while it stays clean", history, trend);
         }
 
         if (after > 0)
@@ -395,7 +410,7 @@ public static class ReportAnalyzer
             message += "; still happening (last call " + Day(last) + ")";
         }
 
-        return new(problem.Level, "providers", message, problem.Action, history, trend);
+        return new(problem.Level, ReportAudience.User, "providers", message, problem.Action, history, trend);
     }
 
     public static string Percent(double rate) => (rate * 100).ToString("F0", CultureInfo.InvariantCulture) + "%";

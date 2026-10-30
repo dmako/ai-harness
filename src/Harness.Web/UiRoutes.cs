@@ -43,8 +43,6 @@ public static class UiRoutes
         "/api/projects",
         "/api/projects/{id}/summary",
         "/api/projects/{id}/snippet",
-        "/api/projects/{id}/context",
-        "/api/projects/{id}/metrics",
         "/api/projects/{id}/memories",
         "/api/projects/{id}/tasks",
         "/api/projects/{id}/proposals",

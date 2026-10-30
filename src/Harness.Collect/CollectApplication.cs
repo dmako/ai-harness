@@ -120,10 +120,7 @@ public static partial class CollectApplication
                 id = id.EndsWith(".json", StringComparison.Ordinal) ? id[..^5] : id;
                 var file = Path.Combine(directory, id, "latest.json");
                 return
-                    MachineId.IsMatch(id)
-                    && File.Exists(file)
-                    && !IsLink(file)
-                    && !IsLink(Path.GetDirectoryName(file)!)
+                    MachineId.IsMatch(id) && File.Exists(file) && !IsLink(file) && !IsLink(Path.GetDirectoryName(file)!)
                     ? Results.Bytes(File.ReadAllBytes(file), "application/json")
                     : Results.NotFound();
             }
@@ -143,6 +140,7 @@ public static partial class CollectApplication
         var html = new StringBuilder(
             "<h1>harness telemetry</h1><p>Opt-in aggregated reports from harness machines. No code, paths, queries or project names.</p><table><tr><th>Machine</th><th>Last report</th><th>harness</th><th>Projects</th><th>Answers</th><th>Context hits</th><th>Findings</th><th>Reports</th></tr>"
         );
+        List<JsonNode> latest = [];
         foreach (
             var dir in Directory
                 .EnumerateDirectories(directory)
@@ -158,6 +156,7 @@ public static partial class CollectApplication
                     continue;
                 }
                 var report = JsonNode.Parse(File.ReadAllBytes(file))!;
+                latest.Add(report);
                 var projects = report["projects"]?.AsArray() ?? [];
                 var hits = projects.Sum(p => p?["context"]?["code_hits"]?.GetValue<int>() ?? 0);
                 var changed = projects.Sum(p => p?["context"]?["code_changed"]?.GetValue<int>() ?? 0);
@@ -174,7 +173,114 @@ public static partial class CollectApplication
         return html.Append(
                 "</table><p>On a machine: harness telemetry enable --endpoint http://&lt;this host&gt;:8766/v1/report</p>"
             )
+            .Append(DeveloperView(latest))
             .ToString();
+    }
+
+    /// <summary>
+    /// The harness developer's view over every machine's latest report: get_context relevance per provider,
+    /// capability and language, the tools' latency and errors, and the findings by audience (in how many projects).
+    /// </summary>
+    internal static string DeveloperView(IReadOnlyList<JsonNode> reports)
+    {
+        static string E(JsonNode? value) => WebUtility.HtmlEncode(value?.ToString() ?? "");
+        static int N(JsonNode? value) => value is JsonValue v && v.TryGetValue<int>(out var n) ? n : 0;
+        var projects = reports.SelectMany(r => r["projects"]?.AsArray() ?? []).OfType<JsonObject>().ToArray();
+        var html = new StringBuilder("<h2>get_context relevance by provider</h2>");
+        var rows = projects
+            .SelectMany(p => p["context_by"]?.AsArray() ?? [])
+            .OfType<JsonObject>()
+            .GroupBy(r => (Provider: E(r["provider"]), Capability: E(r["capability"]), Language: E(r["language"])))
+            .Select(g =>
+                (
+                    g.Key,
+                    Hits: g.Sum(r => N(r["hits"])),
+                    Changed: g.Sum(r => N(r["changed"])),
+                    Tier0: g.Sum(r => N(r["tier0"]))
+                )
+            )
+            .OrderByDescending(r => r.Hits)
+            .ToArray();
+        html.Append(
+            rows.Length is 0
+                ? "<p>No relevance reported yet.</p>"
+                : "<table><tr><th>Provider</th><th>Capability</th><th>Language</th><th>Hits</th><th>Changed</th><th>Rate</th><th>Top tier</th></tr>"
+                    + string.Concat(
+                        rows.Select(r =>
+                            string.Create(
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                $"<tr><td>{r.Key.Provider}</td><td>{r.Key.Capability}</td><td>{r.Key.Language}</td><td>{r.Hits}</td><td>{r.Changed}</td><td>{(r.Changed > 0 ? (double)r.Hits / r.Changed : 0):P0}</td><td>{r.Tier0}</td></tr>"
+                            )
+                        )
+                    )
+                    + "</table>"
+        );
+        html.Append("<h2>Tools</h2>");
+        var tools = projects
+            .SelectMany(p => p["tools"]?.AsArray() ?? [])
+            .OfType<JsonObject>()
+            .GroupBy(t => E(t["tool"]))
+            .Select(g =>
+                (
+                    Tool: g.Key,
+                    Calls: g.Sum(t => N(t["calls"])),
+                    Errors: g.Sum(t => N(t["errors"])),
+                    P95: g.Max(t => N(t["p95_ms"]))
+                )
+            )
+            .OrderByDescending(t => t.Calls)
+            .ToArray();
+        html.Append(
+            tools.Length is 0
+                ? "<p>No tool calls reported yet.</p>"
+                : "<table><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>p95 (worst)</th></tr>"
+                    + string.Concat(
+                        tools.Select(t =>
+                            string.Create(
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                $"<tr><td>{t.Tool}</td><td>{t.Calls}</td><td>{t.Errors}</td><td>{t.P95} ms</td></tr>"
+                            )
+                        )
+                    )
+                    + "</table>"
+        );
+        foreach (
+            var (audience, title) in new[]
+            {
+                ("developer", "Findings for the harness developer"),
+                ("user", "Findings users act on"),
+            }
+        )
+        {
+            html.Append("<h2>").Append(title).Append("</h2>");
+            var findings = projects
+                .SelectMany(p =>
+                    (p["findings"]?.AsArray() ?? []).OfType<JsonObject>().Select(f => (Project: p, Finding: f))
+                )
+                .Where(x => (x.Finding["audience"]?.ToString() ?? "") == audience)
+                .GroupBy(x =>
+                    (Level: E(x.Finding["level"]), Area: E(x.Finding["area"]), Message: E(x.Finding["message"]))
+                )
+                .Select(g => (g.Key, Projects: g.Select(x => x.Project).Distinct().Count()))
+                .OrderByDescending(f => f.Projects)
+                .ToArray();
+            html.Append(
+                findings.Length is 0
+                    ? "<p>None reported.</p>"
+                    : "<table><tr><th>Level</th><th>Area</th><th>Finding</th><th>Projects</th></tr>"
+                        + string.Concat(
+                            findings.Select(f =>
+                                string.Create(
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    $"<tr><td>{f.Key.Level}</td><td>{f.Key.Area}</td><td>{f.Key.Message}</td><td>{f.Projects}</td></tr>"
+                                )
+                            )
+                        )
+                        + "</table>"
+            );
+        }
+
+        return html.ToString();
     }
 
     public static async Task<int> RunAsync(string[] args)

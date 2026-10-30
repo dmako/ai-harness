@@ -53,7 +53,7 @@ uninstall` alone lets you pick what to remove.
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
-| `harness metrics` / `report` | How the tools and providers fared; findings with a suggested action. |
+| `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
 | `harness ui` | Opens the local GUI over every project on this machine. |
 | `harness docs [section]` | This documentation. |
 | `harness completion` | Shell completion for zsh, bash, fish and PowerShell. |

@@ -1,7 +1,12 @@
 # Telemetry and developer tools
 
 Local recording is implemented in Core and Infrastructure, with CLI reports and
-MCP diagnostics. The optional [Collect](../../src/Harness.Collect) and
+MCP diagnostics. Report findings say who acts on them: the user (configuration,
+hooks, instructions, reviews) or the harness developer (how harness gathers and
+serves). `harness report`, harness ui and the overview show only the user's
+(`LocalReport.ForUser`); the developer's findings and tuning numbers (relevance
+per provider, capability and language; tool latency) reach only the opt-in
+export and `harness-collect`'s developer view. The optional [Collect](../../src/Harness.Collect) and
 [Share](../../src/Harness.Share) executables reference Infrastructure and Web.
 They are packaged separately and are not installed by the main CLI.
 
