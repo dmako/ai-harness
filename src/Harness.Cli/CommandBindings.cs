@@ -98,8 +98,8 @@ internal static class CommandBindings
     {
         var addressOption = new Option<string>("--addr")
         {
-            DefaultValueFactory = _ => UiHost.DefaultAddress,
-            Description = "Loopback listen address (default 127.0.0.1:17477)",
+            DefaultValueFactory = _ => UiHost.ConfiguredAddress,
+            Description = "Loopback listen address (default 127.0.0.1:17477, or HARNESS_UI_ADDR when set)",
         };
         command.Options.Add(addressOption);
         var noOpenOption = new Option<bool>("--no-open")

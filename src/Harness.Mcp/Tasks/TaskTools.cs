@@ -304,7 +304,7 @@ internal static class TaskTools
             Priority = Text(values, "priority").Trim(),
             Blueprint = Text(values, "blueprint"),
             Scope = Strings(values, "scope"),
-            DependsOn = Strings(values, "depends_on").Select(d => d.Trim().ToUpperInvariant()).ToArray(),
+            DependsOn = Strings(values, "depends_on").Select(TaskWorkflow.NormalizeDependency).ToArray(),
         };
         var proposal = await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token);
         var blueprint = proposal.Task.Blueprint;

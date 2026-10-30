@@ -28,6 +28,10 @@ internal sealed partial class UiReadService : IUiWriteApi
             {
                 return WriteKnowledge(request, token);
             }
+            if (endpoint is "/api/telemetry")
+            {
+                return await SetTelemetryAsync(request.Body, token);
+            }
             if (endpoint is "/api/graphify/sessions/{action}")
             {
                 return await WriteGraphifyAsync(request, token);
@@ -85,11 +89,30 @@ internal sealed partial class UiReadService : IUiWriteApi
             );
         }
         var project = await catalog.FindAsync(route.Value("id"), token);
+        if (endpoint is "fix")
+        {
+            return await FixAsync(project, request.Body, token);
+        }
         using var database = Open(project, tasks: true);
         var store = new MemoryStore(database);
         var human = HumanActor.Current();
         return endpoint switch
         {
+            "memories" => AddMemory(store, request.Body, token),
+            "tasks/{tid}/delete" => DeleteTask(database, request, token),
+            "tasks/{tid}/blueprint" => UiJson.Node(
+                new JsonObjectMap
+                {
+                    ["task"] = TaskViews.Task(
+                        new TaskStore(database).MoveToBlueprint(
+                            route.Value("tid"),
+                            new UiWriteBody(request.Body, "blueprint").Text("blueprint"),
+                            human,
+                            token
+                        )
+                    ),
+                }
+            ),
             "memories/{mid}/supersede" => CorrectMemory(store, route.Value("mid"), request.Body, null, token),
             "memories/{mid}/retire" => RetireMemory(store, route.Value("mid"), request.Body, null, token),
             "memories/{mid}/promote" => await PromoteAsync(project, database, request, token),
@@ -132,6 +155,14 @@ internal sealed partial class UiReadService : IUiWriteApi
             ),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
+    }
+
+    // Deleting a task is harness ui's only; the body is empty.
+    private static JsonNode? DeleteTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
+    {
+        _ = new UiWriteBody(request.Body);
+        new TaskStore(database).DeleteTask(request.Route.Value("tid"), token);
+        return UiJson.Node(new JsonObjectMap { ["deleted"] = request.Route.Value("tid") });
     }
 
     private static JsonNode? CorrectMemory(
@@ -254,7 +285,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             Blueprint = fields.Text("blueprint").Trim(),
             DependsOn = fields
                 .List("depends_on")
-                .Select(s => s.Trim().ToUpperInvariant())
+                .Select(TaskWorkflow.NormalizeDependency)
                 .Where(s => s.Length > 0)
                 .ToArray(),
             Acceptance = Clean(fields.List("acceptance")),

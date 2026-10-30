@@ -170,12 +170,27 @@ public sealed partial class DeveloperExport(string directory)
                                 ["writes"] = report.KnowledgeWrites,
                             }
                         ),
+                        // get_context relevance per provider, capability and language: which one surfaces the
+                        // files agents change, how high. Names of providers and languages only, never files.
+                        ["context_by"] = HarnessJson.SerializeToNode(
+                            (context.Rows ?? []).Select(r => new JsonObjectMap
+                            {
+                                ["provider"] = Clean(r.Provider),
+                                ["capability"] = Clean(r.Capability),
+                                ["language"] = Clean(r.Language),
+                                ["hits"] = r.Hits,
+                                ["changed"] = r.Changed,
+                                ["tier0"] = r.BestTier0,
+                                ["median_position"] = r.MedianPos,
+                            })
+                        ),
                         ["hook_events"] = report.Metrics.Hooks.Events,
                         ["languages"] = HarnessJson.SerializeToNode(context.Language),
                         ["findings"] = HarnessJson.SerializeToNode(
                             (report.Findings ?? []).Select(f => new JsonObjectMap
                             {
                                 ["level"] = Clean(f.Level),
+                                ["audience"] = Clean(f.Audience),
                                 ["area"] = Clean(f.Area),
                                 ["message"] = Clean(f.Message),
                             })

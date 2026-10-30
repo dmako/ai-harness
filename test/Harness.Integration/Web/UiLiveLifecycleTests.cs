@@ -35,7 +35,9 @@ public sealed class UiLiveLifecycleTests
         await app.StartAsync(Token);
         try
         {
-            using var handler = new SocketsHttpHandler { UseProxy = false };
+            // A disposed stream closes its connection at once, as a browser closing the page does: by default the
+            // handler would first drain the never-ending stream for 2 s, spending most of the waits below.
+            using var handler = new SocketsHttpHandler { UseProxy = false, MaxResponseDrainSize = 0 };
             using var client = new HttpClient(handler, disposeHandler: false)
             {
                 BaseAddress = new(UiHost.Address(app)),

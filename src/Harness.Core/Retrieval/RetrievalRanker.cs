@@ -15,11 +15,12 @@ public static class RetrievalRanker
         {
             "definition" => 1,
             "context" or "constraint" or "decision" or "warning" => 0.9,
-            "convention" => 0.8,
+            // a question still open there ranks beside the rules: not to be settled unknowingly
+            "convention" or "open_question" => 0.8,
             "caller" => 0.7,
             "flow" or "impact" => 0.6,
             "reference" or "match" or "fact" => 0.5,
-            "open_question" or "change" => 0.4,
+            "change" => 0.4,
             "file" or "goal" => 0.3,
             _ => 0,
         };

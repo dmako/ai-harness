@@ -36,14 +36,12 @@ public sealed class AuxiliaryCliTests
                 "tasks",
                 "proposals",
                 "memory",
-                "context",
                 "projects",
                 "workspace",
                 "docs",
                 "providers",
                 "completion",
                 "telemetry",
-                "metrics",
                 "report",
             }
         )

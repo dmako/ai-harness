@@ -44,10 +44,13 @@ public sealed partial class TaskStore
             (c, t) =>
             {
                 var (existing, _) = LoadGraph(c, t);
-                if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+                if (TaskWorkflow.Local(d.DependsOn).FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
                 {
                     throw new ArgumentException($"depends on unknown task {missing}");
                 }
+
+                // another project's task is read now: an unknown one is refused, not proposed
+                ExternalStatuses(d with { Id = "the proposal" });
 
                 var proposal = new TaskProposal(
                     "tpr_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)),

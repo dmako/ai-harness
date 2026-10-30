@@ -123,7 +123,7 @@ internal static class MemoryTools
         {
             "goals_current" => ["goal"],
             "constraints_current" => ["constraint"],
-            "decisions_for" => ["decision", "convention", "warning"],
+            "decisions_for" => [.. MemoryText.AreaTypes],
             _ => args.Array("types").Select(MemoryText.ParseType).ToArray(),
         };
         return new MemoryQuery

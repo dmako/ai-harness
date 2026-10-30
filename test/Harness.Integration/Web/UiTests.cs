@@ -1,5 +1,5 @@
 using System.Net;
-using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
@@ -62,15 +62,22 @@ public sealed class UiTests
     }
 
     [Fact]
-    public async Task DefaultListenerPortBindsWhenItIsAvailable()
+    public async Task WithoutAddrTheListenerBindsTheConfiguredDefault()
     {
-        if (IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(endpoint => endpoint.Port is 17477))
+        // A free port of its own through HARNESS_UI_ADDR: the developer's harness ui keeps 17477.
+        int port;
+        using (var probe = new TcpListener(IPAddress.Loopback, 0))
         {
-            throw Xunit.Sdk.SkipException.ForSkip("Port 17477 is already used by another local application.");
+            probe.Start();
+            port = ((IPEndPoint)probe.LocalEndpoint).Port;
         }
         using var fixture = await SyncFixture.CreateAsync();
-        await using var server = await UiFixture.StartAsync(fixture, address: null);
-        server.Client.BaseAddress!.Port.Should().Be(17477);
+        await using var server = await UiFixture.StartAsync(
+            fixture,
+            address: null,
+            environment: new Dictionary<string, string> { [UiHost.AddressVariable] = "127.0.0.1:" + port }
+        );
+        server.Client.BaseAddress!.Port.Should().Be(port);
         using var response = await server.Client.GetAsync("/", Token);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -160,8 +167,6 @@ public sealed class UiTests
             {
                 "summary",
                 "health",
-                "metrics",
-                "context",
                 "report",
                 "providers",
                 "hooks",
@@ -172,6 +177,7 @@ public sealed class UiTests
                 "tasks/TASK-9999/events",
                 "tasks-next-id",
                 "blueprints-next-id",
+                "trends?days=7",
                 "task-proposals",
                 "blueprint-proposals",
                 "arch-proposals",
@@ -224,7 +230,7 @@ public sealed class UiTests
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             response.Dispose();
         }
-        using var invalidDays = await server.Client.GetAsync($"/api/projects/{id}/metrics?days=0", Token);
+        using var invalidDays = await server.Client.GetAsync($"/api/projects/{id}/report?days=0", Token);
         invalidDays.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -266,7 +272,7 @@ public sealed class UiTests
     public async Task ExistingReadStateIsNotCreatedOrMigratedAndMachineMetadataExcludesTokens()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Sql("DELETE FROM schema_migrations WHERE version=21");
+        fixture.Sql("DELETE FROM schema_migrations WHERE version=22");
         await File.WriteAllTextAsync(
             Path.Combine(fixture.Global, "telemetry.json"),
             """{"enabled":true,"endpoint":"https://telemetry.invalid","token":"must-stay-private","projects":{}}""",
@@ -289,7 +295,7 @@ public sealed class UiTests
         Convert
             .ToInt32(await command.ExecuteScalarAsync(Token), System.Globalization.CultureInfo.InvariantCulture)
             .Should()
-            .Be(20);
+            .Be(21);
     }
 
     [Fact]
@@ -323,12 +329,19 @@ public sealed class UiTests
         languages.Select(language => language!["language"]!.GetValue<string>()).Should().Equal("csharp", "typescript");
         var csharp = languages[0]!;
         csharp["thresholds"]!.ToJsonString().Should().Be("""{"note":11,"warn":21,"problem":51}""");
-        csharp["members"]!.GetValue<int>().Should().Be(3);
+        csharp["functions"]!.GetValue<int>().Should().Be(3);
+        csharp["max"]!.GetValue<int>().Should().Be(14);
         csharp["measured"]!.GetValue<int>().Should().Be(0);
-        csharp["counts"]!.ToJsonString().Should().Be("[[1,2],[14,1]]");
+        csharp["bins"]!
+            .ToJsonString()
+            .Should()
+            .Be("""[{"from":1,"to":5,"count":2},{"from":6,"to":10,"count":0},{"from":11,"to":15,"count":1}]""");
+        csharp["top"]![0]!["complexity"]!.GetValue<int>().Should().Be(14);
+        csharp["files"]!.AsObject().Should().NotBeEmpty();
         var script = languages[1]!;
         script["thresholds"]!["warn"]!.GetValue<int>().Should().Be(31);
-        script["counts"]!.ToJsonString().Should().Be("[[3,1]]");
+        script["bins"]!.ToJsonString().Should().Be("""[{"from":1,"to":5,"count":1}]""");
+        script["files"]!["web/app.ts"]!.GetValue<int>().Should().Be(3);
     }
 
     [Fact]

@@ -202,7 +202,7 @@ public sealed class UiBrowserTests
                     .Should()
                     .Be("True");
                 await page.EvaluateAsync("document.querySelector('#task-UI-0001 .tedit').click()");
-                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .tdetail input[aria-label=Title]')");
+                await page.WaitAsync("!!document.querySelector('dialog[open] input[aria-label=Title]')");
                 (
                     await ValueAsync(
                         page,
@@ -213,12 +213,19 @@ public sealed class UiBrowserTests
                 )
                     .Should()
                     .Be("True");
-                (await ValueAsync(page, "document.querySelector('input[aria-label=Id]').disabled")).Should().Be("True");
-                (await ValueAsync(page, "document.querySelector('textarea[aria-label=\"Acceptance criteria\"]').value"))
+                (await ValueAsync(page, "document.querySelector('dialog[open] input[aria-label=Id]').disabled"))
+                    .Should()
+                    .Be("True");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('dialog[open] .lrow input')].map(i => i.value).join()"
+                    )
+                )
                     .Should()
                     .Be("Old");
                 await page.EvaluateAsync(
-                    "document.querySelector('input[aria-label=Title]').value = 'Edited in the browser'"
+                    "document.querySelector('dialog[open] input[aria-label=Title]').value = 'Edited in the browser'"
                 );
                 await page.EvaluateAsync(
                     "[...document.querySelectorAll('button')].find(b => b.textContent === 'Save the task').click()"
@@ -230,9 +237,7 @@ public sealed class UiBrowserTests
                 await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/UI-0002'");
                 await page.WaitAsync("!!document.querySelector('#task-UI-0002 .tdetail')");
                 (await ValueAsync(page, "document.querySelector('#task-UI-0002 .tedit').disabled")).Should().Be("True");
-                (await ValueAsync(page, "!!document.querySelector('#task-UI-0002 .tdetail form')"))
-                    .Should()
-                    .Be("False");
+                (await ValueAsync(page, "!!document.querySelector('dialog[open]')")).Should().Be("False");
             }
         );
     }
@@ -248,6 +253,9 @@ public sealed class UiBrowserTests
         static string Click(string text) =>
             $"[...document.querySelectorAll('button')].find(b => b.textContent === '{text}').click()";
         static string Card(string id) => $"document.querySelector('.mcard[data-blueprint=\"{id}\"]')";
+        static string CardButton(string id, string action) =>
+            $"{Card(id)}.querySelector('button[aria-label=\"{action} blueprint {id}\"]')";
+        const string Dialog = "document.querySelector('dialog[open]')";
         await BrowseAsync(
             executable,
             fixture,
@@ -262,33 +270,30 @@ public sealed class UiBrowserTests
                     "[...document.querySelectorAll('button')].some(b => b.textContent === 'New blueprint…')"
                 );
                 await page.EvaluateAsync(Click("New blueprint…"));
-                await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
-                (await ValueAsync(page, "document.querySelector('input[aria-label=Name]').value"))
-                    .Should()
-                    .Be("New blueprint");
-                await page.EvaluateAsync("document.querySelector('input[aria-label=Name]').value = 'From the browser'");
-                await page.EvaluateAsync(Click("Add the blueprint"));
+                await page.WaitAsync($"{Dialog}?.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
+                await page.EvaluateAsync(
+                    $"{Dialog}.querySelector('input[aria-label=Title]').value = 'From the browser'"
+                );
+                await page.EvaluateAsync(Click("Create blueprint"));
                 await page.WaitAsync($"!!{Card("BP-001")}");
                 tasks.Blueprints(Token).Select(b => b.Definition.Title).Should().Contain("From the browser");
 
-                await page.EvaluateAsync(
-                    $"[...{Card("BP-001")}.querySelectorAll('button')].find(b => b.textContent === 'Edit…').click()"
-                );
-                await page.WaitAsync($"!!{Card("BP-001")}.querySelector('textarea[aria-label=Goal]')");
-                await page.EvaluateAsync(
-                    $"{Card("BP-001")}.querySelector('textarea[aria-label=Goal]').value = 'Edited goal'"
-                );
-                await page.EvaluateAsync(Click("Save the blueprint"));
+                await page.EvaluateAsync($"{CardButton("BP-001", "Edit")}.click()");
+                await page.WaitAsync($"!!{Dialog}?.querySelector('textarea[aria-label=Goal]')");
+                (await ValueAsync(page, $"!!{Dialog}.querySelector('input[aria-label=Id]')"))
+                    .Should()
+                    .Be("False", "an edited blueprint keeps its id");
+                await page.EvaluateAsync($"{Dialog}.querySelector('textarea[aria-label=Goal]').value = 'Edited goal'");
+                await page.EvaluateAsync(Click("Save blueprint"));
                 await ProviderFixture.EventuallyAsync(() =>
                     tasks.Blueprints(Token).Single(b => b.Definition.Id == "BP-001").Definition.Goal is "Edited goal"
                 );
 
                 // no tasks: removed once confirmed, nothing else asked
-                await page.EvaluateAsync(
-                    $"[...{Card("EMPTY")}.querySelectorAll('button')].find(b => b.textContent === 'Remove…').click()"
-                );
-                await page.WaitAsync($"!!{Card("EMPTY")}.querySelector('form.aform')");
-                (await ValueAsync(page, $"!!{Card("EMPTY")}.querySelector('input[type=radio]')")).Should().Be("False");
+                await page.WaitAsync($"!{Dialog}");
+                await page.EvaluateAsync($"{CardButton("EMPTY", "Remove")}.click()");
+                await page.WaitAsync($"!!{Dialog}");
+                (await ValueAsync(page, $"!!{Dialog}.querySelector('input[type=radio]')")).Should().Be("False");
                 tasks.Blueprints(Token).Should().HaveCount(2, "nothing is removed before it is confirmed");
                 await page.EvaluateAsync(Click("Remove the blueprint"));
                 await page.WaitAsync($"!{Card("EMPTY")}");
@@ -306,22 +311,16 @@ public sealed class UiBrowserTests
                     Token
                 );
                 await page.EvaluateAsync("location.reload()");
-                await page.WaitAsync(
-                    $"[...({Card("BP-001")}?.querySelectorAll('button') || [])].some(b => b.textContent === 'Remove…')"
-                );
-                await page.EvaluateAsync(
-                    $"[...{Card("BP-001")}.querySelectorAll('button')].find(b => b.textContent === 'Remove…').click()"
-                );
-                await page.WaitAsync("!!document.querySelector('select[aria-label=\"Move to\"]')");
-                (await ValueAsync(page, "document.querySelector('.aform .hint').textContent"))
-                    .Should()
-                    .Contain("1 task(s)");
+                await page.WaitAsync($"!!{Card("BP-001")}?.textContent.includes('1 task')");
+                await page.EvaluateAsync($"{CardButton("BP-001", "Remove")}.click()");
+                await page.WaitAsync($"!!{Dialog}?.querySelector('select[aria-label=\"Move to\"]')");
+                (await ValueAsync(page, $"{Dialog}.textContent")).Should().Contain("It has 1 task.");
                 // each radio button sits at the start of its line, its text right beside it
                 (
                     await ValueAsync(
                         page,
                         """
-                        [...document.querySelectorAll('.aform label.choice')].every(l => {
+                        [...document.querySelectorAll('dialog[open] label.choice')].every(l => {
                           const r = l.querySelector('input[type=radio]').getBoundingClientRect();
                           const t = l.querySelector('span').getBoundingClientRect();
                           return r.width < 30 && r.left - l.getBoundingClientRect().left < 4
@@ -371,7 +370,7 @@ public sealed class UiBrowserTests
                     "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint…').click()"
                 );
                 await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value === 'BP-001'");
-                (await ValueAsync(page, "document.querySelector('input[aria-label=Name]').value"))
+                (await ValueAsync(page, "document.querySelector('input[aria-label=Title]').value"))
                     .Should()
                     .Be("Agent idea");
                 await page.EvaluateAsync(
@@ -501,13 +500,13 @@ public sealed class UiBrowserTests
                 (
                     await ValueAsync(
                         page,
-                        $"[...{Group}.querySelectorAll('.lvfilter .chip')].map(c => c.dataset.level + ':' + c.querySelector('.count').textContent).join()"
+                        $"[...{Group}.querySelectorAll('.lvchips .chip')].map(c => c.textContent.trim()).join()"
                     )
                 )
                     .Should()
-                    .Be("problem:1,warn:1,info:8");
+                    .Be("✕ 1 problems,▲ 1 warnings,ⓘ 8 notes");
 
-                await page.EvaluateAsync($"{Group}.querySelector('.lvfilter .chip[data-level=info]').click()");
+                await page.EvaluateAsync($"{Group}.querySelector('.lvchips .chip.lv-info').click()");
                 (await ValueAsync(page, $"{List}.querySelectorAll(':scope > li').length")).Should().Be("2");
                 (await ValueAsync(page, $"{Group}.open")).Should().Be("True", "filtering redraws only the list");
 
@@ -517,18 +516,566 @@ public sealed class UiBrowserTests
                 (
                     await ValueAsync(
                         page,
-                        $"{Group}.querySelector('.chip[data-level=info]').getAttribute('aria-pressed')"
+                        $"{Group}.querySelector('.lvchips .chip.lv-info').getAttribute('aria-pressed')"
                     )
                 )
                     .Should()
                     .Be("false", "the viewer's choice is kept");
                 (await ValueAsync(page, $"{List}.querySelectorAll(':scope > li').length")).Should().Be("2");
 
+                await page.EvaluateAsync(
+                    "location.hash = '#/p/" + UiWriteTests.ProjectId(fixture) + "/architecture/complexity'"
+                );
                 await page.WaitAsync("!!document.querySelector('.cxchart')");
                 (await ValueAsync(page, "document.querySelectorAll('.cxchart .cxth').length")).Should().Be("3");
-                (await ValueAsync(page, "document.querySelector('.cxlang').textContent"))
+                (await ValueAsync(page, "document.querySelector('.cxlang h4').textContent"))
                     .Should()
-                    .Contain("10 functions; at these thresholds 10 reported");
+                    .Contain("10 functions, the most complex at 60");
+                (await ValueAsync(page, "document.querySelector('.cxtop li b').textContent")).Should().Contain("Huge");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task RingsTrendKnowledgeIsAddedTelemetryToggledATaskDraggedAndAFixRun()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.CreateBlueprint(new("M1", "First"), "test", Token);
+        tasks.Create(new TaskDefinition { Id = "UI-0001", Title = "Done today" }, "", origin, Token);
+        var claim = tasks.Claim("UI-0001", new("claude"), cancellationToken: Token);
+        tasks.Complete("UI-0001", new("claude", claim.Token), new("done"), Token);
+        tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "To drag" }, "", origin, Token);
+        tasks.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0003",
+                Title = "Already in M1",
+                Blueprint = "M1",
+            },
+            "",
+            origin,
+            Token
+        );
+        // Claude Code has run once on this machine: its user config exists, for harness install to add to
+        var claude = Path.Combine(fixture.DirectoryRoot, "claude", ".claude.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(claude)!);
+        await File.WriteAllTextAsync(claude, "{}", Token);
+        static string Click(string text) =>
+            $"[...document.querySelectorAll('button')].find(b => b.textContent === '{text}').click()";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/overview" }
+                );
+                // a task done today: the tasks ring carries its trend
+                await page.WaitAsync("!!document.querySelector('.ringlegend li[data-r=r-tasks] .rspark')");
+
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/knowledge'");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'Add knowledge')"
+                );
+                await page.EvaluateAsync(Click("Add knowledge"));
+                await page.WaitAsync("!!document.querySelector('textarea[name=content]')");
+                await page.EvaluateAsync(
+                    "document.querySelector('textarea[name=content]').value = 'Added from the knowledge page'"
+                );
+                await page.EvaluateAsync(Click("Add"));
+                await ProviderFixture.EventuallyAsync(() =>
+                    new MemoryStore(database)
+                        .Search(new() { Text = "Added from the knowledge page" }, Token)
+                        .Any(m => m.Source.Type is "user")
+                );
+
+                await page.EvaluateAsync("location.hash = '#/machine'");
+                await page.WaitAsync("!!document.querySelector('.telcard .switch')");
+                await page.EvaluateAsync("document.querySelector('.telcard .switch').click()");
+                await page.WaitAsync("!!document.querySelector('input[aria-label=\"Collector endpoint\"]')");
+                await page.EvaluateAsync(
+                    "document.querySelector('input[aria-label=\"Collector endpoint\"]').value = 'http://127.0.0.1:9/v1/report'"
+                );
+                await page.EvaluateAsync(Click("Turn on"));
+                await page.WaitAsync(
+                    "document.querySelector('.telcard .switch')?.getAttribute('aria-checked') === 'true'"
+                );
+                await page.EvaluateAsync("document.querySelector('.telcard .switch').click()");
+                await page.WaitAsync(
+                    "document.querySelector('.telcard .switch')?.getAttribute('aria-checked') === 'false'"
+                );
+
+                // a task dropped on another blueprint's group moves there
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/tasks'");
+                await page.WaitAsync("!!document.querySelector('#task-UI-0002 .trow')");
+                await page.EvaluateAsync(
+                    """
+                    (() => {
+                      const dt = new DataTransfer();
+                      const row = document.querySelector('#task-UI-0002 .trow');
+                      const target = [...document.querySelectorAll('section.mstone')].find(s => s.querySelector('.mname')?.textContent.startsWith('M1'));
+                      row.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }));
+                      target.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+                      target.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+                    })()
+                    """
+                );
+                await ProviderFixture.EventuallyAsync(() => tasks.Get("UI-0002", Token).Definition.Blueprint is "M1");
+
+                // Health's Fix it runs the client check's own fix
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/health'");
+                const string ClaudeFix =
+                    "[...document.querySelectorAll('.chk')].find(c => c.querySelector('.cname')?.textContent.startsWith('claude-code'))?.querySelector('.fixbtn')";
+                await page.WaitAsync($"!!{ClaudeFix}");
+                await page.EvaluateAsync($"{ClaudeFix}.click()");
+                // the install runs as its own process; its toast lasts two seconds, so the config is what is waited for
+                bool Installed()
+                {
+                    try
+                    {
+                        return File.ReadAllText(claude).Contains("harness", StringComparison.Ordinal);
+                    }
+                    catch (IOException)
+                    {
+                        return false; // being written
+                    }
+                }
+                await ProviderFixture.EventuallyAsync(Installed, TimeSpan.FromSeconds(60));
+            }
+        );
+    }
+
+    [Fact]
+    public async Task TaskIsDeletedFromItsRowAfterTheDialogSaysWhatGoes()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        tasks.Create(
+            new TaskDefinition { Id = "UI-0001", Title = "To delete" },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/tasks" }
+                );
+                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .rowdel')");
+                await page.EvaluateAsync("document.querySelector('#task-UI-0001 .rowdel').click()");
+                await page.WaitAsync("!!document.querySelector('dialog[open] .dchanges')");
+                (await ValueAsync(page, "document.querySelector('dialog[open]').textContent"))
+                    .Should()
+                    .Contain("Delete UI-0001?")
+                    .And.Contain("'harness tasks export' writes the deletion into the file");
+                tasks.List(new(), Token).Should().ContainSingle("nothing goes before it is confirmed");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent === 'Delete task').click()"
+                );
+                await page.WaitAsync("!document.querySelector('#task-UI-0001')");
+                tasks.List(new(), Token).Should().BeEmpty();
+            }
+        );
+    }
+
+    /// <summary>
+    /// Every page, at a desktop and a phone width, dark and light, with every fold closed and open, passes the Go
+    /// harness's layout and accessibility checks (checks.js: overflow, overlapping or clipped text, squeezed columns,
+    /// controls under 24 px, contrast under WCAG AA, sections showing an error) and raises no script error.
+    /// </summary>
+    [Fact]
+    public async Task EveryPagePassesTheUiChecksInBothThemesAtBothWidths()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "example.csproj",
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"""
+        );
+        fixture.Write(
+            "Router.cs",
+            "namespace Example;\npublic class Router\n{\n    public int Huge(int a)\n    {\n"
+                + string.Concat(Enumerable.Repeat("        if (a > 0) { a--; }\n", 29))
+                + "        return a;\n    }\n}\n"
+        );
+        await fixture.CommitAsync("a project");
+        await fixture.RunAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            var origin = new TaskOrigin("test", "test", "fixture");
+            tasks.CreateBlueprint(new("M1", "First", "What it is for", ["it is done"]), "test", Token);
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0001",
+                    Title = "A task in the blueprint",
+                    Goal = "Its goal",
+                    Blueprint = "M1",
+                    Acceptance = ["checked"],
+                },
+                "",
+                origin,
+                Token
+            );
+            tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "A loose task" }, "", origin, Token);
+            tasks.Propose(
+                new TaskDefinition
+                {
+                    Title = "A proposed task",
+                    Goal = "Found while working",
+                    Acceptance = ["it works"],
+                },
+                "seen",
+                "codex",
+                Token
+            );
+            new MemoryStore(database).Put(
+                new()
+                {
+                    Type = "decision",
+                    Content = "The router stays small",
+                    Source = new("user", "test", "test"),
+                },
+                Token
+            );
+        }
+
+        string checks;
+        using (var stream = typeof(UiBrowserTests).Assembly.GetManifestResourceStream("checks.js")!)
+        using (var reader = new StreamReader(stream))
+        {
+            checks = await reader.ReadToEndAsync(Token);
+        }
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync("Page.enable", new { });
+                await page.CommandAsync(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    new
+                    {
+                        source = """
+                        window.__errors = [];
+                        addEventListener('error', (e) => window.__errors.push(String(e.message || e.error)));
+                        addEventListener('unhandledrejection', (e) => window.__errors.push('rejected: ' + String(e.reason && (e.reason.stack || e.reason))));
+                        """,
+                    }
+                );
+                var root = server.Client.BaseAddress!.ToString().TrimEnd('/');
+                await page.CommandAsync("Page.navigate", new { url = root + "/#/" });
+                await page.WaitAsync("!!document.querySelector('#main h2, #main .card')");
+                await page.EvaluateAsync(
+                    $$"""
+                    fetch('/api/workspaces', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Harness-UI': '1' },
+                      body: JSON.stringify({ name: 'pages', project_ids: ['{{id}}'] }) })
+                    """
+                );
+                await Task.Delay(500, Token);
+                List<string> pages = ["", "search", "knowledge", "machine", "docs"];
+                pages.AddRange(
+                    new[]
+                    {
+                        "overview",
+                        "architecture",
+                        "architecture/layers",
+                        "architecture/complexity",
+                        "architecture/coupling",
+                        "knowledge",
+                        "knowledge/inbox",
+                        "work",
+                        "work/tasks",
+                        "work/inbox",
+                        "agents",
+                        "agents/tools",
+                        "health",
+                    }.Select(view => $"p/{id}/{view}")
+                );
+                pages.AddRange(
+                    new[]
+                    {
+                        "overview",
+                        "architecture",
+                        "architecture/build",
+                        "architecture/libraries",
+                        "knowledge",
+                        "issues",
+                        "issues/versions",
+                        "members",
+                    }.Select(view => "w/pages/" + view)
+                );
+                List<string> faults = [];
+                foreach (var theme in new[] { "dark", "light" })
+                {
+                    foreach (var width in new[] { 1400, 390 })
+                    {
+                        await page.CommandAsync(
+                            "Emulation.setDeviceMetricsOverride",
+                            new
+                            {
+                                width,
+                                height = 900,
+                                deviceScaleFactor = 1,
+                                mobile = width < 600,
+                            }
+                        );
+                        await page.CommandAsync(
+                            "Emulation.setEmulatedMedia",
+                            new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                        );
+                        foreach (var path in pages)
+                        {
+                            var at = $"{path} {width} {theme}";
+                            await page.CommandAsync("Page.navigate", new { url = "about:blank" });
+                            await page.CommandAsync("Page.navigate", new { url = root + "/#/" + path });
+                            if (!await SettleAsync(page))
+                            {
+                                faults.Add(at + ": still loading after 20 s");
+                            }
+                            var closed = await ChecksAsync(page, checks);
+                            await page.EvaluateAsync(
+                                "document.querySelectorAll('details').forEach((d) => { d.open = true; })"
+                            );
+                            await SettleAsync(page);
+                            var open = await ChecksAsync(page, checks);
+                            faults.AddRange(
+                                closed
+                                    .Concat(open.Except(closed).Select(f => f + " (with every fold open)"))
+                                    .Select(f => $"{at}: {f}")
+                            );
+                            var errors = await ValueAsync(page, "(window.__errors || ['no error log']).join(' | ')");
+                            if (errors.Length > 0)
+                            {
+                                faults.Add($"{at}: script error {errors}");
+                            }
+                        }
+                    }
+                }
+
+                faults.Should().BeEmpty(string.Join("\n", faults.Take(60)));
+
+                // the checks do report: a control too small to hit
+                await page.EvaluateAsync(
+                    "document.body.append(Object.assign(document.createElement('button'), { textContent: 'x', style: 'width:10px;height:10px;padding:0' }))"
+                );
+                (await ChecksAsync(page, checks))
+                    .Should()
+                    .Contain(f => f.StartsWith("small-target", StringComparison.Ordinal));
+            }
+        );
+    }
+
+    /// <summary>The page has loaded, its sections drawn and its fonts in, twice in a row; false after 20 s.</summary>
+    private static async Task<bool> SettleAsync(BrowserPage page)
+    {
+        await Task.Delay(400, Token);
+        var still = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ready = await ValueAsync(
+                page,
+                "document.readyState === 'complete' && !document.querySelector('.loadbar') && !document.getElementById('splash') && document.fonts.status === 'loaded'"
+            );
+            still = ready is "True" ? still + 1 : 0;
+            if (still >= 2)
+            {
+                return true;
+            }
+            await Task.Delay(250, Token);
+        }
+        return false;
+    }
+
+    /// <summary>The checks' faults on the page as it is: rule, element, its text and the detail.</summary>
+    private static async Task<IReadOnlyList<string>> ChecksAsync(BrowserPage page, string checks)
+    {
+        var json = await ValueAsync(page, "JSON.stringify(" + checks.Trim().TrimEnd(';') + ")");
+        using var document = JsonDocument.Parse(json);
+        return document
+            .RootElement.EnumerateArray()
+            .Select(f =>
+                $"{f.GetProperty("rule").GetString()} {f.GetProperty("el").GetString()} \"{f.GetProperty("text").GetString()}\" {f.GetProperty("detail").GetString()}"
+            )
+            .ToArray();
+    }
+
+    [Fact]
+    public async Task DependencySearchOffersTheWorkspacesOtherProjectsTasks()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var theirs = await Harness.Integration.Tasks.ExternalDependencyTests.TheirsAsync(fixture);
+        var projects = fixture.Lifecycle.Registry.Load()["projects"]!.AsArray();
+        var mine = UiWriteTests.ProjectId(fixture);
+        var other = projects.Single(p => p!["name"]?.GetValue<string>() == "theirs")!["id"]!.GetValue<string>();
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync("Page.navigate", new { url = server.Client.BaseAddress + "#/" });
+                await page.WaitAsync("!!document.querySelector('#main h2, #main .card')");
+                await page.EvaluateAsync(
+                    $$"""
+                    fetch('/api/workspaces', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Harness-UI': '1' },
+                      body: JSON.stringify({ name: 'both', project_ids: ['{{mine}}', '{{other}}'] }) })
+                    """
+                );
+                await Task.Delay(500, Token);
+                await page.EvaluateAsync("location.hash = '#/p/" + mine + "/work/tasks'; location.reload()");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'New task…')"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'New task…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('dialog[open] input[aria-label=\"Depends on\"]')");
+                await page.EvaluateAsync(
+                    "document.querySelector('dialog[open] input[aria-label=Title]').value = 'Waits for theirs'"
+                );
+                await page.EvaluateAsync(
+                    "document.querySelector('dialog[open] input[aria-label=\"Depends on\"]').dispatchEvent(new FocusEvent('focus'))"
+                );
+                const string Theirs =
+                    "[...document.querySelectorAll('dialog[open] .tpopt')].find(o => o.textContent.includes('OT-0001'))";
+                await page.WaitAsync($"!!({Theirs})");
+                (await ValueAsync(page, "document.querySelector('dialog[open] .tphead')?.textContent"))
+                    .Should()
+                    .Contain("other projects");
+                await page.EvaluateAsync($"({Theirs}).click()");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent === 'Add the task').click()"
+                );
+                using var database = fixture.Database();
+                var tasks = new TaskStore(database);
+                await ProviderFixture.EventuallyAsync(
+                    () => tasks.List(cancellationToken: Token).Any(t => t.Definition.Title == "Waits for theirs"),
+                    TimeSpan.FromSeconds(15)
+                );
+                var task = tasks.List(cancellationToken: Token).Single(t => t.Definition.Title == "Waits for theirs");
+                task.Definition.DependsOn.Should().Equal("theirs:OT-0001");
+                task.Status.Should().Be("backlog", "their task is not done");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task EveryPageLoadsWithoutAScriptError()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "example.csproj",
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"""
+        );
+        fixture.Write(
+            "Router.cs",
+            "namespace Example;\npublic class Router\n{\n    public int Route(int a) => a;\n}\n"
+        );
+        await fixture.CommitAsync("a project");
+        await fixture.RunAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            tasks.CreateBlueprint(new("M1", "First"), "test", Token);
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0001",
+                    Title = "A task",
+                    Blueprint = "M1",
+                },
+                "",
+                new("test", "test", "fixture"),
+                Token
+            );
+        }
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                // uncaught errors and rejected promises of every document, kept for the checks below
+                await page.CommandAsync("Page.enable", new { });
+                await page.CommandAsync(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    new
+                    {
+                        source = """
+                        window.__errors = [];
+                        addEventListener('error', (e) => window.__errors.push(String(e.message || e.error)));
+                        addEventListener('unhandledrejection', (e) => window.__errors.push('rejected: ' + String(e.reason && (e.reason.stack || e.reason))));
+                        """,
+                    }
+                );
+                await page.CommandAsync("Page.navigate", new { url = server.Client.BaseAddress + "#/" });
+                await page.WaitAsync("!!document.querySelector('#main h2, #main .card')");
+                await page.EvaluateAsync(
+                    $$"""
+                    fetch('/api/workspaces', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Harness-UI': '1' },
+                      body: JSON.stringify({ name: 'pages', project_ids: ['{{id}}'] }) })
+                    """
+                );
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                string[] routes =
+                [
+                    "#/",
+                    $"#/p/{id}/overview",
+                    $"#/p/{id}/architecture/structure",
+                    $"#/p/{id}/architecture/layers",
+                    $"#/p/{id}/architecture/complexity",
+                    $"#/p/{id}/architecture/coupling",
+                    $"#/p/{id}/knowledge",
+                    $"#/p/{id}/knowledge/inbox",
+                    $"#/p/{id}/work/blueprints",
+                    $"#/p/{id}/work/tasks",
+                    $"#/p/{id}/work/inbox",
+                    $"#/p/{id}/work/UI-0001",
+                    $"#/p/{id}/agents/serving",
+                    $"#/p/{id}/agents/tools",
+                    $"#/p/{id}/health",
+                    "#/w/pages/overview",
+                    "#/w/pages/architecture/runtime",
+                    "#/w/pages/architecture/build",
+                    "#/w/pages/architecture/libraries",
+                    "#/w/pages/knowledge",
+                    "#/w/pages/issues",
+                    "#/w/pages/members",
+                    "#/knowledge",
+                    "#/machine",
+                    "#/docs",
+                    "#/search?q=task",
+                ];
+                foreach (var route in routes)
+                {
+                    await page.EvaluateAsync($"location.hash = '{route}'");
+                    await page.WaitAsync(
+                        "!!document.querySelector('#main') && document.querySelector('#main').children.length > 0"
+                            + " && !document.querySelector('#main .loadbar')"
+                    );
+                    (await ValueAsync(page, "(window.__errors || ['no error log']).join(' | ')"))
+                        .Should()
+                        .BeEmpty(route);
+                }
             }
         );
     }
@@ -554,7 +1101,9 @@ public sealed class UiBrowserTests
     )
     {
         await using var server = await UiFixture.StartAsync(fixture);
-        var profile = Path.Combine(fixture.DirectoryRoot, "browser");
+        // The profile lives apart from the fixture: Edge's helper processes can outlive the browser and keep its
+        // files open a while (Edge 156), which must not fail the fixture's cleanup.
+        var profile = Path.Combine(Path.GetTempPath(), "harness-edge-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(profile);
         using var browser = new Process
         {
@@ -585,13 +1134,14 @@ public sealed class UiBrowserTests
         browser.Start();
         var errors = browser.StandardError.ReadToEndAsync(Token);
         var output = browser.StandardOutput.ReadToEndAsync(Token);
+        using var handler = new SocketsHttpHandler { UseProxy = false };
+        using var client = new HttpClient(handler, disposeHandler: false);
+        var port = "";
         try
         {
             var portFile = Path.Combine(profile, "DevToolsActivePort");
             await ProviderFixture.EventuallyAsync(() => File.Exists(portFile));
-            var port = (await File.ReadAllLinesAsync(portFile, Token))[0];
-            using var handler = new SocketsHttpHandler { UseProxy = false };
-            using var client = new HttpClient(handler, disposeHandler: false);
+            port = (await File.ReadAllLinesAsync(portFile, Token))[0];
             using var targets = JsonDocument.Parse(
                 await client.GetStringAsync("http://127.0.0.1:" + port + "/json/list", Token)
             );
@@ -602,18 +1152,65 @@ public sealed class UiBrowserTests
         }
         finally
         {
-            if (!browser.HasExited)
-            {
-                browser.Kill(entireProcessTree: true);
-            }
-            await browser.WaitForExitAsync(CancellationToken.None);
+            await CloseAsync(browser, client, port);
             await Task.WhenAll(errors, output);
+            try
+            {
+                TestDirectory.Delete(profile);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // A helper still holding a file leaves the profile in the temporary folder; the test stands.
+            }
         }
+    }
+
+    /// <summary>Closes the browser as a user would (its helpers exit with it), killing it only if that fails.</summary>
+    private static async Task CloseAsync(Process browser, HttpClient client, string port)
+    {
+        if (port.Length is not 0 && !browser.HasExited)
+        {
+            try
+            {
+                using var version = JsonDocument.Parse(
+                    await client.GetStringAsync("http://127.0.0.1:" + port + "/json/version", CancellationToken.None)
+                );
+                using var socket = new ClientWebSocket();
+                await socket.ConnectAsync(
+                    new(version.RootElement.GetProperty("webSocketDebuggerUrl").GetString()!),
+                    CancellationToken.None
+                );
+                await new BrowserPage(socket).SendAsync("Browser.close");
+                using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await browser.WaitForExitAsync(wait.Token);
+            }
+            catch (Exception error)
+                when (error is HttpRequestException or WebSocketException or OperationCanceledException)
+            {
+                // It did not close by itself: killed below.
+            }
+        }
+
+        if (!browser.HasExited)
+        {
+            browser.Kill(entireProcessTree: true);
+        }
+
+        await browser.WaitForExitAsync(CancellationToken.None);
     }
 
     private sealed class BrowserPage(ClientWebSocket socket)
     {
         private int _id;
+
+        /// <summary>Sends a command without waiting for its answer (a closing browser may give none).</summary>
+        internal Task SendAsync(string method) =>
+            socket.SendAsync(
+                JsonSerializer.SerializeToUtf8Bytes(new { id = ++_id, method }),
+                WebSocketMessageType.Text,
+                true,
+                CancellationToken.None
+            );
 
         internal async Task<JsonElement> CommandAsync(string method, object parameters)
         {

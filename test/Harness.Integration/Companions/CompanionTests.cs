@@ -84,11 +84,23 @@ public sealed class CompanionTests
                 Hits = 3,
                 Changed = 10,
                 Misses = [new() { Path = "source-secret.cs" }],
+                Rows =
+                [
+                    new()
+                    {
+                        Provider = "ripwire",
+                        Capability = "code.search",
+                        Language = "csharp",
+                        Hits = 3,
+                        Changed = 10,
+                    },
+                ],
             },
             Findings =
             [
                 new(
                     "warn",
+                    "developer",
                     "context",
                     "provider failed: https://bot:pw@host/x and C:\\repo\\a.cs",
                     "harness context stats --project secret-project"
@@ -126,6 +138,11 @@ public sealed class CompanionTests
         {
             body.Should().NotContain(forbidden);
         }
+        // the developer's aggregates: relevance per provider, capability and language, and who acts on each finding
+        var project = payload["projects"]![0]!;
+        project["context_by"]![0]!["provider"]!.ToString().Should().Be("ripwire");
+        project["context_by"]![0]!["hits"]!.GetValue<int>().Should().Be(3);
+        project["findings"]![0]!["audience"]!.ToString().Should().Be("developer");
         var again = DeveloperExport.Build(state, [report], new(), new Dictionary<string, string>(), now);
         again["projects"]![0]!["id"]!.ToString().Should().Be(payload["projects"]![0]!["id"]!.ToString());
         await exporter.SendAsync(state, bytes, now, Token);
@@ -140,7 +157,14 @@ public sealed class CompanionTests
         }
         using var client = new HttpClient { BaseAddress = new Uri(UiHost.Address(app)) };
         (await client.GetStringAsync("/machines/" + state.Machine + ".json", Token)).Should().Be(body);
-        (await client.GetStringAsync("/", Token)).Should().Contain(state.Machine).And.Contain("--brand-teal");
+        var page = await client.GetStringAsync("/", Token);
+        page.Should().Contain(state.Machine).And.Contain("--brand-teal");
+        page.Should()
+            .Contain("get_context relevance by provider")
+            .And.Contain("<td>ripwire</td><td>code.search</td><td>csharp</td><td>3</td><td>10</td>")
+            .And.Contain("Findings for the harness developer")
+            .And.Contain("provider failed: [path] and [path]")
+            .And.NotContain("bot:pw");
         Directory.GetFiles(Path.Combine(temp.Path, "reports", state.Machine)).Should().HaveCount(2);
         state.Token = "wrong";
         var send = () => exporter.SendAsync(state, bytes, now.AddMinutes(1), Token);

@@ -1,5 +1,5 @@
 {
-  "description": "Current decisions, conventions and warnings that apply to a scope (a file or directory path, subsystem or branch), including project-wide ones and the current branch's. Check before changing that area.",
+  "description": "Current constraints, decisions, conventions and warnings that apply to a scope (a file or directory path, subsystem or branch), including project-wide ones and the current branch's. Check before changing that area.",
   "inputSchema": {
     "type": "object",
     "properties": {

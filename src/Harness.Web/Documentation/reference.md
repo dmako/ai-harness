@@ -53,7 +53,7 @@ uninstall` alone lets you pick what to remove.
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
-| `harness metrics` / `report` | How the tools and providers fared; findings with a suggested action. |
+| `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
 | `harness ui` | Opens the local GUI over every project on this machine. |
 | `harness docs [section]` | This documentation. |
 | `harness completion` | Shell completion for zsh, bash, fish and PowerShell. |
@@ -216,6 +216,26 @@ timeout_ms = 600000                   # a longer run fails and keeps the counted
 Providers belong in the global file (executable paths are machine
 specific). `harness doctor` prints which files were read.
 
+## Knowledge types
+
+Knowledge is one statement with a type and a scope (the project, a path,
+a subsystem, a branch; wider: a workspace or the user). Agents record it
+(`memory_put`, or `memory_propose` for you to approve); you add, correct,
+retire or promote it in harness ui (a project's Knowledge, Your knowledge,
+a workspace's Knowledge). The type says how it binds an agent:
+
+| Type | What it is | Example | Reaches agents |
+|---|---|---|---|
+| goal | What the work is for: an outcome to optimize toward. | Optimize code intelligence for C#/.NET first. | `goals_current`; the top goals in every `get_context` |
+| constraint | A hard limit set from outside: what must or must not happen, not ours to change. | Keycloak must not be changed for now. | `get_context`, `decisions_for`, `constraints_current` |
+| decision | A choice made between alternatives, with its reason. | Live updates use Server-Sent Events, not WebSocket. | `get_context`, `decisions_for` |
+| convention | How code and work are done here, in every new change. | CancellationToken is always the last parameter. | `get_context`, `decisions_for`; offered to other projects |
+| warning | A trap: what breaks or misleads, and how to avoid it. | graphify-csharp ignores SIGTERM: stop sessions by id. | `get_context`, `decisions_for` |
+| fact | Something true that the code does not show. | Tenant GUIDs originate in a Confluence table. | `get_context` where it applies or matches the task; `memory_search` |
+| open_question | Not decided yet: what is open and what it waits for. | Do roles exist on the organization server? | `get_context` where it applies or matches the task (agents ask rather than decide it); `memory_search` |
+
+History (what was added when) belongs in Git, not in knowledge.
+
 ## Workspaces
 
 A workspace groups repositories that belong together (services and the
@@ -236,7 +256,7 @@ list` or in harness ui (Work).
 
 | Command | What it does |
 |---|---|
-| `harness tasks add --title … [--goal --accept … --depends … --blueprint --type --priority --scope --prefix --id]` | Adds a task by hand with the next free id of the prefix (default: the prefix of the backlog's newest task). harness ui: Work › Tasks › New task. |
+| `harness tasks add --title … [--goal --accept … --depends … --blueprint --type --priority --scope --prefix --id]` | Adds a task by hand with the next free id of the prefix (default: the prefix of the backlog's newest task). `--depends` takes this project's task ids, or `<project>:<task id>` for another registered project's task (its short name, folder name, parent/folder or id, any case; a name two projects share is refused): the task stays in the backlog until that one is done, and goes back if it reopens (its status is read again after 30 s). Backlog files and `task_propose` take the same form. harness ui: Work › Tasks › New task, whose dependency search offers the workspace's other projects' open tasks. |
 | `harness tasks blueprints` | The blueprints (formerly milestones): what each group of tasks is for, its exit criteria and progress. `harness tasks list --blueprint M5` and the agents' `task_next` take one blueprint's tasks. The former names (`tasks milestones`, `--milestone`, the backlog keys `milestones:` and `milestone:`) are still accepted. harness ui: Work › Blueprints, where blueprints are also created, edited and removed (with their tasks moved or deleted). Agents list them with `task_blueprints`. |
 | `harness tasks blueprints add [--id --title --goal --exit … --notes]` | Adds a blueprint: the next free id (M17 after M16, or BP-001) and the name "New blueprint" unless given. |
 | `harness tasks blueprints edit <id> [--title --goal --exit … --notes]` | Restates a blueprint; what is not given stays, `--exit ""` clears its exit criteria. Its id stays. |
@@ -255,14 +275,17 @@ deleted with it; the deleted tasks' own trails go with them.
 
 ## harness ui
 
-The default listener is `127.0.0.1:17477`. Use `--addr` to override it and `--no-open` to leave the browser closed.
+The default listener is `127.0.0.1:17477`, or `HARNESS_UI_ADDR` when that is set (a loopback address, as for `--addr`). Use `--addr` to override it and `--no-open` to leave the browser closed.
 
 `harness ui` opens a local page (loopback only, nothing leaves the machine)
 over every project on this machine: overview, knowledge (with the Inbox of
-proposals to approve), work, the agents' tool use and `get_context` quality,
-architecture findings, and the Docs. Changes made there (approving
-proposals, marking findings, workspace membership, graphify sessions) are
-recorded as yours.
+proposals to approve), work, how harness serves the agents and what to
+change so it serves them better, architecture findings, health, and the
+Docs. How harness itself performs (relevance per provider, latency) is the
+harness developer's, from opt-in telemetry, and not part of harness ui.
+Changes made there (approving proposals, adding knowledge, creating,
+editing, moving or deleting tasks and blueprints, marking findings,
+workspace membership, graphify sessions, Fix it) are recorded as yours.
 
 ## Troubleshooting
 

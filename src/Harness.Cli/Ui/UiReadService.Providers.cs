@@ -30,15 +30,7 @@ internal sealed partial class UiReadService
         {
             Trusted(request, "probing providers");
         }
-        var inspection = await lifecycle.InspectAsync(UiProjectCatalog.Text(project, "root"), token);
-        var checks = inspection.Checks(lifecycle.Version).ToList();
-        checks.AddRange(ClientChecks(inspection.Location.Root));
-        foreach (var (name, provider) in inspection.Location.Configuration.Value.Providers)
-        {
-            checks.Add(
-                new(name, "ok", provider.IsEnabled() ? "configured: " + provider.Command + " (not probed)" : "disabled")
-            );
-        }
+        var (inspection, checks) = await ChecksAsync(project, token);
         if (probe)
         {
             await using var providers = ConfiguredProviders.Build(
@@ -72,8 +64,27 @@ internal sealed partial class UiReadService
                 ["checks"] = checks,
                 ["healthy"] = !checks.Any(c => c.Level is "fail"),
                 ["probed"] = probe,
+                ["fixable"] = checks.Where(HarnessFix.Fixable).Select(c => c.Name).ToArray(),
             }
         );
+    }
+
+    /// <summary>The project's checks without probing its providers, as Health shows them first.</summary>
+    private async Task<(ProjectInspection Inspection, List<HealthCheck> Checks)> ChecksAsync(
+        JsonObject project,
+        CancellationToken token
+    )
+    {
+        var inspection = await lifecycle.InspectAsync(UiProjectCatalog.Text(project, "root"), token);
+        var checks = inspection.Checks(lifecycle.Version).ToList();
+        checks.AddRange(ClientChecks(inspection.Location.Root));
+        foreach (var (name, provider) in inspection.Location.Configuration.Value.Providers)
+        {
+            checks.Add(
+                new(name, "ok", provider.IsEnabled() ? "configured: " + provider.Command + " (not probed)" : "disabled")
+            );
+        }
+        return (inspection, checks);
     }
 
     internal static IReadOnlyList<HealthCheck> ClientChecks(string root)
@@ -98,7 +109,7 @@ internal sealed partial class UiReadService
                         client.Id,
                         "warn",
                         "harness MCP server not configured (checked " + string.Join(", ", status.Checked) + ")",
-                        "harness install (or see: harness docs connecting-claude-code-and-codex)"
+                        "harness install --client " + client.Id + " (or see: harness docs connecting-claude-code-and-codex)"
                     );
                 }
                 if (status.Entries.FirstOrDefault(e => e.Problem.Length > 0) is { } broken)

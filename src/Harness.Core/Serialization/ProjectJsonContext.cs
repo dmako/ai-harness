@@ -171,6 +171,8 @@ namespace Harness.Core.Serialization;
 [JsonSerializable(typeof(Harness.Core.Telemetry.ProviderTrend))]
 [JsonSerializable(typeof(Harness.Core.Telemetry.ToolMetrics))]
 [JsonSerializable(typeof(Harness.Core.Telemetry.ToolObservation))]
+[JsonSerializable(typeof(Harness.Core.Telemetry.TrendDay))]
+[JsonSerializable(typeof(Harness.Core.Telemetry.TrendDay[]))]
 [JsonSerializable(typeof(Harness.Core.Web.UiReadRequest))]
 [JsonSerializable(typeof(Harness.Core.Web.UiWriteRequest))]
 [JsonSerializable(typeof(Harness.Core.Workspaces.ConcernCode))]

@@ -22,7 +22,7 @@ public sealed class MemoryMcpProcessTests
                 )
             )
             {
-                database.SchemaVersion().Should().Be(21);
+                database.SchemaVersion().Should().Be(22);
             }
 
             await using var claude = await StartAsync(root, "claude-code");
@@ -45,6 +45,25 @@ public sealed class MemoryMcpProcessTests
             created.GetProperty("memory").GetProperty("recorded_by").GetString().Should().Be("claude-code fixture");
             var rules = await Call(codex, "decisions_for", new { scope = "path:src/tasks/import.cs" });
             rules.GetProperty("memories")[0].GetProperty("id").GetString().Should().Be(old);
+            // the area's constraints come with its rules: the type never to miss when changing it
+            await Call(
+                claude,
+                "memory_put",
+                new
+                {
+                    type = "constraint",
+                    content = "Task import never calls the network",
+                    scope = "path:src/tasks",
+                    source_ref = "TASK-0009 review",
+                    confidence = (double?)null,
+                }
+            );
+            (await Call(codex, "decisions_for", new { scope = "path:src/tasks/import.cs" }))
+                .GetProperty("memories")
+                .EnumerateArray()
+                .Select(m => m.GetProperty("type").GetString())
+                .Should()
+                .Contain(["constraint", "decision"]);
             var replaced = await Call(
                 codex,
                 "memory_supersede",

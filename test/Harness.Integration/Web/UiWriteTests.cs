@@ -6,6 +6,7 @@ using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Memory;
+using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Tasks;
 using Harness.Infrastructure.Workspaces;
 using Harness.Integration.Sync;
@@ -584,6 +585,152 @@ public sealed class UiWriteTests
         new TaskStore(database).List(cancellationToken: Token).Should().Contain(t => t.Id == taskId);
         await PostAsync(server.Client, "/api/workspaces/suite/findings/unmark", body);
         new FindingStore(wider).MarkOf(finding.Key, Token).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task NewUiCallsShowTrendsAddKnowledgeMoveTasksSwitchTelemetryAndRunFixes()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.CreateBlueprint(new("M1", "First"), "test", Token);
+        tasks.Create(new TaskDefinition { Id = "UI-0001", Title = "Done today" }, "", origin, Token);
+        var claim = tasks.Claim("UI-0001", new("claude"), cancellationToken: Token);
+        tasks.Complete("UI-0001", new("claude", claim.Token), new("done"), Token);
+        tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "To move" }, "", origin, Token);
+        using (var connection = database.OpenConnection())
+        {
+            using var command = connection.CreateCommand();
+            // one answer today: one changed code file held, one missed; the missed test file does not count
+            command.CommandText = """
+                INSERT INTO context_calls(id,at,worktree_id,head,task,budget,used) VALUES(1,$at,'w','h','t',1,1);
+                INSERT INTO context_outcomes(call_id,path,language,hit) VALUES(1,'src/a.cs','csharp',1),(1,'src/b.cs','csharp',0),(1,'test/a_tests.cs','csharp',0);
+                """;
+            command.Parameters.AddWithValue("$at", HarnessDatabase.FormatTime(DateTimeOffset.UtcNow));
+            await command.ExecuteNonQueryAsync(Token);
+        }
+        // Claude Code has run once on this machine: its user config exists, for harness install to add to
+        Directory.CreateDirectory(Path.Combine(fixture.DirectoryRoot, "claude"));
+        await File.WriteAllTextAsync(Path.Combine(fixture.DirectoryRoot, "claude", ".claude.json"), "{}", Token);
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+        async Task<HttpStatusCode> RefusedAsync(string path, string json)
+        {
+            using var request = Request(server.Client, path, json);
+            using var response = await server.Client.SendAsync(request, Token);
+            return response.StatusCode;
+        }
+
+        // the rings' trend: every day of the window, oldest first
+        var days = (await UiTests.ReadAsync(server.Client, root + "/trends?days=7"))["days"]!.AsArray();
+        days.Should().HaveCount(7);
+        days[^1]!["done"]!.GetValue<int>().Should().Be(1);
+        days[^1]!["answers"]!.GetValue<int>().Should().Be(1);
+        days[^1]!["hit_rate"]!.GetValue<double>().Should().Be(0.5);
+        days[0]!["answers"]!.GetValue<int>().Should().Be(0);
+
+        // the author's own knowledge, at a project scope only
+        var added = await PostAsync(
+            server.Client,
+            root + "/memories",
+            """{"type":"decision","content":"UI writes go through the write API","scope":"path:src/Harness.Web"}"""
+        );
+        added["status"]!.GetValue<string>().Should().Be("created");
+        added["memory"]!["scope"]!.GetValue<string>().Should().Be("path:src/Harness.Web");
+        added["memory"]!["source_type"]!.GetValue<string>().Should().Be("user");
+        added["memory"]!["source_ref"]!.GetValue<string>().Should().Be("harness ui");
+        (await RefusedAsync(root + "/memories", """{"type":"decision","content":"Wider","scope":"user"}"""))
+            .Should()
+            .Be(HttpStatusCode.BadRequest);
+        (await RefusedAsync(root + "/memories", """{"type":"decision","content":"x","level":"user"}"""))
+            .Should()
+            .Be(HttpStatusCode.BadRequest, "unknown fields are refused");
+
+        // a task dragged onto another blueprint, the move in its audit trail
+        var moved = await PostAsync(server.Client, root + "/tasks/UI-0002/blueprint", """{"blueprint":"M1"}""");
+        moved["task"]!["blueprint"]!.GetValue<string>().Should().Be("M1");
+        tasks.Events("UI-0002", Token)[^1].Detail.Should().Be("moved from no blueprint to M1");
+        (await RefusedAsync(root + "/tasks/UI-0002/blueprint", """{"blueprint":"M9"}"""))
+            .Should()
+            .Be(HttpStatusCode.BadRequest);
+
+        // developer telemetry on and off; the token is stored, never sent back
+        var on = await PostAsync(
+            server.Client,
+            "/api/telemetry",
+            """{"enabled":true,"endpoint":"http://127.0.0.1:9/v1/report","token":"secret-token"}"""
+        );
+        on["telemetry"]!["enabled"]!.GetValue<bool>().Should().BeTrue();
+        on["telemetry"]!["endpoint"]!.GetValue<string>().Should().Be("http://127.0.0.1:9/v1/report");
+        on.ToJsonString().Should().NotContain("secret-token");
+        (await File.ReadAllTextAsync(Path.Combine(fixture.Global, "telemetry.json"), Token))
+            .Should()
+            .Contain("secret-token");
+        var off = await PostAsync(server.Client, "/api/telemetry", """{"enabled":false}""");
+        off["telemetry"]!["enabled"]!.GetValue<bool>().Should().BeFalse();
+
+        // Fix it: the client check's own fix, run as this binary
+        var health = await UiTests.ReadAsync(server.Client, root + "/health");
+        health["fixable"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Contain("claude-code");
+        var fixedCheck = await PostAsync(server.Client, root + "/fix", """{"check":"claude-code"}""");
+        fixedCheck["ok"]!.GetValue<bool>().Should().BeTrue(fixedCheck.ToJsonString());
+        fixedCheck["message"]!.GetValue<string>().Should().Be("harness install --client claude-code done");
+        health = await UiTests.ReadAsync(server.Client, root + "/health");
+        health["checks"]!.AsArray().Single(c => c!["name"]!.GetValue<string>() == "claude-code")!["level"]!
+            .GetValue<string>()
+            .Should()
+            .Be("ok");
+        health["fixable"]!.AsArray().Select(n => n!.GetValue<string>()).Should().NotContain("claude-code");
+        (await RefusedAsync(root + "/fix", """{"check":"config"}""")).Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task TaskIsDeletedFromTheUiUnlessAnotherDependsOnIt()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.Create(new TaskDefinition { Id = "UI-0001", Title = "Needed" }, "", origin, Token);
+        tasks.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0002",
+                Title = "Waits",
+                DependsOn = ["UI-0001"],
+            },
+            "",
+            origin,
+            Token
+        );
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}/tasks";
+
+        using (var request = Request(server.Client, root + "/UI-0001/delete", "{}"))
+        using (var response = await server.Client.SendAsync(request, Token))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            JsonNode.Parse(await response.Content.ReadAsStringAsync(Token))!["error"]!
+                .GetValue<string>()
+                .Should()
+                .Be("UI-0001 cannot be deleted: UI-0002 depends on it");
+        }
+        using (var request = Request(server.Client, root + "/UI-0002/delete", """{"force":true}"""))
+        using (var response = await server.Client.SendAsync(request, Token))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "the body is empty");
+        }
+
+        (await PostAsync(server.Client, root + "/UI-0002/delete", "{}"))["deleted"]!
+            .GetValue<string>()
+            .Should()
+            .Be("UI-0002");
+        (await PostAsync(server.Client, root + "/UI-0001/delete", "{}"))["deleted"]!
+            .GetValue<string>()
+            .Should()
+            .Be("UI-0001");
+        tasks.List(new(), Token).Should().BeEmpty();
     }
 
     internal static string ProjectId(SyncFixture fixture) =>

@@ -18,6 +18,13 @@ public static class UiHost
 {
     public const string DefaultAddress = "127.0.0.1:17477";
 
+    /// <summary>Overrides the default listener: a second installation, or tests beside a running harness ui.</summary>
+    public const string AddressVariable = "HARNESS_UI_ADDR";
+
+    /// <summary>The listener without --addr: <see cref="AddressVariable"/> when set, else the default.</summary>
+    public static string ConfiguredAddress =>
+        Environment.GetEnvironmentVariable(AddressVariable) is { Length: > 0 } address ? address : DefaultAddress;
+
     public static bool IsLoopback(string host) =>
         host is "localhost" || IPAddress.TryParse(host.Trim('[', ']'), out var ip) && IPAddress.IsLoopback(ip);
 

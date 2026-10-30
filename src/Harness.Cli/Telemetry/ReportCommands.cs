@@ -21,18 +21,6 @@ internal sealed class ReportSettings : TelemetrySettings
     public bool All { get; init; }
 }
 
-internal sealed class MetricsCommand(ReportCommandRunner runner)
-{
-    public Task<int> ExecuteAsync(TelemetrySettings settings, CancellationToken cancellationToken) =>
-        runner.RunAsync("metrics", settings, cancellationToken);
-}
-
-internal sealed class ContextStatsCommand(ReportCommandRunner runner)
-{
-    public Task<int> ExecuteAsync(TelemetrySettings settings, CancellationToken cancellationToken) =>
-        runner.RunAsync("context stats", settings, cancellationToken);
-}
-
 internal sealed class ReportCommand(ReportCommandRunner runner)
 {
     public Task<int> ExecuteAsync(ReportSettings settings, CancellationToken cancellationToken) =>
@@ -63,7 +51,6 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
                 verb switch
                 {
                     "report" => ReportAsync(settings, now, token),
-                    "metrics" or "context stats" => MetricsAsync(verb, settings, now, token),
                     _ => throw new InvalidOperationException("unknown report"),
                 }
             );
@@ -92,22 +79,24 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
             var location = await lifecycle.LocateAsync(settings.Project, cancellationToken: token);
             reports.Add(Read(location.DatabasePath, location.Root, settings.Days, now));
         }
+        // What the user acts on; the developer's findings and tuning numbers go only to the opt-in telemetry.
+        var own = reports.Select(r => r.ForUser()).ToArray();
         if (settings.Json)
         {
             await output.WriteLineAsync(
-                HarnessJson.Serialize(new JsonObjectMap { ["projects"] = reports }, TelemetryJson.Options)
+                HarnessJson.Serialize(new JsonObjectMap { ["projects"] = own }, TelemetryJson.Options)
             );
         }
         else
         {
-            for (var i = 0; i < reports.Count; i++)
+            for (var i = 0; i < own.Length; i++)
             {
                 if (i > 0)
                 {
                     await output.WriteLineAsync();
                 }
 
-                await ReportText.ReportAsync(output, reports[i]);
+                await ReportText.ReportAsync(output, own[i]);
             }
         }
 
@@ -132,6 +121,7 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
                 [
                     new(
                         "problem",
+                        ReportAudience.User,
                         "project",
                         "state cannot be read: " + ex.Message,
                         "harness doctor --project " + root
@@ -139,43 +129,6 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
                 ],
             };
         }
-    }
-
-    private async Task<int> MetricsAsync(
-        string verb,
-        TelemetrySettings settings,
-        DateTimeOffset now,
-        CancellationToken token
-    )
-    {
-        var own = await lifecycle.LocateAsync(settings.Project, cancellationToken: token);
-        using var db = HarnessDatabase.OpenReadOnly(own.DatabasePath);
-        var store = new TelemetryStore(db);
-        object result = verb is "metrics"
-            ? store.Metrics(now.AddDays(-settings.Days))
-            : store.ContextStats(now.AddDays(-settings.Days));
-        if (result is MetricsReport metricsResult)
-        {
-            metricsResult.Bypasses = store.Bypasses(
-                now.AddDays(-settings.Days),
-                ProviderServerMap.Read(own.Root, own.Configuration.Value.Providers)
-            );
-        }
-
-        if (settings.Json)
-        {
-            await output.WriteLineAsync(HarnessJson.Serialize(result, TelemetryJson.Options));
-        }
-        else if (result is MetricsReport metrics)
-        {
-            await ReportText.MetricsAsync(output, metrics, settings.Days);
-        }
-        else
-        {
-            await ReportText.ContextAsync(output, (ContextStatistics)result, settings.Days);
-        }
-
-        return 0;
     }
 
     private LocalReport Read(string path, string root, int days, DateTimeOffset now)

@@ -9,6 +9,31 @@ const MEMORY_GROUPS = {
   goal: "Goals", constraint: "Constraints", decision: "Decisions", convention: "Conventions",
   warning: "Warnings", fact: "Facts", open_question: "Open questions",
 };
+// MEMORY_TYPE_HELP says what each type is for, an example, and where it
+// reaches agents (TASK-0056; docs/reference.md "Knowledge types").
+const MEMORY_TYPE_HELP = {
+  goal: ["What the work is for: an outcome to optimize toward.", "Optimize code intelligence for C#/.NET first.", "goals_current, and the top goals in every get_context"],
+  constraint: ["A hard limit set from outside: what must or must not happen, not ours to change.", "Keycloak must not be changed for now.", "get_context, decisions_for and constraints_current"],
+  decision: ["A choice made between alternatives, with its reason: why the design is this way.", "Live updates use Server-Sent Events, not WebSocket: the page only needs to know what changed.", "get_context and decisions_for"],
+  convention: ["How code and work are done here, in every new change.", "CancellationToken is always the last parameter of an async method.", "get_context and decisions_for; offered to other projects as a convention they may adopt"],
+  warning: ["A trap: what breaks or misleads, and how to avoid it.", "graphify-csharp ignores SIGTERM: stop its sessions by id.", "get_context and decisions_for"],
+  fact: ["Something true that the code does not show: who uses what, where data comes from.", "Tenant GUIDs originate in a Confluence table.", "get_context, where it applies or matches the task, and memory_search"],
+  open_question: ["Not decided yet: what is open and what it waits for.", "Do roles exist on the organization server, and who approves?", "get_context, where it applies or matches the task (an agent asks rather than decides it), and memory_search"],
+};
+
+// typeSelect is a memory type's select, the chosen type's meaning,
+// example and reach under it.
+function typeSelect(value) {
+  const help = h("p", { class: "typehelp muted small" });
+  const sel = h("select", { name: "type", "aria-label": "Type", onchange: () => explain() },
+    MEMORY_TYPES.map((t) => h("option", { value: t, selected: t === value || null }, `${MEMORY_GROUPS[t].replace(/s$/, "")}: ${MEMORY_TYPE_HELP[t][0]}`)));
+  const explain = () => {
+    const [, example, reach] = MEMORY_TYPE_HELP[sel.value];
+    fill(help, h("span", {}, "e.g. ", h("i", {}, example)), h("br"), h("span", {}, `Reaches agents: ${reach}.`));
+  };
+  explain();
+  return { sel, help };
+}
 const TASK_STATUSES = ["ready", "claimed", "in_progress", "review", "blocked", "backlog", "done", "deferred"];
 // Status is shown as icon + label, never color alone.
 const STATUS_ICON = { ready: "●", claimed: "◐", in_progress: "◐", review: "◆", blocked: "✕", backlog: "○", done: "✓", deferred: "◌" };
@@ -23,7 +48,7 @@ const state = {
   days: store.get("days", "30"),
   knowledge: { types: new Set(["goal", "constraint", "decision", "convention", "warning"]), q: "", inactive: false, scope: "" },
   proposals: { status: "pending" },
-  tasks: { statuses: new Set(["ready", "claimed", "in_progress", "review", "blocked"]), blueprint: "", open: new Set(), collapsed: new Set(), editing: "" },
+  tasks: { statuses: new Set(["ready", "claimed", "in_progress", "review", "blocked"]), milestone: "", open: new Set(), collapsed: new Set() },
   history: new Set(), // memories whose history panel is open
 };
 
@@ -62,8 +87,6 @@ function ago(iso) {
   return `${Math.floor(s / 86400)} days ago`;
 }
 function ms(n) { return n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${n} ms`; }
-// compact writes an axis count: 950, 1.2K, 12K
-function compact(n) { return n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0).replace(/\.0$/, "")}K`; }
 function bytes(n) { return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} K`; }
 
 // A Go pseudo-version (v0.0.0-20260929194539-761645d87556+dirty) reads
@@ -79,15 +102,50 @@ function stateKind(live) {
   if (live.state === "ok") return live.stale ? "stale" : "ok";
   return live.state === "missing" || live.state === "error" ? "bad" : "warn";
 }
-const STATE_GLYPH = { ok: "✓", stale: "↻", warn: "▲", bad: "✕" };
+// a state's drawn icon (font characters come out at uneven sizes)
+const STATE_ICON = { ok: "st-ok", stale: "refresh", warn: "st-warn", bad: "st-fail" };
+const stateIcon = (k) => icon(STATE_ICON[k]);
 const STATE_WORD = { ok: "ok", stale: "stale index", warn: "needs a fix", bad: "unreadable" };
 // stateGlyph is a compact state: a shape per state (never colour alone)
 // with the full text as its label.
 function stateGlyph(live) {
   const k = stateKind(live);
   const text = live.state === "ok" ? STATE_WORD[k] : live.state.replaceAll("_", " ");
-  return h("span", { class: `glyph g-${k}`, title: text, "aria-label": text, role: "img" }, STATE_GLYPH[k]);
+  return h("span", { class: `glyph g-${k}`, title: text, "aria-label": text, role: "img" }, stateIcon(k));
 }
+
+// projectMark is a project's monogram in its own colour, the same
+// everywhere (sidebar, header, cards, activity): "Fleet Admin WebAPI" FA,
+// "Route Planner WebAPI" RP, "Acme.Core" AC.
+const MARK_SKIP = new Set(["webapi", "api", "web", "service", "services", "app"]);
+function projectInitials(name) {
+  const words = (name || "?").split(/[\s._-]+/).filter((w) => w && !MARK_SKIP.has(w.toLowerCase()));
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  const w = words[0] || name || "?";
+  const caps = w.match(/[A-Z]/g) || [];
+  return (caps.length >= 2 ? caps[0] + caps[1] : w.slice(0, 2)).toUpperCase();
+}
+function projectMark(p, big) {
+  const id = (p && (p.id || p.project_id)) || "";
+  let hash = 0;
+  for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  // a registered project by its shown name (the folder's when it has none)
+  const name = p ? (p.root || p.title || p.name ? pname(p) : p.project || "") : "";
+  return h("span", { class: `pmark pc-${hash % 8}${big ? " big" : ""}`, "aria-hidden": "true", title: name }, projectInitials(name));
+}
+// markFor finds a project by id for its mark.
+const markFor = (id) => { const p = state.projects.find((x) => x.id === id); return p ? projectMark(p) : null; };
+
+// shortPath is a folder as its parent and name ("…/Source/core"); the full
+// path is the element's title.
+function shortPath(p) {
+  const parts = (p || "").split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? "…/" + parts.slice(-2).join("/") : p;
+}
+
+// plural is a count with its noun: "1 call", "3 calls"; irregular plurals
+// are passed (plural(n, "copy", "copies")).
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + "s"}`;
 
 // healthBadge is a project's state in one word, linking to Health: what
 // is wrong if anything, otherwise healthy.
@@ -95,10 +153,9 @@ function healthBadge(p) {
   const l = p.live;
   const href = projectHref(p.id, "health");
   if (l.state !== "ok") return h("a", { href, class: "badge-link" }, stateBadge(l));
-  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const [cls, label] = l.checks_failed > 0 ? ["bad", `${plural(l.checks_failed, "check")} failing`] : l.stale ? ["warn", "index stale"]
     : l.checks_warned > 0 ? ["warn", plural(l.checks_warned, "warning")] : ["ok", "healthy"];
-  return h("a", { href, class: "badge-link", title: "See Health" }, h("span", { class: `state ${cls}` }, label));
+  return h("a", { href, class: "badge-link", title: l.stale && !l.checks_failed ? `${l.stale}. See Health` : "See Health" }, h("span", { class: `state ${cls}` }, label));
 }
 
 function stateBadge(live) {
@@ -123,22 +180,13 @@ function rateMeter(f) {
     h("div", { class: "track", role: "img", "aria-label": pct(f) }, fill), h("span", { class: "num" }, pct(f)));
 }
 
-// rate flags: error rates and slow p95s are called out with icon + text
-function rateCell(rate, warnAt, badAt) {
-  const cls = rate >= badAt ? "flag bad" : rate >= warnAt ? "flag warn" : "";
-  return h("td", { class: "n" }, cls ? h("span", { class: cls }, pct(rate)) : pct(rate));
-}
-function latencyCell(n) {
-  const cls = n >= 10000 ? "flag bad" : n >= 3000 ? "flag warn" : "";
-  return h("td", { class: "n" }, cls ? h("span", { class: cls }, ms(n)) : ms(n));
-}
 
 function statusPill(status) {
   return h("span", { class: `pill st-${status}` }, h("span", { class: "ico", "aria-hidden": "true" }, STATUS_ICON[status] || "•"), status.replace("_", " "));
 }
-const LEVEL_ICON = { ok: "✓", warn: "▲", fail: "✕", problem: "✕", info: "ⓘ" };
 function levelPill(level) {
-  return h("span", { class: `pill lv-${level}` }, h("span", { class: "ico", "aria-hidden": "true" }, LEVEL_ICON[level] || "•"), level);
+  const icon = { ok: "✓", warn: "▲", fail: "✕", problem: "✕", info: "ⓘ" }[level] || "•";
+  return h("span", { class: `pill lv-${level}`, title: level }, h("span", { class: "ico", "aria-hidden": "true" }, icon), h("span", { class: "pword" }, level));
 }
 // taskBar shows how a project's tasks divide over their states, one
 // stacked bar; with legend, each part is named with its icon and count.
@@ -190,9 +238,6 @@ async function post(path, body) {
   return out;
 }
 const projectAPI = (p, what) => `/api/projects/${encodeURIComponent(p.id)}/${what}`;
-// workInbox counts what waits in Work › Inbox: proposed tasks, blueprints
-// and architectural tasks or marks.
-const workInbox = (l) => (l.pending_arch_proposals || 0) + (l.pending_task_proposals || 0) + (l.pending_blueprint_proposals || 0);
 
 // chevron is the open/closed marker of anything that expands: drawn in
 // CSS so it reads the same size in every font.
@@ -207,7 +252,11 @@ const chevron = (open) => h("span", { class: "chev" + (open ? " open" : ""), "ar
 // Links of the earlier layout (#/<project>/<tab>, #/workspaces/<name>)
 // redirect to their new places.
 const PROJECT_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["work", "Work"], ["agents", "Agents"], ["health", "Health"]];
-const WORKSPACE_VIEWS = [["overview", "Overview"], ["issues", "Issues"], ["knowledge", "Knowledge"], ["shared", "Shared code"], ["libraries", "Libraries"], ["architecture", "Architecture"], ["members", "Members"]];
+// A workspace's views mirror a project's: Architecture second, Issues where
+// a project has Health; each groups its parts as sub-views.
+const WORKSPACE_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["issues", "Issues"], ["members", "Members"]];
+// views of the earlier layout, now sub-views
+const WORKSPACE_MOVED = { shared: ["issues", "shared"], libraries: ["architecture", "libraries"] };
 const LEGACY_TABS = { findings: "overview", context: "agents/context", providers: "agents/tools", metrics: "agents/tools", knowledge: "knowledge", proposals: "knowledge/inbox", tasks: "work", health: "health" };
 const enc = encodeURIComponent;
 // Display names (chosen in the page or with 'harness projects rename' and
@@ -218,7 +267,7 @@ const wsByName = (name) => (state.workspaces || []).find((w) => w.name === name)
 const wtitle = (name) => { const w = wsByName(name); return w ? wname(w) : name; };
 const defaultView = () => { const v = store.get("projectView", "overview"); return PROJECT_VIEWS.some(([x]) => x === v) ? v : "overview"; };
 const projectHref = (id, view, item) => `#/p/${enc(id)}/${view || defaultView()}${item ? "/" + enc(item) : ""}`;
-const workspaceHref = (name, view) => `#/w/${enc(name)}/${view || "overview"}`;
+const workspaceHref = (name, view, item) => `#/w/${enc(name)}/${view || "overview"}${item ? "/" + item : ""}`;
 
 function route() {
   const raw = location.hash.replace(/^#\/?/, "");
@@ -228,7 +277,10 @@ function route() {
   switch (seg[0]) {
     case undefined: return r;
     case "p": return { ...r, page: "project", id: seg[1] || "", view: PROJECT_VIEWS.some(([v]) => v === seg[2]) ? seg[2] : defaultView(), item: seg.slice(3).join("/") };
-    case "w": return { ...r, page: "workspace", ws: seg[1] || "", view: WORKSPACE_VIEWS.some(([v]) => v === seg[2]) ? seg[2] : "overview", item: seg[3] || "" };
+    case "w": {
+      const [view, item] = WORKSPACE_MOVED[seg[2]] || [WORKSPACE_VIEWS.some(([v]) => v === seg[2]) ? seg[2] : "overview", seg[3] || ""];
+      return { ...r, page: "workspace", ws: seg[1] || "", view, item };
+    }
     case "knowledge": case "machine": case "search": return { ...r, page: seg[0] };
     case "docs": return { ...r, page: "docs", item: seg[1] || "guide" };
     default: return { ...r, page: "legacy" };
@@ -268,10 +320,13 @@ function renderCrumbs() {
   } else if (r.page === "knowledge") crumbs.push(["Your knowledge", ""]);
   else if (r.page === "machine") crumbs.push(["Machine", ""]);
   else if (r.page === "search") crumbs.push(["Search", ""]);
+  else if (r.page === "docs") crumbs.push(["Docs", ""]);
   const el = document.getElementById("crumbs");
+  // the first crumb, Home, is its icon unless Home is the page
+  const home = (label, i) => i === 0 && crumbs.length > 1 ? [icon("home"), h("span", { class: "sr" }, label)] : label;
   fill(el, ...crumbs.flatMap(([label, href], i) => [
     i > 0 && h("span", { class: "sep", "aria-hidden": "true" }, "›"),
-    href && i < crumbs.length - 1 ? h("a", { href }, label) : h("span", { "aria-current": "page" }, label)]).filter(Boolean));
+    href && i < crumbs.length - 1 ? h("a", { href, title: label }, home(label, i)) : h("span", { "aria-current": "page" }, label)]).filter(Boolean));
 }
 
 const THEMES = ["system", "light", "dark"];
@@ -288,15 +343,19 @@ function applyTheme() {
 }
 
 // waitingIn is how many things in a project wait for a person.
-const waitingIn = (p) => (p.live.pending_proposals || 0) + (p.live.pending_arch_proposals || 0) + (p.live.checks_failed || 0) + (p.live.state !== "ok" ? 1 : 0);
+// It is the sum of the project's tab badges (Knowledge, Work, Health),
+// plus one when its state cannot be read.
+const workProposals = (l) => (l.pending_arch_proposals || 0) + (l.pending_task_proposals || 0) + (l.pending_blueprint_proposals || 0);
+const waitingIn = (p) => (p.live.pending_proposals || 0) + workProposals(p.live) + (p.live.checks_failed || 0) + (p.live.state !== "ok" ? 1 : 0);
 
 function navProject(p, ws, r) {
   const n = waitingIn(p);
   return h("a", {
     class: "nrow", href: projectHref(p.id, r.page === "project" ? r.view : ""), "aria-current": r.page === "project" && r.id === p.id && (!ws || state.lastWs === ws || !(p.workspaces || []).includes(state.lastWs)) ? "page" : null,
     onclick: () => { state.lastWs = ws || ""; document.getElementById("projects").classList.remove("open"); },
-  }, h("span", { class: "nname" }, pname(p)), stateGlyph(p.live),
-  n > 0 && h("span", { class: "badge", title: `${n} thing(s) wait for you: proposals, failing checks or unreadable state` }, n));
+  }, projectMark(p), h("span", { class: "nname" }, pname(p)), stateGlyph(p.live),
+  // the badge's slot stays when it is empty, so the state icons line up
+  h("span", { class: "nslot" }, n > 0 && h("span", { class: "badge", title: `${n} waiting for you: proposals, failing checks or unreadable state` }, n)));
 }
 
 // NAV_CAP is how many projects an open workspace group lists; the rest
@@ -324,12 +383,12 @@ function renderProjects() {
   const summary = (members) => {
     const count = {};
     for (const p of members) count[stateKind(p.live)] = (count[stateKind(p.live)] || 0) + 1;
-    return ["bad", "warn", "stale", "ok"].filter((k) => count[k]).map((k) => h("span", { class: `glyph g-${k}`, title: `${count[k]} ${STATE_WORD[k]}` }, STATE_GLYPH[k], h("span", { class: "gcount" }, count[k])));
+    return ["bad", "warn", "stale", "ok"].filter((k) => count[k]).map((k) => h("span", { class: `glyph g-${k}`, title: `${count[k]} ${STATE_WORD[k]}` }, stateIcon(k), h("span", { class: "gcount" }, count[k])));
   };
   const outside = state.projects.filter((p) => !inWs.has(p.id) && hit(p));
   fill(nav, [
-    h("a", { class: "ntop", href: "#/", "aria-current": r.page === "home" ? "page" : null, onclick: close }, "⌂ Home"),
-    h("a", { class: "ntop", href: "#/search", "aria-current": r.page === "search" ? "page" : null, onclick: close }, "⌕ Search"),
+    h("a", { class: "ntop", href: "#/", "aria-current": r.page === "home" ? "page" : null, onclick: close }, icon("home"), "Home"),
+    h("a", { class: "ntop", href: "#/search", "aria-current": r.page === "search" ? "page" : null, onclick: close }, icon("search"), "Search"),
     filter,
     h("h2", { class: "nhead" }, "Workspaces", h("span", { class: "count" }, wss.length)),
     wss.length ? wss.map((w) => {
@@ -353,20 +412,21 @@ function renderProjects() {
       return h("div", { class: "ngroup" },
         h("div", { class: "nws" }, toggle,
           h("a", { href: workspaceHref(w.name), "aria-current": r.page === "workspace" && r.ws === w.name ? "page" : null, onclick: close },
-            h("span", { class: "nicon", "aria-hidden": "true" }, "▦"), h("span", { class: "nname" }, wname(w)), h("span", { class: "count" }, w.members.length)),
-          waiting > 0 && h("span", { class: "badge", title: `${waiting} thing(s) wait for you in its projects` }, waiting)),
+            h("span", { class: "nicon", "aria-hidden": "true" }, icon("workspace")), h("span", { class: "nname" }, wname(w)), !isOpen && h("span", { class: "count", title: plural(w.members.length, "project") }, w.members.length)),
+          waiting > 0 && h("span", { class: "badge", title: `${waiting} waiting for you in its projects` }, waiting)),
         !isOpen && h("div", { class: "nsum" }, summary(all)),
         isOpen && h("div", { class: "nmembers" }, shown.map((p) => navProject(p, w.name, r)),
           !q && sorted.length > shown.length && h("a", { class: "nmore", href: workspaceHref(w.name, "members"), onclick: close }, `All ${sorted.length} projects →`)));
     }) : h("p", { class: "nempty" }, h("a", { href: "#/", onclick: close }, "Create one on Home"), " to search repositories together."),
-    (outside.length > 0 || !q) && h("h2", { class: "nhead" }, "Projects", h("span", { class: "count" }, outside.length)),
+    // the heading only when it lists something (or nothing is registered)
+    (outside.length > 0 || !q && !wss.length) && h("h2", { class: "nhead" }, "Projects", h("span", { class: "count" }, outside.length)),
     outside.map((p) => navProject(p, "", r)),
     !state.projects.length && h("p", { class: "nempty" }, "No projects registered yet. 'harness init' in a repository registers it."),
     q && !outside.length && !wss.some((w) => w.members.some((m) => { const p = state.projects.find((x) => x.id === m.project_id); return p && hit(p); })) && h("p", { class: "nempty" }, "No project matches."),
     h("div", { class: "nfoot" },
-      h("a", { class: "ntop", href: "#/knowledge", "aria-current": r.page === "knowledge" ? "page" : null, onclick: close }, "Your knowledge"),
-      h("a", { class: "ntop", href: "#/machine", "aria-current": r.page === "machine" ? "page" : null, onclick: close }, "Machine"),
-      h("a", { class: "ntop", href: "#/docs", "aria-current": r.page === "docs" ? "page" : null, onclick: close }, "Docs")),
+      h("a", { class: "ntop", href: "#/knowledge", "aria-current": r.page === "knowledge" ? "page" : null, onclick: close }, icon("knowledge"), "Your knowledge"),
+      h("a", { class: "ntop", href: "#/machine", "aria-current": r.page === "machine" ? "page" : null, onclick: close }, icon("machine"), "Machine"),
+      h("a", { class: "ntop", href: "#/docs", "aria-current": r.page === "docs" ? "page" : null, onclick: close }, icon("docs"), "Docs")),
   ]);
 }
 
@@ -380,9 +440,20 @@ async function renderMain(opts) {
   const live = !!(opts && opts.live);
   const n = ++renderSeq;
   const main = document.getElementById("main");
-  if (live && main.querySelector(".aform, .decide")) return;
   renderCrumbs();
-  if (!live) return drawMain(main, false);
+  // the window applies to what agents did: Home's project cards, a
+  // project's Overview and Agents; elsewhere it would change nothing
+  const r = route();
+  const win = document.querySelector(".top .window");
+  if (win) win.hidden = !(r.page === "home" || r.page === "project" && (r.view === "overview" || r.view === "agents"));
+  if (!live) {
+    // a page you open rises in; a live update redraws in place, still
+    main.classList.remove("enter"); void main.offsetWidth; main.classList.add("enter");
+    state.freshUntil = Date.now() + 4000;
+    clearTimeout(renderMain.enterTimer); renderMain.enterTimer = setTimeout(() => main.classList.remove("enter"), 600);
+    return drawMain(main, false);
+  }
+  if (main.querySelector(".aform, .decide")) return;
   const next = h("div", {});
   await drawMain(next, true);
   if (n !== renderSeq || main.querySelector(".aform, .decide")) return; // navigation or a review opened while loading
@@ -417,7 +488,8 @@ function restoreFocus(main, f) {
 // error with Retry; the rest of the page never waits for it. It names what
 // it shows: a project (or a workspace's members, or any project) and the
 // kinds of data (tasks, knowledge, proposals, findings, activity, sync,
-// summary; registry and workspaces for the machine's lists). A live change
+// summary; registry and workspaces for the machine's lists; levels for the
+// workspaces' and the user's knowledge databases, TASK-0065). A live change
 // draws again only the sections showing what changed, in place: scroll,
 // focus and open folds are kept, an open form keeps its section as it is,
 // and an answer arriving after a newer one is dropped.
@@ -431,7 +503,8 @@ function mount(o) {
     if (!first && !force && review) return; // a form is open: leave it be
     const n = ++m.seq;
     if (o.draw) return put(m, o.draw);
-    if (first) fill(el, h("div", { class: "loadbar", role: "progressbar", "aria-label": "Loading" }));
+    // the first time, the shape of what is coming, shimmering
+    if (first) fill(el, h("div", { class: "loadbar skel", role: "progressbar", "aria-label": "Loading" }, h("span", {}), h("span", {}), h("span", {})));
     const busy = first ? 0 : setTimeout(() => el.classList.add("busy"), 150);
     try {
       const node = await o.load();
@@ -456,10 +529,38 @@ function put(m, draw) {
   const x = window.scrollX, y = window.scrollY;
   const focus = focusOf(el);
   const open = new Set([...el.querySelectorAll("details[open] > summary")].map((s) => s.textContent));
+  const before = m.drawn ? el.textContent : null;
   fill(el, draw());
   for (const s of el.querySelectorAll("details > summary")) if (open.has(s.textContent)) s.parentElement.open = true;
   if (el.isConnected) window.scrollTo(x, y);
   restoreFocus(el, focus);
+  // a redraw that changed something glows a moment; a page just opened
+  // counts its numbers up
+  if (before != null && before !== el.textContent) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+  if (!m.drawn && Date.now() < (state.freshUntil || 0)) countUp(el);
+  m.drawn = true;
+}
+
+// countUp runs a section's headline numbers up from zero (tiles, rings,
+// totals): "12", "72%", "1,240".
+function countUp(root) {
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const el of root.querySelectorAll(".tile .value, .rval, .asum > b, .mt-meter b")) {
+    const t = el.firstChild;
+    if (!t || t.nodeType !== 3) continue;
+    const m = /^(\d[\d,]*)(%?)(.*)$/.exec(t.textContent.trim());
+    if (!m) continue;
+    const to = Number(m[1].replace(/,/g, "")), suffix = m[2] + m[3];
+    if (!to) continue;
+    const start = performance.now(), dur = 700;
+    const step = (now) => {
+      const f = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - f, 3);
+      t.textContent = Math.round(to * e).toLocaleString("en") + suffix;
+      if (f < 1) requestAnimationFrame(step);
+    };
+    t.textContent = "0" + suffix;
+    requestAnimationFrame(step);
+  }
 }
 
 // wants: a change shows something a section draws.
@@ -468,6 +569,7 @@ function wants(m, c) {
   if (c === "all") return true;
   if (!ks.length) return false;
   if ((c.registry && ks.includes("registry")) || (c.workspaces && ks.includes("workspaces"))) return true;
+  if ((c.levels || []).length && ks.includes("levels")) return true;
   const kinds = c.kinds || {};
   const ids = m.o.project ? [m.o.project] : m.o.members ? m.o.members() : m.o.anyProject ? Object.keys(kinds) : [];
   return ids.some((id) => (kinds[id] || []).some((k) => k === "all" || ks.includes(k)));
@@ -483,10 +585,28 @@ function invalidate(c) {
   }
 }
 
+// emptyState is a list with nothing in it, said kindly: a drawn icon, a
+// title and a line (TASK-0057).
+function emptyState(name, title, text) {
+  return h("div", { class: `emptystate es-${name}` }, h("span", { class: "esico" }, icon(name)),
+    h("div", {}, h("b", {}, title), h("p", { class: "muted small" }, text)));
+}
+
+// toast says a moment that something happened, at the bottom corner.
+function toast(text, bad, detail) {
+  const t = h("div", { class: "toast" + (bad ? " bad" : ""), role: bad ? "alert" : "status", title: detail || "" },
+    h("span", { class: "tick", "aria-hidden": "true" }, bad ? "✕" : "✓"), h("span", {}, text, detail && bad && h("span", { class: "tdetail" }, detail)));
+  document.body.append(t);
+  const stay = bad ? 6000 : 1600;
+  setTimeout(() => t.classList.add("out"), stay);
+  setTimeout(() => t.remove(), stay + 400);
+}
+
 // afterWrite follows a write made on this page: the lists and the
 // sections, not the page around them.
 async function afterWrite() {
   live.last = Date.now();
+  toast("Done");
   if (await loadProjects()) renderProjects();
   invalidate("all");
 }
@@ -530,7 +650,6 @@ async function drawMain(main, live) {
 function projectHead(p) {
   const id = p.id, view = route().view;
   const l = p.live;
-  const renameBox = h("div", {});
   // The header: name and health; where it lives and what it belongs to;
   // one line of what changes. The harness version shows only when agents
   // run another build than this page.
@@ -544,21 +663,20 @@ function projectHead(p) {
     ver && cur && ver !== cur && h("span", { class: "warnish", title: `This page runs harness ${cur}; the project's agents last used ${ver}. Restart the agents' MCP servers to use this build.` }, "▲ agents run another harness build"),
   ].filter(Boolean);
   const head = h("div", { class: "phead" },
-    h("div", { class: "title" }, h("h2", {}, pname(p)), healthBadge(p), h("span", { class: "spacer" }),
-      h("button", { class: "action", title: "Change the display name or the short name", onclick: () => fill(renameBox, renameForm({
-        what: "project", display: p.title || "", short: p.name || "", folder: baseName(p.root), box: renameBox,
+    h("div", { class: "title" }, projectMark(p, true), h("h2", {}, pname(p)),
+      iconButton("edit", "Rename: change the display name or the short name", () => renameDialog({
+        what: "project", display: p.title || "", short: p.name || "", folder: baseName(p.root), mark: p,
         send: (body) => post(projectAPI(p, "rename"), body),
-      })) }, "✎ Rename")),
+      })),
+      healthBadge(p)),
     h("div", { class: "where" },
-      h("span", { class: "mono" }, p.root),
+      h("span", { class: "mono", title: p.root }, shortPath(p.root)),
       p.name && p.name !== baseName(p.root) && h("span", { class: "muted" }, `short name ${p.name}`),
       (p.workspaces || []).length > 0 && h("span", { class: "inws" }, "in ",
         p.workspaces.map((w) => h("a", { class: "wschip", href: workspaceHref(w), title: "Open this workspace", onclick: () => { state.lastWs = w; } }, wtitle(w))))),
-    renameBox,
     facts.length > 0 && h("p", { class: "metaline" }, facts),
-    l.detail && h("p", { class: "detail" }, l.detail),
-    l.stale && h("p", { class: "detail" }, l.stale));
-  const badges = { knowledge: l.pending_proposals, work: workInbox(l), health: l.checks_failed };
+    l.detail && h("p", { class: "detail" }, l.detail));
+  const badges = { knowledge: l.pending_proposals, work: workProposals(l), health: l.checks_failed };
   const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Views" },
     PROJECT_VIEWS.map(([v, label]) => h("a", { href: projectHref(id, v), role: "tab", "aria-selected": String(v === view) },
       label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
@@ -569,8 +687,8 @@ function projectHead(p) {
 // runs doctor's checks when opened or refreshed).
 const VIEW_KINDS = {
   overview: ["summary", "tasks", "knowledge", "proposals", "findings", "sync"], architecture: ["findings", "sync"],
-  "work/inbox": ["proposals"], work: ["tasks", "proposals"], health: [], "knowledge/inbox": ["proposals"], knowledge: ["knowledge"],
-  "agents/tools": ["activity", "sync"], "agents/findings": ["findings", "activity"], agents: ["activity"],
+  "work/inbox": ["proposals"], work: ["tasks", "proposals"], health: [], "knowledge/inbox": ["proposals"], knowledge: ["knowledge", "levels"],
+  "agents/tools": ["activity", "sync"], agents: ["activity", "knowledge", "proposals"],
 };
 
 // projectBody is a project's view as a section.
@@ -593,14 +711,19 @@ async function projectView(p, view, item, opts) {
   const base = `#/p/${enc(p.id)}/${view}`;
   switch (view) {
     case "overview": return viewOverview(p);
-    case "architecture": return viewArchitecture(p);
+    case "architecture": {
+      // four parts, one at a time: the structure and its smells, the
+      // layers, complexity, what changes
+      const sec = ["layers", "complexity", "coupling"].includes(item) ? item : "structure";
+      const nav = subnav(base, [["structure", "Structure"], ["layers", "Layers"], ["complexity", "Complexity"], ["coupling", "Change coupling"]], sec);
+      return h("div", {}, nav, await viewArchitecture(p, sec));
+    }
     case "work": {
       // one switch: Blueprints, Tasks, Inbox; a task's id opens Tasks
-      // blueprints were called milestones (TASK-0047): old links still open them
-      const named = item === "milestones" ? "blueprints" : item;
-      const sec = ["blueprints", "tasks", "inbox"].includes(named) ? named : named ? "tasks" : state.tasks.view || "blueprints";
+      // (#…/work/milestones, the former name, opens Blueprints)
+      const sec = item === "milestones" ? "blueprints" : ["blueprints", "tasks", "inbox"].includes(item) ? item : item ? "tasks" : state.tasks.view || "blueprints";
       if (sec !== "inbox") state.tasks.view = sec;
-      const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", workInbox(p.live)]], sec);
+      const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", workProposals(p.live)]], sec);
       return h("div", {}, nav, sec === "inbox" ? await viewArchProposals(p) : await viewTasks(p, opts, sec));
     }
     case "health": return viewHealth(p);
@@ -610,9 +733,12 @@ async function projectView(p, view, item, opts) {
       return h("div", {}, nav, inbox ? await viewProposals(p) : await viewKnowledge(p));
     }
     case "agents": {
-      const sec = ["context", "tools", "findings"].includes(item) ? item : "context";
-      const nav = subnav(base, [["context", "Context quality"], ["tools", "Tools & providers"], ["findings", "Findings"]], sec);
-      const content = await { context: viewContext, tools: viewProviders, findings: viewFindings }[sec](p);
+      // what the user acts on; how harness itself performs is the
+      // developer's, in harness-collect over opted-in telemetry, never here
+      // (TASK-0053)
+      const sec = item === "tools" ? "tools" : "serving";
+      const nav = subnav(base, [["serving", "How harness serves them"], ["tools", "Tools & providers"]], sec);
+      const content = await { serving: viewServing, tools: viewProviders }[sec](p);
       return h("div", {}, nav, content);
     }
   }
@@ -647,25 +773,26 @@ async function renderWorkspacePage(main, r) {
 
 // WS_VIEW_KINDS: the kinds of the members' data each workspace view shows.
 const WS_VIEW_KINDS = {
-  overview: ["summary", "findings", "sync", "workspaces", "registry"], issues: ["sync"], knowledge: ["workspaces"],
-  shared: ["sync", "findings"], libraries: ["sync"], members: ["workspaces", "registry", "summary", "sync"], architecture: ["sync", "findings"],
+  overview: ["summary", "findings", "sync", "workspaces", "registry", "levels"], issues: ["sync", "findings", "levels"], knowledge: ["workspaces", "levels"],
+  members: ["workspaces", "registry", "summary", "sync"], architecture: ["sync", "findings", "levels"],
 };
 
 // workspaceHead is a workspace page's header and tabs.
 function workspaceHead(w, members, r) {
   if (!w) return h("p", { class: "error" }, `There is no workspace ${r.ws} on this machine.`);
   const waiting = members.reduce((s, p) => s + waitingIn(p), 0);
-  const renameBox = h("div", {});
   const head = h("div", { class: "phead" },
-    h("div", { class: "title" }, h("span", { class: "kind" }, "workspace"), h("h2", {}, wname(w)), h("span", { class: "spacer" }),
-      h("button", { class: "action", title: "Change the display name or the short name", onclick: () => fill(renameBox, renameForm({
-        what: "workspace", display: w.title || "", short: w.name, box: renameBox,
+    h("div", { class: "title" }, h("span", { class: "kind" }, "workspace"), h("h2", {}, wname(w)),
+      iconButton("edit", "Rename: change the display name or the short name", () => renameDialog({
+        what: "workspace", display: w.title || "", short: w.name,
         send: async (body) => { const res = await post(`/api/workspaces/${enc(w.name)}/rename`, body); location.hash = workspaceHref(res.workspace, route().view); },
-      })) }, "✎ Rename")),
-    w.title && h("p", { class: "path mono" }, `short name ${w.name}: agents and commands use workspace:${w.name}`),
-    renameBox,
-    h("p", { class: "path" }, `${w.members.length} project(s), created ${ago(w.created)}`,
-      waiting > 0 ? ` · ${waiting} thing(s) wait for you` : ""));
+      })),
+      h("button", {
+        class: "copychip", title: `Agents and commands name this workspace workspace:${w.name}. Click to copy.`,
+        onclick: (ev) => { navigator.clipboard?.writeText(`workspace:${w.name}`); ev.currentTarget.classList.add("copied"); },
+      }, `workspace:${w.name}`)),
+    h("p", { class: "path" }, `${plural(w.members.length, "project")}, created ${ago(w.created)}`,
+      waiting > 0 ? ` · ${waiting} waiting for you` : ""));
   const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Views" },
     WORKSPACE_VIEWS.map(([v, label]) => h("a", { href: workspaceHref(w.name, v), role: "tab", "aria-selected": String(v === route().view) }, label)));
   return [head, tabs];
@@ -681,18 +808,27 @@ async function workspaceView(w, members, view, item) {
         section("At a glance", "What the workspace is made of and how its parts depend on each other; details on Architecture and Members.", glance));
       return out;
     }
-    case "issues": return issuesView(w);
-    case "knowledge": return levelKnowledge(`workspace:${w.name}`, "Knowledge for every project of this workspace: it applies to each of them unless a project states otherwise (then the project's own takes precedence).");
-    case "shared": return sharedCodeView(w);
-    case "libraries": return sharedCode(w);
-    case "members": {
-      const [stk] = await Promise.all([api(`/api/workspaces/${enc(w.name)}/stack`).catch(() => null)]);
-      return h("div", {}, membersManage(w), versionsTable(w, stk));
+    case "issues": {
+      // findings (the code repeated across members among them) and
+      // version drift; an old link to shared code opens the findings
+      const sec = item === "versions" ? "versions" : "findings";
+      const nav = subnav(workspaceHref(w.name, "issues"), [["findings", "Findings"], ["versions", "Version drift"]], sec);
+      if (sec === "versions") {
+        const [stk, drift] = await Promise.all([api(`/api/workspaces/${enc(w.name)}/stack`).catch(() => null), issuesView(w, "version-drift")]);
+        return h("div", {}, nav, drift, versionsTable(w, stk));
+      }
+      // a peer of the design issues: its smells, the full table folded in it
+      const shared = h("div", { id: "repeated" }, mount({ members: () => w.members.map((m) => m.project_id), kinds: ["sync", "findings"], load: () => sharedCodeView(w) }));
+      if (item === "shared") setTimeout(() => shared.scrollIntoView({ block: "start" }), 300);
+      return h("div", {}, nav, await issuesView(w), shared);
     }
+    case "knowledge": return levelKnowledge(`workspace:${w.name}`, "Knowledge for every project of this workspace: it applies to each of them unless a project states otherwise (then the project's own takes precedence).");
+    case "members": return h("div", {}, membersManage(w));
     case "architecture": {
-      const lens = item === "build" ? "build" : "runtime";
-      const nav = subnav(workspaceHref(w.name, "architecture"), [["runtime", "Runtime: calls"], ["build", "Build: packages"]], lens);
+      const lens = ["build", "libraries"].includes(item) ? item : "runtime";
+      const nav = subnav(workspaceHref(w.name, "architecture"), [["runtime", "Runtime: calls"], ["build", "Build: packages"], ["libraries", "Libraries"]], lens);
       if (lens === "runtime") return h("div", {}, nav, await systemView(w));
+      if (lens === "libraries") return h("div", {}, nav, await sharedCode(w));
       const g = await api(`/api/workspaces/${enc(w.name)}/dependencies`);
       const axes = (g.nodes || []).length <= 12
         ? "Read it on two axes: down is depth (users above what they use, as in Runtime), right is how many members use it. A member three or more others use gets a bus: where their lines run together, they draw as one heavier line. A library on a bus stands at the right, level with the middle of its users, whose lines meet and run in together."
@@ -709,7 +845,7 @@ async function workspaceView(w, members, view, item) {
 // warnings and notes each, worst first, marks apart (HAR-0117).
 const sev = (r) => (r.levels.problem || 0) * 10000 + (r.levels.warn || 0) * 100 + (r.levels.info || 0);
 function findingsRollup(w, rows) {
-  const href = (r) => r.kind === "member" ? projectHref(r.member_id, "architecture") : workspaceHref(w.name, r.kind === "shared" ? "shared" : "architecture");
+  const href = (r) => r.kind === "member" ? projectHref(r.member_id, "architecture") : (r.kind === "shared" ? workspaceHref(w.name, "issues", "shared") : workspaceHref(w.name, "architecture"));
   const total = (r) => (r.levels.problem || 0) + (r.levels.warn || 0) + (r.levels.info || 0);
   const most = Math.max(1, ...rows.map(total));
   const LV = [["problem", "problem", "problems"], ["warn", "warning", "warnings"], ["info", "note", "notes"]];
@@ -796,7 +932,7 @@ async function atAGlance(w) {
     for (const e of dep.edges || []) (users[e.to] = users[e.to] || new Set()).add(e.from);
     for (const n of (dep.nodes || []).filter((x) => x.library)) {
       const k = (users[n.project_id] || new Set()).size, of = (dep.nodes || []).length - 1;
-      if (k) line("◇", `${name(n.project_id)} is used by ${k === of ? `all ${k}` : `${k} of ${of}`} other members`, workspaceHref(w.name, "architecture") + "/build", "· a library, used through its packages");
+      if (k) line("◇", `${name(n.project_id)} is used by ${k === of ? `all ${k}` : `${k} of ${of}`} other members`, workspaceHref(w.name, "architecture", "build"), "· a library, used through its packages");
     }
   }
   // versions behind or declared stale
@@ -808,10 +944,10 @@ async function atAGlance(w) {
         if (vs.some((v) => cmpVer(v, r.published) > 0) && !stale.includes(r.name)) stale.push(r.name);
       }
     }
-    if (behind.size) line("↺", `${behind.size} member${behind.size === 1 ? " uses" : "s use"} older versions of packages from ${[...new Set([...behind.values()].flatMap((x) => [...x]))].join(", ")}`, workspaceHref(w.name, "members"), "· than their owners declare now");
-    if (stale.length) line("?", `${stale.length} package version declaration${stale.length === 1 ? " looks" : "s look"} stale`, workspaceHref(w.name, "members"), `· ${stale.slice(0, 2).join(", ")}${stale.length > 2 ? "…" : ""}`);
+    if (behind.size) line("↺", `${behind.size} member${behind.size === 1 ? " uses" : "s use"} older versions of packages from ${[...new Set([...behind.values()].flatMap((x) => [...x]))].join(", ")}`, workspaceHref(w.name, "issues", "versions"), "· than their owners declare now");
+    if (stale.length) line("?", `${stale.length} package version declaration${stale.length === 1 ? " looks" : "s look"} stale`, workspaceHref(w.name, "issues", "versions"), `· ${stale.slice(0, 2).join(", ")}${stale.length > 2 ? "…" : ""}`);
     const rts = (stk.rows || []).filter((x) => x.kind === "runtime" && x.differ);
-    for (const r of rts) line("↺", `${r.name} versions differ`, workspaceHref(w.name, "members"), `· ${[...new Set(Object.values(r.versions).flat())].join(", ")}`);
+    for (const r of rts) line("↺", `${r.name} versions differ`, workspaceHref(w.name, "issues", "versions"), `· ${[...new Set(Object.values(r.versions).flat())].join(", ")}`);
   }
   return lines.length ? h("ul", { class: "card pad glance" }, lines) : h("p", { class: "empty" }, "Nothing read yet.");
 }
@@ -844,10 +980,11 @@ async function systemView(w) {
   // own databases (stacked when there is one per tenant); outside systems
   // and brokers in their own row; members talking to nothing as a note
   const side = h("aside", { class: "depside archside" });
-  const map = h("div", { class: "archmap sysmap" });
+  // wide windows read it left to right: callers, the called, outside
+  const map = h("div", { class: "archmap sysmap" + (window.innerWidth >= 1100 ? " horiz" : "") });
   const svg = sv("svg", { class: "archlines", "aria-hidden": "true" });
   const nodes = {};
-  let sel = null;
+  let sel = null, hover = null;
   const calls = s.links.filter((l) => l.style !== "database");
   const dbsOf = (id) => s.links.filter((l) => l.from === id && l.style === "database").map((l) => byId[l.to]).filter(Boolean);
   const talking = new Set(calls.flatMap((l) => [l.from, l.to]));
@@ -860,7 +997,8 @@ async function systemView(w) {
     const callers = new Set(calls.filter((l) => l.to === n.id && byId[l.from] && (byId[l.from].kind === "service" || byId[l.from].kind === "frontend")).map((l) => l.from));
     const hub = others > 1 && callers.size === others;
     const dbs = dbsOf(n.id);
-    const el = h("button", { class: `anode syscard sys-${n.kind}${hub ? " hub" : ""}`, title: n.name, onclick: () => select(sel === n.id ? null : n.id) },
+    const el = h("button", { class: `anode syscard sys-${n.kind}${hub ? " hub" : ""}`, title: n.name, onclick: () => select(sel === n.id ? null : n.id),
+      onmouseenter: () => { hover = n.id; draw(); }, onmouseleave: () => { hover = null; draw(); } },
       h("span", { class: "aname" }, n.name),
       h("span", { class: "ameta" }, h("span", {}, `calls ${out} · called by ${callers.size}`),
         n.member_id && stackBadge(n.member_id, "small side", true)),
@@ -891,7 +1029,19 @@ async function systemView(w) {
       if (!a || !b) continue;
       const hot = sel && (l.from === sel || l.to === sel);
       if (sel && !hot) continue;
+      // the lines of the service pointed at (or selected) flow, toward the called
+      const flow = (hover || sel) && (l.from === (hover || sel) || l.to === (hover || sel));
       const fa = a.getBoundingClientRect(), ta = b.getBoundingClientRect();
+      if (map.classList.contains("horiz") && (ta.left > fa.right - 4 || ta.right < fa.left + 4)) {
+        // side by side: from the caller's edge to the called's edge
+        const right = ta.left > fa.right - 4;
+        const x1 = (right ? fa.right : fa.left) - box.left, x2 = (right ? ta.left : ta.right) - box.left;
+        const y1 = fa.top + fa.height / 2 - box.top, y2 = ta.top + ta.height / 2 - box.top, m = (x1 + x2) / 2;
+        const p = sv("path", { d: `M${x1},${y1} C${m},${y1} ${m},${y2} ${x2},${y2}`, class: `sline st-${l.style}${hot ? " hot" : ""}${flow ? " flow" : ""}`, "marker-end": `url(#sa-${l.style})` });
+        p.append(sv("title", {}, `${label(l.from)} → ${label(l.to)} (${STYLE_LABEL[l.style]}): ${l.what.join(", ")}`));
+        lines.push(p);
+        continue;
+      }
       const x1 = fa.left + fa.width / 2 - box.left, x2 = ta.left + ta.width / 2 - box.left;
       const down = ta.top > fa.bottom - 4, up = ta.bottom < fa.top + 4;
       const y1 = (down ? fa.bottom : up ? fa.top : fa.bottom) - box.top;
@@ -906,7 +1056,7 @@ async function systemView(w) {
         const ym = (y1 + y2) / 2;
         d = `M${x1},${y1} C${x1},${y1 + 40} ${cx},${y1 + 20} ${cx},${ym} C${cx},${y2 - 20} ${x2},${y2 - 40} ${x2},${y2}`;
       }
-      const p = sv("path", { d, class: `sline st-${l.style}${hot ? " hot" : ""}`, "marker-end": `url(#sa-${l.style})` });
+      const p = sv("path", { d, class: `sline st-${l.style}${hot ? " hot" : ""}${flow ? " flow" : ""}`, "marker-end": `url(#sa-${l.style})` });
       p.append(sv("title", {}, `${label(l.from)} → ${label(l.to)} (${STYLE_LABEL[l.style]}): ${l.what.join(", ")}`));
       lines.push(p);
     }
@@ -921,7 +1071,16 @@ async function systemView(w) {
       el.classList.toggle("dim", !!id && !rel.has(k));
     }
     draw();
-    if (!id) return fill(side, h("p", { class: "hint" }, "Select a service to see whom it calls and who calls it, how (gRPC contracts, HTTP, messaging) and where in the code, with its databases."));
+    // nothing selected: each service in a line (whom it calls, who calls
+    // it, its databases), then how to read more
+    if (!id) return fill(side, h("h4", {}, "Services"),
+      h("ul", { class: "svclist" }, members.map((n) => {
+        const out = calls.filter((l) => l.from === n.id), inn = calls.filter((l) => l.to === n.id), dbs = dbsOf(n.id);
+        return h("li", {}, h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); select(n.id); } }, h("b", {}, label(n.id))),
+          h("div", { class: "muted small" }, [out.length && `calls ${[...new Set(out.map((l) => label(l.to)))].join(", ")}`, inn.length && `called by ${[...new Set(inn.map((l) => label(l.from)))].join(", ")}`,
+            dbs.length && plural(dbs.length, "database")].filter(Boolean).join(" · ") || "no calls found"));
+      })),
+      h("p", { class: "hint" }, "Select a service for how it calls (gRPC contracts, HTTP, messaging) and where in the code."));
     const n = byId[id];
     const linkItem = (l, other) => h("li", {},
       h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); select(other); } }, label(other)), " ", h("span", { class: `stag st-${l.style}` }, STYLE_LABEL[l.style]),
@@ -956,13 +1115,71 @@ async function systemView(w) {
       h("td", {}, c.clients.length ? c.clients.map(label).join(", ") : h("span", { class: "muted" }, "no member")))))));
   // contracts used between members first; the rest folded
   const used = s.contracts.filter((c) => c.clients.length || !c.servers.length), idle = s.contracts.filter((c) => !c.clients.length && c.servers.length);
-  const contracts = s.contracts.length > 0 && section("gRPC contracts", "Each service contract: the member declaring it, the members serving it (implementing it) and using it.",
-    used.length > 0 && ctable(used),
-    idle.length > 0 && h("details", { class: "more card pad section" }, h("summary", {}, `${idle.length} served, used by no other member`), ctable(idle)));
+  // the used ones grouped by who uses whom: one line per pair, its
+  // contracts as chips (twelve rows saying the same three names are one)
+  const pairs = new Map();
+  for (const c of used) {
+    const k = `${c.clients.map(label).join(", ") || "no member"}\x00${c.servers.map(label).join(", ") || "nobody"}\x00${label(c.owner)}`;
+    if (!pairs.has(k)) pairs.set(k, []);
+    pairs.get(k).push(c);
+  }
+  const plines = h("div", { class: "cpairs" }, [...pairs].map(([k, cs]) => {
+    const [cl, sv2, own] = k.split("\x00");
+    return h("div", { class: "card pad cpair" },
+      h("div", { class: "cphead" }, h("b", {}, cl), h("span", { class: "cparrow", "aria-hidden": "true" }, "→"), h("b", {}, sv2),
+        h("span", { class: "muted small" }, ` · ${plural(cs.length, "contract")}` + (own !== sv2 ? `, declared in ${own}` : ""))),
+      h("div", { class: "cpchips" }, cs.map((c) => h("span", { class: "tag mono", title: c.declared }, c.name.replace(/^I/, "").replace(/GrpcService$|Service$/, "")))));
+  }));
+  const contracts = s.contracts.length > 0 && section("gRPC contracts", "Who uses whose service contracts: the caller, the member serving them, and each contract.",
+    used.length > 0 && plines,
+    idle.length > 0 && h("details", { class: "more card pad section" }, h("summary", {}, `${plural(idle.length, "contract")} served, used by no other member`), ctable(idle)));
   return h("div", {}, head, smells,
     section("Communication", "Who calls whom and how: callers above the services they call, lines pointing from the caller. Each service shows the databases its code owns.", layout,
       silent.length > 0 && h("p", { class: "muted small" }, `Services with no call, configured address or database found: ${silent.map((n) => n.name).join(", ")}.`)),
     contracts);
+}
+
+// ICONS: stroke icons on a 24-unit grid, drawn in the text's colour.
+const ICONS = {
+  home: ["M3 10.5 12 3l9 7.5", "M5 9.5V21h5v-6h4v6h5V9.5"],
+  search: ["M10.5 3a7.5 7.5 0 1 0 0 15a7.5 7.5 0 0 0 0-15z", "m16 16 5 5"],
+  knowledge: ["M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z", "M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5", "M9 8h7M9 12h5"],
+  machine: ["M3 4h18v12H3z", "M8 20h8M12 16v4"],
+  docs: ["M6 2h9l5 5v15H6z", "M14 2v6h6", "M9 13h7M9 17h7"],
+  workspace: ["m12 3 9 4.5-9 4.5-9-4.5z", "m3 12 9 4.5 9-4.5", "m3 16.5 9 4.5 9-4.5"],
+  edit: ["M4 20h4L19 9l-4-4L4 16z", "m13.5 6.5 4 4"],
+  refresh: ["M20 11a8 8 0 1 0-2.3 5.7", "M20 4v7h-7"],
+  close: ["M6 6l12 12", "M18 6 6 18"],
+  // states, drawn so they read the same size (font glyphs do not)
+  "st-ok": ["m5 12.5 4.5 4.5L19 7.5"],
+  "st-warn": ["M12 4.5 21 19.5H3z", "M12 10v4.5", "M12 17h.01"],
+  "st-fail": ["M7 7l10 10", "M17 7 7 17"],
+  trash: ["M4 7h16", "M10 11v6M14 11v6", "M6 7l1 13h10l1-13", "M9 7V4h6v3"],
+  plus: ["M12 5v14", "M5 12h14"],
+  // task types
+  feature: ["M12 3l2.4 5.3 5.6.6-4.2 3.8 1.2 5.6L12 15.6 6.9 18.3l1.2-5.6L4 8.9l5.6-.6z"],
+  bug: ["M9 7.5a3 3 0 0 1 6 0", "M7.5 10h9v4.5a4.5 4.5 0 0 1-9 0z", "M12 10v9", "M4 9l3.5 2M20 9l-3.5 2M4 15h3.5M20 15h-3.5M5 20l3-2.5M19 20l-3-2.5"],
+  chore: ["M14.5 5.5a4 4 0 0 0-5 5L4 16l4 4 5.5-5.5a4 4 0 0 0 5-5L16 12l-4-4z"],
+  spike: ["M13 2 5 13.5h6L10 22l8-11.5h-6z"],
+  test: ["M9 3h6", "M10 3v6l-5 9.5A2 2 0 0 0 6.8 21h10.4a2 2 0 0 0 1.8-2.5L14 9V3", "M7.5 15h9"],
+  process: ["M20 11a8 8 0 0 0-14.3-4.9", "M4 4v4h4", "M4 13a8 8 0 0 0 14.3 4.9", "M20 20v-4h-4"],
+  // priorities
+  "p-low": ["M12 5v14", "m6 13 6 6 6-6"],
+  "p-medium": ["M5 9h14", "M5 15h14"],
+  "p-high": ["M12 19V5", "m6 11 6-6 6 6"],
+  "p-critical": ["M12 21V9", "m6 15 6-6 6 6", "m6 9 6-6 6 6"],
+  check: ["M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z", "m8 12.5 2.7 2.7L16.5 9.5"],
+  inbox: ["M3 13h5l1.5 3h5L16 13h5", "M5.5 5h13L21 13v6H3v-6z"],
+  calm: ["M3 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0", "M3 17c2-3 4-3 6 0s4 3 6 0 4-3 6 0", "M12 3v3"],
+};
+// iconButton is a small button that is only its icon; label names it
+// for the tooltip and screen readers.
+function iconButton(name, label, onclick) {
+  return h("button", { class: "iconbtn", type: "button", title: label, "aria-label": label, onclick }, icon(name));
+}
+function icon(name) {
+  return sv("svg", { class: "icon", viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", "stroke-width": "1.8", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" },
+    (ICONS[name] || []).map((d) => sv("path", { d })));
 }
 
 // --- dependency map (scales to dozens of members) ---
@@ -1092,7 +1309,7 @@ function dependencyMap(g, w) {
     const via = (e) => {
       let ps = [...new Set((e.via || []).map((r) => r.path.split("/").pop().replace(/\.(csproj|json|mod)$/, "")))].sort();
       const parts = ps.map((x) => x.split("."));
-      let k = 0; // drop the prefix the names share (Betrian.TransportPlanner.)
+      let k = 0; // drop the prefix the names share (Acme.RoutePlanner.)
       while (ps.length > 1 && parts.every((q) => q.length > k + 1 && q[k] === parts[0][k])) k++;
       ps = parts.map((q) => q.slice(k).join("."));
       return ps.length > 0 && h("div", { class: "muted small via", title: (e.via || []).map((r) => `${r.path}:${r.line} ${r.matched}`).join("\n") }, "in ", listCut(ps, 3));
@@ -1328,13 +1545,16 @@ const ISSUE_TODO = {
   "version-drift": "Align the versions (a central package version file helps); start with different major versions.",
   "hub": "Decide whether it is a shared library (then version and publish it as one) or a service (then talk to it through an API, not its packages).",
 };
-async function issuesView(w) {
-  const [r, f] = await Promise.all([api(`/api/workspaces/${enc(w.name)}/issues`), api(`/api/workspaces/${enc(w.name)}/findings`).catch(() => null)]);
+// issuesView is the design issues between the members: those of one kind
+// (version drift, on its own view) or all the others with the findings.
+async function issuesView(w, only) {
+  const [r, f] = await Promise.all([api(`/api/workspaces/${enc(w.name)}/issues`), only ? null : api(`/api/workspaces/${enc(w.name)}/findings`).catch(() => null)]);
   const rollup = f && section("Findings", "Open architecture findings per member and between them, as each one's last sync recorded them; open a row for the detail and the evidence.",
     findingsRollup(w, f.rows || []));
   // copies are findings now (shared code, with homes and triage)
-  const is = (r.issues || []).filter((x) => x.kind !== "local-copy" && x.kind !== "duplicate");
-  if (!is.length) return h("div", {}, rollup, section("Design issues", null, h("p", { class: "okay" }, "✓ No design issues found between these projects.")));
+  const is = (r.issues || []).filter((x) => x.kind !== "local-copy" && x.kind !== "duplicate" && (only ? x.kind === only : x.kind !== "version-drift"));
+  if (!is.length) return only ? h("p", { class: "okay section" }, "✓ Every package used by several members is at one version.")
+    : h("div", {}, rollup, section("Design issues", null, h("p", { class: "okay" }, "✓ No design issues found between these projects.")));
   const key = "issues." + w.name;
   const hidden = new Set(store.get(key, "").split(",").filter(Boolean));
   let sel = is[0];
@@ -1362,11 +1582,13 @@ async function issuesView(w) {
     fill(detail, sel ? issueDetail(sel, wsSnippet(w)) : h("p", { class: "empty" }, "Nothing selected."));
   }
   draw();
+  // the levels in one line; the kind filter only when there are kinds to choose
+  const kinds = new Set(is.map((x) => x.kind)).size;
+  const counts = [["problem", "problem", "problems"], ["warn", "warning", "warnings"], ["info", "note", "notes"]].map(([lv, one, many]) => n(lv) ? `${n(lv)} ${n(lv) === 1 ? one : many}` : null).filter(Boolean).join(" · ");
   return h("div", {}, rollup,
-    section("Design issues", "Smells that only show across repositories, read from the members' manifests and code. Evidence, not a verdict.",
-      h("div", { class: "tiles" },
-        tile("Problems", n("problem"), "act on these first"), tile("Warnings", n("warn"), "worth fixing"), tile("Notes", n("info"), "worth a decision")),
-      h("div", { class: "deptools" }, chips),
+    section(only ? "Packages at different versions" : "Design issues", only ? "Each with the members using which version, and what to do." : "Smells that only show across repositories, read from the members' manifests and code. Evidence, not a verdict.",
+      h("p", { class: "small" }, counts),
+      kinds > 1 && h("div", { class: "deptools" }, chips),
       h("div", { class: "ilayout" }, list, detail)));
 }
 
@@ -1395,7 +1617,7 @@ async function sharedCodeView(w) {
   const copies = smellsSection(d.findings || [], "Code repeated in several members (identical, near copies, similar), each with where it could live once: a library that already holds a copy, else one they all use, else a new shared library.",
     "✓ No code is copied between members (same names only, if anything: see below).",
     { snapshot: d.snapshot, members: members.map((m) => ({ id: m.project_id, name: m.title || m.project })), memberName,
-      post: (action, body) => post(`/api/workspaces/${enc(w.name)}/findings/${action}`, body), snippet: wsSnippet(w) });
+      post: (action, body) => post(`/api/workspaces/${enc(w.name)}/findings/${action}`, body), snippet: wsSnippet(w), title: "Code repeated across members" });
   const key = "dup." + w.name;
   let show = new Set((store.get(key, "identical,near copy,similar")).split(",").filter(Boolean));
   let q = "";
@@ -1422,20 +1644,26 @@ async function sharedCodeView(w) {
   }
   const filter = h("input", { type: "search", placeholder: "Filter by name or project", "aria-label": "Filter shared code", oninput: (ev) => { q = ev.target.value.trim().toLowerCase(); draw(); } });
   draw();
-  return h("div", {}, copies,
-    section("All code by name", "The same code in several projects, whether or not a library is involved: types declared in two or more projects, compared by their code, and files with the same content. " +
-      "How alike: the share of code lines the copies have in common (comments, imports and namespaces ignored).",
+  // the copies worth acting on are the smells above; every name shared,
+  // same names only included, is the reference below, folded when the
+  // smells list the copies
+  const byName = [h("p", { class: "hint" }, "The same code in several projects, whether or not a library is involved: types declared in two or more projects, compared by their code, and files with the same content. " +
+      "How alike: the share of code lines the copies have in common (comments, imports and namespaces ignored)."),
     h("div", { class: "deptools" }, chips, filter),
     list,
-    (d.notes || []).filter((x) => !x.startsWith("similarity compares")).map((x) => h("p", { class: "hint" }, x))));
+    (d.notes || []).filter((x) => !x.startsWith("similarity compares")).map((x) => h("p", { class: "hint" }, x))];
+  return h("div", {}, copies,
+    (d.findings || []).length ? h("details", { class: "card pad more" }, h("summary", {}, `All code by name: ${plural(groups.length, "name")} in several projects`), byName)
+      : section("All code by name", null, byName));
 }
 
 // whereList shows copies one per line, the project first; more than
 // three fold behind "+N more".
 function whereList(copies, snip) {
-  const row = (c) => h("div", { class: "where" }, h("b", {}, c.project), " ",
+  // the member by its display name, once: the evidence line carries it
+  const row = (c) => h("div", { class: "where" },
     snip ? h("ul", { class: "evlist inline" }, evidenceItem(`${c.project}: ${c.path}${c.line ? ":" + c.line : ""}`, snip, 0))
-      : h("span", { class: "mono small muted" }, `${c.path}${c.line ? ":" + c.line : ""}`),
+      : [h("b", {}, folderLabel(c.project)), " ", h("span", { class: "mono small muted" }, `${c.path}${c.line ? ":" + c.line : ""}`)],
     c.extends && h("span", { class: "muted small" }, " · extends it"));
   if (copies.length <= 3) return copies.map(row);
   return [copies.slice(0, 3).map(row), h("details", { class: "cut" }, h("summary", {}, `+${copies.length - 3} more`), copies.slice(3).map(row))];
@@ -1471,7 +1699,7 @@ async function sharedCode(w) {
   load();
   return h("div", {},
     h("p", { class: "hint" }, "Projects whose packages other projects use, and how much of each is used: read from the manifests and the code's imports."),
-    h("div", { class: "libs" }, pick, detail));
+    h("div", { class: "libs" + (libs.length <= 4 ? " few" : "") }, pick, detail));
 }
 
 // libraryView: which of a library's packages are used, and by whom.
@@ -1485,29 +1713,38 @@ function libraryView(r, node, name, total, w) {
   const others = total - 1;
   const usedPkgs = r.packages.filter((p) => pkgUsers[p].size);
   const pkgRows = [...r.packages].sort((a, b) => pkgUsers[b].size - pkgUsers[a].size || a.localeCompare(b));
-  const bar = (n, of) => { const f = h("div", { class: "fill" + (n ? "" : " zero") }); f.style.setProperty("--w", `${of ? (100 * n) / of : 0}%`); return h("div", { class: "meter" }, h("div", { class: "track" }, f), h("span", { class: "num" }, `${n} of ${of}`)); };
   const rows = [...consumers].sort((a, b) => (b.packages || []).length - (a.packages || []).length || b.import_files - a.import_files);
   return h("div", {},
     h("h3", { class: "libtitle" }, name),
-    h("p", { class: "libsum" }, `Offers ${r.packages.length} package(s); ${consumers.length} of ${others} other project(s) use it` +
-      (usedPkgs.length < r.packages.length ? `, ${r.packages.length - usedPkgs.length} package(s) nobody here uses.` : ".")),
-    section("Its packages", "How many projects reference each package in their manifests.",
-      h("div", { class: "card" }, h("table", { class: "libpk" },
-        h("thead", {}, h("tr", {}, h("th", {}, "package"), h("th", {}, "used by"), h("th", {}, "projects"))),
-        h("tbody", {}, pkgRows.map((p) => h("tr", {},
-          h("td", { class: "mono small" }, p),
-          h("td", {}, bar(pkgUsers[p].size, others)),
-          h("td", { class: "wrap small" }, pkgUsers[p].size ? listCut([...pkgUsers[p]].sort(), 4) : h("span", { class: "muted" }, "nobody")))))))),
-    section("Who uses it", "Per project: which of its packages it references and how many of its code files import it.",
-      h("div", { class: "card" }, h("table", { class: "libuse" },
-        h("thead", {}, h("tr", {}, h("th", {}, "project"), h("th", {}, "packages"), h("th", { class: "n" }, "files importing"), h("th", {}, "own copies of its types"))),
-        h("tbody", {}, rows.map((c) => h("tr", {},
-          h("td", {}, c.project),
-          h("td", { class: "small wrap" }, h("b", {}, `${(c.packages || []).length ? new Set(c.packages.map((x) => x.matched)).size : 0} of ${r.packages.length}`), " ",
-            h("span", { class: "muted" }, [...new Set((c.packages || []).map((x) => x.matched))].map((x) => x.replace(/^.*\./, "")).join(", "))),
-          h("td", { class: "n" }, c.import_files),
-          h("td", { class: "small" }, twins[c.project] ? h("a", { href: workspaceHref(w.name, "issues"), title: twins[c.project].join(", ") }, `▲ ${twins[c.project].length} — see Issues`) : h("span", { class: "muted" }, "none")))))))),
+    h("p", { class: "libsum" }, `Offers ${plural(r.packages.length, "package")}; ${consumers.length} of ${plural(others, "other project")} use it` +
+      (usedPkgs.length < r.packages.length ? `, ${plural(r.packages.length - usedPkgs.length, "package")} nobody here uses.` : ".")),
+    // one matrix: a row per package, a column per project using any;
+    // under it, how much each project imports and its own copies
+    section("Who uses what", "A mark where a project references the package in its manifest; below, how many of its code files import the library and its own copies of the library's types.",
+      h("div", { class: "card" }, h("table", { class: "libmx" },
+        h("thead", {}, h("tr", {}, h("th", {}, "package"), rows.map((c) => h("th", { class: "mxcol" }, folderLabel(c.project))), h("th", { class: "n" }, "used by"))),
+        h("tbody", {}, pkgRows.map((p) => h("tr", { class: pkgUsers[p].size ? "" : "unused" },
+          h("td", { class: "mono small" }, pkgName(p, r.packages)),
+          rows.map((c) => h("td", { class: "mxcell" }, pkgUsers[p].has(c.project) ? h("span", { class: "mxyes", title: `${c.project} uses ${p}` }, "✓") : [h("span", { class: "mxno", "aria-hidden": "true" }, "·"), h("span", { class: "sr" }, "not used")])),
+          h("td", { class: "n small" }, pkgUsers[p].size ? `${pkgUsers[p].size} of ${others}` : h("span", { class: "muted" }, "nobody"))))),
+        h("tfoot", {},
+          h("tr", {}, h("th", { class: "small" }, "files importing"), rows.map((c) => h("td", { class: "mxcell" }, h("b", {}, c.import_files))), h("td", {})),
+          h("tr", {}, h("th", { class: "small" }, "own copies of its types"), rows.map((c) => h("td", { class: "mxcell small" },
+            twins[c.project] ? h("a", { href: workspaceHref(w.name, "issues", "shared"), title: twins[c.project].join(", ") }, `▲ ${twins[c.project].length}`) : h("span", { class: "muted" }, "none"))), h("td", {})))))),
     (r.non_consumers || []).length > 0 && h("p", { class: "hint" }, `Not using it: ${r.non_consumers.join(", ")}.`));
+}
+
+// folderLabel is a project's display name from its folder name.
+function folderLabel(folder) {
+  const p = state.projects.find((x) => baseName(x.root) === folder || x.name === folder);
+  return p ? pname(p) : folder;
+}
+// pkgName shows a package without the prefix all of the library's share,
+// dimmed ("Acme.Core.Grpc" among Acme.Core.*: "Acme.Core" dim,
+// ".Grpc" bright).
+function pkgName(p, all) {
+  const root = all.reduce((a, b) => (b.length < a.length ? b : a), all[0] || "");
+  return p !== root && p.startsWith(root + ".") ? [h("span", { class: "muted" }, root), p.slice(root.length)] : p;
 }
 
 // listCut shows the first n of a list and the rest behind "+N more".
@@ -1519,18 +1756,25 @@ function listCut(xs, n) {
 // membersSummary is the workspace Overview's line about its projects:
 // how they are and what waits; the table is in Members.
 function membersSummary(w, members) {
-  const count = {};
-  for (const p of members) count[stateKind(p.live)] = (count[stateKind(p.live)] || 0) + 1;
-  const kinds = ["bad", "warn", "stale", "ok"].filter((k) => count[k]);
-  const strip = h("div", { class: "hstrip" }, kinds.map((k) => { const seg = h("span", { class: `seg-${k}` }); seg.style.setProperty("--w", `${(100 * count[k]) / members.length}%`); return seg; }));
-  const waiting = members.filter((p) => waitingIn(p) > 0).sort((a, b) => waitingIn(b) - waitingIn(a));
-  return h("div", { class: "card pad msum" }, strip,
-    h("div", { class: "hcounts" }, kinds.map((k) => h("span", { class: `glyph g-${k}` }, STATE_GLYPH[k], h("span", { class: "gtext" }, ` ${count[k]} ${STATE_WORD[k]}`))),
-      h("a", { href: workspaceHref(w.name, "members"), class: "small" }, `All ${members.length} projects →`)),
-    waiting.length ? h("div", { class: "pchips" }, h("span", { class: "small muted" }, "Waiting for you:"),
-      waiting.slice(0, 8).map((p) => h("a", { class: "pchip", href: projectHref(p.id) }, stateGlyph(p.live), pname(p), h("span", { class: "badge" }, waitingIn(p)))),
-      waiting.length > 8 && h("a", { class: "pchip more", href: workspaceHref(w.name, "members") }, `+${waiting.length - 8} more`))
-      : h("div", { class: "okay small" }, "✓ nothing waits for you in these projects"));
+  // a card per member (the ones waiting for you first, then by name): its
+  // state, what waits, how well get_context serves it, when agents last
+  // used it
+  const sorted = [...members].sort((a, b) => waitingIn(b) - waitingIn(a) || pname(a).localeCompare(pname(b)));
+  const CAP = 12;
+  return h("div", {}, h("div", { class: "mtiles" }, sorted.slice(0, CAP).map(memberTile)),
+    sorted.length > CAP && h("a", { href: workspaceHref(w.name, "members"), class: "small" }, `All ${sorted.length} projects →`));
+}
+function memberTile(p) {
+  const l = p.live, n = waitingIn(p);
+  const parts = [l.pending_proposals && `${l.pending_proposals} knowledge`, workProposals(l) && `${workProposals(l)} tasks`, l.checks_failed && `${l.checks_failed} failing`].filter(Boolean);
+  return h("a", { class: `mtile k-${stateKind(l)}`, href: projectHref(p.id) },
+    h("div", { class: "mt-top" }, projectMark(p), h("b", { class: "mt-name" }, pname(p)), stateGlyph(l),
+      (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id]))),
+    h("div", { class: "mt-wait" }, n ? [h("span", { class: "badge" }, n), h("span", { class: "muted small" }, ` ${parts.join(" · ") || "waiting"}`)] : h("span", { class: "okay small" }, "✓ nothing waiting")),
+    l.context_answers_30d > 0 ? h("div", { class: "mt-meter", title: "get_context hits per answer, 30 days" }, miniRing(l.context_hit_rate_30d, "r-context"),
+      h("span", {}, h("b", {}, pct(l.context_hit_rate_30d)), h("span", { class: "muted small" }, " context hits")))
+      : h("div", { class: "muted small" }, "no scored answers yet"),
+    p.last_mcp && h("div", { class: "muted small" }, `agents ${ago(p.last_mcp)}`));
 }
 
 // --- home: the machine ---
@@ -1538,165 +1782,391 @@ async function renderHome(main) {
   const ps = state.projects;
   const wss = state.workspaces || [];
   const inWs = new Set(wss.flatMap((w) => w.members.map((m) => m.project_id)));
-  const newBox = h("div", {});
   // the tiles and the workspaces' cards draw from the project list, again
   // when a project's summary changes
   const tiles = mount({ anyProject: true, kinds: ["summary", "proposals", "sync", "workspaces"], draw: () => {
     const ps = state.projects, wss = state.workspaces || [];
     const inWs = new Set(wss.flatMap((w) => w.members.map((m) => m.project_id)));
-    const pending = ps.reduce((n, p) => n + (p.live.pending_proposals || 0), 0);
+    const know = ps.reduce((n, p) => n + (p.live.pending_proposals || 0), 0);
+    const work = ps.reduce((n, p) => n + workProposals(p.live), 0);
     const failing = ps.filter((p) => p.live.checks_failed > 0 || p.live.state !== "ok").length;
+    const waiting = ps.filter((p) => waitingIn(p) > 0);
+    const count = {};
+    for (const p of ps) count[stateKind(p.live)] = (count[stateKind(p.live)] || 0) + 1;
+    const states = ["bad", "warn", "stale"].filter((k) => count[k]).map((k) => `${count[k]} ${STATE_WORD[k]}`);
     return h("div", { class: "tiles section" },
-      tile("Projects", ps.length, `${ps.filter((p) => p.live.state === "ok").length} readable`),
-      tile("Workspaces", wss.length, `${inWs.size} project(s) in them`),
-      tile("Need attention", failing, "failing doctor checks or unreadable state"),
-      tile("Proposals to review", pending, pending ? "in each project's Knowledge › Inbox" : "nothing waiting"));
+      tile("Projects", ps.length, states.length ? states.join(" · ") : "all healthy"),
+      tile("Waiting for you", waiting.reduce((n, p) => n + waitingIn(p), 0), waiting.length ? `in ${plural(waiting.length, "project")}: the badges in the sidebar` : "nothing waiting"),
+      tile("Proposals to review", know + work, know + work ? `${know} knowledge · ${work} tasks` : "nothing waiting"),
+      tile("Failing checks", failing, failing ? `${plural(failing, "project")} with a failing check or unreadable state` : "every project passes 'harness doctor'"));
   } });
   const wsGrid = mount({ anyProject: true, kinds: ["summary", "proposals", "sync", "workspaces"],
     draw: () => h("div", { class: "dash" }, (state.workspaces || []).map(workspaceSummary)) });
   const grid = h("div", { class: "dash" });
   fill(main, 
     h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, "Home")),
-      h("p", { class: "path" }, `Every repository on this machine that uses harness. Activity over the last ${state.days} days.`)),
+      h("p", { class: "path" }, "Every repository on this machine that uses harness.")),
+    sinceVisit(""),
     tiles,
     h("div", { class: "withside" },
       h("div", { class: "mainside" },
         h("section", { class: "section" },
           h("div", { class: "shead" },
             h("div", {}, h("h3", {}, "Workspaces"), h("p", { class: "hint" }, "Repositories searched and reasoned about together.")),
-            h("button", { class: "primary", onclick: () => fill(newBox, createForm(newBox)) }, "New workspace")),
-          newBox, wss.length ? wsGrid : h("p", { class: "empty" }, "No workspaces yet.")),
+            h("button", { class: "primary", onclick: () => workspaceWizard() }, "New workspace")),
+          wss.length ? wsGrid : h("p", { class: "empty" }, "No workspaces yet.")),
         (!wss.length || ps.some((p) => !inWs.has(p.id))) && section(wss.length ? "Projects outside workspaces" : "Projects", null, grid)),
       h("aside", { class: "sidecol" }, activitySection(""))));
   const outside = ps.filter((p) => !inWs.has(p.id));
   if (!outside.length) grid.append(h("p", { class: "empty" }, ps.length ? "Every project is in a workspace." : "No projects registered yet. 'harness init' in a repository registers it."));
-  // each card draws from the project list and fills itself in
-  for (const p of outside) {
-    grid.append(mount({ project: p.id, kinds: ["summary", "tasks", "findings", "proposals", "sync"],
-      draw: () => { const c = projectCard(state.projects.find((x) => x.id === p.id) || p); c.load(); return c.el; } }));
-  }
+  // the same compact cards as a workspace's members, in a grid that holds
+  // one project or many alike
+  if (outside.length) grid.append(mount({ anyProject: true, kinds: ["summary", "proposals", "sync"],
+    draw: () => h("div", { class: "mtiles" }, state.projects.filter((p) => !inWs.has(p.id)).map(memberTile)) }));
 }
 
 // workspaceSummary is a workspace's card on Home: how its projects are
 // (a strip and counts per state), what waits, and a few names.
 function workspaceSummary(w) {
-  const members = w.members.map((m) => state.projects.find((x) => x.id === m.project_id)).filter(Boolean);
-  const waiting = members.filter((p) => waitingIn(p) > 0).sort((a, b) => waitingIn(b) - waitingIn(a));
-  const count = {};
-  for (const p of members) count[stateKind(p.live)] = (count[stateKind(p.live)] || 0) + 1;
-  const kinds = ["bad", "warn", "stale", "ok"].filter((k) => count[k]);
-  const strip = h("div", { class: "hstrip", role: "img", "aria-label": kinds.map((k) => `${count[k]} ${STATE_WORD[k]}`).join(", ") },
-    kinds.map((k) => { const seg = h("span", { class: `seg-${k}` }); seg.style.setProperty("--w", `${(100 * count[k]) / members.length}%`); return seg; }));
-  const go = (p, n) => h("a", { class: "pchip", href: projectHref(p.id), title: ((state.stacks || {})[p.id] || {}).badge || "", onclick: () => { state.lastWs = w.name; } }, stateGlyph(p.live), pname(p), (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id])), n > 0 && h("span", { class: "badge" }, n));
-  const others = members.filter((p) => waitingIn(p) === 0).sort((a, b) => pname(a).localeCompare(pname(b)));
+  const members = w.members.map((m) => state.projects.find((x) => x.id === m.project_id)).filter(Boolean)
+    .sort((a, b) => waitingIn(b) - waitingIn(a) || pname(a).localeCompare(pname(b)));
+  const waiting = members.reduce((n, p) => n + waitingIn(p), 0);
   const SHOW = 6;
   return h("article", { class: "pcard wscard" },
-    h("a", { class: "ptitle", href: workspaceHref(w.name) }, h("span", {}, wname(w)), h("span", { class: "count" }, `${members.length} project(s)`)),
-    strip,
-    h("div", { class: "hcounts" }, kinds.map((k) => h("span", { class: `glyph g-${k}` }, STATE_GLYPH[k], h("span", { class: "gtext" }, ` ${count[k]} ${STATE_WORD[k]}`)))),
-    waiting.length ? h("div", { class: "wswait" }, h("div", { class: "k" }, `${waiting.length} project(s) wait for you`),
-      h("div", { class: "pchips" }, waiting.slice(0, 4).map((p) => go(p, waitingIn(p))),
-        waiting.length > 4 && h("a", { class: "pchip more", href: workspaceHref(w.name, "members") }, `+${waiting.length - 4} more`)))
-      : h("div", { class: "okay" }, "✓ nothing waiting"),
-    h("div", { class: "pchips" }, others.slice(0, SHOW).map(go),
-      others.length > SHOW && h("a", { class: "pchip more", href: workspaceHref(w.name) }, `+${others.length - SHOW} more`)));
+    h("a", { class: "ptitle", href: workspaceHref(w.name), onclick: () => { state.lastWs = w.name; } },
+      h("span", { class: "wsname" }, icon("workspace"), wname(w)),
+      h("span", { class: "count" }, waiting ? `${waiting} waiting` : plural(members.length, "project"))),
+    // a row per member: its state, name, language and what waits
+    !members.length && h("div", { class: "wsempty" }, h("p", { class: "muted small" }, "No projects yet."),
+      h("button", { class: "small", type: "button", onclick: () => addProjectsWizard(w, state.projects) }, icon("plus"), "Add projects")),
+    h("div", { class: "wsrows" }, members.slice(0, SHOW).map((p) => h("a", { class: "wsrow", href: projectHref(p.id), onclick: () => { state.lastWs = w.name; } },
+      projectMark(p), h("span", { class: "nname" }, pname(p)), stateGlyph(p.live),
+      (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id])),
+      h("span", { class: "nslot" }, waitingIn(p) > 0 && h("span", { class: "badge" }, waitingIn(p)))))),
+    members.length > SHOW && h("a", { class: "small", href: workspaceHref(w.name, "members") }, `+${members.length - SHOW} more →`),
+    members.length > 0 && wsFooter(members));
+}
+
+// wsFooter sums a workspace's members up in a line: their context hits
+// (each answer's share, the members' mean), when an agent last worked in
+// one, and what is not fine.
+function wsFooter(members) {
+  const scored = members.filter((p) => p.live.context_answers_30d > 0);
+  const rate = scored.length ? scored.reduce((n, p) => n + p.live.context_hit_rate_30d, 0) / scored.length : null;
+  const last = members.map((p) => p.last_mcp).filter(Boolean).sort().pop();
+  const count = {};
+  for (const p of members) count[stateKind(p.live)] = (count[stateKind(p.live)] || 0) + 1;
+  const notFine = ["bad", "warn", "stale"].filter((k) => count[k]);
+  return h("div", { class: "wsfoot" },
+    rate != null && h("span", { class: "wsstat", title: "get_context hits per answer, the members' mean over 30 days" }, miniRing(rate, "r-context"), `${pct(rate)} context hits`),
+    last && h("span", { class: "wsstat" }, icon("calm"), `agents ${ago(last)}`),
+    notFine.map((k) => h("span", { class: `wsstat glyph g-${k}` }, stateIcon(k), `${count[k]} ${STATE_WORD[k]}`)));
+}
+
+// --- since your last visit (TASK-0057) ---
+// sinceVisit says what happened since this browser last opened the page
+// (Home or a project): agents' calls, tasks done, knowledge changes. The
+// time of the last visit is kept per browser; a live redraw keeps the one
+// this visit started from.
+const visitFrom = {};
+function sinceVisit(projectID) {
+  const key = "seen." + (projectID || "home");
+  if (!(key in visitFrom)) { visitFrom[key] = store.get(key, ""); store.set(key, new Date().toISOString()); }
+  const prev = visitFrom[key];
+  const box = h("div", {});
+  if (!prev || Date.now() - new Date(prev).getTime() < 60 * 60 * 1000) return box; // first visit, or back within the hour
+  const qs = new URLSearchParams({ days: "7", limit: "300" });
+  if (projectID) qs.set("project", projectID);
+  api(`/api/activity?${qs}`).then((r) => {
+    const from = new Date(prev).getTime();
+    const xs = (r.items || []).filter((x) => new Date(x.at).getTime() > from);
+    const calls = xs.filter((x) => x.kind === "session").reduce((n, x) => n + (x.calls || 0), 0);
+    const done = xs.filter((x) => x.kind === "task" && / done: /.test(x.title)).length;
+    const other = xs.filter((x) => x.kind === "task").length - done;
+    const know = xs.filter((x) => x.kind === "memory").length;
+    const parts = [calls && plural(calls, "agent call"), done && `${plural(done, "task")} done`, other && plural(other, "other task change"), know && plural(know, "knowledge change")].filter(Boolean);
+    if (!parts.length) return;
+    fill(box, h("div", { class: "since" }, h("span", { class: "since-ico", "aria-hidden": "true" }, "✦"),
+      h("span", {}, h("b", {}, `Since your last visit ${ago(prev)}: `), parts.join(" · ")),
+      h("a", { href: "#activity", class: "small", onclick: (ev) => { ev.preventDefault(); document.querySelector(".sidecol")?.scrollIntoView({ block: "start", behavior: "smooth" }); } }, "see the activity")));
+  }).catch(() => {});
+  return box;
 }
 
 // --- activity (7 days) ---
 const ACTIVITY_ICON = { session: "◆", task: "✓", memory: "✎", sync: "↻" };
+const CLIENT_SHORT = { "claude-code": "Claude Code", codex: "Codex" };
 // activitySection loads what happened (across the machine, or in one
-// project) and lists it newest first.
+// project): a strip of the 7 days (agents' calls per day, failed ones
+// apart, with the task and knowledge changes), then the newest first, one
+// line each.
 function activitySection(projectID) {
-  const qs = new URLSearchParams({ days: "7", limit: projectID ? "15" : "30" });
+  const qs = new URLSearchParams({ days: "7", limit: "300" });
   if (projectID) qs.set("project", projectID);
   const list = mount({ project: projectID || null, anyProject: !projectID, kinds: ["activity", "tasks", "knowledge", "sync"], load: async () => {
     const items = (await api(`/api/activity?${qs}`)).items || [];
-    return items.length ? h("ol", { class: "activity" }, items.map((x) => activityRow(x, !projectID)))
-      : h("p", { class: "empty" }, "Nothing happened in the last 7 days.");
+    if (!items.length) return emptyState("calm", "A quiet week", "No agent session, task or knowledge change in the last 7 days.");
+    const SHOW = projectID ? 8 : 10;
+    const rows = h("ol", { class: "activity" }, items.slice(0, SHOW).map((x) => activityRow(x, !projectID)));
+    const more = items.length > SHOW && h("button", { class: "ghost small actmore", onclick: (ev) => {
+      fill(rows, items.map((x) => activityRow(x, !projectID))); ev.currentTarget.remove();
+    } }, `Show all ${items.length}`);
+    return h("div", {}, activityStrip(items), rows, more);
   } });
-  return section(projectID ? "Recent activity" : "Activity", "The last 7 days: agent sessions, task and knowledge changes, syncs.", list);
+  return section(projectID ? "Recent activity" : "Activity", null, list);
+}
+
+// activityStrip: the last 7 days, a bar each of the agents' calls (failed
+// ones on top, red) and the day's task and knowledge changes under it.
+function activityStrip(items) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = [...Array(7)].map((_, i) => { const d = new Date(today); d.setDate(d.getDate() - 6 + i); return { d, calls: 0, failed: 0, sessions: 0, changes: 0 }; });
+  for (const x of items) {
+    const t = new Date(x.at); t.setHours(0, 0, 0, 0);
+    const day = days.find((d) => d.d.getTime() === t.getTime());
+    if (!day) continue;
+    if (x.kind === "session") { day.calls += x.calls || 0; day.failed += x.failed || 0; day.sessions++; } else if (x.kind !== "sync") day.changes++;
+  }
+  const most = Math.max(1, ...days.map((d) => d.calls));
+  const total = days.reduce((n, d) => n + d.calls, 0), sessions = days.reduce((n, d) => n + d.sessions, 0), changes = days.reduce((n, d) => n + d.changes, 0);
+  const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return h("div", { class: "astrip" },
+    h("div", { class: "asum" }, h("b", {}, plural(total, "call")), h("span", { class: "muted" }, ` in ${plural(sessions, "session")}`, changes ? ` · ${plural(changes, "change")} to tasks and knowledge` : "")),
+    h("div", { class: "alegend", "aria-hidden": "true" },
+      h("span", {}, h("i", { class: "lk calls" }), "agents' calls"), h("span", {}, h("i", { class: "lk failed" }), "failed"),
+      h("span", {}, h("i", { class: "lk chg" }), "a task or knowledge change")),
+    h("div", { class: "abars", role: "img", "aria-label": days.map((d) => `${WD[d.d.getDay()]}: ${d.calls} calls`).join(", ") }, days.map((d, i) => {
+      const bar = h("div", { class: "abar" + (d.calls ? "" : " none") });
+      bar.style.setProperty("--h", `${Math.max(d.calls ? 6 : 2, Math.round((d.calls / most) * 100))}%`);
+      bar.style.setProperty("--f", `${d.calls ? Math.round((d.failed / d.calls) * 100) : 0}%`);
+      return h("div", { class: "aday" + (i === 6 ? " today" : ""), title: `${d.d.toDateString()}: ${plural(d.calls, "call")} (${d.failed} failed) in ${plural(d.sessions, "session")}; ${plural(d.changes, "change")}` },
+        h("span", { class: "anum" }, d.calls || ""), h("div", { class: "acol" }, bar),
+        h("span", { class: "achg", "aria-hidden": "true" }, d.changes ? "●".repeat(Math.min(d.changes, 4)) : ""),
+        h("span", { class: "awd" }, i === 6 ? "today" : WD[d.d.getDay()]));
+    })));
 }
 
 function activityRow(x, showProject) {
   const href = x.kind === "task" ? projectHref(x.project_id, "work", x.ref) : x.kind === "memory" ? projectHref(x.project_id, "knowledge")
     : x.kind === "sync" ? projectHref(x.project_id, "health") : projectHref(x.project_id, "agents", "tools");
+  // line one: what and when; line two: where, who and the detail
+  const when = h("span", { class: "act-when", title: x.at }, ago(x.at));
+  const where = showProject && x.project && h("a", { class: "act-proj", href: projectHref(x.project_id) }, markFor(x.project_id), x.project);
+  if (x.kind === "session") {
+    return h("li", { class: "act session" + (x.level ? ` lv-${x.level}` : "") },
+      h("span", { class: "act-ico k-session", "aria-hidden": "true" }, (CLIENT_SHORT[x.actor] || x.actor || "?").slice(0, 1)),
+      h("div", { class: "act-body" },
+        h("div", { class: "act-line" },
+          h("a", { href }, h("b", {}, plural(x.calls || 0, "call")), h("span", { class: "muted" }, ` ${x.span || ""}`)),
+          x.failed > 0 && h("span", { class: "act-fail" }, `${x.failed} failed`), when),
+        h("div", { class: "act-tools", title: x.detail || "" }, where, where && " · ", CLIENT_SHORT[x.actor] || x.actor || "an agent", x.detail && ` · ${x.detail}`)));
+  }
   return h("li", { class: "act" + (x.level ? ` lv-${x.level}` : "") },
     h("span", { class: `act-ico k-${x.kind}`, "aria-hidden": "true" }, ACTIVITY_ICON[x.kind] || "•"),
     h("div", { class: "act-body" },
-      h("div", {}, h("a", { href }, x.title), x.level && [" ", levelPill(x.level)]),
-      x.detail && h("div", { class: "act-detail" }, x.detail),
-      h("div", { class: "act-meta" }, h("span", { title: x.at }, ago(x.at)),
-        showProject && [" · ", h("a", { href: projectHref(x.project_id) }, x.project)],
-        x.actor && x.kind !== "session" && ` · ${x.actor}`)));
+      h("div", { class: "act-line" }, h("a", { href }, x.title), x.level && levelPill(x.level), when),
+      (x.detail || where) && h("div", { class: "act-detail" }, where, where && x.detail && " · ", x.detail, x.actor && h("span", { class: "muted" }, ` · ${x.actor}`))));
+}
+
+// rings draws up to three rates as concentric rings, the outer first,
+// with a legend beside: how far each has come. They fill when first seen
+// (key), not again on a live redraw.
+const ringsSeen = new Set();
+function rings(key, xs) {
+  const R = [52, 38, 24], W = 11;
+  const fresh = !ringsSeen.has(key);
+  ringsSeen.add(key);
+  const svg = sv("svg", { class: "rings" + (fresh ? " fresh" : ""), viewBox: "0 0 128 128", role: "img", "aria-label": xs.map((x) => `${x.label}: ${x.text}`).join("; ") },
+    xs.map((x, i) => {
+      const c = 2 * Math.PI * R[i], v = x.value == null ? 0 : Math.max(0, Math.min(1, x.value));
+      const arc = sv("circle", { class: `rarc ${x.cls}`, cx: 64, cy: 64, r: R[i], "stroke-width": W, "stroke-dasharray": `${c}`, "stroke-dashoffset": `${c * (1 - v)}`, transform: "rotate(-90 64 64)" });
+      arc.style.setProperty("--c", `${c}`);
+      // a ring and its legend row light up together
+      const g = sv("g", { class: `rgroup ${x.cls}`, onmouseenter: () => card.dataset.hl = x.cls, onmouseleave: () => delete card.dataset.hl },
+        sv("title", {}, `${x.label}: ${x.text}`),
+        sv("circle", { class: `rtrack ${x.cls}`, cx: 64, cy: 64, r: R[i], "stroke-width": W }), v > 0 && arc);
+      return g;
+    }));
+  const card = h("div", { class: "card ringcard" });
+  fill(card, svg,
+    h("ul", { class: "ringlegend" }, xs.map((x) => h("li", { "data-r": x.cls, onmouseenter: () => card.dataset.hl = x.cls, onmouseleave: () => delete card.dataset.hl },
+      h("a", { href: x.href },
+        h("span", { class: `ringdot ${x.cls}`, "aria-hidden": "true" }),
+        h("span", { class: "rlabel" }, x.label),
+        h("b", { class: "rval" }, x.value == null ? "—" : pct(x.value)),
+        h("span", { class: "muted small rtext" }, x.text, x.delta && h("span", { class: `rdelta ${x.delta.cls}` }, ` · ${x.delta.text}`)),
+        x.spark && h("span", { class: "rspark" }, sparkline(x.spark, x.cls)))))));
+  return card;
+}
+
+// nowCard is what is in flight beside the rings: the tasks claimed or in
+// progress, then the next ready ones, a few each.
+function nowCard(p, all) {
+  const flight = all.filter((x) => ["claimed", "in_progress", "review"].includes(x.status));
+  const ready = all.filter((x) => x.status === "ready");
+  // the state only where it is not "ready" (the heading says so)
+  const row = (x) => h("a", { class: "nowrow", href: projectHref(p.id, "work", x.id) }, x.status !== "ready" && statusPill(x.status),
+    h("span", { class: "mono small muted" }, x.id), h("span", { class: "nowtitle" }, x.title));
+  const shown = [...flight.slice(0, 3), ...ready.slice(0, Math.max(0, 4 - Math.min(flight.length, 3)))];
+  return h("div", { class: "card pad nowcard" },
+    h("div", { class: "label" }, flight.length ? "In flight" : "Next up",
+      h("span", { class: "muted small" }, ` · ${flight.length} in flight · ${ready.length} ready`)),
+    shown.length ? h("div", { class: "nowlist" }, shown.map(row))
+      : [h("p", { class: all.length && all.every((x) => x.status === "done") ? "okay small" : "muted small" },
+        !all.length ? "No tasks yet." : all.every((x) => x.status === "done") ? "✓ Every task is done; the last ones:"
+          : "Nothing in flight or ready: the open tasks wait on others or are deferred. Done last:"),
+        // nothing to pick up: what was finished last, newest first
+        h("div", { class: "nowlist" }, all.filter((x) => x.status === "done")
+          .sort((a, b) => String((b.completion || {}).completed_at || "").localeCompare(String((a.completion || {}).completed_at || ""))).slice(0, 3).map(row))],
+    (flight.length + ready.length) > shown.length && h("a", { class: "small", href: projectHref(p.id, "work", "tasks") }, "All tasks →"));
+}
+
+// sparkline is a small picture of the window's days: bars (counts) or a
+// line (rates; a day without data is a gap).
+function sparkline(d, cls) {
+  const W = 72, H = 18;
+  if (d.bars) {
+    const top = Math.max(1, ...d.bars), bw = W / d.bars.length;
+    return sv("svg", { class: `spark ${cls}`, viewBox: `0 0 ${W} ${H}`, "aria-hidden": "true" },
+      d.bars.map((v, i) => sv("rect", { x: i * bw + 0.5, y: H - (v ? Math.max(2, (v / top) * H) : 1), width: Math.max(bw - 1, 1), height: v ? Math.max(2, (v / top) * H) : 1, class: v ? "sbar" : "sbar zero" })));
+  }
+  const n = d.line.length, step = W / Math.max(1, n - 1);
+  let path = "", pen = false;
+  d.line.forEach((v, i) => {
+    if (v == null) { pen = false; return; }
+    path += `${pen ? "L" : "M"}${(i * step).toFixed(1)},${(H - 1 - v * (H - 2)).toFixed(1)}`;
+    pen = true;
+  });
+  const last = d.line.map((v, i) => [v, i]).filter(([v]) => v != null).pop();
+  return sv("svg", { class: `spark ${cls}`, viewBox: `0 0 ${W} ${H}`, "aria-hidden": "true" },
+    sv("path", { d: path, class: "sline" }), last && sv("circle", { cx: last[1] * step, cy: H - 1 - last[0] * (H - 2), r: 2, class: "sdot" }));
+}
+// weekRate: the context hit rate of the last 7 days against the 7 before
+// (each answer weighs the same), in points.
+function weekRate(days) {
+  const mean = (xs) => { const n = xs.reduce((a, d) => a + d.answers, 0); return n ? xs.reduce((a, d) => a + d.hit_rate * d.answers, 0) / n : null; };
+  const a = mean(days.slice(-7)), b = mean(days.slice(-14, -7));
+  if (a == null || b == null) return null;
+  const pts = Math.round((a - b) * 100);
+  return pts ? { text: `${pts > 0 ? "▲" : "▼"} ${Math.abs(pts)} pts vs the week before`, cls: pts > 0 ? "up" : "down" } : { text: "steady this week", cls: "" };
+}
+// weekDone: tasks completed in the last 7 days.
+function weekDone(days) {
+  const n = days.slice(-7).reduce((a, d) => a + d.done, 0);
+  return n ? { text: `+${n} this week`, cls: "up" } : null;
+}
+
+// miniRing is one rate as a small ring, as the Overview's.
+function miniRing(v, cls) {
+  const r = 9, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, v || 0));
+  return sv("svg", { class: "minring", viewBox: "0 0 24 24", "aria-hidden": "true" },
+    sv("circle", { class: `rtrack ${cls}`, cx: 12, cy: 12, r, "stroke-width": 4 }),
+    f > 0 && sv("circle", { class: `rarc ${cls}`, cx: 12, cy: 12, r, "stroke-width": 4, "stroke-dasharray": `${c}`, "stroke-dashoffset": `${c * (1 - f)}`, transform: "rotate(-90 12 12)" }));
 }
 
 // --- project overview ---
 async function viewOverview(p) {
   const l = p.live;
-  const [ts, rep] = await Promise.allSettled([api(projectAPI(p, "tasks")), api(projectAPI(p, `report?days=${state.days}`))]);
+  const [ts, rep, tr] = await Promise.allSettled([api(projectAPI(p, "tasks")), api(projectAPI(p, `report?days=${state.days}`)), api(projectAPI(p, `trends?days=${state.days}`))]);
   const all = ts.status === "fulfilled" ? ts.value.tasks || [] : [];
+  const days = tr.status === "fulfilled" ? tr.value.days || [] : [];
   const fs = rep.status === "fulfilled" ? rep.value.findings || [] : [];
   const st = rep.status === "fulfilled" ? rep.value.context || {} : {};
   const done = all.filter((x) => x.status === "done").length;
   const items = [];
-  if (l.pending_proposals > 0) items.push(["warn", `${l.pending_proposals} proposal(s) wait for review`, projectHref(p.id, "knowledge", "inbox")]);
-  if (l.pending_arch_proposals > 0) items.push(["warn", `${l.pending_arch_proposals} architectural proposal(s) wait for review`, projectHref(p.id, "work", "inbox")]);
-  if (l.checks_failed > 0) items.push(["problem", `${l.checks_failed} doctor check(s) failing`, projectHref(p.id, "health")]);
-  if (l.stale) items.push(["warn", l.stale, projectHref(p.id, "health")]);
+  if (l.pending_proposals > 0) items.push(["warn", `${plural(l.pending_proposals, "knowledge proposal")} ${l.pending_proposals === 1 ? "waits" : "wait"} for review`, projectHref(p.id, "knowledge", "inbox")]);
+  if (workProposals(l) > 0) items.push(["warn", `${plural(workProposals(l), "task proposal")} ${workProposals(l) === 1 ? "waits" : "wait"} for review`, projectHref(p.id, "work", "inbox")]);
+  if (l.checks_failed > 0) items.push(["problem", `${plural(l.checks_failed, "doctor check")} failing`, projectHref(p.id, "health")]);
+  // an index going stale is the header's badge (its sentence on hover), not a row here
   for (const x of all.filter((x) => x.status === "blocked")) items.push(["warn", `${x.id} is blocked${x.blocked_reason ? ": " + x.blocked_reason : ""}`, projectHref(p.id, "work", x.id)]);
-  for (const f of fs.filter((f) => f.level === "problem" || f.level === "warn").slice(0, 5)) items.push([f.level, f.message, projectHref(p.id, "agents", "findings")]);
+  // the proposals' finding is the Inbox row above
+  const act = userFindings(fs).filter((f) => (f.level === "problem" || f.level === "warn") && f.status !== "resolved" && f.problem !== "proposals");
+  for (const g of providerGroups(act)) items.push([g.level, providerLine(g), projectHref(p.id, "agents")]);
+  for (const f of act.filter((f) => !f.provider).slice(0, 5)) items.push([f.level, f.message, projectHref(p.id, "agents")]);
   const rank = { problem: 0, warn: 1, info: 2 };
   items.sort((a, b) => rank[a[0]] - rank[b[0]]);
-  return h("div", {},
-    h("div", { class: "tiles" },
-      h("a", { class: "tile link", href: projectHref(p.id, "agents", "context") }, h("div", { class: "label" }, "Context hits"),
-        h("div", { class: "value" }, st.changed ? pct(st.hit_rate) : "—"),
-        st.changed ? [rateBar(st.hit_rate), h("div", { class: "note" }, `${st.hits} of ${st.changed} changed files were in an answer`)] : h("div", { class: "note" }, "no scored answers yet")),
-      h("a", { class: "tile link", href: projectHref(p.id, "work") }, h("div", { class: "label" }, "Tasks"),
-        h("div", { class: "value" }, all.length ? `${done} of ${all.length}` : "—"),
-        all.length ? [taskBar(all, false), h("div", { class: "note" }, `${all.filter((x) => x.status === "ready").length} ready to take`)] : h("div", { class: "note" }, "no tasks")),
-      h("a", { class: "tile link", href: projectHref(p.id, "knowledge", "inbox") }, h("div", { class: "label" }, "Proposals"),
-        h("div", { class: "value" }, l.pending_proposals || 0), h("div", { class: "note" }, l.pending_proposals ? "waiting in the Inbox" : "nothing waiting"))),
+  const ar = st.after_read || {};
+  return h("div", {}, sinceVisit(p.id),
+    h("div", { class: "ovtop" },
+      rings(`p:${p.id}`, [
+        { label: "Tasks done", value: all.length ? done / all.length : null, text: all.length ? `${done} of ${all.length}` : "no tasks", cls: "r-tasks", href: projectHref(p.id, "work"),
+          spark: days.some((d) => d.done) ? { bars: days.map((d) => d.done) } : null, delta: weekDone(days) },
+        { label: "Context hits", value: st.changed ? st.hit_rate : null, text: st.changed ? `${pct(st.hit_rate)} per answer` : "not scored yet", cls: "r-context", href: projectHref(p.id, "agents"),
+          spark: days.filter((d) => d.answers).length >= 2 ? { line: days.map((d) => (d.answers ? d.hit_rate : null)) } : null, delta: weekRate(days) },
+        { label: "Read next", value: ar.touched ? ar.hit_rate : null, text: ar.touched ? `${ar.hits} of ${ar.touched} files` : "needs the client hooks", cls: "r-read", href: projectHref(p.id, "agents") },
+      ]),
+      nowCard(p, all),
+      h("a", { class: "tile link", href: l.pending_proposals || !workProposals(l) ? projectHref(p.id, "knowledge", "inbox") : projectHref(p.id, "work", "inbox") }, h("div", { class: "label" }, "Proposals to review"),
+        h("div", { class: "value" }, (l.pending_proposals || 0) + workProposals(l)),
+        h("div", { class: "note" }, (l.pending_proposals || 0) + workProposals(l) ? `${l.pending_proposals || 0} knowledge · ${workProposals(l)} tasks` : "nothing waiting"))),
     h("div", { class: "withside" },
       h("div", { class: "mainside" },
         section("Needs attention", "What waits for a person in this project, most urgent first.",
-          items.length ? h("ul", { class: "attn" }, items.map(([lv, msg, href]) => h("li", {}, levelPill(lv), h("a", { href }, msg))))
-            : h("p", { class: "okay" }, "✓ Nothing waits for you here.")),
-        fs.length > 0 && h("p", { class: "section" }, h("a", { href: projectHref(p.id, "agents", "findings") }, `All ${fs.length} findings of harness report, with their actions →`))),
+          items.length ? h("ul", { class: "attn rows" }, items.map(([lv, msg, href]) => h("li", { class: `lv-${lv}` }, levelPill(lv), h("a", { href }, msg))))
+            : emptyState("check", "All clear", "Nothing waits for you in this project.")),
+        userFindings(fs).length > 0 && h("p", { class: "section" }, h("a", { href: projectHref(p.id, "agents") }, `How harness serves your agents, and what to change →`))),
       h("aside", { class: "sidecol" }, activitySection(p.id))));
 }
 
 // --- machine ---
 async function renderMachine(main) {
   const m = await api("/api/machine").catch((e) => ({ error: e.message }));
-  const viewSel = h("select", { "aria-label": "Default project view", onchange: (ev) => { store.set("projectView", ev.target.value); } },
-    PROJECT_VIEWS.map(([v, label]) => h("option", { value: v, selected: v === defaultView() }, label)));
-  const themeSel = h("select", { "aria-label": "Theme", onchange: (ev) => { store.set("theme", ev.target.value); applyTheme(); } },
-    THEMES.map((t) => h("option", { value: t, selected: t === store.get("theme", "system") }, t === "system" ? "follow the system" : t)));
-  const b = m.build || {}, t = m.telemetry || {}, paths = m.paths || {};
-  fill(main, 
+  // segmented choices: every option in view, the chosen one lit
+  const seg = (label, opts, cur, pick) => {
+    const box = h("div", { class: "seg", role: "radiogroup", "aria-label": label });
+    const draw = (c) => fill(box, opts.map(([v, text]) => h("button", { type: "button", role: "radio", "aria-checked": String(v === c), onclick: () => { pick(v); draw(v); } }, text)));
+    draw(cur);
+    return box;
+  };
+  const b = m.build || {}, paths = m.paths || {};
+  const tel = h("div", {});
+  const drawTel = (t, editing, err) => fill(tel, telemetryCard(t || {}, editing, err, drawTel));
+  drawTel(m.telemetry);
+  fill(main,
     h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, "Machine")),
       h("p", { class: "path" }, "This harness installation, where its state lives, and this page's settings.")),
     m.error && h("p", { class: "error" }, m.error),
-    section("Settings", "Kept in this browser.", h("div", { class: "card pad" }, kv([
-      ["Open projects on", viewSel],
-      ["Theme", themeSel],
-    ]))),
-    section("harness", null, h("div", { class: "card pad" }, kv([
-      ["Version", b.version], ["Commit", b.commit && h("code", {}, b.commit.slice(0, 12))], ["Built", b.date], ["Platform", b.platform], ["Runtime", b.runtime],
-    ]))),
+    section("Settings", "Kept in this browser.", h("div", { class: "card pad settings" },
+      h("div", { class: "setrow" }, h("div", {}, h("b", {}, "Theme"), h("p", { class: "muted small" }, "Follow the system, or always light or dark.")),
+        seg("Theme", THEMES.map((t) => [t, t === "system" ? "System" : t[0].toUpperCase() + t.slice(1)]), store.get("theme", "system"), (v) => { store.set("theme", v); applyTheme(); })),
+      h("div", { class: "setrow" }, h("div", {}, h("b", {}, "Open projects on"), h("p", { class: "muted small" }, "The view a project opens on from the sidebar.")),
+        seg("Default project view", PROJECT_VIEWS, defaultView(), (v) => store.set("projectView", v))))),
+    section("Developer telemetry", "Anonymous, aggregated numbers for the harness developer: how well harness serves agents. Never code, paths, queries or names.", tel),
     section("C# sessions (graphify-csharp)", "Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone.",
       graphifySessions(null)),
     section("State", "Machine-wide files; each project keeps its own state in its .harness folder.", h("div", { class: "card pad" }, kv([
-      ["Global folder", paths.global && h("code", {}, paths.global)], ["Project registry", paths.registry && h("code", {}, paths.registry)],
-      ["Workspaces", paths.workspaces && h("code", {}, paths.workspaces)], ["Workspace and user knowledge", paths.knowledge && h("code", {}, paths.knowledge)],
+      // the folder once, the files in it by name
+      ["Global folder", paths.global && h("code", {}, paths.global)],
+      ...[["Project registry", paths.registry], ["Workspaces", paths.workspaces], ["Workspace and user knowledge", paths.knowledge]].map(([k, v]) =>
+        [k, v && h("code", { title: v }, paths.global && v.startsWith(paths.global + "/") ? v.slice(paths.global.length + 1) : v)]),
     ]))),
-    section("Developer telemetry", "Opt-in aggregated reports to the harness developer ('harness telemetry'). Never code, paths or names.",
-      h("div", { class: "card pad" }, kv([
-        ["State", t.enabled ? h("span", { class: "okay" }, "✓ on") : "off"],
-        ["Endpoint", t.endpoint && h("code", {}, t.endpoint)],
-        ["Last sent", t.last_sent ? ago(t.last_sent) : t.enabled ? "not yet" : ""],
-      ]))));
+    h("p", { class: "muted small buildline" }, `harness ${b.version || "?"}`, b.commit && ` · ${b.commit.slice(0, 12)}`, b.date && ` · built ${b.date.slice(0, 10)}`, b.platform && ` · ${b.platform}`, b.runtime && ` · ${b.runtime}`));
+}
+
+// telemetryCard is the opt-in as a switch: on asks for the collector's
+// endpoint (and token, if it wants one), off stops sending (TASK-0057).
+function telemetryCard(t, editing, err, redraw) {
+  const send = async (body) => {
+    try { redraw((await post("/api/telemetry", body)).telemetry); } catch (e) { redraw(t, editing, e.message); }
+  };
+  const sw = h("button", {
+    type: "button", class: "switch", role: "switch", "aria-checked": String(!!t.enabled), "aria-label": "Share telemetry",
+    onclick: () => t.enabled ? send({ enabled: false }) : redraw(t, true),
+  }, h("span", { class: "knob" }));
+  const endpoint = h("input", { type: "text", value: t.endpoint || "", placeholder: "http://collector.example:8766/v1/report", "aria-label": "Collector endpoint" });
+  const token = h("input", { type: "password", placeholder: t.endpoint ? "(unchanged)" : "if the collector asks for one", "aria-label": "Collector token" });
+  return h("div", { class: "card pad telcard" + (t.enabled ? " on" : "") },
+    h("div", { class: "setrow" },
+      h("div", {}, h("b", {}, t.enabled ? "Sharing" : "Not sharing"),
+        h("p", { class: "muted small" }, t.enabled ? `To ${t.endpoint}; ${t.last_sent ? `last sent ${ago(t.last_sent)}` : "nothing sent yet"}, at most daily after a sync.`
+          : "Turn on to send a daily report to a harness-collect server.")),
+      h("div", { class: "telacts" }, t.enabled && !editing && h("button", { class: "ghost small", type: "button", onclick: () => redraw(t, true) }, "Change…"), sw)),
+    editing && h("form", { class: "telform", onsubmit: (ev) => { ev.preventDefault(); send({ enabled: true, endpoint: endpoint.value.trim(), token: token.value }); } },
+      h("label", {}, h("span", {}, "Collector endpoint"), endpoint),
+      h("label", {}, h("span", {}, "Token"), token),
+      err && h("p", { class: "error" }, err),
+      h("div", { class: "review" }, h("button", { class: "primary", type: "submit" }, t.enabled ? "Save" : "Turn on"), h("button", { class: "ghost", type: "button", onclick: () => redraw(t) }, "Cancel")),
+      h("p", { class: "muted small" }, "'harness telemetry preview' prints exactly what is sent.")));
 }
 
 // --- docs (TASK-0044) ---
@@ -1715,10 +2185,24 @@ async function renderDocs(main, r) {
     h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, "Docs")),
       h("p", { class: "path" }, "The guide and the reference this harness carries; 'harness docs <section>' prints the same.")),
     h("div", { class: "docs" },
-      h("nav", { class: "doclist", "aria-label": "Sections" }, groups.map((g) => h("div", {},
-        h("h4", {}, title(g.doc)),
-        h("ul", {}, g.items.map((s) => h("li", {}, h("a", { href: "#/docs/" + enc(s.slug), "aria-current": s.slug === sec.slug ? "page" : null }, s.title))))))),
-      h("article", { class: "doctext card pad" }, sec.error ? h("p", { class: "error" }, sec.error) : markdown(sec.body || ""))));
+      // a document's first section is its introduction: the heading opens it
+      h("nav", { class: "doclist", "aria-label": "Sections" }, groups.map((g) => {
+        const intro = g.items[0] && g.items[0].title === title(g.doc) ? g.items[0] : null;
+        return h("div", {},
+          h("h4", {}, intro ? h("a", { href: "#/docs/" + enc(intro.slug), "aria-current": intro.slug === sec.slug ? "page" : null }, title(g.doc)) : title(g.doc)),
+          h("ul", {}, g.items.filter((s) => s !== intro).map((s) => h("li", {}, h("a", { href: "#/docs/" + enc(s.slug), "aria-current": s.slug === sec.slug ? "page" : null }, s.title)))));
+      })),
+      h("article", { class: "doctext" }, sec.error ? h("p", { class: "error" }, sec.error) : markdown(sec.body || ""), docsNext(list.sections, sec.slug))));
+}
+
+// docsNext links the section before and after, to read on.
+function docsNext(all, slug) {
+  const i = all.findIndex((s) => s.slug === slug);
+  if (i < 0) return null;
+  const prev = all[i - 1], next = all[i + 1];
+  return h("nav", { class: "docnext", "aria-label": "Read on" },
+    prev ? h("a", { href: "#/docs/" + enc(prev.slug) }, h("span", { class: "muted small" }, "Previous"), h("b", {}, "← " + prev.title)) : h("span", {}),
+    next && h("a", { class: "next", href: "#/docs/" + enc(next.slug) }, h("span", { class: "muted small" }, "Next"), h("b", {}, next.title + " →")));
 }
 
 // markdown renders the docs' Markdown as elements (never as HTML): headings,
@@ -1786,8 +2270,8 @@ function markdown(src) {
 async function renderUserKnowledge(main) {
   fill(main, 
     h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, "Your knowledge")),
-      h("p", { class: "path" }, "Memories at user scope: they apply to every project of yours on this machine.")),
-    await levelKnowledge("user", "Knowledge for every project of yours on this machine; a workspace's or a project's own statement takes precedence."));
+      h("p", { class: "path" }, "Knowledge for every project of yours on this machine; a workspace's or a project's own statement takes precedence.")),
+    mount({ kinds: ["levels"], load: () => levelKnowledge("user", null) }));
 }
 
 // --- search ---
@@ -1822,18 +2306,37 @@ function hitRow(x, onclick) {
     h("span", { class: "hwhere" }, hitWhere(x)));
 }
 
+// SEARCH_HINT: what each kind of result is, for the empty page.
+const SEARCH_HINT = { project: "by name or folder", workspace: "by name", memory: "decisions, conventions, warnings… by their words", task: "by id or title", blueptone: "by id, title or goal" };
 async function renderSearch(main, r) {
-  const head = h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, r.q ? `Search: “${r.q}”` : "Search")),
-    h("p", { class: "path" }, "Projects, workspaces, memories, tasks and blueprints across the machine. Code is searched by agents, with search_project."));
-  if (r.q.length < 2) return fill(main, head, h("p", { class: "empty" }, "Type at least two characters in the search box above."));
+  const head = h("div", { class: "phead" }, h("div", { class: "title" }, h("h2", {}, "Search")),
+    h("p", { class: "path" }, "Projects, workspaces, knowledge, tasks and blueprints across the machine. Agents search the code."));
+  const field = h("input", { type: "search", class: "bigsearch", value: r.q, placeholder: "Search everything…", "aria-label": "Search everything", autofocus: true });
+  const form = h("form", { class: "bigform", role: "search", onsubmit: (ev) => { ev.preventDefault(); location.hash = `#/search?q=${enc(field.value.trim())}`; } },
+    icon("search"), field);
+  setTimeout(() => { if (document.activeElement !== field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); } }, 0);
+  if (r.q.length < 2) {
+    return fill(main, head, form, h("div", { class: "kindcards" }, SEARCH_KINDS.map(([k, label]) => h("div", { class: "kindcard" },
+      h("b", {}, label), h("span", { class: "muted small" }, SEARCH_HINT[k])))));
+  }
   const res = await api(`/api/search?q=${enc(r.q)}`);
   const hits = res.hits || [];
-  const groups = SEARCH_KINDS.map(([k, label]) => {
-    const xs = hits.filter((x) => x.kind === k);
-    return xs.length && h("section", { class: "section hits" }, h("h3", {}, label, " ", h("span", { class: "count" }, xs.length >= res.per_kind ? `${xs.length}+` : xs.length)),
-      h("div", { class: "hitlist" }, xs.map((x) => hitRow(x))));
-  }).filter(Boolean);
-  fill(main, head, groups.length ? groups : h("p", { class: "empty" }, `Nothing matches “${r.q}”.`));
+  const off = new Set();
+  const chips = h("div", { class: "filters" });
+  const out = h("div", {});
+  function draw() {
+    fill(chips, SEARCH_KINDS.filter(([k]) => hits.some((x) => x.kind === k)).map(([k, label]) => h("button", {
+      class: "chip", "aria-pressed": String(!off.has(k)), onclick: () => { off.has(k) ? off.delete(k) : off.add(k); draw(); },
+    }, label, h("span", { class: "count" }, hits.filter((x) => x.kind === k).length))));
+    const groups = SEARCH_KINDS.filter(([k]) => !off.has(k)).map(([k, label]) => {
+      const xs = hits.filter((x) => x.kind === k);
+      return xs.length && h("section", { class: "section hits" }, h("h3", {}, label, " ", h("span", { class: "count" }, xs.length >= res.per_kind ? `${xs.length}+` : xs.length)),
+        h("div", { class: "hitlist" }, xs.map((x) => hitRow(x))));
+    }).filter(Boolean);
+    fill(out, groups.length ? groups : emptyState("search", `Nothing matches “${r.q}”`, "Try fewer or other words: names, ids, or a phrase from a memory."));
+  }
+  draw();
+  fill(main, head, form, chips, out);
 }
 
 // quickSearch shows the top results under the search box while typing;
@@ -1887,7 +2390,7 @@ function membersManage(w) {
   const all = h("input", { type: "checkbox", "aria-label": "Select all shown" });
   function shown() {
     return members.filter(({ m, p }) => !q || (p ? pname(p) : m.project).toLowerCase().includes(q) || (m.root || "").toLowerCase().includes(q))
-      .sort((a, b) => (b.p ? waitingIn(b.p) : 0) - (a.p ? waitingIn(a.p) : 0) || (a.p ? pname(a.p) : a.m.project).localeCompare(b.p ? pname(b.p) : b.m.project));
+      .sort((a, b) => (a.p ? pname(a.p) : a.m.project).localeCompare(b.p ? pname(b.p) : b.m.project)); // by name, as the sidebar
   }
   function update() {
     removeBtn.disabled = !sel.size;
@@ -1917,141 +2420,241 @@ function membersManage(w) {
     const ids = [...sel];
     const name = (id) => { const x = members.find(({ m }) => m.project_id === id); return x && x.p ? pname(x.p) : id; };
     fill(box, reviewPanel({
-      title: `Remove ${ids.length} project(s) from ${wname(w)}?`, lines: ids.map((id) => `− ${name(id)}`).concat([`Their own state and the other members stay as they are.`]),
+      title: `Remove ${plural(ids.length, "project")} from ${wname(w)}?`, lines: ids.map((id) => `− ${name(id)}`).concat([`Their own state and the other members stay as they are.`]),
       confirm: "Remove", danger: true, onBack: () => fill(box),
       onConfirm: async () => { for (const id of ids) await post(`/api/workspaces/${enc(w.name)}/leave`, { project_id: id }); await afterWrite(); },
     }));
   });
   const filter = h("input", { type: "search", placeholder: "Filter members", "aria-label": "Filter members", oninput: (ev) => { q = ev.target.value.trim().toLowerCase(); draw(); } });
+  const dbox = h("div", {});
   draw();
   return h("div", {},
     h("div", { class: "deptools" }, filter,
       removeBtn,
-      others.length > 0 && h("button", { onclick: () => fill(box, pickProjects({
-        title: `Add projects to ${wname(w)}`, projects: others, checked: new Set(), submit: "Review",
-        onBack: () => fill(box),
-        onPick: (ids) => fill(box, reviewPanel({
-          title: `Add ${ids.length} project(s) to ${wname(w)}?`, lines: ids.map((id) => `+ ${projectLabel(id)}`), confirm: "Add",
-          onBack: () => fill(box),
-          onConfirm: async () => { await post(`/api/workspaces/${enc(w.name)}/join`, { project_ids: ids }); await afterWrite(); },
-        })),
-      })) }, "Add projects"),
-      h("span", { class: "spacer" }),
-      h("button", { class: "ghost danger-text", onclick: () => fill(box, reviewPanel({
-        title: `Delete workspace ${wname(w)}?`, lines: [`The workspace and its membership list go; its ${w.members.length} project(s) keep all their state.`,
-          "Knowledge recorded at workspace scope stays on disk but no longer applies to any project."],
-        confirm: "Delete workspace", danger: true, onBack: () => fill(box),
-        onConfirm: async () => { await post(`/api/workspaces/${enc(w.name)}/delete`, {}); location.hash = "#/"; await refresh(); },
-      })) }, "Delete workspace")),
+      others.length > 0 && h("button", { onclick: () => addProjectsWizard(w, others) }, "Add projects")),
     box,
     common && h("p", { class: "hint" }, "Paths under ", h("code", {}, common)),
     h("div", { class: "card" }, h("table", { class: "members" },
       h("thead", {}, h("tr", {}, h("th", { class: "cbx" }, all), h("th", {}, "project"), h("th", {}, "state"), h("th", {}, "stack"), h("th", { class: "n" }, "waiting"), h("th", {}, "synced"), h("th", {}, "agent used"), h("th", {}, "context hits"), h("th", {}, "path"))),
-      tbody)));
+      tbody)),
+    // what cannot be taken back, apart at the bottom
+    h("div", { class: "card pad danger-zone" },
+      h("div", {}, h("b", {}, "Delete this workspace"), h("p", { class: "muted small" }, "Its projects keep all their state; its workspace knowledge no longer applies.")),
+      h("button", { class: "ghost danger-text", onclick: () => fill(dbox, reviewPanel({
+        title: `Delete workspace ${wname(w)}?`, lines: [`The workspace and its membership list go; its ${plural(w.members.length, "project")} keep all their state.`,
+          "Knowledge recorded at workspace scope stays on disk but no longer applies to any project."],
+        confirm: "Delete workspace", danger: true, onBack: () => fill(dbox),
+        onConfirm: async () => { await post(`/api/workspaces/${enc(w.name)}/delete`, {}); location.hash = "#/"; await refresh(); },
+      })) }, "Delete workspace…")),
+    dbox);
 }
 
 const projectLabel = (id) => { const p = state.projects.find((x) => x.id === id); return p ? `${pname(p)}  ${p.root}` : id; };
 
 // createForm: a name, and optionally the registered projects under a
 // folder, all shown checked for review before anything is created.
-function createForm(box) {
-  const nameIn = h("input", { type: "text", name: "ws-name", placeholder: "e.g. company", "aria-label": "Workspace name" });
-  const titleIn = h("input", { type: "text", name: "ws-title", placeholder: "e.g. Company services (optional)", "aria-label": "Display name" });
-  const folderIn = h("input", { type: "text", name: "ws-folder", placeholder: "/path/to/folder (optional)", "aria-label": "Folder" });
-  const err = h("p", { class: "error", hidden: true });
-  const fail = (m) => { err.textContent = m; err.hidden = false; };
-  const next = async (ev) => {
-    ev.preventDefault();
-    const name = nameIn.value.trim();
-    const title = titleIn.value.trim().replace(/\s+/g, " ");
-    if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) return fail("Use lower-case letters, digits, '.', '_' or '-' (starting with a letter or digit).");
-    let checked = new Set();
-    const folder = folderIn.value.trim();
-    if (folder) {
-      try {
-        const found = await api(`/api/workspaces/discover?folder=${encodeURIComponent(folder)}`);
-        checked = new Set(found.projects.map((p) => p.project_id));
-        if (!checked.size) return fail(`No registered projects under ${found.folder}.`);
-      } catch (e) { return fail(e.message); }
-    }
-    fill(box, pickProjects({
-      title: `Projects in ${name}` + (folder ? ` (those under ${folder} are checked)` : ""), projects: state.projects, checked,
-      submit: "Review", allowNone: true, onBack: () => fill(box, createForm(box)),
-      onPick: (ids) => fill(box, reviewPanel({
-        title: `Create workspace ${title || name}?`, lines: [title && `shown as “${title}”, short name ${name}`, ...(ids.length ? ids.map((id) => `+ ${projectLabel(id)}`) : ["No projects yet; add them later."])].filter(Boolean),
-        confirm: "Create", onBack: () => fill(box, createForm(box)),
-        onConfirm: async () => { await post("/api/workspaces", { name, title, project_ids: ids }); location.hash = workspaceHref(name); refresh(); },
-      })),
-    }));
+// --- dialogs (TASK-0057) ---
+// dialog opens a centred dialog over a dimmed page (the browser's own:
+// focus stays inside, Esc closes it) with a title, a body that can change
+// (wizard steps) and its buttons; it removes itself when closed.
+function dialog({ title, sub, wide }) {
+  const head = h("div", { class: "dlg-head" }, h("div", {}, h("h3", { class: "dlg-title" }, title), sub && h("p", { class: "muted small" }, sub)),
+    iconButton("close", "Close", () => d.close()));
+  const body = h("div", { class: "dlg-body" });
+  const foot = h("div", { class: "dlg-foot" });
+  const d = h("dialog", { class: "dlg" + (wide ? " wide" : "") }, head, body, foot);
+  d.addEventListener("close", () => d.remove());
+  d.addEventListener("click", (ev) => { if (ev.target === d) d.close(); }); // a click on the backdrop
+  document.body.append(d);
+  d.showModal();
+  return {
+    el: d, body, foot,
+    set(title2, nodes, buttons) { if (title2) head.querySelector(".dlg-title").textContent = title2; fill(body, nodes); fill(foot, buttons); setTimeout(() => body.querySelector("input:not([type=checkbox])")?.focus(), 0); },
+    close: () => d.close(),
   };
-  return h("form", { class: "aform", onsubmit: next },
-    h("p", { class: "hint" }, "New workspace"),
-    h("label", {}, h("span", {}, "Short name (what agents and commands use)"), nameIn),
-    h("label", {}, h("span", {}, "Display name (any text, optional)"), titleIn),
-    h("label", {}, h("span", {}, "Find registered projects under a folder"), folderIn),
-    err,
-    h("div", { class: "review" }, h("button", { class: "primary", type: "submit" }, "Next"),
-      h("button", { type: "button", class: "ghost", onclick: () => fill(box) }, "Cancel")));
 }
+// field is a labelled input with its hint under it.
+function field(label, input, hint) {
+  // a label only around one field: a label forwards a click anywhere in it
+  // to its first control, which would make a group of buttons pick its first
+  const one = /^(INPUT|TEXTAREA|SELECT)$/.test(input.tagName);
+  return h(one ? "label" : "div", { class: "dfield" }, h("span", { class: "dlabel" }, label), input, hint && h("span", { class: "dhint" }, hint));
+}
+// stepper shows a wizard's steps, the current one lit.
+function stepper(steps, at) {
+  return h("ol", { class: "stepper" }, steps.map((t, i) => h("li", { class: i < at ? "done" : i === at ? "on" : "" }, h("span", { class: "sn" }, i < at ? "✓" : i + 1), t)));
+}
+const slug = (t) => t.toLowerCase().normalize("NFKD").replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
 
-// renameForm changes a display name (any text) and a short name (what
-// commands, scopes and workspace results use), reviewed before it is sent.
-function renameForm({ what, display, short, folder, box, send }) {
-  const dIn = h("input", { type: "text", name: "rn-display", "aria-label": "Display name", placeholder: what === "project" ? folder : short });
-  dIn.value = display;
-  const sIn = h("input", { type: "text", name: "rn-short", "aria-label": "Short name", placeholder: folder || "" });
-  sIn.value = short;
-  const err = h("p", { class: "error", hidden: true });
+// renameDialog changes a project's or a workspace's names: a live preview,
+// what will change, Save.
+function renameDialog({ what, display, short, folder, mark, send }) {
+  const dlg = dialog({ title: `Rename this ${what}`, sub: what === "workspace" ? "Only the machine's workspace list changes." : "Only the machine's project registry changes; the repository and its .harness state are untouched." });
+  const dIn = h("input", { type: "text", value: display, placeholder: what === "project" ? folder : short, maxlength: "80" });
+  const sIn = h("input", { type: "text", value: short, placeholder: folder || "", class: "mono" });
   const shortRule = what === "workspace" ? /^[a-z0-9][a-z0-9._-]{0,63}$/ : /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-  const next = (ev) => {
-    ev.preventDefault();
-    const d = dIn.value.trim().replace(/\s+/g, " "), sh = sIn.value.trim();
-    if (d.length > 80) { err.textContent = "Keep the display name under 80 characters."; err.hidden = false; return; }
-    if ((what === "workspace" || sh) && !shortRule.test(sh)) {
-      err.textContent = what === "workspace" ? "Short name: lower-case letters, digits, '.', '_' or '-'." : "Short name: letters, digits, '.', '_' or '-' (empty: the folder's name).";
-      err.hidden = false; return;
-    }
-    const body = {}, lines = [];
-    if (d !== display) { body.title = d; lines.push(d ? `display name: ${display || "(none)"} → ${d}` : `display name removed (${display})`); }
-    if (sh !== short) {
-      body.name = sh;
-      lines.push(`short name: ${short || folder} → ${sh || folder}`);
-      lines.push(what === "workspace" ? `agents and commands will use workspace:${sh}` : `workspace results will name it ${sh || folder}`);
-    }
-    if (!lines.length) { fill(box); return; }
-    fill(box, reviewPanel({
-      title: `Rename this ${what}?`, lines, confirm: "Rename", onBack: () => fill(box, renameForm({ what, display, short, folder, box, send })),
-      note: what === "workspace" ? WS_NOTE : "Only the machine's project registry changes; the repository and its .harness state are untouched.",
-      onConfirm: async () => { await send(body); await afterWrite(); },
-    }));
+  const preview = h("div", { class: "dpreview" });
+  const changes = h("ul", { class: "dchanges" });
+  const err = h("p", { class: "error", hidden: true });
+  const save = h("button", { class: "primary", type: "button" }, "Save");
+  const state2 = () => ({ d: dIn.value.trim().replace(/\s+/g, " "), sh: sIn.value.trim() });
+  const draw = () => {
+    const { d, sh } = state2();
+    const shown = d || sh || folder || short;
+    fill(preview, mark && projectMark({ ...mark, title: d || undefined, name: sh || mark.name }, true), h("div", {},
+      h("b", { class: "dpname" }, shown), h("div", { class: "muted small mono" }, what === "workspace" ? `workspace:${sh || "…"}` : `short name ${sh || folder}`)));
+    const lines = [];
+    if (d !== display) lines.push(d ? ["Display name", display || "(none)", d] : ["Display name", display, "removed"]);
+    if (sh !== short) lines.push(["Short name", short || folder, sh || folder]);
+    fill(changes, lines.length ? lines.map(([k, a, b]) => h("li", {}, h("span", { class: "muted" }, k), " ", h("s", {}, a), " → ", h("b", {}, b))) : h("li", { class: "muted" }, "Nothing changed yet."));
+    const bad = (what === "workspace" || sh) && !shortRule.test(sh);
+    err.hidden = !bad;
+    err.textContent = bad ? (what === "workspace" ? "Short name: lower-case letters, digits, '.', '_' or '-'." : "Short name: letters, digits, '.', '_' or '-' (empty: the folder's name).") : "";
+    save.disabled = bad || !lines.length;
   };
-  return h("form", { class: "aform", onsubmit: next },
-    h("p", { class: "hint" }, `Rename this ${what}`),
-    h("label", {}, h("span", {}, "Display name (any text; empty shows the short name)"), dIn),
-    h("label", {}, h("span", {}, what === "workspace" ? "Short name (what agents and commands use)" : "Short name (how workspace results name it; empty: the folder's name)"), sIn),
-    err,
-    h("div", { class: "review" }, h("button", { class: "primary", type: "submit" }, "Review"),
-      h("button", { type: "button", class: "ghost", onclick: () => fill(box) }, "Cancel")));
+  dIn.addEventListener("input", draw);
+  sIn.addEventListener("input", draw);
+  save.addEventListener("click", async () => {
+    const { d, sh } = state2(), body = {};
+    if (d !== display) body.title = d;
+    if (sh !== short) body.name = sh;
+    save.disabled = true;
+    try { await send(body); dlg.close(); await afterWrite(); } catch (e) { err.textContent = e.message; err.hidden = false; save.disabled = false; }
+  });
+  dlg.set(null, [preview,
+    field("Display name", dIn, "Any text, shown everywhere; empty shows the short name."),
+    field("Short name", sIn, what === "workspace" ? "What agents and commands use: workspace:<short name>." : "How workspace results and agents name it; empty: the folder's name."),
+    h("div", { class: "dsum" }, h("div", { class: "dlabel" }, "Will change"), changes), err],
+  [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), save]);
+  draw();
 }
 
-// pickProjects is a checklist of registered projects.
-function pickProjects({ title, projects, checked, submit, allowNone, onPick, onBack }) {
+// projectPicker chooses projects: a filter, a row each with its mark and
+// folder, select what is shown, and (optionally) find those under a
+// folder. It returns the element and the chosen ids.
+function projectPicker(projects, chosen, withFolder) {
+  let q = "";
+  const list = h("div", { class: "pick-list" });
+  const count = h("span", { class: "muted small" });
+  const draw = () => {
+    const shown = projects.filter((p) => !q || pname(p).toLowerCase().includes(q) || p.root.toLowerCase().includes(q));
+    fill(list, shown.length ? shown.map((p) => {
+      const cb = h("input", { type: "checkbox", checked: chosen.has(p.id), onchange: (ev) => { ev.target.checked ? chosen.add(p.id) : chosen.delete(p.id); drawCount(); } });
+      return h("label", { class: "pick-row" + (chosen.has(p.id) ? " on" : "") }, cb, projectMark(p), h("span", { class: "pick-name" }, pname(p)), h("span", { class: "muted small mono pick-path", title: p.root }, shortPath(p.root)));
+    }) : h("p", { class: "muted small" }, "No project matches."));
+    drawCount();
+  };
+  const drawCount = () => {
+    count.textContent = `${chosen.size} chosen`;
+    for (const r of list.querySelectorAll(".pick-row")) r.classList.toggle("on", r.querySelector("input").checked);
+  };
+  const filter = h("input", { type: "search", placeholder: "Filter by name or folder", oninput: (ev) => { q = ev.target.value.trim().toLowerCase(); draw(); } });
+  const all = h("button", { class: "ghost small", type: "button", onclick: () => { for (const p of projects) if (!q || pname(p).toLowerCase().includes(q) || p.root.toLowerCase().includes(q)) chosen.add(p.id); draw(); } }, "Choose all shown");
+  const none = h("button", { class: "ghost small", type: "button", onclick: () => { chosen.clear(); draw(); } }, "None");
+  const folderIn = h("input", { type: "text", placeholder: "/path/to/folder", class: "mono" });
+  const folderMsg = h("span", { class: "muted small" });
+  const find = h("button", { class: "small", type: "button", onclick: async () => {
+    try {
+      const found = await api(`/api/workspaces/discover?folder=${encodeURIComponent(folderIn.value.trim())}`);
+      const ids = found.projects.map((x) => x.project_id).filter((id) => projects.some((p) => p.id === id));
+      ids.forEach((id) => chosen.add(id));
+      folderMsg.textContent = ids.length ? `✓ ${plural(ids.length, "project")} under ${found.folder} chosen` : `No registered project under ${found.folder}.`;
+      draw();
+    } catch (e) { folderMsg.textContent = e.message; }
+  } }, "Find");
+  draw();
+  return {
+    el: h("div", { class: "picker" },
+      h("div", { class: "pick-tools" }, filter, all, none, count),
+      list,
+      withFolder && h("div", { class: "pick-folder" }, h("span", { class: "dlabel" }, "Or choose those under a folder"), h("div", { class: "pick-tools" }, folderIn, find), folderMsg)),
+  };
+}
+
+// workspaceWizard creates a workspace in three steps: its name, its
+// projects, a review.
+function workspaceWizard() {
+  const steps = ["Name", "Projects", "Review"];
+  const dlg = dialog({ title: "New workspace", sub: "Repositories searched and reasoned about together.", wide: true });
+  const st = { title: "", name: "", nameEdited: false, ids: new Set() };
+  const titleIn = h("input", { type: "text", placeholder: "e.g. Company services", maxlength: "80" });
+  const nameIn = h("input", { type: "text", placeholder: "e.g. company", class: "mono" });
   const err = h("p", { class: "error", hidden: true });
-  const boxes = projects.map((p) => {
-    const cb = h("input", { type: "checkbox", value: p.id, "aria-label": pname(p) });
-    cb.checked = checked.has(p.id);
-    return h("label", { class: "check" }, cb, h("span", {}, pname(p)), h("span", { class: "mono muted small" }, p.root));
-  });
-  return h("form", {
-    class: "aform",
-    onsubmit: (ev) => {
-      ev.preventDefault();
-      const ids = boxes.map((l) => l.querySelector("input")).filter((c) => c.checked).map((c) => c.value);
-      if (!ids.length && !allowNone) { err.textContent = "Choose at least one project."; err.hidden = false; return; }
-      onPick(ids);
-    },
-  }, h("p", { class: "hint" }, title), boxes, err,
-  h("div", { class: "review" }, h("button", { class: "primary", type: "submit" }, submit), h("button", { type: "button", class: "ghost", onclick: onBack }, "Back")));
+  const next = h("button", { class: "primary", type: "button" }, "Next");
+  const back = h("button", { class: "ghost", type: "button" }, "Back");
+  const cancel = h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel");
+  const okName = () => /^[a-z0-9][a-z0-9._-]{0,63}$/.test(st.name) && !(state.workspaces || []).some((w) => w.name === st.name);
+  // the short name follows the display name until it is edited
+  titleIn.addEventListener("input", () => { st.title = titleIn.value.trim().replace(/\s+/g, " "); if (!st.nameEdited) { st.name = slug(st.title); nameIn.value = st.name; } checkName(); });
+  nameIn.addEventListener("input", () => { st.nameEdited = true; st.name = nameIn.value.trim(); checkName(); });
+  const checkName = () => {
+    const taken = (state.workspaces || []).some((w) => w.name === st.name);
+    err.hidden = !st.name || okName();
+    err.textContent = taken ? `A workspace ${st.name} exists already.` : "Lower-case letters, digits, '.', '_' or '-', starting with a letter or digit.";
+    next.disabled = !okName();
+  };
+  const step = (i) => {
+    const head = stepper(steps, i);
+    if (i === 0) {
+      next.textContent = "Next";
+      next.onclick = () => step(1);
+      dlg.set(null, [head, field("Display name", titleIn, "Any text, shown in the sidebar and on its page (optional)."),
+        field("Short name", nameIn, "What agents and commands use: workspace:<short name>. Follows the display name until you edit it."), err], [cancel, next]);
+      checkName();
+    } else if (i === 1) {
+      const pk = projectPicker(state.projects, st.ids, true);
+      next.textContent = "Next";
+      next.disabled = false;
+      next.onclick = () => step(2);
+      back.onclick = () => step(0);
+      dlg.set(null, [head, h("p", { class: "muted small" }, "Choose its projects now, or none and add them later."), pk.el], [back, next]);
+    } else {
+      const ps = [...st.ids].map((id) => state.projects.find((p) => p.id === id)).filter(Boolean);
+      next.textContent = "Create workspace";
+      next.disabled = false;
+      back.onclick = () => step(1);
+      next.onclick = async () => {
+        next.disabled = true;
+        try { await post("/api/workspaces", { name: st.name, title: st.title, project_ids: [...st.ids] }); dlg.close(); toast("Workspace created"); location.hash = workspaceHref(st.name); refresh(); }
+        catch (e) { err.textContent = e.message; err.hidden = false; next.disabled = false; }
+      };
+      err.hidden = true;
+      dlg.set(null, [head, h("div", { class: "dreview" },
+        h("div", { class: "dpreview" }, h("span", { class: "nicon big" }, icon("workspace")), h("div", {}, h("b", { class: "dpname" }, st.title || st.name), h("div", { class: "muted small mono" }, `workspace:${st.name}`))),
+        h("div", { class: "dlabel" }, ps.length ? plural(ps.length, "project") : "No projects yet"),
+        ps.length ? h("div", { class: "dchips" }, ps.map((p) => h("span", { class: "pchip" }, projectMark(p), pname(p)))) : h("p", { class: "muted small" }, "Add them later on the workspace's Members."),
+        h("p", { class: "muted small" }, WS_NOTE)), err], [back, next]);
+    }
+  };
+  step(0);
+}
+
+// addProjectsWizard adds projects to a workspace: choose, then review.
+function addProjectsWizard(w, others) {
+  const dlg = dialog({ title: `Add projects to ${wname(w)}`, wide: true });
+  const ids = new Set();
+  const err = h("p", { class: "error", hidden: true });
+  const next = h("button", { class: "primary", type: "button" }, "Next");
+  const back = h("button", { class: "ghost", type: "button", onclick: () => step(0) }, "Back");
+  const step = (i) => {
+    if (i === 0) {
+      const pk = projectPicker(others, ids, true);
+      next.textContent = "Next";
+      next.onclick = () => { if (!ids.size) { err.textContent = "Choose at least one project."; err.hidden = false; return; } err.hidden = true; step(1); };
+      dlg.set(null, [stepper(["Projects", "Review"], 0), pk.el, err], [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), next]);
+    } else {
+      const ps = [...ids].map((id) => state.projects.find((p) => p.id === id)).filter(Boolean);
+      next.textContent = `Add ${plural(ps.length, "project")}`;
+      next.onclick = async () => {
+        next.disabled = true;
+        try { await post(`/api/workspaces/${enc(w.name)}/join`, { project_ids: [...ids] }); dlg.close(); await afterWrite(); }
+        catch (e) { err.textContent = e.message; err.hidden = false; next.disabled = false; }
+      };
+      dlg.set(null, [stepper(["Projects", "Review"], 1), h("div", { class: "dreview" }, h("div", { class: "dlabel" }, `Joining ${wname(w)}`),
+        h("div", { class: "dchips" }, ps.map((p) => h("span", { class: "pchip" }, projectMark(p), pname(p)))), h("p", { class: "muted small" }, WS_NOTE)), err], [back, next]);
+    }
+  };
+  step(0);
 }
 
 // reviewPanel shows what a change will do before it is sent.
@@ -2070,50 +2673,6 @@ function reviewPanel({ title, lines, confirm, danger, onConfirm, onBack, note })
   h("div", { class: "review" }, ok, h("button", { type: "button", class: "ghost", onclick: onBack }, "Back")));
 }
 
-function projectCard(p) {
-  const l = p.live;
-  const href = (tab) => projectHref(p.id, ...({ context: ["agents", "context"], findings: ["agents", "findings"], proposals: ["knowledge", "inbox"], tasks: ["work"], health: ["health"] }[tab] || [tab]));
-  const tasksRow = h("div", { class: "row" }, h("span", { class: "k" }, "Tasks"), h("span", { class: "v muted" }, l.state === "ok" ? "…" : "—"));
-  const findRow = h("div", { class: "row" }, h("span", { class: "k" }, "Findings"), h("span", { class: "v muted" }, l.state === "ok" ? "…" : "—"));
-  const checks = l.checks_failed > 0 ? h("span", { class: "flag bad" }, `${l.checks_failed} failing`)
-    : l.checks_warned > 0 ? h("span", { class: "flag warn" }, `${l.checks_warned} warning(s)`) : h("span", { class: "okay" }, "✓ all pass");
-  const el = h("article", { class: "pcard" },
-    h("a", { class: "ptitle", href: href("context") }, h("span", {}, pname(p)), stateBadge(l)),
-    h("div", { class: "pmeta mono" }, l.commit ? `${l.branch || "detached HEAD"} · ${shortCommit(l.commit)}` : p.root),
-    h("div", { class: "pmeta" }, [l.synced_at && `synced ${ago(l.synced_at)}`, p.last_mcp && `agent ${ago(p.last_mcp)}`].filter(Boolean).join(" · ")),
-    l.detail && h("p", { class: "detail" }, l.detail),
-    h("div", { class: "rows" },
-      h("div", { class: "row" }, h("a", { class: "k", href: href("health") }, "Doctor"), h("span", { class: "v" }, checks)),
-      h("div", { class: "row" }, h("a", { class: "k", href: href("context") }, "Context hits"),
-        h("span", { class: "v" }, l.state === "ok" && l.context_answers_30d > 0 ? rateMeter(l.context_hit_rate_30d) : h("span", { class: "muted" }, "no scored answers (30 days)"))),
-      h("div", { class: "row" }, h("a", { class: "k", href: href("proposals") }, "Proposals"),
-        h("span", { class: "v" }, l.pending_proposals > 0 ? h("span", { class: "flag warn" }, `${l.pending_proposals} to review`) : h("span", { class: "muted" }, "none pending"))),
-      findRow, tasksRow));
-  async function load() {
-    if (l.state !== "ok") return;
-    const [ts, rep] = await Promise.allSettled([api(projectAPI(p, "tasks")), api(projectAPI(p, `report?days=${state.days}`))]);
-    if (ts.status === "fulfilled") {
-      const all = ts.value.tasks || [];
-      const n = (s) => all.filter((x) => x.status === s).length;
-      const done = n("done");
-      fill(tasksRow, h("a", { class: "k", href: href("tasks") }, "Tasks"), h("span", { class: "v" },
-        all.length ? [meter(done, all.length, `${done} of ${all.length} done`),
-          h("span", { class: "counts" }, ["ready", "in_progress", "blocked"].filter((s) => n(s)).map((s) => [statusPill(s), " ", n(s), " "]))]
-          : h("span", { class: "muted" }, "no tasks")));
-    }
-    if (rep.status === "fulfilled") {
-      const fs = rep.value.findings || [];
-      const n = (lv) => fs.filter((f) => f.level === lv).length;
-      const worst = fs.filter((f) => f.level !== "info").slice(0, 2);
-      fill(findRow, h("a", { class: "k", href: href("findings") }, "Findings"), h("span", { class: "v" },
-        !fs.length ? h("span", { class: "okay" }, "✓ nothing to report")
-          : [h("span", { class: "counts" }, ["problem", "warn", "info"].filter((lv) => n(lv)).map((lv) => [levelPill(lv), " ", n(lv), " "])),
-            worst.length > 0 && h("span", { class: "issues" }, worst.map((f) => h("span", { class: "flag " + (f.level === "problem" ? "bad" : "warn") }, f.message)))]));
-    }
-  }
-  return { el, load };
-}
-
 // --- health: harness status + doctor ---
 async function viewHealth(p) {
   const wrap = h("div", {});
@@ -2124,7 +2683,7 @@ async function viewHealth(p) {
     probeBtn.disabled = true;
     try {
       const r = await api(projectAPI(p, `health${probe ? "?probe=1" : ""}`), probe ? { "X-Harness-UI": "1" } : null);
-      fill(out, healthReport(r));
+      fill(out, healthReport(r, p, () => load(false)));
     } catch (e) {
       fill(out, h("p", { class: "error" }, e.message));
     } finally {
@@ -2132,7 +2691,7 @@ async function viewHealth(p) {
     }
   }
   wrap.append(h("div", { class: "shead" },
-    h("p", { class: "hint" }, "What 'harness doctor' and 'harness status' report. Provider checks start each provider, so they run only on request."), probeBtn), out);
+    h("p", { class: "hint" }, "What 'harness doctor' reports. Checking the providers starts each one, so it runs only on request."), probeBtn), out);
   load(false);
   return wrap;
 }
@@ -2165,8 +2724,9 @@ function stackBadge(id, cls, markOnly) {
 // owner declares.
 function versionsTable(w, d) {
   if (!d || !(d.rows || []).length) return null;
-  const ids = w.members.map((m) => m.project_id).filter((id) => d.stacks[id] || d.rows.some((r) => r.versions[id]));
   const name = (id) => { const p = state.projects.find((x) => x.id === id); return p ? pname(p) : id; };
+  // the members by name, as the sidebar lists them
+  const ids = w.members.map((m) => m.project_id).filter((id) => d.stacks[id] || d.rows.some((r) => r.versions[id])).sort((a, b) => name(a).localeCompare(name(b)));
   const KIND = { runtime: "Runtime", framework: "Frameworks", core: "The members' own packages" };
   // one owner's packages used at the same versions are one row
   const merged = [];
@@ -2191,7 +2751,7 @@ function versionsTable(w, d) {
         r.owner && h("div", { class: "muted small" }, `from ${name(r.owner)}`)),
       ids.map((id) => {
         const vs = r.versions[id];
-        if (!vs) return h("td", { class: "muted" }, "·");
+        if (!vs) return h("td", { class: "muted", title: "not used" }, "—");
         const behind = vs.some((v) => cmpVer(v, r.published || top) < 0);
         return h("td", { class: "mono" + (behind ? " vdiff" : "") }, vs.join(", "), behind && h("span", { class: "sr" }, " (behind)"));
       }),
@@ -2244,6 +2804,28 @@ const SMELL_KIND = { layering: "lower layers referencing higher ones", "deep-imp
   boundary: "dependencies your rules forbid", "rule-unclear": "rules not understood", "stale-knowledge": "knowledge naming code that is gone",
   "no-solution": "in no solution", "test-reference": "production code referencing tests", "missing-project": "references to what is not there", cycle: "circles",
   complexity: "functions with many paths through them" };
+// SMELL_RISK: what a kind of smell costs, in a few words, for its row.
+const SMELL_RISK = {
+  layering: "a lower layer cannot change without a higher one",
+  "deep-import": "a change inside a feature breaks what imports it",
+  unused: "code to read and keep that nothing needs",
+  duplicate: "a fix in one copy misses the others",
+  template: "the same steps maintained in several places",
+  "interface-candidate": "each new variant means editing every place that chooses",
+  "repeated-sequence": "a change to the steps must be made in each",
+  "shared-code": "a fix in one member's copy misses the others",
+  boundary: "it breaks a rule recorded as knowledge",
+  complexity: "hard to understand and test: bugs hide in the paths",
+};
+// smellSubject is a finding's subject: its title up to what is said of
+// it ("Findings has cyclomatic complexity 50": "Findings").
+function smellSubject(x) {
+  const t = x.title || "";
+  // "2 statements repeated in 4 places (Compare, sortedKeys, …)": the first name inside
+  const inner = /^\d.*?\(([^,)]+)/.exec(t);
+  if (inner) return inner[1];
+  return t.split(/: | (?:has|is|are|repeats|follows|and \d+ more|written|takes|reach(?:es)?) /)[0].replace(/^(Functions?|Types?) /, "");
+}
 const SMELL_WHY = {
   layering: "A lower layer depends on a higher one, so the lower one cannot be used or changed without it. Roles are read from the names (a heuristic).",
   "deep-import": "Files inside a feature are imported instead of its entry file (index), so a change inside the feature breaks its importers. Export what is needed from the index.",
@@ -2254,7 +2836,7 @@ const SMELL_WHY = {
   "repeated-sequence": "The same run of statements written out in several functions, even when each statement calls a shared function: a change to the steps is made in each. One call, however often repeated, is usage and not listed; error checks and cleanup are not counted.",
   "shared-code": "The same code lives in several members: a fix in one copy misses the others. Each says where it could live once.",
   boundary: "References that break the boundary rules recorded as knowledge (layers, forbid, only); each names its rule.",
-  complexity: "Cyclomatic complexity counts the independent paths through a function (its branches, loops, cases, short-circuits and null checks): each path wants its own test, and the more there are, the harder a change is to get right. The level follows the thresholds in [architecture.complexity]; the highest come first. Exact .NET values replace harness's count once the Metrics worker has measured HEAD.",
+  complexity: "Cyclomatic complexity counts the independent paths through a function, each a case to understand and test. Counted as each language's usual tool counts it (gocyclo, Microsoft's code metrics, ESLint); the thresholds are [architecture.complexity] in the configuration (note 11, warning 21, problem 51 by default).",
 };
 // smellsSection lists smells, each one line opening to why and where;
 // three or more of a kind are one line opening to the list. With t (the
@@ -2283,7 +2865,19 @@ function runSpan(x) {
 }
 
 function evidenceText(e) {
-  return e.split(" → ").map((part, i) => h("code", { class: i ? "evto" : "" }, i ? "→ " + part : part));
+  // a path breaks at its slashes, never inside a name: the folder dimmed,
+  // from the file name on bright
+  const show = (part) => {
+    const i = part.lastIndexOf("/");
+    return i < 0 ? part : [h("span", { class: "evdir" }, part.slice(0, i + 1).replace(/\//g, "/\u200b")), part.slice(i + 1)];
+  };
+  // "TP-WebAPI: path" names the member by its display name
+  const named = (part) => {
+    const m = /^([^\s:/]+): (.+)$/.exec(part);
+    const label = m && folderLabel(m[1]);
+    return m && label !== m[1] ? [h("b", { class: "evwho" }, label), ": ", show(m[2])] : show(part);
+  };
+  return e.split(" → ").map((part, i) => h("code", { class: i ? "evto" : "" }, i ? "→ " : "", named(part)));
 }
 
 // namesFile tells evidence naming a place in a file ("member: path:line
@@ -2296,14 +2890,30 @@ function namesFile(e) {
 
 // evidenceItem is one place, opening to its code when snip can read it.
 function evidenceItem(e, snip, span) {
+  // a call: "caller file:line → server file:line (Contract)", each side
+  // opening to its own code
+  if (snip && e.includes(" → ")) {
+    const [from, to] = e.split(" → ");
+    const what = /\s\(([^()]+)\)$/.exec(to);
+    const sides = [from, what ? to.slice(0, what.index) : to];
+    if (sides.every(namesFile)) {
+      return h("li", { class: "evpair" }, what && h("span", { class: "muted small" }, what[1]),
+        codeFold(sides[0], snip, span), h("span", { class: "evarrow", "aria-hidden": "true" }, "↓ calls"), codeFold(sides[1], snip, span));
+    }
+  }
   if (!snip || !namesFile(e)) return h("li", {}, evidenceText(e));
+  return h("li", {}, codeFold(e, snip, span));
+}
+
+// codeFold is a place that opens to its code, read when opened.
+function codeFold(e, snip, span) {
   const d = h("details", { class: "evcode" }, h("summary", {}, evidenceText(e)));
   d.addEventListener("toggle", () => {
     if (!d.open || d.dataset.loaded) return;
     d.dataset.loaded = "1";
     d.append(mount({ load: async () => codeView((await api(snip(e, span))).snippet) }));
   });
-  return h("li", {}, d);
+  return d;
 }
 
 // evidenceList is a finding's evidence, folded, with Compare for copies.
@@ -2460,54 +3070,122 @@ function smellsSection(list, intro, okay, t) {
       shown.length ? h("ul", { class: "attn smells" }, smellGroups(shown).map(([kind, xs]) => {
         if (xs.length < 3) {
           return xs.map((x) => h("li", { class: "smell" + (quiet(x) ? " quiet" : "") }, h("details", { open: x.level === "problem" && !x.mark ? "" : null },
-            h("summary", {}, levelPill(x.level), h("span", { class: "stitle" }, x.title), chips(x)), body(x))));
+            h("summary", {}, levelPill(x.level), h("span", { class: "stitle" }, x.title), chips(x),
+              SMELL_RISK[kind] && h("span", { class: "srisk" }, SMELL_RISK[kind])), body(x))));
         }
         const fresh = xs.filter((x) => x.status === "new" || x.status === "changed").length;
         // one "could help" for the group when it is the same for all;
         // otherwise each says its own (a shared-code group's home)
         const sameFix = xs.every((x) => x.fix === xs[0].fix);
         const item = (x) => h("li", { class: quiet(x) ? "quiet" : "" }, h("details", {}, h("summary", {}, x.title, chips(x)), body(x, sameFix)));
-        // the pill shows the group's worst level, whatever comes first (TASK-0039)
-        const levels = SMELL_LEVELS.map(([lv]) => lv).filter((lv) => xs.some((x) => x.level === lv));
         return h("li", { class: "smell" }, h("details", {},
-          h("summary", {}, levelPill(levels[0] || xs[0].level), h("span", { class: "stitle" }, h("b", {}, `${xs.length} × `), SMELL_KIND[kind] || kind),
-            fresh > 0 && h("span", { class: "tag fstat new" }, `${fresh} new or changed`)),
+          h("summary", {}, levelPill(worstLevel(xs)), h("span", { class: "stitle" }, h("b", {}, `${xs.length} × `), SMELL_KIND[kind] || kind),
+            fresh > 0 && h("span", { class: "tag fstat new" }, `${fresh} new or changed`),
+            // closed, a row still says what the risk is and where it is worst
+            h("span", { class: "srisk" }, SMELL_RISK[kind] && h("span", {}, SMELL_RISK[kind]),
+              h("span", { class: "sworst" }, kind === "complexity" ? " · worst: " : " · e.g. ", xs.slice(0, 3).map((x) => smellSubject(x)).join(", ")))),
           h("div", { class: "sbody" }, sameFix && xs[0].fix && h("p", { class: "sfix" }, h("b", {}, "Could help: "), xs[0].fix),
             h("p", { class: "muted small swhy" }, SMELL_WHY[kind] || xs[0].why),
-            levels.length > 1 ? levelFilter(kind, xs, item) : smellList(xs, item))));
-      })) : h("p", { class: "okay" }, marked.length ? `✓ Nothing open: ${marked.length} marked by design.` : okay),
+            levelFiltered(kind, xs, item))));
+      })) : emptyState("check", marked.length ? "Nothing open" : "No smells", marked.length ? `${plural(marked.length, "finding")} marked by design.` : okay.replace(/^✓ ?/, "")),
       gone.length > 0 && h("details", { class: "evfold gonefold" }, h("summary", {}, `Gone (${gone.length})`),
         h("ul", { class: "evlist" }, gone.map((x) => h("li", {}, x.title,
           x.mark && x.mark.state === "task" ? h("span", { class: "tag fmark resolved" }, `resolved · ${x.mark.task_id}`) : null)))));
   };
   draw();
-  return section("Smells", intro, box);
+  return section((t && t.title) || "Smells", intro, box);
 }
 
-// levelFilter shows a group spanning levels (complexity: notes up to
-// problems) with a chip per level and its count; a chip hides or shows its
-// level, the choice kept per kind for this viewer. Only the list is drawn
-// again, so the open group stays open (TASK-0039).
-const SMELL_LEVELS = [["problem", "problem", "problems"], ["warn", "warning", "warnings"], ["info", "note", "notes"]];
-function levelFilter(kind, xs, item) {
+// LEVELS orders finding levels, worst first, with what a chip says.
+const LEVELS = [["problem", "problems"], ["warn", "warnings"], ["info", "notes"]];
+function worstLevel(xs) {
+  return (LEVELS.find(([l]) => xs.some((x) => x.level === l)) || [xs[0].level])[0];
+}
+
+// levelFiltered is a group's list; a group spanning levels gets a chip
+// per level with its count that filters it (the viewer's choice kept in
+// the browser; only the list draws again).
+function levelFiltered(kind, xs, item) {
+  const present = LEVELS.filter(([l]) => xs.some((x) => x.level === l));
+  if (present.length < 2) return smellList(xs, item);
   const key = "smells.levels." + kind;
-  const hidden = new Set(store.get(key, "").split(",").filter(Boolean));
-  const chips = h("div", { class: "dupfilter lvfilter", role: "group", "aria-label": "Levels shown" });
+  let on = new Set((store.get(key, "") || present.map(([l]) => l).join(",")).split(",").filter((l) => present.some(([p]) => p === l)));
+  if (!on.size) on = new Set(present.map(([l]) => l));
   const list = h("div", {});
-  function draw() {
-    fill(chips, SMELL_LEVELS.filter(([lv]) => xs.some((x) => x.level === lv)).map(([lv, one, many]) => {
-      const n = xs.filter((x) => x.level === lv).length;
-      return h("button", {
-        type: "button", class: "chip", "aria-pressed": String(!hidden.has(lv)), "data-level": lv,
-        onclick: () => { hidden.has(lv) ? hidden.delete(lv) : hidden.add(lv); store.set(key, [...hidden].join(",")); draw(); },
-      }, h("span", { class: `pill lv-${lv}` }, h("span", { class: "ico", "aria-hidden": "true" }, LEVEL_ICON[lv])), n === 1 ? one : many,
-      h("span", { class: "count" }, n));
-    }));
-    const shown = xs.filter((x) => !hidden.has(x.level));
-    fill(list, shown.length ? smellList(shown, item) : h("p", { class: "muted small" }, "Every level is hidden: choose one above."));
-  }
+  const bar = h("div", { class: "lvchips", role: "group", "aria-label": "Show levels" });
+  const draw = () => {
+    fill(bar, present.map(([l, label]) => h("button", {
+      type: "button", class: `chip lv-${l}` + (on.has(l) ? " on" : ""), "aria-pressed": on.has(l) ? "true" : "false",
+      onclick: () => {
+        if (on.has(l) && on.size > 1) on.delete(l); else on.add(l);
+        store.set(key, [...on].join(","));
+        draw();
+      },
+    }, h("span", { class: "ico", "aria-hidden": "true" }, { problem: "✕", warn: "▲", info: "ⓘ" }[l]), ` ${xs.filter((x) => x.level === l).length} ${label}`)));
+    fill(list, smellList(xs.filter((x) => on.has(x.level)), item));
+  };
   draw();
-  return [chips, list];
+  return h("div", {}, bar, list);
+}
+
+// complexitySection (from the C# rewrite): how the project's functions
+// spread over cyclomatic complexity, per language reported, loaded on its
+// own: bins of five with the thresholds marked, and the bins as a table.
+function complexitySection(p) {
+  return section("Complexity distribution", "Every function by cyclomatic complexity, reported or not, in bins of five (bar heights on a square-root scale, each bar with its count); the lines are the thresholds of a note, a warning and a problem.",
+    mount({ project: p.id, kinds: ["sync"], load: async () => {
+      const d = await api(projectAPI(p, "complexity"));
+      if (!(d.languages || []).length) return h("p", { class: "empty" }, "No function of a reported language (csharp and go by default; [architecture.complexity] languages).");
+      return h("div", { class: "cxcharts" }, d.languages.map((l) => complexityChart(l, d.bin_width)));
+    } }));
+}
+
+const CX_LANG = { csharp: "C#", go: "Go", typescript: "TypeScript and JavaScript" };
+function complexityChart(l, width) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = (tag, attrs, ...kids) => {
+    const el = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+    for (const c of kids.flat()) if (c != null) el.append(typeof c === "string" || typeof c === "number" ? String(c) : c);
+    return el;
+  };
+  const bins = l.bins, n = bins.length, top = Math.max(...bins.map((b) => b.count), 1);
+  const W = Math.max(320, n * 22), band = 30, plot = 120, axis = 18, H = band + plot + axis;
+  const bw = W / n;
+  // heights on a square-root scale: the many simple functions would
+  // flatten the few complex ones; every bar says its count
+  const y = (c) => band + plot - (c ? Math.max(2, Math.sqrt(c / top) * (plot - 14)) : 0);
+  const th = l.thresholds;
+  const marks = [["info", "note", th.note], ["warn", "warning", th.warn], ["problem", "problem", th.problem]].filter(([, , v]) => (v - 1) / width < n);
+  // a label moves up a row only when it would overlap the one before
+  let lastEnd = -Infinity, row = 0;
+  const labels = marks.map(([cls, name, v]) => {
+    const x = ((v - 1) / width) * bw, text = `${name} ${v}`, w = text.length * 6.2 + 6;
+    row = x < lastEnd ? row + 1 : 0;
+    lastEnd = x + w;
+    return { cls, x, text, yy: band - 6 - row * 12 };
+  });
+  const level = (b) => b.from >= th.problem ? "problem" : b.from >= th.warn ? "warn" : b.from >= th.note ? "info" : "low";
+  const chart = svg("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMinYMin meet", class: "cxchart", role: "img",
+    "aria-label": `${CX_LANG[l.language] || l.language}: ${l.functions} functions, the most complex at ${l.max}` },
+  bins.map((b, i) => svg("g", { class: `cxbar lv-${level(b)}` },
+    svg("title", {}, `${b.from}–${b.to}: ${b.count} function${b.count === 1 ? "" : "s"}`),
+    svg("rect", { x: i * bw + 1, y: y(b.count), width: Math.max(bw - 2, 1), height: band + plot - y(b.count) }),
+    b.count > 0 && svg("text", { x: i * bw + bw / 2, y: y(b.count) - 3, "text-anchor": "middle", class: "cxcount" }, b.count))),
+  marks.map(([cls, , v]) => svg("line", { class: `cxth lv-${cls}`, x1: ((v - 1) / width) * bw, x2: ((v - 1) / width) * bw, y1: band - 2, y2: band + plot })),
+  labels.map((lb) => svg("text", { x: lb.x + 3, y: lb.yy, class: `cxlabel lv-${lb.cls}` }, lb.text)),
+  svg("line", { x1: 0, x2: W, y1: band + plot, y2: band + plot, class: "cxaxis" }),
+  bins.map((b, i) => i % Math.ceil(n / 12) === 0 && svg("text", { x: i * bw + 2, y: H - 4, class: "cxtick" }, b.from)));
+  const lv = (c) => c >= th.problem ? "problem" : c >= th.warn ? "warn" : c >= th.note ? "info" : "low";
+  const most = (l.top || []).length > 0 && h("div", { class: "cxtop" }, h("h5", {}, "Most complex"),
+    h("ol", {}, l.top.map((f) => h("li", {}, h("span", { class: `cxn lv-${lv(f.complexity)}` }, f.complexity),
+      h("div", { class: "cxf" }, h("b", {}, f.name), h("div", { class: "muted small" }, filePath(`${f.path}:${f.line}`)))))));
+  return h("div", { class: "cxlang" },
+    h("h4", {}, CX_LANG[l.language] || l.language, h("span", { class: "muted small" }, ` · ${l.functions} functions, the most complex at ${l.max}`)),
+    h("div", { class: "cxrow" }, h("div", { class: "cxscroll" }, chart), most),
+    h("details", { class: "evfold" }, h("summary", {}, "Table"),
+      h("table", { class: "hot" }, h("thead", {}, h("tr", {}, h("th", {}, "complexity"), h("th", { class: "n" }, "functions"))),
+        h("tbody", {}, bins.map((b) => h("tr", {}, h("td", {}, `${b.from}–${b.to}`), h("td", { class: "n" }, b.count)))))));
 }
 
 // smellList lists a kind's findings in the server's order (most worth
@@ -2550,18 +3228,20 @@ function smellGroups(smells) {
 // members use each package. The providers' raw overview stays below.
 const ROLE_NOTE = { model: "models, contracts", data: "data access, state, API calls", logic: "business logic", api: "host, API", test: "tests",
   base: "shared basics: types, utils, theme", hooks: "React hooks", ui: "components", feature: "a feature", page: "pages, routing, app shell" };
-async function viewArchitecture(p) {
+async function viewArchitecture(p, sec) {
+  if (sec === "coupling") return couplingSection(p);
+  if (sec === "complexity") return complexitySection(p);
   const [s, built] = await Promise.all([api(projectAPI(p, "structure")), api(projectAPI(p, "stack")).catch(() => null)]);
   const builtOn = builtOnSection(built);
   if (!s.known) {
-    return h("div", {}, builtOn, h("p", { class: "empty section" }, "No .NET project (.csproj), go.mod, package.json or tsconfig found: this view reads .NET, Go and TypeScript/JavaScript repositories."), couplingSection(p));
+    return h("div", {}, builtOn, h("p", { class: "empty section" }, "No .NET project (.csproj), go.mod, package.json or tsconfig found: this view reads .NET, Go and TypeScript/JavaScript repositories."));
   }
   const a = s.architecture;
   const noun = a.noun || "project", nouns = noun + "s";
   const ts = a.language === "typescript" || a.language === "go"; // references are imports
   const users = s.package_users || {};
   const all = a.projects;
-  // names without the prefix every project shares (Betrian.TransportPlanner.)
+  // names without the prefix every project shares (Acme.RoutePlanner.)
   const parts = all.map((x) => x.name.split("."));
   let common = 0;
   while (parts.every((q) => q.length > common + 1 && q[common] === parts[0][common])) common++;
@@ -2592,13 +3272,20 @@ async function viewArchitecture(p) {
   const map = h("div", { class: "archmap" });
   const svg = sv("svg", { class: "archlines", "aria-hidden": "true" });
   const nodes = {};
-  let sel = null;
+  let sel = null, hover = null;
+  // a large graph draws lines only for the package hovered or selected:
+  // every line at once is a tangle
+  const big = all.filter((x) => x.kind !== "test").length > 24;
+  if (big) map.classList.add("big");
   const node = (x) => {
     const n = memberCount(x);
-    const el = h("button", { class: `anode role-${x.role || "none"}`, title: x.name, onclick: () => select(sel === x.path ? null : x.path) },
+    const el = h("button", {
+      class: `anode role-${x.role || "none"}`, title: x.name, onclick: () => select(sel === x.path ? null : x.path),
+      onmouseenter: () => { if (!sel) { hover = x.path; draw(); } }, onmouseleave: () => { if (hover) { hover = null; draw(); } },
+    },
       h("span", { class: "aname" }, short(x)),
       h("span", { class: "ameta" }, x.role ? h("span", { class: "arole" }, x.role) : x.kind === "entry" ? h("span", { class: "arole" }, "entry") : null,
-        n > 0 && h("span", { class: "ausers", title: `${n} workspace member(s) use its package` }, `↗ ${n}`)));
+        n > 0 && h("span", { class: "ausers", title: `${plural(n, "workspace member")} use its package` }, `↗ ${n}`)));
     nodes[x.path] = el;
     return el;
   };
@@ -2618,13 +3305,14 @@ async function viewArchitecture(p) {
     const box = map.getBoundingClientRect();
     svg.setAttribute("width", box.width); svg.setAttribute("height", box.height);
     const lines = [];
+    const focus = sel || hover;
     for (const x of all) {
       for (const r of x.references) {
         const from = nodes[x.path], to = nodes[r];
         if (!from || !to) continue;
-        const hot = sel && (x.path === sel || r === sel);
-        if (sel && !hot) continue;
-        if (!sel && (x.kind === "test")) continue; // test edges only when selected
+        const hot = focus && (x.path === focus || r === focus);
+        if (focus && !hot) continue;
+        if (!focus && (x.kind === "test" || big)) continue; // test edges, and a large graph's, only when in focus
         const fa = from.getBoundingClientRect(), ta = to.getBoundingClientRect();
         const x1 = fa.left + fa.width / 2 - box.left, y1 = fa.bottom - box.top;
         const x2 = ta.left + ta.width / 2 - box.left, y2 = ta.top - box.top;
@@ -2632,7 +3320,7 @@ async function viewArchitecture(p) {
         const ya = down ? y1 : fa.top - box.top, yb = down ? y2 : ta.bottom - box.top;
         const m = (ya + yb) / 2;
         lines.push(sv("path", { d: `M${x1},${ya} C${x1},${m} ${x2},${m} ${x2},${yb}`,
-          class: "aline" + (hot ? (x.path === sel ? " out" : " in") : "") }));
+          class: "aline" + (hot ? (x.path === focus ? " out" : " in") : "") }));
       }
     }
     fill(svg, sv("defs", {}, ["", " out", " in"].map((c) => sv("marker", { id: "ah" + c.trim(), viewBox: "0 0 8 8", refX: "7", refY: "4", markerWidth: "7", markerHeight: "7", orient: "auto" },
@@ -2648,7 +3336,7 @@ async function viewArchitecture(p) {
       el.classList.toggle("dim", !!x && k !== path && !x.references.includes(k) && !x.referenced_by.includes(k));
     }
     draw();
-    if (!x) return fill(side, h("p", { class: "hint" }, `Select a ${noun} to see what it ${ts ? "imports" : "references"}, what ${ts ? "imports" : "references"} it, its packages and who uses it. Lines point from a ${noun} to the ${nouns} it ${ts ? "imports" : "references"}.`));
+    if (!x) return fill(side, h("p", { class: "hint" }, `${big ? `Point at a ${noun} to see its lines; select` : "Select"} a ${noun} to see what it ${ts ? "imports" : "references"}, what ${ts ? "imports" : "references"} it, its packages and who uses it. Lines point from a ${noun} to the ${nouns} it ${ts ? "imports" : "references"}.`));
     const list = (paths) => paths.length ? h("ul", {}, paths.map((q) => h("li", {}, h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); select(q); } }, byPath[q] ? short(byPath[q]) : q)))) : h("p", { class: "muted small" }, "none");
     const us = users[x.package] || [];
     const byMember = {};
@@ -2670,9 +3358,115 @@ async function viewArchitecture(p) {
   const layout = h("div", { class: "deplayout archlayout" }, h("div", { class: "depwrap archwrap" }, map), side);
   requestAnimationFrame(draw);
   if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(map);
-  return h("div", {}, builtOn, head, smells, complexitySection(p),
-    section("Layers", `${noun[0].toUpperCase() + nouns.slice(1)} by what they ${ts ? "import" : "reference"}: layer 0 ${ts ? "imports" : "references"} no other ${noun} here, each layer above ${ts ? "imports" : "references"} the ones below; ${nouns} in a circle share a layer. Tests sit on top.`, layout),
-    couplingSection(p));
+  // the stack and the shape in one card
+  const bcard = builtOn && builtOn.querySelector(".builton");
+  if (bcard) { bcard.append(h("div", { class: "archline" }, ...head.childNodes)); }
+  if (sec === "layers") {
+    const intro = `${noun[0].toUpperCase() + nouns.slice(1)} by what they ${ts ? "import" : "reference"}: layer 0 ${ts ? "imports" : "references"} no other ${noun} here, each layer above ${ts ? "imports" : "references"} the ones below; ${nouns} in a circle share a layer. Tests sit on top.`;
+    if (!big) return h("div", {}, section("Layers", intro, layout));
+    // a large one also as a matrix, which stays readable at any size
+    const body = h("div", {});
+    const show = (k) => { store.set("layers.view", k); fill(body, k === "matrix" ? depMatrix(all, short, ts) : layout); if (k !== "matrix") requestAnimationFrame(draw); };
+    const pick = h("div", { class: "seg", role: "radiogroup", "aria-label": "Show as" });
+    const drawPick = (k) => fill(pick, [["map", "Map"], ["matrix", "Matrix"]].map(([v, t]) => h("button", { type: "button", role: "radio", "aria-checked": String(v === k), onclick: () => { drawPick(v); show(v); } }, t)));
+    const k0 = store.get("layers.view", "map");
+    drawPick(k0); show(k0);
+    return h("div", {}, section("Layers", intro, h("div", { class: "filters" }, pick), body));
+  }
+  return h("div", {}, builtOn, !bcard && head, smells);
+}
+
+// depMatrix: who imports whom as a grid, a row and a column per package,
+// ordered by layer (the highest first). A mark is "the row imports the
+// column"; layered code keeps them right of the diagonal, so a mark left
+// of it (a lower layer importing a higher one, or a circle) is red.
+function depMatrix(all, short, ts) {
+  // tests first (they sit on top), then the highest layer down
+  const isTest = (x) => (x.kind === "test" ? 1 : 0);
+  const xs = [...all].sort((a, b) => isTest(b) - isTest(a) || b.layer - a.layer || short(a).localeCompare(short(b)));
+  const idx = Object.fromEntries(xs.map((x, i) => [x.path, i]));
+  const n = xs.length, T = 24;
+  let C = 18; // the cell size follows the card's width (below)
+  const verb = ts ? "imports" : "references", verbed = ts ? "imported" : "referenced";
+  // the label gutter fits the longest name
+  const L = Math.max(...xs.map((x) => short(x).length)) * 7 + 24;
+  const group = (x) => (isTest(x) ? "tests" : `L${x.layer}`);
+  // the side: what it shows, or the package or pair in focus
+  const side = h("aside", { class: "depside mxside" });
+  let back = 0, edges = 0;
+  const intro = () => fill(side, h("h4", {}, "Reading it"),
+    h("p", { class: "small" }, `A row ${verb} the columns it has a mark in; the columns are the same ${n} packages in the same order, the highest layer first.`),
+    h("p", { class: "small" }, "Layered code keeps every mark right of the dashed diagonal; a mark left of it (red) is a lower layer reaching up, or a circle."),
+    h("p", { class: "muted small" }, `${plural(edges, "reference")} · ${plural(new Set(xs.map(group)).size, "layer group")}` + (back ? ` · ${back} against the layers` : "")),
+    h("p", { class: "muted small" }, "Point at a mark for the pair; select a name for all of its."));
+  let labels = [];
+  const lit = (is, on) => { for (const i of is) labels[i].classList.toggle("on", on); };
+  const nameList = (ps) => ps.length ? h("ul", { class: "mxlist" }, ps.map((p) => h("li", {}, h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); pick(idx[p]); } }, short(xs[idx[p]] || { name: p }))))) : h("p", { class: "muted small" }, "none");
+  let picked = null;
+  function pick(i) {
+    if (picked != null) lit([picked], false);
+    picked = i;
+    lit([i], true);
+    const x = xs[i];
+    fill(side, h("h4", {}, short(x)), h("p", { class: "muted small" }, `${group(x)} · ${x.kind}`),
+      h("h5", {}, ts ? "Imports" : "References"), nameList((x.references || []).filter((r) => idx[r] != null)),
+      h("h5", {}, `${verbed[0].toUpperCase() + verbed.slice(1)} by`), nameList((x.referenced_by || []).filter((r) => idx[r] != null)),
+      h("button", { class: "ghost small", type: "button", onclick: () => { lit([i], false); picked = null; intro(); } }, "Back"));
+  }
+  // the pairs, counted once
+  const pairs = [];
+  xs.forEach((x, i) => (x.references || []).forEach((r) => {
+    const j = idx[r];
+    if (j == null) return;
+    const wrong = j < i && !isTest(x);
+    pairs.push([i, j, wrong]);
+    edges++;
+    if (wrong) back++;
+  }));
+  // draw lays the grid out at cell size C
+  const holder = h("div", { class: "mxscroll" });
+  function draw() {
+    const W = L + n * C + 8, H = T + n * C + 8;
+    // a faint stripe every other row, as a table; a line where a layer
+    // group starts, across and down, its name above the columns
+    const bands = [], heads = [];
+    for (let i = 1; i < n; i += 2) bands.push(sv("rect", { x: 0, y: T + i * C, width: L + n * C, height: C, class: "mxband" }));
+    let start = 0;
+    for (let i = 1; i <= n; i++) {
+      if (i === n || group(xs[i]) !== group(xs[start])) {
+        const w = (i - start) * C;
+        if (start > 0) {
+          bands.push(sv("line", { x1: L + start * C, x2: L + start * C, y1: T - 16, y2: T + n * C, class: "mxsep" }));
+          bands.push(sv("line", { x1: 0, x2: L + n * C, y1: T + start * C, y2: T + start * C, class: "mxsep" }));
+        }
+        heads.push(sv("text", { x: L + start * C + w / 2, y: T - 8, "text-anchor": "middle", class: "mxhead" }, w >= 26 ? group(xs[start]) : group(xs[start]).replace("tests", "t")));
+        start = i;
+      }
+    }
+    labels = xs.map((x, i) => sv("text", { x: L - 8, y: T + i * C + C / 2 + 4, "text-anchor": "end", class: "mxlabel" + (isTest(x) ? " test" : "") + (i === picked ? " on" : ""), onclick: () => pick(i) }, short(x)));
+    const cells = pairs.map(([i, j, wrong]) => { const x = xs[i]; return sv("rect", { x: L + j * C + 2, y: T + i * C + 2, width: C - 4, height: C - 4, rx: 3, class: "mxdot" + (wrong ? " back" : ""),
+      onmouseenter: () => { lit([i, j], true); if (picked == null) fill(side, h("h4", {}, short(x)), h("p", { class: "small" }, `${verb} `, h("b", {}, short(xs[j]))), wrong && h("p", { class: "flag warn small" }, "a lower layer reaching up")); },
+      onmouseleave: () => { lit([i, j], false); if (picked != null) lit([picked], true); else intro(); } },
+      sv("title", {}, `${short(x)} ${verb} ${short(xs[j])}`)); });
+    // as wide as its card, never wider: the cells are sized to fit it
+    fill(holder, sv("svg", { viewBox: `0 0 ${W} ${H}`, style: `width: min(100%, ${W}px)`, class: "depmx", role: "img", "aria-label": `${n} packages; ${back} imports against the layers` },
+      bands, heads,
+      sv("line", { x1: L, y1: T, x2: L + n * C, y2: T + n * C, class: "mxdiag" }),
+      labels, cells));
+  }
+  intro();
+  draw();
+  // the cells grow to fill the card (14 to 34 px), the labels keep their size
+  if (window.ResizeObserver) {
+    new ResizeObserver(([e]) => {
+      const c = Math.max(10, Math.min(34, Math.floor((e.contentRect.width - L - 12) / n)));
+      if (c !== C) { C = c; draw(); }
+    }).observe(holder);
+  }
+  const card = h("div", { class: "card pad mxcard" },
+    h("p", { class: "small" }, back ? h("span", { class: "flag warn" }, `${plural(back, "import")} against the layers (red)`) : h("span", { class: "okay" }, "✓ every import points down the layers")),
+    holder);
+  return h("div", { class: "deplayout archlayout" }, card, side);
 }
 
 // filePath shows a path wrapping at its slashes: the folder dimmed, the
@@ -2690,111 +3484,80 @@ function couplingSection(p) {
   const pct = (x) => `${Math.round(x * 100)}%`;
   const partner = (q) => h("span", { class: "tag cpart", title: `${q.path}: ${q.together} commits together, ${pct(q.share)} of its commits (${q.provider}, ${q.tool})` },
     h("span", { class: "cname" }, q.path.split("/").pop()), h("span", { class: "cpct" }, pct(q.share)));
-  api(projectAPI(p, "coupling"), { "X-Harness-UI": "1" }).then((c) => {
+  Promise.all([api(projectAPI(p, "coupling"), { "X-Harness-UI": "1" }), api(projectAPI(p, "complexity")).catch(() => ({}))]).then(([c, cx]) => {
     const miss = c.missing || [];
+    // each file's most complex function, over the reported languages
+    const fileCx = Object.assign({}, ...(cx.languages || []).map((l) => l.files || {}));
+    const th = ((cx.languages || [])[0] || {}).thresholds || { note: 11, warn: 21, problem: 31 };
+    const hs = c.hotspots || [];
+    const most = Math.max(1, ...hs.map((x) => x.commits));
+    const cxCell = (x) => { const v = fileCx[x.path]; return v ? h("span", { class: `cxn lv-${v >= th.problem ? "problem" : v >= th.warn ? "warn" : v >= th.note ? "info" : "low"}` }, v) : h("span", { class: "muted" }, "–"); };
     fill(body,
       miss.length > 0 && h("div", { class: "card pad cmiss" },
-        h("p", {}, h("b", {}, `Your uncommitted change leaves out ${miss.length} file(s) that usually change with it`), h("span", { class: "muted" }, " (a reminder, not a rule)")),
+        h("p", {}, h("b", {}, `Your uncommitted change leaves out ${plural(miss.length, "file")} that usually change with it`), h("span", { class: "muted" }, " (a reminder, not a rule)")),
         miss.map((m) => h("p", { class: "cline" }, h("code", {}, m.partner.path), " usually changes with ", h("code", {}, m.changed),
           h("span", { class: "muted" }, ` (${m.partner.together} commits together, ${pct(m.partner.share)} of its commits)`)))),
-      c.changed && !miss.length && h("p", { class: "okay" }, `✓ Your uncommitted change (${c.changed.length} file(s)) leaves out none of their usual partners.`),
-      (c.hotspots || []).length ? h("table", { class: "hot" },
-        h("thead", {}, h("tr", {}, h("th", {}, "file"), h("th", { class: "n" }, "commits"), h("th", {}, "changes together with"))),
-        h("tbody", {}, c.hotspots.map((x) => h("tr", {}, h("td", { class: "cfile" }, filePath(x.path)), h("td", { class: "n" }, x.commits),
-          h("td", {}, (x.partners || []).length ? h("div", { class: "cparts" }, x.partners.map(partner)) : h("span", { class: "muted" }, c.providers ? "nothing often" : "–"))))))
+      c.changed && !miss.length && h("p", { class: "okay" }, `✓ Your uncommitted change (${plural(c.changed.length, "file")}) leaves out none of their usual partners.`),
+      !c.providers && hs.length > 0 && h("p", { class: "muted small" }, "No provider offers change coupling (ripwire does), so the files that change together are unknown; the counts are Git's."),
+      hs.length > 0 && Object.keys(fileCx).length > 0 && hotspotChart(hs, fileCx, th),
+      hs.length ? h("table", { class: "hot" },
+        h("thead", {}, h("tr", {}, h("th", {}, "file"), h("th", {}, "commits"), h("th", { class: "cxcell", title: "its most complex function" }, "complexity"), c.providers ? h("th", {}, "changes together with") : null)),
+        h("tbody", {}, hs.map((x) => {
+          const bar = h("span", { class: "cbar" }); bar.style.setProperty("--w", `${(100 * x.commits) / most}%`);
+          return h("tr", {}, h("td", { class: "cfile" }, filePath(x.path)), h("td", {}, h("div", { class: "cbarcell" }, bar, h("span", { class: "n" }, x.commits))), h("td", { class: "cxcell" }, cxCell(x)),
+            !c.providers ? null : h("td", {}, (x.partners || []).length ? h("div", { class: "cparts" }, x.partners.map(partner)) : h("span", { class: "muted" }, "nothing often")));
+        })))
         : h("p", { class: "empty" }, "No code file changed more than once in the window."),
-      !c.providers && h("p", { class: "muted small" }, "No provider offers change coupling (ripwire does), so partners are unknown; the counts are Git's."),
       (c.errors || []).length > 0 && h("p", { class: "muted small" }, c.errors.join("; ")));
   }).catch((e) => fill(body, h("p", { class: "error" }, e.message)));
   return section("Change coupling", "Code files changed most in the last 180 days (hotspots: harness's count from Git) and the files that change with them (co-change, from providers offering it; the percentage is the share of the file's commits). A partner that usually changes but was not touched may have been forgotten.", body);
 }
 
-// complexitySection shows how many functions have each cyclomatic
-// complexity, per language, with the thresholds that make a note, a warning
-// or a problem: the data to choose thresholds from. It loads on its own
-// (counting reads every function), the rest of the page does not wait.
-const LANGUAGE_NAME = { csharp: "C#", go: "Go", typescript: "TypeScript/JavaScript" };
-function complexitySection(p) {
-  const body = h("div", {}, h("div", { class: "loadbar", role: "progressbar", "aria-label": "Loading" }));
-  api(projectAPI(p, "complexity")).then((c) => {
-    const langs = c.languages || [];
-    fill(body, langs.length ? langs.map((l) => complexityChart(l, langs.length > 1))
-      : h("p", { class: "empty" }, "No functions in the languages [architecture.complexity] lists."));
-  }).catch((e) => fill(body, h("p", { class: "error" }, e.message)));
-  return section("Complexity distribution", "Functions by cyclomatic complexity, with the thresholds from [architecture.complexity] marked: where the tail starts shows where a threshold pays off. Lambdas and nested functions count toward the function around them.", body);
+// hotspotChart: each changing file by how often it changed (across) and
+// its most complex function (up); top right is complex code that keeps
+// changing, where bugs and slow changes concentrate. The worst few are
+// named.
+function hotspotChart(hs, fileCx, th) {
+  const pts = hs.filter((x) => fileCx[x.path]).map((x) => ({ x, c: x.commits, k: fileCx[x.path] }));
+  if (pts.length < 3) return null;
+  const W = 640, H = 220, L = 34, B = 26, T = 10, R = 10;
+  const cmax = Math.max(...pts.map((q) => q.c)), kmax = Math.max(th.problem + 5, ...pts.map((q) => q.k));
+  const X = (c) => L + (c / cmax) * (W - L - R), Y = (k) => H - B - (k / kmax) * (H - B - T);
+  const score = (q) => (q.c / cmax) * (q.k / kmax);
+  const named = [...pts].sort((a, b) => score(b) - score(a)).slice(0, 4);
+  const lv = (k) => k >= th.problem ? "problem" : k >= th.warn ? "warn" : k >= th.note ? "info" : "low";
+  return h("div", { class: "card pad hotchart" },
+    h("h5", {}, "Hotspots: complex and often changed"),
+    sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "hotsvg", role: "img", "aria-label": `Changing files by commits and complexity; the worst: ${named.map((q) => q.x.path.split("/").pop()).join(", ")}` },
+      // the warning band: complexity above the warning threshold
+      sv("rect", { x: L, y: T, width: W - L - R, height: Math.max(0, Y(th.warn) - T), class: "hband" }),
+      sv("line", { x1: L, x2: W - R, y1: Y(th.warn), y2: Y(th.warn), class: "hth" }),
+      sv("text", { x: W - R - 4, y: Y(th.warn) - 4, "text-anchor": "end", class: "hlabel" }, `warning ${th.warn}`),
+      sv("line", { x1: L, x2: W - R, y1: H - B, y2: H - B, class: "haxis" }), sv("line", { x1: L, x2: L, y1: T, y2: H - B, class: "haxis" }),
+      sv("text", { x: W - R, y: H - 6, "text-anchor": "end", class: "hlabel" }, `commits →  (${cmax} at most)`),
+      sv("text", { x: 4, y: T + 8, class: "hlabel" }, "cx"),
+      pts.map((q) => sv("circle", { cx: X(q.c), cy: Y(q.k), r: named.includes(q) ? 6 : 4.5, class: `hdot lv-${lv(q.k)}` }, sv("title", {}, `${q.x.path}: ${q.c} commits, complexity ${q.k}`))),
+      hotLabels(named.map((q) => ({ x: X(q.c) - 9, y: Y(q.k) + 4, text: q.x.path.split("/").pop() })),
+        [{ x: W - R, y: H - 6, text: `commits →  (${cmax} at most)` }, { x: W - R - 4, y: Y(th.warn) - 4, text: `warning ${th.warn}` }], H - B - 2, L + 4).map((lb) => sv("text", { x: lb.x, y: lb.y, "text-anchor": "end", class: "hname" }, lb.text))));
 }
 
-// complexityChart is one language's histogram: bins of five on a value
-// axis, each bar shaded by the level its values start at, the thresholds
-// as lines; counts label only the reported bars (the tail is the story),
-// every bar has its tooltip, and the table holds every number.
-const CX_LEVEL = { ok: "below the note threshold", info: "note", warn: "warning", problem: "problem" };
-function complexityChart(l, titled) {
-  const t = l.thresholds;
-  const level = (v) => (v >= t.problem ? "problem" : v >= t.warn ? "warn" : v >= t.note ? "info" : "ok");
-  const size = 5;
-  const max = Math.max(...l.counts.map(([v]) => v), t.problem);
-  const top = Math.min(Math.ceil(max / size) * size, 150); // longer tails fold into the last bin
-  const bins = [];
-  for (let lo = 1; lo <= top; lo += size) bins.push({ lo, hi: lo + size - 1, n: 0 });
-  for (const [v, n] of l.counts) bins[Math.min(Math.floor((v - 1) / size), bins.length - 1)].n += n;
-  const open = max > top;
-  const count = (lv) => l.counts.filter(([v]) => level(v) === lv).reduce((s, [, n]) => s + n, 0);
-  const range = (b, i) => (open && i === bins.length - 1 ? `${b.lo}+` : `${b.lo}–${b.hi}`);
-  // geometry: one value axis, one count axis from zero
-  // the top band (T) holds two rows of threshold labels above the counts on the tallest bars
-  const W = 720, H = 204, L = 44, R = 12, T = 48, B = 26;
-  const pw = W - L - R, ph = H - T - B, base = T + ph;
-  const x = (v) => L + ((v - 1) / top) * pw;
-  const peak = Math.max(1, ...bins.map((b) => b.n));
-  const top4 = (x0, w, y0) => {
-    const r = Math.min(4, w / 2, base - y0);
-    return `M${x0},${base}V${y0 + r}Q${x0},${y0} ${x0 + r},${y0}H${x0 + w - r}Q${x0 + w},${y0} ${x0 + w},${y0 + r}V${base}Z`;
-  };
-  const bars = bins.map((b, i) => {
-    if (!b.n) return null;
-    const x0 = x(b.lo) + 1, w = Math.min(24, x(b.hi + 1) - x(b.lo) - 2);
-    const y0 = base - Math.max(2, (b.n / peak) * ph);
-    const lv = level(b.lo);
-    return sv("g", { class: "cxbar" },
-      sv("path", { class: `cx-${lv}`, d: top4(x0, w, y0) }),
-      sv("rect", { class: "cxhit", x: x0 - 1, y: T, width: w + 2, height: ph }), // hover target taller than the bar
-      sv("title", {}, `complexity ${range(b, i)}: ${b.n} function${b.n === 1 ? "" : "s"} (${CX_LEVEL[lv]})`),
-      lv !== "ok" && sv("text", { class: "cxn", x: x0 + w / 2, y: y0 - 4, "text-anchor": "middle" }, b.n));
-  });
-  // thresholds: a line each, their labels on one baseline; a label goes to a
-  // second row only when it would run into the one before it (11px text is
-  // about 6.5px a character)
-  const ends = [-Infinity, -Infinity];
-  const marks = [["info", t.note], ["warn", t.warn], ["problem", t.problem]].filter(([, v]) => v <= top).map(([lv, v]) => {
-    const xv = x(v), label = `${LEVEL_ICON[lv]} ${CX_LEVEL[lv]} ≥ ${v}`;
-    const row = xv + 4 >= ends[0] + 6 ? 0 : 1;
-    ends[row] = xv + 4 + label.length * 6.5;
-    return sv("g", { class: `cxth cxth-${lv}` },
-      sv("line", { x1: xv, x2: xv, y1: T - 18 - row * 12, y2: base }),
-      sv("text", { x: xv + 4, y: T - 22 - row * 12 }, label));
-  });
-  const ticks = [1];
-  for (let v = 11; v <= top; v += 10) ticks.push(v);
-  const svg = sv("svg", { class: "cxchart", viewBox: `0 0 ${W} ${H}`, role: "img",
-    "aria-label": `${l.members} functions by cyclomatic complexity: ${count("info")} notes, ${count("warn")} warnings, ${count("problem")} problems` },
-  sv("line", { class: "cxgrid", x1: L, x2: W - R, y1: T, y2: T }),
-  sv("line", { class: "cxaxis", x1: L, x2: W - R, y1: base, y2: base }),
-  sv("text", { class: "cxtick", x: L - 6, y: T + 4, "text-anchor": "end" }, compact(peak)),
-  sv("text", { class: "cxtick", x: L - 6, y: base, "text-anchor": "end" }, "0"),
-  ticks.map((v) => sv("text", { class: "cxtick", x: x(v), y: base + 16, "text-anchor": "middle" }, v)),
-  bars, marks);
-  const reported = count("info") + count("warn") + count("problem");
-  return h("div", { class: "cxlang" },
-    titled && h("h4", {}, LANGUAGE_NAME[l.language] || l.language),
-    h("p", { class: "small" }, `${l.members} function${l.members === 1 ? "" : "s"}; at these thresholds ${reported} reported: `,
-      [["problem", "problem"], ["warn", "warning"], ["info", "note"]].map(([lv, word], i) =>
-        [i ? ", " : "", h("span", { class: `pill lv-${lv}` }, h("span", { class: "ico", "aria-hidden": "true" }, LEVEL_ICON[lv])), `${count(lv)} ${word}${count(lv) === 1 ? "" : "s"}`]),
-      l.measured > 0 && h("span", { class: "muted" }, ` · ${l.measured} measured by Microsoft.CodeAnalysis.Metrics`)),
-    svg,
-    h("details", { class: "cut" }, h("summary", { class: "muted small" }, "Table"),
-      h("table", { class: "cxtable" }, h("thead", {}, h("tr", {}, h("th", {}, "complexity"), h("th", { class: "n" }, "functions"), h("th", {}, "level"))),
-        h("tbody", {}, bins.map((b, i) => h("tr", {}, h("td", {}, range(b, i)), h("td", { class: "n" }, b.n), h("td", {}, CX_LEVEL[level(b.lo)])))))));
+// hotLabels places right-aligned labels so none overlaps another: a label
+// that would moves down a line, then up; one with no room is left out.
+// taken are labels already drawn (axis captions); a label stays above
+// floor and right of left.
+function hotLabels(xs, taken, floor, left) {
+  const placed = [...taken];
+  const box = (lb) => ({ l: lb.x - lb.text.length * 6.8, r: lb.x, t: lb.y - 11, b: lb.y + 2 });
+  const hits = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  const out = [];
+  for (const lb of xs) {
+    for (const dy of [0, -13, 13, -26, 26]) {
+      const c = { ...lb, y: lb.y + dy };
+      if (c.y > floor || box(c).l < left) continue;
+      if (!placed.some((p) => hits(box(p), box(c)))) { placed.push(c); out.push(c); break; }
+    }
+  }
+  return out;
 }
 
 // indexedSection shows what a provider offering project.overview (as MCP
@@ -2864,7 +3627,7 @@ function checkParts(c) {
   switch (c.name) {
     case "binary": return (m = /^(\S+) \((.*)\)$/.exec(d)) ? [m[1] === "dev" ? "dev build" : m[1].replace(/^v0\.0\.0-\d{14}-([0-9a-f]{7})[0-9a-f]*/, "$1"), [m[2].replaceAll(", ", " · "), m[1] !== "dev" && m[1]]] : ["", [d]];
     case "git": return (m = /^(.*) — (.+) at ([0-9a-f]+)$/.exec(d)) ? [`${m[2]} @ ${m[3].slice(0, 7)}`, [m[1]]] : ["", [d]];
-    case "project": return (m = /^(\S+), (\d+) worktree\(s\)$/.exec(d)) ? [`${m[2]} worktree${m[2] === "1" ? "" : "s"}`, [m[1]]] : ["", [d]];
+    case "project": return (m = /^(\S+), (\d+) worktrees?$/.exec(d)) ? [`${m[2]} worktree${m[2] === "1" ? "" : "s"}`, [m[1]]] : ["", [d]];
     case "storage": return (m = /^(.*) is (writable.*)$/.exec(d)) ? [m[2], [m[1]]] : ["", [d]];
     case "database": return (m = /^(.*), schema (.+)$/.exec(d)) ? [`schema ${m[2]}`, [m[1]]] : ["", [d]];
     case "permissions": return (m = /is (.+)$/.exec(d)) ? [m[1], []] : ["", [d]];
@@ -2881,7 +3644,21 @@ function checkParts(c) {
   return ["", [d]];
 }
 
-function healthReport(r) {
+// runFix runs a check's fix (or a sync) on the server and says how it went.
+async function runFix(p, body, btn, after) {
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Working…";
+  try {
+    const res = await post(projectAPI(p, "fix"), body);
+    toast(res.message || (res.ok ? "Done" : "Failed"), !res.ok, res.output);
+    if (res.ok) { await afterWrite(); after && after(); }
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+  btn.textContent = label;
+}
+
+function healthReport(r, p, reload) {
   const checks = r.checks || [];
   const n = (lv) => checks.filter((c) => c.level === lv).length;
   const st = r.status || {};
@@ -2890,15 +3667,16 @@ function healthReport(r) {
   // one summary line; the database and the index are named only when
   // something is wrong with them
   const issues = [
-    n("fail") > 0 && `${n("fail")} failing check(s)`,
-    n("warn") > 0 && `${n("warn")} warning(s)`,
+    n("fail") > 0 && `${plural(n("fail"), "failing check")}`,
+    n("warn") > 0 && plural(n("warn"), "warning"),
     !db.exists ? "no database" : db.schema_version !== db.schema_latest && `schema ${db.schema_version} of ${db.schema_latest}`,
     db.error,
-    sync.stale ? `index stale: ${sync.stale}` : !sync.synced_at && "never synced",
+    sync.stale ? "index stale" : !sync.synced_at && "never synced",
   ].filter(Boolean);
   const out = h("div", {},
     h("div", { class: "card pad hsum " + (r.healthy ? "ok" : "bad") },
-      h("span", { class: "hico", "aria-hidden": "true" }, r.healthy ? "✓" : "✕"),
+      h("span", { class: "hico", "aria-hidden": "true" }, icon(r.healthy ? "st-ok" : "st-fail")),
+      p && (sync.stale || !sync.synced_at) && h("button", { class: "small hsync", type: "button", onclick: (ev) => runFix(p, { sync: true }, ev.currentTarget, reload) }, "Sync now"),
       h("div", {}, h("b", {}, r.healthy ? (issues.length ? "Healthy, with notes" : "Healthy") : "Needs a fix"),
         h("div", { class: "muted" }, [
           issues.length ? issues.join(" · ") : `${checks.length} checks pass`,
@@ -2910,23 +3688,30 @@ function healthReport(r) {
   // ones as a compact grid (the detail on hover and a second line).
   const AREA = { binary: "Installation", config: "Installation", permissions: "Installation",
     git: "Project", project: "Project", storage: "Project", database: "Project", "claude-code": "Agents' clients", codex: "Agents' clients" };
-  const CHECK_ICON = { ok: "✓", warn: "▲", fail: "✕" };
   const check = (c) => {
-    const [value, lines] = c.level === "ok" ? checkParts(c) : ["", [c.detail]];
-    return h("div", { class: `chk lv-${c.level}` },
-      h("span", { class: "cico", "aria-hidden": "true" }, CHECK_ICON[c.level] || "•"),
+    // a failing check's detail without the file it read: that is on hover
+    const at = c.level !== "ok" && /\s*\((?:checked|read|in) ([^)]+)\)/.exec(c.detail || "");
+    const [value, lines] = c.level === "ok" ? checkParts(c) : ["", [at ? c.detail.replace(at[0], "") : c.detail]];
+    return h("div", { class: `chk lv-${c.level}`, title: at ? at[1] : null },
+      h("span", { class: "cico", "aria-hidden": "true" }, icon({ ok: "st-ok", warn: "st-warn", fail: "st-fail" }[c.level] || "st-ok")),
       h("div", { class: "cbody" },
         h("div", { class: "chead" }, h("span", { class: "cname" }, c.name, c.level !== "ok" && h("span", { class: "sr" }, ` (${c.level})`)), value && h("span", { class: "cvalue" }, value)),
-        lines.filter(Boolean).map((x) => h("div", { class: "cdetail" }, x)), c.fix && h("div", { class: "fix" }, h("b", {}, "Fix: "), c.fix)));
+        lines.filter(Boolean).map((x) => h("div", { class: "cdetail" }, x)), c.fix && h("div", { class: "fix" }, h("b", {}, "Fix: "), c.fix)),
+      // what harness can fix itself: the action at the card's right
+      p && (r.fixable || []).includes(c.name) && h("button", { class: "primary fixbtn", type: "button", onclick: (ev) => runFix(p, { check: c.name }, ev.currentTarget, reload) }, icon("chore"), "Fix it"));
   };
   const bad = checks.filter((c) => c.level !== "ok");
   const stacks = [["Installation", "Agents' clients"], ["Project"], ["Code providers"]];
-  out.append(section("Checks", "What 'harness doctor' verifies. Failures mean harness cannot work correctly here; warnings mean something is missing.",
+  // what is wrong in full; what passes one line per area, its checks
+  // (versions, paths) folded inside
+  out.append(section("Checks", bad.length ? "What is wrong first, with its fix; then what passes." : null,
     bad.length > 0 && h("div", { class: "chkgrid wide" }, bad.map(check)),
-    h("div", { class: "chkareas" }, stacks.map((st) => h("div", { class: "chkstack" }, st.map((ar) => {
+    h("div", { class: "chkareas" }, stacks.flat().map((ar) => {
       const cs = checks.filter((c) => c.level === "ok" && (AREA[c.name] || "Code providers") === ar);
-      return cs.length > 0 && h("div", { class: "chkarea" }, h("h4", {}, ar, h("span", { class: "count" }, `✓ ${cs.length} pass`)), h("div", { class: "chkgrid" }, cs.map(check)));
-    }))))));
+      return cs.length > 0 && h("details", { class: "chkarea" },
+        h("summary", {}, h("h4", {}, ar, h("span", { class: "count" }, `✓ ${cs.length} pass`)), h("span", { class: "muted small" }, cs.map((c) => c.name).join(" · "))),
+        h("div", { class: "chkgrid" }, cs.map(check)));
+    }))));
   const git = st.git;
   out.append(h("details", { class: "card pad section more" }, h("summary", {}, "Paths and identifiers"),
     h("div", { class: "cols" },
@@ -2989,6 +3774,21 @@ function healthReport(r) {
 }
 
 // --- knowledge ---
+// typeBar: the knowledge by type, one stacked bar in the types' colours;
+// a segment toggles its type like its chip.
+function typeBar(ms, on, toggle) {
+  const n = ms.length;
+  if (!n) return null;
+  return h("div", { class: "tybar", role: "group", "aria-label": "Knowledge by type" },
+    MEMORY_TYPES.filter((t) => ms.some((m) => m.type === t)).map((t) => {
+      const c = ms.filter((m) => m.type === t).length;
+      const seg = h("button", { class: `tyseg ty-${t}` + (on.has(t) ? "" : " off"), title: `${MEMORY_GROUPS[t]}: ${c}. ${MEMORY_TYPE_HELP[t][0]}`, "aria-pressed": String(on.has(t)), onclick: () => toggle(t) },
+        h("span", { class: "tyn" }, c), h("span", { class: "tyl" }, MEMORY_GROUPS[t]));
+      seg.style.setProperty("--w", String(c));
+      return seg;
+    }));
+}
+
 async function viewKnowledge(p) {
   const k = state.knowledge;
   const wrap = h("div", {});
@@ -2999,11 +3799,8 @@ async function viewKnowledge(p) {
   let seq = 0;
   async function load() {
     const n = ++seq;
-    if (k.types.size === 0) {
-      memories = [];
-      return draw("Pick at least one type.");
-    }
-    const qs = new URLSearchParams({ type: [...k.types].join(","), limit: "500", levels: "1" });
+    // every type is loaded, the chosen ones shown: the bar counts them all
+    const qs = new URLSearchParams({ type: MEMORY_TYPES.join(","), limit: "500", levels: "1" });
     if (k.q) qs.set("q", k.q);
     if (k.inactive) qs.set("inactive", "1");
     try {
@@ -3020,24 +3817,20 @@ async function viewKnowledge(p) {
     if (k.scope && !scopes.includes(k.scope)) k.scope = "";
     fill(scopeSel, h("option", { value: "" }, `all scopes (${scopes.length})`),
       scopes.map((s) => h("option", { value: s, selected: s === k.scope }, s)));
-    const shown = memories.filter((m) => !k.scope || m.scope === k.scope);
+    const inScope = memories.filter((m) => !k.scope || m.scope === k.scope);
+    const shown = inScope.filter((m) => k.types.has(m.type));
     summary.textContent = `${shown.length} memor${shown.length === 1 ? "y" : "ies"}${k.scope ? " in " + k.scope : ""}`;
+    fill(bar, typeBar(inScope, k.types, (t) => { k.types.has(t) ? k.types.delete(t) : k.types.add(t); draw(); }));
+    if (!k.types.size) return fill(list, h("p", { class: "empty" }, "Pick at least one type."));
     if (!shown.length) return fill(list, h("p", { class: "empty" }, empty || "No memories match."));
     fill(list, ...MEMORY_TYPES.filter((t) => shown.some((m) => m.type === t)).map((t) => {
       const group = shown.filter((m) => m.type === t);
       return h("section", { class: `mgroup ty-${t}` },
-        h("h3", {}, h("span", { class: "dot", "aria-hidden": "true" }), MEMORY_GROUPS[t], h("span", { class: "count" }, group.length)),
+        h("h3", { title: MEMORY_TYPE_HELP[t][0] }, h("span", { class: "dot", "aria-hidden": "true" }), MEMORY_GROUPS[t], h("span", { class: "count" }, group.length)),
         h("div", { class: "mems" }, group.map((m) => memoryCard(p, m))));
     }));
   }
-  const chips = MEMORY_TYPES.map((t) => h("button", {
-    class: `chip ty-${t}`, "aria-pressed": String(k.types.has(t)),
-    onclick: (ev) => {
-      k.types.has(t) ? k.types.delete(t) : k.types.add(t);
-      ev.currentTarget.setAttribute("aria-pressed", String(k.types.has(t)));
-      load();
-    },
-  }, h("span", { class: "dot", "aria-hidden": "true" }), MEMORY_GROUPS[t]));
+  const bar = h("div", {});
   let timer;
   const search = h("input", {
     type: "search", placeholder: "Search memories", value: k.q, "aria-label": "Search memories",
@@ -3047,7 +3840,25 @@ async function viewKnowledge(p) {
     h("input", { type: "checkbox", checked: k.inactive, onchange: (ev) => { k.inactive = ev.target.checked; load(); } }),
     "include superseded and expired");
   const applies = appliesPanel(p);
-  wrap.append(applies, h("div", { class: "filters" }, chips), h("div", { class: "filters" }, search, scopeSel, inactive, summary), list);
+  // the author adds knowledge too, not only agents (TASK-0056)
+  const addBox = h("div", {});
+  const add = h("button", { class: "primary", onclick: () => fill(addBox, actionForm({
+    title: "Add knowledge for this project, as yours: agents get it where its type and scope apply.",
+    fields: [{ name: "type", label: "Type", value: "decision", required: true, memoryType: true },
+      { name: "content", label: "Statement", multiline: true, required: true },
+      { name: "scope", label: "Applies to (project, or path:internal/gui, subsystem:sync, branch:main)", value: "project" },
+      { name: "source_ref", label: "Source (optional)" }],
+    submit: "Add",
+    onSubmit: async (v) => {
+      const r = await post(projectAPI(p, "memories"), v);
+      if (r.status === "needs_decision") throw new Error(`Something similar is already recorded: ${(r.similar || []).map((x) => x.content).join("; ")} (correct that one instead)`);
+      fill(addBox);
+      await afterWrite();
+    },
+    onCancel: () => fill(addBox),
+  })) }, "Add knowledge");
+  // the type bar is the one type filter: its segments toggle
+  wrap.append(h("div", { class: "section kadd" }, add, addBox), applies, bar, h("div", { class: "filters" }, search, scopeSel, inactive, summary), list);
   list.append(h("p", { class: "empty" }, "Loading…"));
   await Promise.all([load(), applies.ready]);
   return wrap;
@@ -3091,7 +3902,16 @@ function appliesPanel(p) {
 const isLevel = (scope) => scope === "user" || (scope || "").startsWith("workspace:");
 const levelWord = (scope) => scope === "user" ? "all your projects" : `workspace ${wtitle(scope.slice("workspace:".length))}`;
 
-function memoryCard(p, m) {
+// leadOf splits a statement into its point and the rest: up to the first
+// ": ", "; " or sentence end, when that is a real part of it.
+function leadOf(text) {
+  const t = (text || "").trim();
+  const m = /^(.{12,140}?[.:;])\s+(\S[\s\S]*)$/.exec(t);
+  return m ? [m[1], m[2]] : [t, ""];
+}
+
+// onLevel: the card is on its level's own page, which says the scope.
+function memoryCard(p, m, onLevel) {
   const inactive = !!m.superseded_by || (m.valid_until && new Date(m.valid_until) < new Date());
   const panel = h("div", { class: "mpanel" });
   const level = isLevel(m.scope) ? m.scope : "";
@@ -3105,7 +3925,9 @@ function memoryCard(p, m) {
     fill(panel, h("p", { class: "empty" }, "Loading…"));
     try { fill(panel, historyView(await api(url("")))); } catch (e) { fill(panel, h("p", { class: "error" }, e.message)); }
   }
-  const actions = h("div", { class: "review" },
+  // the actions show on hover or focus: a page of memories is read, not
+  // a wall of buttons
+  const actions = h("div", { class: "review memacts" },
     !inactive && h("button", {
       onclick: () => fill(panel, actionForm({
         title: "Correct this memory: the new statement replaces it (same type and scope); the old one stays in its history.",
@@ -3128,22 +3950,24 @@ function memoryCard(p, m) {
     !inactive && !level && p && m.scope === "project" && h("button", { title: "Record it for a workspace or for all your projects", onclick: () => fill(panel, promoteForm(p, m, panel)) }, "Promote"),
     h("button", { class: "ghost", onclick: () => openHistory() }, "History"));
   if (state.history.has(m.id)) openHistory(true); // it was open before a redraw
+  const [lead, rest] = leadOf(m.content);
   return h("article", { class: `mem ty-${m.type}` + (inactive ? " inactive" : "") },
-    h("div", { class: "content" }, m.content),
+    // the point first, the detail after it
+    h("div", { class: "content" }, h("b", { class: "mlead" }, lead), rest && h("span", { class: "mrest" }, " " + rest)),
     h("div", { class: "prov" },
-      h("span", { class: "scope" + (level ? " lvl" : "") }, level ? (m.scope === "user" ? "you · all your projects" : `workspace · ${wtitle(m.scope.slice(10))}`) : m.scope),
-      m.source_ref && h("span", {}, h("b", {}, "source "), m.source_ref),
-      h("span", {}, h("b", {}, m.source_type === "user" ? "stated by user" : "recorded by agent"), m.recorded_by ? ` · ${m.recorded_by}` : ""),
-      h("span", { title: m.created_at }, ago(m.created_at)),
+      !onLevel && h("span", { class: "scope" + (level ? " lvl" : "") }, level ? (m.scope === "user" ? "you · all your projects" : `workspace · ${wtitle(m.scope.slice(10))}`) : m.scope),
+      h("span", { class: "who", title: m.recorded_by || "" }, m.source_type === "user" ? "stated by you" : "recorded by an agent"),
+      m.source_ref && h("span", { class: "src", title: m.source_ref }, m.source_ref),
+      h("span", { title: `${m.created_at} · ${m.id}` }, ago(m.created_at)),
       m.confidence != null && h("span", {}, `confidence ${m.confidence}`),
       m.valid_until && h("span", {}, `valid until ${m.valid_until.slice(0, 10)}`),
-      h("code", { class: "id" }, m.id)),
+      actions),
     (m.overrides || []).length > 0 && h("div", { class: "overrides" }, "Takes precedence here over ", m.overrides.join(", ")),
     (m.overridden_in || []).length > 0 && h("div", { class: "overrides" }, "Overridden by their own memory in: ", m.overridden_in.join(", ")),
     m.superseded_by && h("div", { class: "superseded" }, "Superseded by ",
       h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); openHistory(true); }, title: "Show the versions, newest included" }, m.superseded_by),
       m.supersede_reason ? ": " + m.supersede_reason : ""),
-    actions, panel);
+    panel);
 }
 
 // promoteForm records a project memory for one of the project's
@@ -3187,7 +4011,7 @@ async function levelKnowledge(level, intro) {
   const box = h("div", {});
   const add = h("button", { class: "primary", onclick: () => fill(box, actionForm({
     title: `Add for ${levelWord(level)}: it applies to every one of them unless a project states otherwise.`,
-    fields: [{ name: "type", label: "Type (decision, convention, constraint, warning, goal, fact)", value: "convention", required: true },
+    fields: [{ name: "type", label: "Type", value: "convention", required: true, memoryType: true },
       { name: "content", label: "Statement", multiline: true, required: true }, { name: "source_ref", label: "Source (optional)" }],
     submit: "Add",
     onSubmit: async (v) => {
@@ -3199,11 +4023,15 @@ async function levelKnowledge(level, intro) {
   })) }, "Add");
   const groups = MEMORY_TYPES.filter((t) => ms.some((m) => m.type === t)).map((t) => {
     const g = ms.filter((m) => m.type === t);
-    return h("section", { class: `mgroup ty-${t}` }, h("h3", {}, h("span", { class: "dot", "aria-hidden": "true" }), MEMORY_GROUPS[t], h("span", { class: "count" }, g.length)),
-      h("div", { class: "mems" }, g.map((m) => memoryCard(null, m))));
+    return h("section", { class: `mgroup ty-${t}` }, h("h3", { title: MEMORY_TYPE_HELP[t][0] }, h("span", { class: "dot", "aria-hidden": "true" }), MEMORY_GROUPS[t], h("span", { class: "count" }, g.length)),
+      h("div", { class: "mems" }, g.map((m) => memoryCard(null, m, true))));
   });
-  return h("div", {}, h("p", { class: "hint" }, intro), h("div", { class: "review" }, add), box,
-    groups.length ? groups : h("p", { class: "empty section" }, "Nothing recorded yet. Agents add here with memory_put scope " + (level === "user" ? "user" : level) + ", or promote a project's memory from its Knowledge view."));
+  // nothing yet: what each type is, to start from
+  const empty = h("div", { class: "section" }, h("p", { class: "empty" }, "Nothing recorded yet: add a statement, or promote a project's memory from its Knowledge view. What each type is for:"),
+    h("div", { class: "kindcards" }, MEMORY_TYPES.map((t) => h("div", { class: `kindcard tycard ty-${t}` },
+      h("b", {}, h("span", { class: "dot", "aria-hidden": "true" }), " ", MEMORY_GROUPS[t].replace(/s$/, "")), h("span", { class: "muted small" }, MEMORY_TYPE_HELP[t][0])))));
+  return h("div", {}, intro && h("p", { class: "hint" }, intro), h("div", { class: "review" }, add), box,
+    groups.length ? groups : empty);
 }
 
 function historyView(d) {
@@ -3235,6 +4063,11 @@ function actionForm({ title, fields, submit, danger, onSubmit, onCancel }) {
   },
     title && h("p", { class: "hint" }, title),
     fields.map((f) => {
+      if (f.memoryType) {
+        const { sel, help } = typeSelect(f.value);
+        inputs[f.name] = sel;
+        return h("label", {}, h("span", {}, f.label), sel, help);
+      }
       const el = f.multiline ? h("textarea", { rows: "3", name: f.name }) : h("input", { type: "text", name: f.name });
       el.value = f.value || "";
       inputs[f.name] = el;
@@ -3246,58 +4079,98 @@ function actionForm({ title, fields, submit, danger, onSubmit, onCancel }) {
   return form;
 }
 
-async function viewContext(p) {
-  const st = await api(`/api/projects/${encodeURIComponent(p.id)}/context?days=${state.days}`);
-  const misses = st.changed - st.hits;
-  const out = h("div", {},
+// userFindings are the report findings the user can act on (TASK-0053):
+// a configuration, hook, instruction or review fixes them; the others
+// are about how harness itself gathers and serves: the developer's, sent
+// only in the opt-in telemetry and never served here (the report endpoint
+// leaves them out).
+function userFindings(fs) { return fs.filter((f) => f.audience !== "developer"); }
+
+const CLIENT_NAME = { "claude-code": "Claude Code", codex: "Codex" };
+
+// viewServing is how well harness serves the project's agents, for the
+// person using it: which agents use it, what the answers held, and what
+// to change (TASK-0053).
+async function viewServing(p) {
+  const r = await api(projectAPI(p, `report?days=${state.days}`));
+  const st = r.context || {}, ar = st.after_read || {};
+  // a problem that stopped is not something to change: listed apart
+  const resolved = (f) => /: resolved$/.test(f.message);
+  const all = userFindings(r.findings || []);
+  const fs = all.filter((f) => !resolved(f)), done = all.filter(resolved);
+  const act = fs.filter((f) => f.level !== "info");
+  const tools = (r.metrics && r.metrics.tools) || [];
+  const calls = tools.reduce((n, t) => n + t.calls, 0);
+  const clients = [...new Set(tools.flatMap((t) => t.clients || []))];
+  const last = tools.map((t) => t.last_at).filter(Boolean).sort().pop();
+  const hooks = (r.metrics && r.metrics.hooks && r.metrics.hooks.events) || 0;
+  const providerProblems = providerGroups(fs.filter((f) => f.level !== "info")).length;
+  return h("div", {},
+    h("p", { class: act.length ? "flag warn section verdict" : "okay section verdict" },
+      act.length ? `${plural(act.length, "thing")} to change so harness serves your agents better: see below.`
+        : calls ? "✓ Harness serves your agents; nothing to change." : `No agent called harness in ${state.days} days.`),
     h("div", { class: "tiles" },
-      tile("Hit rate", st.changed ? pct(st.hit_rate) : "—", `${st.hits} of ${st.changed} changed files were in the context`),
-      tile("Scored answers", st.calls, `${st.open} waiting for a commit`),
-      tile("Callee misses", misses > 0 ? pct(st.callee_misses / misses) : "—", `${st.callee_misses} of ${misses} misses (what code.callees, HAR-0145, would add)`)));
-  if (!st.changed) {
-    out.append(h("p", { class: "empty section" }, "No scored answers yet: they are scored when HEAD moves on (harness sync) or a task completes with a commit."));
-    return out;
-  }
-  const langs = Object.entries(st.by_language || {}).sort((a, b) => b[1][1] - a[1][1]);
-  out.append(section("By language", "Changed files that a get_context answer contained.",
-    h("div", { class: "card bars" }, langs.flatMap(([lang, [hits, of]]) => [h("span", { class: "k" }, lang), meter(hits, of)]))));
-  out.append(section("By provider, capability and language",
-    "Of the changed files in the answers each one contributed to, how many it surfaced. Tier 0: hits in the top tier; median: median position of its hits.",
-    h("div", { class: "card" }, h("table", {},
-      h("thead", {}, h("tr", {}, h("th", {}, "provider"), h("th", {}, "capability"), h("th", {}, "language"), h("th", {}, "hits"), h("th", { class: "n" }, "tier 0"), h("th", { class: "n" }, "median"))),
-      h("tbody", {}, (st.by_provider || []).map((r) => h("tr", {},
-        h("td", {}, r.provider), h("td", {}, r.capability.replace(/^code\./, "")), h("td", {}, r.language),
-        h("td", {}, meter(r.hits, r.changed)), h("td", { class: "n" }, r.hits_tier0), h("td", { class: "n" }, r.median_position))))))));
-  if ((st.top_misses || []).length) {
-    out.append(section("Changed but never in the context", "Candidates for better gathering or a language-specific provider.",
-      h("div", { class: "card" }, h("table", {},
-        h("thead", {}, h("tr", {}, h("th", { class: "n" }, "times"), h("th", {}, "language"), h("th", {}, "file"), h("th", {}, "called from"))),
-        h("tbody", {}, st.top_misses.map((m) => h("tr", {},
-          h("td", { class: "n" }, `${m.times}×`), h("td", {}, m.language), h("td", { class: "mono wrap" }, m.path), h("td", { class: "mono wrap" }, m.called_from || ""))))))));
-  }
-  return out;
+      tile("Agent calls", calls || "none",
+        calls ? `from ${clients.map((c) => CLIENT_NAME[c] || c).join(", ")}; the last ${ago(last)}` : "connect an agent: harness install, then harness doctor"),
+      tile("Context hits", st.changed ? pct(st.hit_rate) : "—",
+        st.changed ? `per answer · ${st.hits} of ${st.changed} changed files over ${st.calls} answers` : "scored once agents' changes are committed (harness sync)"),
+      tile("Read next", ar.touched ? pct(ar.hit_rate) : "—",
+        ar.touched ? `of ${ar.touched} files agents read or edited after an answer, ${ar.hits} were in it` : hooks ? "nothing read after an answer yet" : "measured with the client hooks (Tools & providers → Hooks)"),
+      tile("Knowledge", `${r.knowledge_reads || 0} read`, `${r.knowledge_writes || 0} written by agents; ${(r.knowledge || {}).current_memories || 0} current memories`),
+      tile("Providers with problems", providerProblems || "✓ none", providerProblems ? "failing or slow: see below" : "no provider failed or was slow")),
+    section("What to change", `What harness finds over the last ${r.days} days that you can act on, most severe first, each with what to do.`,
+      fs.length ? h("div", { class: "findings" },
+        // the providers' problems a card per provider, the others one each,
+        // most severe first
+        [...providerGroups(fs).map((g) => ({ level: g.level, el: providerCard(g) })), ...fs.filter((f) => !f.provider).map((f) => ({ level: f.level, el: findingCard(f) }))]
+          .sort((a, b) => LV_RANK[a.level] - LV_RANK[b.level]).map((x) => x.el)) : emptyState("check", "Nothing to change", "Harness serves your agents as it should over this window."),
+      done.length > 0 && h("details", { class: "capfold" }, h("summary", {}, `Resolved: ${plural(done.length, "problem")} that stopped`), h("div", { class: "findings" }, done.map(findingCard)))));
 }
 
-async function viewFindings(p) {
-  const r = await api(projectAPI(p, `report?days=${state.days}`));
-  const st = r.context || {}, ar = st.after_read || {}, k = r.knowledge || {};
-  const fs = r.findings || [];
-  const n = (lv) => fs.filter((f) => f.level === lv).length;
-  const out = h("div", {},
-    h("div", { class: "tiles" },
-      tile("Problems", n("problem"), "act on these first"),
-      tile("Warnings", n("warn"), "worth a look"),
-      tile("Context hits", st.changed ? pct(st.hit_rate) : "—", `${st.hits || 0} of ${st.changed || 0} changed files, ${st.calls || 0} answers`),
-      tile("Read after context", ar.touched ? pct(ar.hit_rate) : "—", `${ar.hits || 0} of ${ar.touched || 0} files read or edited next`)),
-    h("p", { class: "hint section" }, `What harness report says about the last ${r.days} days, most severe first. The same as 'harness report' in a terminal.`));
-  out.append(fs.length ? h("div", { class: "findings" }, fs.map(findingCard)) : h("p", { class: "empty" }, "Nothing to report."));
-  out.append(section("Numbers", null, h("div", { class: "card pad" }, kv([
-    ["Callee misses", `${st.callee_misses || 0} of ${(st.changed || 0) - (st.hits || 0)} misses`],
-    ["Hook events", `${(r.metrics && r.metrics.hooks && r.metrics.hooks.events) || 0}`],
-    ["Knowledge", `${r.knowledge_reads} reads, ${r.knowledge_writes} writes by agents; ${k.current_memories} current memories`],
-    ["Proposals", `${k.proposed} made, ${k.approved} approved, ${k.rejected} rejected, ${k.pending} pending`],
-  ]))));
-  return out;
+// providerGroups puts the provider findings together, one per provider
+// with its capabilities' problems (failed, slow, empty), worst first.
+const LV_RANK = { problem: 0, warn: 1, info: 2 };
+function providerGroups(fs) {
+  const by = new Map();
+  for (const f of fs.filter((f) => f.provider)) {
+    if (!by.has(f.provider)) by.set(f.provider, []);
+    by.get(f.provider).push(f);
+  }
+  return [...by].map(([provider, xs]) => ({ provider, xs, level: xs.map((f) => f.level).sort((a, b) => LV_RANK[a] - LV_RANK[b])[0] }))
+    .sort((a, b) => LV_RANK[a.level] - LV_RANK[b.level] || a.provider.localeCompare(b.provider));
+}
+// providerLine is a provider's problems in a few words: "impact and
+// references fail and are slow".
+function providerLine(g) {
+  const caps = [...new Set(g.xs.map((f) => f.capability))];
+  const kinds = [...new Set(g.xs.map((f) => f.problem))];
+  const verb = { failed: caps.length === 1 ? "fails" : "fail", slow: caps.length === 1 ? "is slow" : "are slow", empty: "answers empty" };
+  const list = (xs) => xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0];
+  return `${g.provider}: ${list(caps)} ${list(kinds.map((k) => verb[k] || k))}`;
+}
+const STATUS_WORD = { still: "still happening", unclear: "too few calls since to tell", resolved: "stopped" };
+// providerCard is one provider's problems as a table: a row per
+// capability, its failures and slowness, whether it goes on, its days.
+function providerCard(g) {
+  const caps = [...new Set(g.xs.map((f) => f.capability))];
+  const actions = [...new Set(g.xs.map((f) => f.action).filter(Boolean))];
+  const cell = (f) => f ? h("span", { class: `pfig lv-${f.level}` }, h("span", { class: "ico", "aria-hidden": "true" }, f.level === "problem" ? "✕" : f.level === "warn" ? "▲" : "ⓘ"), f.figure) : h("span", { class: "muted" }, "—");
+  return h("article", { class: `finding provcard lv-${g.level}` },
+    h("div", { class: "fhead" }, levelPill(g.level), h("b", {}, g.provider), h("span", { class: "farea" }, plural(caps.length, "capability", "capabilities"))),
+    h("div", { class: "provwrap" }, h("table", { class: "provtab" },
+      h("thead", {}, h("tr", {}, h("th", {}, "capability"), h("th", {}, "failed"), h("th", {}, "slow"), h("th", {}, "goes on?"), h("th", {}, "calls per day, red: with the problem"))),
+      h("tbody", {}, caps.map((c) => {
+        const mine = g.xs.filter((f) => f.capability === c);
+        const get = (k) => mine.find((f) => f.problem === k);
+        const trend = mine.map((f) => f.trend).find(Boolean);
+        const status = mine.map((f) => f.status).find(Boolean);
+        return h("tr", {},
+          h("td", {}, h("b", {}, c.replaceAll("_", " ")), get("empty") && h("div", { class: "muted small" }, get("empty").figure)),
+          h("td", {}, cell(get("failed"))), h("td", {}, cell(get("slow"))),
+          h("td", { class: "small" + (status === "still" ? " still" : " muted") }, STATUS_WORD[status] || ""),
+          h("td", {}, trend ? dayChart(trend) : ""));
+      })))),
+    actions.length > 0 && h("ul", { class: "factions" }, actions.map((a) => h("li", {}, "→ ", a))));
 }
 
 function findingCard(f) {
@@ -3327,7 +4200,7 @@ function dayChart(trend) {
   for (const d of days) {
     const bar = h("span", {
       class: d.errors + d.slow > 0 ? "bad" : d.calls ? "" : "none",
-      title: `${d.day}: ${d.calls} call(s)${d.errors ? `, ${d.errors} failed` : ""}${d.slow ? `, ${d.slow} slow` : ""}`,
+      title: `${d.day}: ${plural(d.calls, "call")}${d.errors ? `, ${d.errors} failed` : ""}${d.slow ? `, ${d.slow} slow` : ""}`,
     });
     bar.style.setProperty("--h", `${d.calls ? Math.max(8, Math.round((d.calls / peak) * 100)) : 4}%`);
     chart.append(bar);
@@ -3336,7 +4209,7 @@ function dayChart(trend) {
 }
 
 async function viewProviders(p) {
-  const [v, m] = await Promise.all([api(projectAPI(p, `providers?days=${state.days}`)), api(projectAPI(p, `metrics?days=${state.days}`))]);
+  const v = await api(projectAPI(p, `providers?days=${state.days}`));
   const provs = v.providers || [];
   const used = provs.filter((x) => x.enabled && !x.inactive);
   const idle = provs.filter((x) => !x.enabled || x.inactive);
@@ -3351,30 +4224,14 @@ async function viewProviders(p) {
     const quiet = caps.filter((c) => !c.metrics);
     const calls = called.reduce((n, c) => n + c.metrics.calls, 0);
     const errs = called.reduce((n, c) => n + c.metrics.calls * c.metrics.error_rate, 0);
-    const timeouts = called.some((c) => c.metrics.timeouts > 0);
-    const cols = ["calls", "errors", timeouts && "timeouts", "empty", "p95", "context hits"].filter(Boolean);
     return h("article", { class: "provcard" },
       h("div", { class: "provhead" },
         h("h3", {}, ps.name), h("span", { class: "tag" }, kind(ps)), ps.pack && h("span", { class: "tag" }, `pack ${ps.pack}`),
-        h("span", { class: "provsum" }, calls ? `${calls} call(s) · ${pct(calls ? errs / calls : 0)} failed` : `not called in ${state.days} days`)),
+        h("span", { class: "provsum" }, calls ? `${plural(calls, "call")} · ${pct(calls ? errs / calls : 0)} failed` : `not called in ${state.days} days`)),
       h("div", { class: "pmeta mono muted" }, ps.command),
       (ps.only || []).length > 0 && h("div", { class: "pmeta" }, "Limited to ", ps.only.map(cap).join(", ")),
       caps.length === 0 ? h("p", { class: "empty" }, ps.type === "harness" ? "Declares its capabilities when started; none called yet." : "No capabilities.")
-        : [called.length > 0 && h("div", { class: "card captable" }, h("table", {},
-          h("thead", {}, h("tr", {}, h("th", {}, "capability"), cols.map((c) => h("th", { class: "n" }, c)), h("th", {}, "per day"), h("th", { class: "n" }, "since last problem"))),
-          h("tbody", {}, called.map((c) => {
-            const r = c.metrics, t = c.trend;
-            const last = t && (t.last_error_at || t.last_slow_at)
-              ? `${Math.min(t.last_error_at ? t.calls_after_error : Infinity, t.last_slow_at ? t.calls_after_slow : Infinity)} call(s)` : t ? "none" : "";
-            return h("tr", {},
-              h("td", {}, h("div", {}, cap(c.capability), !c.declared && h("span", { class: "muted small", title: "seen in calls; the provider declares its capabilities when started" }, " (seen)")),
-                c.tool && h("div", { class: "mono muted small" }, c.tool)),
-              h("td", { class: "n" }, r.calls), rateCell(r.error_rate, 0.1, 0.5), timeouts && h("td", { class: "n" }, r.timeouts),
-              h("td", { class: "n" }, pct(r.empty_rate)), latencyCell(r.p95_ms), h("td", { class: "n" }, r.context_hit_share >= 0 ? pct(r.context_hit_share) : "—"),
-              h("td", { class: "chartcell" }, t ? dayChart(t) : ""),
-              h("td", { class: "n" }, last));
-          })))),
-          quiet.length > 0 && h("p", { class: "pmeta muted" }, `Not called in ${state.days} days: `, quiet.map((c) => cap(c.capability) + (c.tool ? ` (${c.tool})` : "")).join(", "))],
+        : [quiet.length > 0 && h("p", { class: "pmeta muted" }, `Not called in ${state.days} days: `, quiet.map((c) => cap(c.capability) + (c.tool ? ` (${c.tool})` : "")).join(", "))],
       caps.some((c) => c.capability === "project.overview") && indexedSection(p, ps.name),
       ps.name === "graphify-csharp" && h("div", { class: "pmeta" }, h("h4", {}, "Warm session"), graphifySessions(p.id)));
   })));
@@ -3386,14 +4243,17 @@ async function viewProviders(p) {
       (ps.languages || []).length > 0 && h("span", { class: "muted small" }, ps.languages.join(", ")))))));
   // which architecture capabilities have a provider (HAR-0108)
   const arch = v.architecture || [];
-  if (arch.length) out.append(section("Architecture evidence", "Who serves each architecture capability; without a provider nothing fails, and the line says what is missing.",
-    h("div", { class: "card" }, h("table", { class: "archcov" },
-      h("thead", {}, h("tr", {}, h("th", {}, "capability"), h("th", {}, "served by"), h("th", {}, "without one"))),
-      h("tbody", {}, arch.map((c) => h("tr", {},
-        h("td", { class: "mono" }, c.capability.replace(/^arch\./, "")),
-        h("td", {}, c.providers.length ? c.providers.join(", ") : h("span", { class: "muted" }, "none")),
-        h("td", { class: "wrap small muted" }, c.without || "—"))))))));
-  out.append(toolsSection(m, p));
+  // the ones a provider could add, first; the served ones in a line
+  const complete = (c) => c.providers.length || /nothing is missing/.test(c.without || "");
+  const missing = arch.filter((c) => !complete(c)), served = arch.filter(complete);
+  if (arch.length) out.append(section("Architecture evidence", "What a provider would add to the Architecture view; nothing fails without one.",
+    missing.length > 0 && h("div", { class: "card" }, h("table", { class: "archcov" },
+      h("thead", {}, h("tr", {}, h("th", {}, "capability"), h("th", {}, "without a provider"))),
+      h("tbody", {}, missing.map((c) => h("tr", {},
+        h("td", {}, h("b", {}, c.capability.replace(/^arch\./, "").replaceAll("_", " "))),
+        h("td", { class: "wrap small muted" }, c.without || "—")))))),
+    served.length > 0 && h("p", { class: "okay small" }, "✓ Complete: ", served.map((c) => `${c.capability.replace(/^arch\./, "").replaceAll("_", " ")}${c.providers.length ? ` (${c.providers.join(", ")})` : ""}`).join(", "))));
+  out.append(hooksSection(p));
   return out;
 }
 
@@ -3412,33 +4272,27 @@ function graphifySessions(projectId) {
     } }, label);
     fill(box,
       d.error && h("p", { class: "error" }, d.error),
-      ss.length ? h("table", { class: "gstable" }, h("tbody", {}, ss.map((s) => h("tr", {},
-        !projectId && h("td", {}, s.project_id ? h("a", { href: projectHref(s.project_id, "agents", "tools") }, s.project_name || s.project_id) : h("span", { class: "mono small" }, s.root)),
-        h("td", { class: "small" }, s.summary),
+      ss.length ? h("table", { class: "gstable" },
+        h("thead", {}, h("tr", {}, !projectId && h("th", {}, "solution"), h("th", {}, "state"), h("th", {}, "detail"), h("th", {}, ""),
+          h("th", { class: "gsact" }, iconButton("refresh", "Refresh", () => load().catch((e) => fill(box, h("p", { class: "error" }, e.message))))))),
+        h("tbody", {}, ss.map((s) => {
+        // "ready, 0.1 GB, up 2h, …": the state apart, the rest as it says
+        const [stateWord, ...rest] = (s.summary || "").split(", ");
+        return h("tr", {},
+        !projectId && h("td", {}, s.project_id ? h("a", { href: projectHref(s.project_id, "agents", "tools") }, s.project_name || s.project_id)
+          : h("span", { title: s.root }, h("b", {}, baseName(s.root)), h("span", { class: "muted small" }, " " + shortPath(s.root.slice(0, -baseName(s.root).length - 1))))),
+        h("td", {}, h("span", { class: `state ${stateWord === "ready" ? "ok" : stateWord === "loading" ? "warn" : "bad"}` }, stateWord)),
+        h("td", { class: "small muted" }, rest.join(" · ")),
         h("td", { class: "mono muted small", title: s.id }, s.id.slice(0, 8)),
-        h("td", { class: "gsbtns" }, s.project_id && act("restart", { project: s.project_id }, "Restart"), act("stop", { session: s.id }, "Stop"))))))
+        h("td", { class: "gsact" }, h("div", { class: "gsbtns" }, s.project_id && act("restart", { project: s.project_id }, "Restart"), act("stop", { session: s.id }, "Stop"))));
+        })))
         : h("p", { class: "muted small" }, projectId ? "No warm session for this project: the first callers, references or impact question starts one." : "No graphify sessions on this machine."),
-      h("div", { class: "gsbtns" }, projectId && !ss.length && act("start", { project: projectId }, "Start a session"),
-        h("button", { class: "ghost small", type: "button", onclick: () => load().catch((e) => fill(box, h("p", { class: "error" }, e.message))) }, "Refresh")));
+      // with sessions, Refresh is in the table's header
+      !ss.length && h("div", { class: "gsbtns" }, projectId && act("start", { project: projectId }, "Start a session"),
+        iconButton("refresh", "Refresh", () => load().catch((e) => fill(box, h("p", { class: "error" }, e.message))))));
   };
   load().catch((e) => fill(box, h("p", { class: "error" }, e.message)));
   return box;
-}
-
-function toolsSection(m, p) {
-  const tools = m.tools || [];
-  const out = h("div", {});
-  out.append(section("MCP tools", "Calls agents made to harness, by tool. Error rates of 10% and over and p95 latencies of 3 s and over are marked.",
-    tools.length === 0 ? h("p", { class: "empty" }, "No tool calls recorded in this window.") :
-      h("div", { class: "card" }, h("table", {},
-        h("thead", {}, h("tr", {}, ["tool", "kind"].map((t) => h("th", {}, t)), ["calls", "errors", "empty", "p50", "p95", "avg size"].map((t) => h("th", { class: "n" }, t)), h("th", {}, "clients"), h("th", {}, "last"))),
-        h("tbody", {}, tools.map((r) => h("tr", {},
-          h("td", { class: "mono" }, r.tool), h("td", {}, r.kind || ""), h("td", { class: "n" }, r.calls),
-          rateCell(r.error_rate, 0.1, 0.5), h("td", { class: "n" }, pct(r.empty_rate)),
-          h("td", { class: "n" }, ms(r.p50_ms)), latencyCell(r.p95_ms), h("td", { class: "n" }, bytes(r.avg_bytes)),
-          h("td", {}, (r.clients || []).join(", ")), h("td", {}, ago(r.last_at)))))))));
-  if (p) out.append(hooksSection(p));
-  return out;
 }
 
 // hooksSection shows which hooks are installed, read from the files as
@@ -3446,7 +4300,7 @@ function toolsSection(m, p) {
 // (TASK-0044): installed but silent says the hook may not run.
 function hooksSection(p) {
   const box = h("div", { class: "card pad" }, h("p", { class: "muted small" }, "Reading the hook files…"));
-  const yes = (on, label) => h("span", { class: on ? "okay" : "muted" }, on ? `✓ ${label}` : `– ${label}`);
+  const yes = (on, label) => h("span", { class: on ? "okay" : "muted" }, on ? `✓ ${label}` : `○ ${label}`);
   api(projectAPI(p, "hooks")).then((d) => {
     const ev = d.events || {};
     const git = d.git || [];
@@ -3457,18 +4311,19 @@ function hooksSection(p) {
         : h("p", { class: "small" }, gitOn === git.length && git.length ? yes(true, `installed (${git.map((g) => g.name).join(", ")})`)
           : gitOn ? [yes(true, `${gitOn} of ${git.length}`), " installed: ", git.filter((g) => !g.installed).map((g) => g.name).join(", "), " missing"]
             : yes(false, "not installed: harness hooks install"),
-        d.git_dir && h("span", { class: "muted mono" }, "  " + d.git_dir)),
+      ),
       h("h4", {}, "Client hooks"),
       h("table", { class: "gstable" }, h("tbody", {}, (d.clients || []).map((c) => h("tr", {},
-        h("td", {}, c.client === "claude-code" ? "Claude Code" : "Codex", h("span", { class: "muted" }, ` · ${c.scope}`)),
+        h("td", { title: c.path }, c.client === "claude-code" ? "Claude Code" : "Codex", h("span", { class: "muted" }, ` · ${c.scope}`)),
         h("td", { class: "small" }, yes(!!c.command, "tool events"), c.client === "claude-code" && ["  ", yes(!!c.session, "session start")]),
-        h("td", { class: "mono muted small" }, c.path),
-        h("td", { class: "small" }, c.error ? h("span", { class: "error" }, c.error) : c.problem ? h("span", { class: "error" }, c.problem) : ""))))),
-      h("p", { class: "small" }, ev.events ? `${ev.events} event(s) in 7 days over ${ev.sessions} session(s) from ${(ev.clients || []).join(", ")}, last ${ago(ev.last_at)}.`
-        : "No events recorded in 7 days."),
+        h("td", { class: "small" }, c.error ? h("span", { class: "error" }, c.error) : c.problem ? h("span", { class: "error" }, c.problem)
+          // one scope with the hook is enough: the install hint only for a client with none
+          : !c.command && !(d.clients || []).some((o) => o.client === c.client && o.command) ? "harness hooks install" : ""))))),
+      h("p", { class: "small" }, ev.events ? `Last event ${ago(ev.last_at)}: the hooks run.` : "No events recorded in 7 days: if they are installed, they may not run."),
+      h("details", { class: "evfold" }, h("summary", {}, "Files"), h("ul", { class: "evlist" }, (d.clients || []).map((c) => h("li", {}, h("code", {}, c.path))), d.git_dir && h("li", {}, h("code", {}, d.git_dir)))),
       d.note && h("p", { class: "small freview" }, d.note));
   }).catch((e) => fill(box, h("p", { class: "error" }, e.message)));
-  return section("Hooks", "Read from the hook files, as 'harness hooks status' does; the events are what they recorded.", box);
+  return section("Hooks", "Installed hooks tell harness what agents read and when sessions start.", box);
 }
 
 async function viewProposals(p) {
@@ -3480,7 +4335,7 @@ async function viewProposals(p) {
     try {
       const res = await api(`/api/projects/${encodeURIComponent(p.id)}/proposals?status=${st.status}`);
       const ps = res.proposals || [];
-      fill(list, ...(ps.length ? ps.map((x) => proposalCard(p, x)) : [h("p", { class: "empty" }, `No ${st.status === "all" ? "" : st.status + " "}proposals.`)]));
+      fill(list, ...(ps.length ? ps.map((x) => proposalCard(p, x)) : [st.status === "pending" ? emptyState("inbox", "Inbox zero", "No proposal waits for you: agents' suggestions appear here for you to approve.") : h("p", { class: "empty" }, `No ${st.status === "all" ? "" : st.status + " "}proposals.`)]));
     } catch (e) {
       fill(list, h("p", { class: "error" }, e.message));
     }
@@ -3582,7 +4437,7 @@ async function viewArchProposals(p) {
         ts.length > 0 && h("h3", { class: "inboxhead" }, "Tasks"), ...ts.map((x) => taskProposalCard(p, x)),
         bs.length > 0 && h("h3", { class: "inboxhead" }, "Blueprints"), ...bs.map((x) => blueprintProposalCard(p, x)),
         ps.length > 0 && h("h3", { class: "inboxhead" }, "Architecture"), ...ps.map((x) => archProposalCard(p, x)),
-      ] : [h("p", { class: "empty" }, `No ${st.status === "all" ? "" : st.status + " "}proposals.`)]));
+      ] : [st.status === "pending" ? emptyState("inbox", "Inbox zero", "No proposal waits for you: agents' suggestions appear here for you to approve.") : h("p", { class: "empty" }, `No ${st.status === "all" ? "" : st.status + " "}proposals.`)]));
     } catch (e) {
       fill(list, h("p", { class: "error" }, e.message));
     }
@@ -3605,95 +4460,237 @@ async function viewArchProposals(p) {
 const TASK_TYPES = ["feature", "bug", "chore", "spike", "docs", "test", "process"];
 const PRIORITIES = ["low", "medium", "high", "critical"];
 
-// taskFields is the form for a task's definition (new, a proposal
-// restated before it is approved, or an unclaimed task edited); value()
-// reads it back. An edited task keeps its id.
-function taskFields(p, init, blueprints, keepId) {
-  const lines = (v) => v.split("\n").map((x) => x.trim()).filter(Boolean);
-  const commas = (v) => v.split(",").map((x) => x.trim()).filter(Boolean);
-  const id = h("input", { type: "text", value: init.id || "", placeholder: "next free id", "aria-label": "Id", disabled: !!keepId });
-  if (!init.id) api(projectAPI(p, "tasks-next-id")).then((r) => { id.placeholder = r.id; }).catch(() => {});
-  const title = h("input", { type: "text", value: init.title || "", required: true, "aria-label": "Title" });
-  const goal = h("textarea", { rows: 2, "aria-label": "Goal" }, init.goal || "");
-  const pick = (opts, cur, label) => h("select", { "aria-label": label }, opts.map(([v, t]) => h("option", { value: v, selected: v === cur }, t)));
-  const type = pick(TASK_TYPES.map((t) => [t, t]), init.type || "feature", "Type");
-  const prio = pick(PRIORITIES.map((t) => [t, t]), init.priority || "medium", "Priority");
-  // A blueprint named but not (yet) known, as a proposal may, stays
-  // chosen rather than falling back to none.
-  const known = blueprints.map((m) => [m.id, m.title ? `${m.id} · ${m.title}` : m.id]);
-  if (init.blueprint && !blueprints.some((m) => m.id === init.blueprint)) known.push([init.blueprint, `${init.blueprint} (new)`]);
-  const ms = pick([["", "none"], ...known], init.blueprint || "", "Blueprint");
-  const deps = h("input", { type: "text", value: (init.depends_on || []).join(", "), placeholder: "TASK-0041, HAR-0109", "aria-label": "Depends on" });
-  const acc = h("textarea", { rows: 3, placeholder: "one criterion per line, each one checkable", "aria-label": "Acceptance criteria" }, (init.acceptance || []).join("\n"));
-  const scope = h("input", { type: "text", value: (init.scope || []).join(", "), placeholder: "internal/tasks, docs", "aria-label": "Scope" });
-  const field = (label, el) => h("label", {}, h("span", {}, label), el);
+// --- form pieces (TASK-0057) ---
+// segmented is a choice among a few, every option in view (with an icon
+// when it has one); value() reads it.
+function segmented(label, opts, cur, cls, iconOf) {
+  let v = cur;
+  const box = h("div", { class: "seg segpick" + (cls ? " " + cls : ""), role: "radiogroup", "aria-label": label });
+  const draw = () => fill(box, opts.map(([k, t]) => h("button", { type: "button", role: "radio", "aria-checked": String(k === v), class: `opt-${k}`, onclick: () => { v = k; draw(); } }, iconOf && icon(iconOf(k)), t)));
+  draw();
+  return { el: box, value: () => v };
+}
+// listBuilder edits a list one row each: Enter adds the next row, × removes
+// one (acceptance criteria, exit criteria).
+function listBuilder(items, placeholder, mark) {
+  const box = h("div", { class: "lbuild" });
+  const row = (text) => {
+    const input = h("input", { type: "text", value: text || "", placeholder });
+    const r = h("div", { class: "lrow" }, h("span", { class: "lbox" + (mark === "round" ? " round" : ""), "aria-hidden": "true" }), input,
+      h("button", { type: "button", class: "iconbtn", title: "Remove", "aria-label": "Remove", onclick: () => { r.remove(); if (!box.querySelector(".lrow")) box.insertBefore(row(""), add); } }, icon("close")));
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); const n = row(""); r.after(n); n.querySelector("input").focus(); }
+      if (ev.key === "Backspace" && !input.value && box.querySelectorAll(".lrow").length > 1) { ev.preventDefault(); const prev = r.previousElementSibling; r.remove(); prev?.querySelector("input")?.focus(); }
+    });
+    return r;
+  };
+  const add = h("button", { type: "button", class: "ladd", onclick: () => { const n = row(""); box.insertBefore(n, add); n.querySelector("input").focus(); } }, icon("plus"), "Add another (or press Enter)");
+  fill(box, (items && items.length ? items : [""]).map(row), add);
+  return { el: box, value: () => [...box.querySelectorAll(".lrow input")].map((i) => i.value.trim()).filter(Boolean) };
+}
+// tokenInput holds a few short values as chips (task ids, paths); Enter or
+// a comma makes a chip, suggestions complete them.
+function tokenInput(values, placeholder, suggestions) {
+  const vals = [...(values || [])];
+  const listId = "tok-" + Math.random().toString(36).slice(2);
+  const input = h("input", { type: "text", placeholder, list: suggestions ? listId : null });
+  const chips = h("span", { class: "tchips" });
+  const draw = () => fill(chips, vals.map((v, i) => h("span", { class: "tchip" }, v, h("button", { type: "button", "aria-label": `Remove ${v}`, onclick: () => { vals.splice(i, 1); draw(); } }, "×"))));
+  const take = () => { for (const v of input.value.split(",").map((x) => x.trim()).filter(Boolean)) if (!vals.includes(v)) vals.push(v); input.value = ""; draw(); };
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === ",") { ev.preventDefault(); take(); }
+    if (ev.key === "Backspace" && !input.value && vals.length) { vals.pop(); draw(); }
+  });
+  input.addEventListener("change", take);
+  draw();
   return {
-    nodes: [field("Title", title), field("Goal: the outcome and why", goal),
-      h("div", { class: "frow" }, field("Type", type), field("Priority", prio), field("Blueprint", ms), field("Id", id)),
-      field("Depends on", deps), field("Acceptance criteria", acc), field("Scope (paths it may touch)", scope)],
-    value: () => ({ id: id.value.trim(), title: title.value, goal: goal.value, type: type.value, priority: prio.value, blueprint: ms.value,
-      depends_on: commas(deps.value), acceptance: lines(acc.value), scope: commas(scope.value) }),
+    el: h("div", { class: "tokens", onclick: () => input.focus() }, chips, input, suggestions && h("datalist", { id: listId }, suggestions.map((x) => h("option", { value: x })))),
+    value: () => { take(); return [...vals]; },
   };
 }
 
-function newTaskForm(p, panel, blueprints) {
-  const f = taskFields(p, {}, blueprints);
-  return writeForm(panel, "A new task: it starts in the backlog and is ready once its dependencies are done. 'harness tasks export' writes it into the backlog file.",
-    [f.nodes], "Add the task", () => post(projectAPI(p, "tasks"), f.value()));
+// taskPicker chooses the tasks one waits for: search by id or title over
+// this project's tasks and the workspace's other projects' (those written
+// <project>:<task id>, TASK-0058), several chosen as chips.
+function taskPicker(p, chosen, self) {
+  const picked = [...chosen];
+  let all = [], others = [], q = "", at = 0;
+  const chips = h("span", { class: "tchips" });
+  const input = h("input", { type: "text", placeholder: "Search tasks by id or title", "aria-label": "Depends on", autocomplete: "off" });
+  const menu = h("div", { class: "tpmenu", hidden: true, role: "listbox" });
+  const box = h("div", { class: "tokens tpick", onclick: () => input.focus() }, chips, input, menu);
+  const extKey = (x) => `${x.p.name || baseName(x.p.root)}:${x.id}`;
+  const drawChips = () => fill(chips, picked.map((id, i) => {
+    const t = all.find((x) => x.id === id) || others.find((x) => extKey(x) === id);
+    return h("span", { class: "tchip", title: t ? t.title : "" }, t && t.p && projectMark(t.p), id, h("button", { type: "button", "aria-label": `Remove ${id}`, onclick: (ev) => { ev.stopPropagation(); picked.splice(i, 1); drawChips(); drawMenu(); } }, "×"));
+  }));
+  const match = (x) => !q || x.id.toLowerCase().includes(q) || (x.title || "").toLowerCase().includes(q);
+  const toggle = (id) => { const i = picked.indexOf(id); i >= 0 ? picked.splice(i, 1) : picked.push(id); input.value = ""; q = ""; drawChips(); drawMenu(); input.focus(); };
+  function drawMenu() {
+    const mine = all.filter((x) => x.id !== self && x.status !== "done" && match(x)).slice(0, 40);
+    const theirs = others.filter(match).slice(0, 20);
+    at = Math.min(at, Math.max(0, mine.length - 1));
+    fill(menu, mine.length ? mine.map((x, i) => h("button", { type: "button", role: "option", class: "tpopt" + (i === at ? " at" : "") + (picked.includes(x.id) ? " on" : ""), "aria-selected": String(picked.includes(x.id)),
+      onmousedown: (ev) => ev.preventDefault(), onclick: () => toggle(x.id) },
+      h("span", { class: "tpcheck", "aria-hidden": "true" }, picked.includes(x.id) ? "✓" : ""), h("span", { class: "mono small" }, x.id), h("span", { class: "tptitle" }, x.title), statusPill(x.status)))
+      : h("p", { class: "muted small tpnone" }, q ? "No open task here matches." : "No open task in this project."),
+      theirs.length > 0 && [h("div", { class: "tphead" }, "In the workspace's other projects"),
+        theirs.map((x) => h("button", { type: "button", role: "option", class: "tpopt" + (picked.includes(extKey(x)) ? " on" : ""), "aria-selected": String(picked.includes(extKey(x))),
+          onmousedown: (ev) => ev.preventDefault(), onclick: () => toggle(extKey(x)) },
+          h("span", { class: "tpcheck", "aria-hidden": "true" }, picked.includes(extKey(x)) ? "✓" : ""), projectMark(x.p), h("span", { class: "mono small" }, x.id), h("span", { class: "tptitle" }, x.title), statusPill(x.status)))]);
+  }
+  input.addEventListener("focus", () => { menu.hidden = false; drawMenu(); });
+  input.addEventListener("blur", () => setTimeout(() => { menu.hidden = true; }, 120));
+  input.addEventListener("input", () => { q = input.value.trim().toLowerCase(); at = 0; menu.hidden = false; drawMenu(); });
+  input.addEventListener("keydown", (ev) => {
+    const opts = [...menu.querySelectorAll("button.tpopt")];
+    if (ev.key === "ArrowDown") { ev.preventDefault(); at = Math.min(at + 1, opts.length - 1); drawMenu(); }
+    else if (ev.key === "ArrowUp") { ev.preventDefault(); at = Math.max(at - 1, 0); drawMenu(); }
+    else if (ev.key === "Enter") { ev.preventDefault(); opts[at]?.click(); }
+    else if (ev.key === "Escape") { menu.hidden = true; }
+    else if (ev.key === "Backspace" && !input.value && picked.length) { picked.pop(); drawChips(); drawMenu(); }
+  });
+  // this project's tasks, and the workspace's other members' to show
+  api(projectAPI(p, "tasks")).then((r) => { all = r.tasks || []; drawChips(); if (!menu.hidden) drawMenu(); }).catch(() => {});
+  const members = [...new Set((state.workspaces || []).filter((w) => (p.workspaces || []).includes(w.name)).flatMap((w) => w.members.map((m) => m.project_id)))].filter((id) => id !== p.id);
+  Promise.all(members.map((id) => { const q2 = state.projects.find((x) => x.id === id); return q2 ? api(projectAPI(q2, "tasks")).then((r) => (r.tasks || []).filter((x) => x.status !== "done").map((x) => ({ ...x, p: q2 }))).catch(() => []) : []; }))
+    .then((xs) => { others = xs.flat(); if (!menu.hidden) drawMenu(); });
+  drawChips();
+  return { el: box, value: () => [...picked] };
 }
 
-// editTaskForm restates a ready or backlog task with the same form; the
-// definition is fixed once an agent claims it.
-async function editTaskForm(p, panel, x) {
+// taskFields is the form for a task's definition (new, a proposal
+// restated before it is approved, or an unclaimed task edited): what it
+// is, how it is sorted, when it is done, what it touches; value() reads it
+// back. An edited task keeps its id.
+function taskFields(p, init, blueprints, keepId) {
+  const id = h("input", { type: "text", value: init.id || "", placeholder: "next free id", class: "mono", "aria-label": "Id", disabled: !!keepId });
+  if (!init.id) api(projectAPI(p, "tasks-next-id")).then((r) => { id.placeholder = r.id; }).catch(() => {});
+  const title = h("input", { type: "text", value: init.title || "", required: true, class: "tbig", placeholder: "What should be done", "aria-label": "Title" });
+  const goal = h("textarea", { rows: 3, placeholder: "The outcome wanted, and why", "aria-label": "Goal" }, init.goal || "");
+  const type = segmented("Type", TASK_TYPES.map((t) => [t, t]), init.type || "feature", "types", (k) => (k === "docs" ? "docs" : k));
+  const prio = segmented("Priority", PRIORITIES.map((t) => [t, t]), init.priority || "medium", "prio", (k) => "p-" + k);
+  const known = blueprints.map((m) => [m.id, m.title ? `${m.id} · ${m.title}` : m.id]);
+  if (init.blueprint && !blueprints.some((m) => m.id === init.blueprint)) known.push([init.blueprint, `${init.blueprint} (new)`]);
+  const bp = h("select", { "aria-label": "Blueprint" }, h("option", { value: "" }, "none"),
+    known.map(([v, t]) => h("option", { value: v, selected: v === (init.blueprint || "") }, t)));
+  const acc = listBuilder(init.acceptance, "A criterion one can check", "box");
+  const deps = taskPicker(p, init.depends_on || [], init.id);
+  const scope = tokenInput(init.scope, "a path, e.g. internal/tasks");
+  const group = (title2, ...kids) => h("fieldset", { class: "fgroup" }, h("legend", {}, title2), ...kids);
+  return {
+    nodes: [
+      h("div", { class: "frow-title" }, field("Title", title), field("Id", id, keepId ? "An edited task keeps its id." : "Empty: the next free one.")),
+      group("Sorting", field("Type", type.el), h("hr", { class: "fsep" }), field("Priority", prio.el), h("hr", { class: "fsep" }), field("Blueprint", bp)),
+      field("Goal", goal),
+      group("Done when", acc.el),
+      group("Around it", field("Depends on", deps.el, "Tasks that must be done first: search by id or title."), field("Scope", scope.el, "Paths it may touch.")),
+    ],
+    value: () => ({ id: id.value.trim(), title: title.value, goal: goal.value, type: type.value(), priority: prio.value(), blueprint: bp.value,
+      depends_on: deps.value(), acceptance: acc.value(), scope: scope.value() }),
+  };
+}
+
+// newTaskDialog adds a task by hand.
+async function newTaskDialog(p, blueprints, blueprint) {
+  const dlg = dialog({ title: "New task", sub: "It starts in the backlog and is ready once its dependencies are done; 'harness tasks export' writes it into the backlog file.", wide: true });
+  const f = taskFields(p, { blueprint: blueprint || "" }, blueprints);
+  const err = h("p", { class: "error", hidden: true });
+  const add = h("button", { class: "primary", type: "button", onclick: async () => {
+    add.disabled = true;
+    try { await post(projectAPI(p, "tasks"), f.value()); dlg.close(); await afterWrite(); }
+    catch (e) { err.textContent = e.message; err.hidden = false; add.disabled = false; }
+  } }, "Add the task");
+  dlg.set(null, [...f.nodes, err], [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), add]);
+}
+
+// editTaskDialog restates a ready or backlog task with the same fields;
+// the definition is fixed once an agent claims it.
+async function editTaskDialog(p, x) {
+  const dlg = dialog({ title: `Edit ${x.id}`, sub: "It can change until an agent claims it; its validation and notes stay as they are.", wide: true });
   const ms = await api(projectAPI(p, "blueprints")).then((r) => r.blueprints || []).catch(() => []);
   const init = { ...x, depends_on: (x.depends_on || []).map((d) => d.id), acceptance: (x.acceptance || []).map((c) => c.criterion) };
   const f = taskFields(p, init, ms, true);
-  return writeForm(panel, `Edit ${x.id}? It can change until an agent claims it; its validation and notes stay as they are.`,
-    [f.nodes], "Save the task", () => post(projectAPI(p, `tasks/${enc(x.id)}/edit`), f.value()));
+  const err = h("p", { class: "error", hidden: true });
+  const save = h("button", { class: "primary", type: "button", onclick: async () => {
+    save.disabled = true;
+    try { await post(projectAPI(p, `tasks/${enc(x.id)}/edit`), f.value()); dlg.close(); toast(`${x.id} saved`); await afterWrite(); }
+    catch (e) { err.textContent = e.message; err.hidden = false; save.disabled = false; }
+  } }, "Save the task");
+  dlg.set(null, [...f.nodes, err], [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), save]);
 }
 
-function taskProposalCard(p, x) {
-  const panel = h("div", { class: "mpanel" });
-  const url = (what) => projectAPI(p, `task-proposals/${enc(x.id)}/${what}`);
-  const d = x.task || {};
-  const approveForm = async () => {
-    const ms = await api(projectAPI(p, "blueprints")).then((r) => r.blueprints || []).catch(() => []);
-    const f = taskFields(p, d, ms);
-    return writeForm(panel, `Create this task? ${x.proposed_by} is recorded as the proposer and you as the one who made it.`,
-      [f.nodes], "Create the task", () => post(url("approve"), { task: f.value() }));
+function taskEditable(x) {
+  return x.status === "ready" || x.status === "backlog";
+}
+
+// blueprintFields is a blueprint's description, new or edited: a new one
+// has an id (the next free one suggested, as 'harness tasks blueprints
+// add' gives it), an edited one keeps its id; value() reads it back.
+function blueprintFields(p, init, isNew) {
+  const id = isNew && h("input", { type: "text", value: "", required: true, class: "mono", "aria-label": "Id" });
+  if (isNew) api(projectAPI(p, "blueprints-next-id")).then((r) => { if (!id.value) id.value = r.id; }).catch(() => {});
+  const title = h("input", { type: "text", value: init.title || "", required: true, class: "tbig", placeholder: "e.g. Search works offline", "aria-label": "Title" });
+  const goal = h("textarea", { rows: 3, placeholder: "What it is for: the outcome, and why now", "aria-label": "Goal" }, init.goal || "");
+  const exit = listBuilder(init.exit || [], "A criterion that says it is done", "round");
+  const notes = h("textarea", { rows: 2, "aria-label": "Notes" }, init.notes || "");
+  return {
+    nodes: [isNew ? h("div", { class: "frow2 bphead" }, field("Id", id, "Suggested: the next one."), field("Title", title)) : field("Title", title),
+      field("Goal", goal), h("fieldset", { class: "fgroup" }, h("legend", {}, "Done when"), exit.el), field("Notes", notes)],
+    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value.trim(), goal: goal.value.trim(), exit: exit.value(), notes: notes.value.trim() }),
   };
-  const rejectForm = () => {
-    const note = h("textarea", { rows: 2, placeholder: "Why not (optional)" });
-    return writeForm(panel, "Reject it?", [note], "Reject", () => post(url("reject"), { note: note.value }));
-  };
-  const acc = d.acceptance || [];
-  return h("article", { class: "mem aprop" + (x.status === "rejected" ? " inactive" : "") },
-    h("div", { class: "mtype" }, "Task", h("span", { class: "tag" }, `${d.type || "feature"} · ${d.priority || "medium"}`),
-      d.blueprint && h("span", { class: "tag" }, d.blueprint),
-      x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
-    h("div", { class: "content" }, d.title),
-    d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
-    x.reason && h("p", { class: "why" }, h("b", {}, "Why proposed: "), x.reason),
-    acc.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Acceptance (${acc.length})`), h("ol", { class: "evlist" }, acc.map((a) => h("li", {}, a)))),
-    h("div", { class: "prov" },
-      (d.depends_on || []).length > 0 && h("span", {}, h("b", {}, "depends on "), d.depends_on.join(", ")),
-      (d.scope || []).length > 0 && h("span", {}, h("b", {}, "scope "), d.scope.join(", ")),
-      h("span", {}, h("b", {}, "proposed by "), x.proposed_by || "unknown"),
-      h("span", { title: x.proposed_at }, ago(x.proposed_at)),
-      x.decided_by && h("span", {}, h("b", {}, `${x.status} by `), x.decided_by),
-      x.note && h("span", {}, h("b", {}, "note "), x.note),
-      h("code", { class: "id" }, x.id)),
-    x.status === "pending" && h("div", { class: "review" },
-      h("button", { class: "primary", onclick: async () => {
-        const opening = h("div", { class: "aform" }, h("p", { class: "hint" }, "Loading review…"));
-        fill(panel, opening);
-        try {
-          const form = await approveForm();
-          if (opening.parentNode === panel) fill(panel, form);
-        } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
-      } }, "Create the task…"),
-      h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
-    panel);
+}
+
+// blueprintDialog creates a blueprint (m null) or restates one; its id stays.
+function blueprintDialog(p, m) {
+  const isNew = !m;
+  const dlg = dialog({ title: isNew ? "New blueprint" : `Edit blueprint ${m.id}`, sub: isNew ? "A group of tasks with what it is for and when it is done." : "Its id and its tasks stay.", wide: true });
+  const f = blueprintFields(p, m || {}, isNew);
+  const err = h("p", { class: "error", hidden: true });
+  const save = h("button", { class: "primary", type: "button", onclick: async () => {
+    save.disabled = true;
+    try {
+      const v = f.value();
+      if (isNew) { await post(projectAPI(p, "blueprints"), v); toast(`Blueprint ${v.id} created`); }
+      else { await post(projectAPI(p, `blueprints/${enc(m.id)}/edit`), v); toast(`Blueprint ${m.id} saved`); }
+      dlg.close(); await afterWrite();
+    } catch (e) { err.textContent = e.message; err.hidden = false; save.disabled = false; }
+  } }, isNew ? "Create blueprint" : "Save blueprint");
+  dlg.set(null, [...f.nodes, err], [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), save]);
+}
+function newBlueprintDialog(p) { blueprintDialog(p, null); }
+
+// removeBlueprintDialog confirms removing a blueprint and, when it has
+// tasks, asks what happens to them: moved to another blueprint (or none),
+// or deleted with it (TASK-0048).
+function removeBlueprintDialog(p, m, others) {
+  const url = projectAPI(p, `blueprints/${enc(m.id)}/remove`);
+  const backlog = "A backlog file that still defines it brings it back on the next import: 'harness tasks export' writes the change into the file.";
+  if (!m.total) {
+    return confirmDelete({ title: `Remove blueprint ${m.id}?`, what: m.title, lines: ["It has no tasks.", backlog],
+      confirm: "Remove the blueprint", send: () => post(url, {}), done: `Blueprint ${m.id} removed` });
+  }
+  const dlg = dialog({ title: `Remove blueprint ${m.id}?`, sub: `It has ${plural(m.total, "task")}. What happens to them?` });
+  const name = "bprm-" + m.id;
+  const move = h("input", { type: "radio", name, value: "move", checked: true, "aria-label": "Move the tasks" });
+  const del = h("input", { type: "radio", name, value: "delete", "aria-label": "Delete the tasks" });
+  const to = h("select", { "aria-label": "Move to", onchange: () => { move.checked = true; } },
+    h("option", { value: "" }, "no blueprint"),
+    others.map((o) => h("option", { value: o.id }, o.title ? `${o.id} · ${o.title}` : o.id)));
+  const err = h("p", { class: "error", hidden: true });
+  const ok = h("button", { class: "danger", type: "button", onclick: async () => {
+    ok.disabled = true;
+    try {
+      await post(url, del.checked ? { tasks: "delete" } : { tasks: "move", move_to: to.value });
+      dlg.close(); toast(`Blueprint ${m.id} removed`); await afterWrite();
+    } catch (e) { err.textContent = e.message; err.hidden = false; ok.disabled = false; }
+  } }, "Remove the blueprint");
+  dlg.set(null, [m.title && h("p", { class: "dpname" }, m.title),
+    h("div", { class: "choices" },
+      h("label", { class: "choice" }, move, h("span", {}, "Move them to"), to),
+      h("label", { class: "choice" }, del, h("span", {}, "Delete them, with their audit trail"))),
+    h("ul", { class: "dchanges" }, h("li", {}, "Deleting is refused while an agent holds one of them; tasks elsewhere that depend on a deleted one lose that dependency."), h("li", {}, backlog)), err],
+  [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), ok]);
 }
 
 // blueprintProposalCard is an agent's new blueprint or change to one
@@ -3716,21 +4713,71 @@ function blueprintProposalCard(p, x) {
   return h("article", { class: "mem aprop" + (x.status === "rejected" ? " inactive" : ""), "data-proposal": x.id },
     h("div", { class: "mtype" }, isNew ? "New blueprint" : "Blueprint change", !isNew && h("span", { class: "tag" }, x.changes),
       x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
-    h("div", { class: "content" }, d.title),
+    h("h4", { class: "ptitle2" }, d.title),
     d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
     x.reason && h("p", { class: "why" }, h("b", {}, "Why proposed: "), x.reason),
-    exit.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Done when (${exit.length})`), h("ul", { class: "evlist" }, exit.map((e) => h("li", {}, e)))),
+    exit.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Done when (${exit.length})`), h("ul", { class: "donewhen" }, exit.map((e) => h("li", {}, e)))),
     d.notes && h("p", { class: "why" }, h("b", {}, "Notes: "), d.notes),
     h("div", { class: "prov" },
       h("span", {}, h("b", {}, "proposed by "), x.proposed_by || "unknown"),
       h("span", { title: x.proposed_at }, ago(x.proposed_at)),
       x.decided_by && h("span", {}, h("b", {}, `${x.status} by `), x.decided_by),
-      x.note && h("span", {}, h("b", {}, "note "), x.note),
-      h("code", { class: "id" }, x.id)),
+      x.note && h("span", {}, h("b", {}, "note "), x.note)),
     x.status === "pending" && h("div", { class: "review" },
       h("button", { class: "primary", onclick: () => fill(panel, approveForm()) }, isNew ? "Create the blueprint…" : "Apply the change…"),
       h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
     panel);
+}
+
+function taskProposalCard(p, x) {
+  const panel = h("div", { class: "mpanel" });
+  const url = (what) => projectAPI(p, `task-proposals/${enc(x.id)}/${what}`);
+  const d = x.task || {};
+  const approveForm = async () => {
+    const ms = await api(projectAPI(p, "blueprints")).then((r) => r.blueprints || []).catch(() => []);
+    const f = taskFields(p, d, ms);
+    return writeForm(panel, `Create this task? ${x.proposed_by} is recorded as the proposer and you as the one who made it.`,
+      [f.nodes], "Create the task", () => post(url("approve"), { task: f.value() }));
+  };
+  const rejectForm = () => {
+    const note = h("textarea", { rows: 2, placeholder: "Why not (optional)" });
+    return writeForm(panel, "Reject it?", [note], "Reject", () => post(url("reject"), { note: note.value }));
+  };
+  const acc = d.acceptance || [];
+  return h("article", { class: "mem aprop" + (x.status === "rejected" ? " inactive" : ""), "data-proposal": x.id },
+    h("div", { class: "mtype" }, "Task", h("span", { class: "tag" }, `${d.type || "feature"} · ${d.priority || "medium"}`),
+      d.blueprint && h("span", { class: "tag" }, d.blueprint),
+      x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
+    h("h4", { class: "ptitle2" }, d.title),
+    d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
+    x.reason && h("p", { class: "why" }, h("b", {}, "Why proposed: "), x.reason),
+    acc.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Done when (${acc.length})`), h("ul", { class: "donewhen" }, acc.map((a) => h("li", {}, a)))),
+    h("div", { class: "prov" },
+      (d.depends_on || []).length > 0 && h("span", {}, h("b", {}, "depends on "), d.depends_on.join(", ")),
+      (d.scope || []).length > 0 && h("span", {}, h("b", {}, "scope "), d.scope.join(", ")),
+      h("span", {}, h("b", {}, "proposed by "), x.proposed_by || "unknown"),
+      h("span", { title: x.proposed_at }, ago(x.proposed_at)),
+      x.decided_by && h("span", {}, h("b", {}, `${x.status} by `), x.decided_by),
+      x.note && h("span", {}, h("b", {}, "note "), x.note)),
+    x.status === "pending" && h("div", { class: "review" },
+      h("button", { class: "primary", onclick: async () => {
+        const opening = h("div", { class: "aform" }, h("p", { class: "hint" }, "Loading review…"));
+        fill(panel, opening);
+        try {
+          const form = await approveForm();
+          if (opening.parentNode === panel) fill(panel, form);
+        } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
+      } }, "Create the task…"),
+      h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
+    panel);
+}
+
+// findingKind names a finding by its key's kind ("duplicate:a|b": "copy
+// finding"); the key itself is the title.
+const FINDING_NOUN = { duplicate: "copy", "local-copy": "local copy", complexity: "complexity", template: "template", contract: "contract", sequence: "repeated statements" };
+function findingKind(key) {
+  const k = key.split(":")[0];
+  return `${FINDING_NOUN[k] || k.replaceAll("-", " ")} finding`;
 }
 
 function archProposalCard(p, x) {
@@ -3753,76 +4800,23 @@ function archProposalCard(p, x) {
   const ev = x.evidence || [];
   return h("article", { class: "mem aprop" + (x.status === "rejected" ? " inactive" : "") },
     h("div", { class: "mtype" }, task ? (own ? "Task from the agent's observation" : "Task from a finding") : "By design",
-      own ? h("span", { class: "tag fown", title: "Not found by harness: the agent's reading of the code" }, "model interpretation")
+      own ? h("span", { class: "tag", title: "Not found by harness: the agent's reading of the code" }, "the agent's reading")
         : h("span", { class: "tag" }, `harness finding · ${x.basis}`),
       x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result && x.result !== "marked" ? ` → ${x.result}` : ""}`)),
-    h("div", { class: "content" }, x.title),
+    h("h4", { class: "ptitle2" }, x.title),
     x.body && h("p", { class: "why" }, h("b", {}, task ? "Proposed: " : "Why intended: "), x.body),
-    ev.length > 0 && h("details", { class: "evfold" }, h("summary", {}, `Evidence (${ev.length})`), h("ul", { class: "evlist" }, ev.map((e) => h("li", {}, h("code", {}, e))))),
+    ev.length > 0 && h("details", { class: "evfold" }, h("summary", {}, `Evidence (${ev.length})`), h("ul", { class: "evlist" }, ev.map((e) => h("li", {}, evidenceText(e))))),
     h("div", { class: "prov" },
       h("span", { class: "scope" }, x.scope),
-      x.finding_key && h("span", {}, h("b", {}, "finding "), h("code", {}, x.finding_key)),
+      x.finding_key && h("span", { title: x.finding_key }, h("b", {}, "from a "), findingKind(x.finding_key)),
       h("span", {}, h("b", {}, "proposed by "), x.proposed_by || "unknown"),
       h("span", { title: x.proposed_at }, ago(x.proposed_at)),
       x.decided_by && h("span", {}, h("b", {}, `${x.status} by `), x.decided_by),
-      x.note && h("span", {}, h("b", {}, "note "), x.note),
-      h("code", { class: "id" }, x.id)),
+      x.note && h("span", {}, h("b", {}, "note "), x.note)),
     x.status === "pending" && h("div", { class: "review" },
       h("button", { class: "primary", onclick: () => fill(panel, approveForm()) }, task ? "Create the task…" : "Mark by design…"),
       h("button", { class: "ghost", onclick: () => fill(panel, rejectForm()) }, "Reject…")),
     panel);
-}
-
-// --- blueprints by hand (TASK-0048) ---
-// blueprintFields is the form for a blueprint's description, new or
-// edited; a new one starts with the next free id and a placeholder title.
-function blueprintFields(p, init, isNew) {
-  const lines = (v) => v.split("\n").map((x) => x.trim()).filter(Boolean);
-  const id = isNew && h("input", { type: "text", value: "", required: true, "aria-label": "Id" });
-  if (isNew) api(projectAPI(p, "blueprints-next-id")).then((r) => { if (!id.value) id.value = r.id; }).catch(() => {});
-  const title = h("input", { type: "text", value: init.title || (isNew ? "New blueprint" : ""), required: true, "aria-label": "Name" });
-  const goal = h("textarea", { rows: 2, "aria-label": "Goal" }, init.goal || "");
-  const exit = h("textarea", { rows: 3, placeholder: "one criterion per line", "aria-label": "Done when" }, (init.exit || []).join("\n"));
-  const notes = h("textarea", { rows: 2, "aria-label": "Notes" }, init.notes || "");
-  const field = (label, el) => h("label", {}, h("span", {}, label), el);
-  return {
-    nodes: [isNew ? h("div", { class: "frow" }, field("Name", title), field("Id", id)) : field("Name", title),
-      field("Goal: what it is for", goal), field("Done when", exit), field("Notes", notes)],
-    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value, goal: goal.value, exit: lines(exit.value), notes: notes.value }),
-  };
-}
-
-function newBlueprintForm(p, panel) {
-  const f = blueprintFields(p, {}, true);
-  return writeForm(panel, "A new blueprint: group tasks under it by choosing it in their Blueprint field.",
-    [f.nodes], "Add the blueprint", () => post(projectAPI(p, "blueprints"), f.value()));
-}
-
-function editBlueprintForm(p, panel, m) {
-  const f = blueprintFields(p, m, false);
-  return writeForm(panel, `Edit ${m.id}? Its id stays.`,
-    [f.nodes], "Save the blueprint", () => post(projectAPI(p, `blueprints/${enc(m.id)}/edit`), f.value()));
-}
-
-// removeBlueprintForm confirms removing a blueprint and, when it has
-// tasks, asks what happens to them: moved to another blueprint (or none),
-// or deleted with it.
-function removeBlueprintForm(p, panel, m, others) {
-  const url = projectAPI(p, `blueprints/${enc(m.id)}/remove`);
-  if (!m.total) {
-    return writeForm(panel, `Remove ${m.id}? It has no tasks.`, [], "Remove the blueprint", () => post(url, {}));
-  }
-  const name = "bprm-" + m.id;
-  const move = h("input", { type: "radio", name, value: "move", checked: true, "aria-label": "Move the tasks" });
-  const del = h("input", { type: "radio", name, value: "delete", "aria-label": "Delete the tasks" });
-  const to = h("select", { "aria-label": "Move to", onchange: () => { move.checked = true; } },
-    h("option", { value: "" }, "no blueprint"),
-    others.map((o) => h("option", { value: o.id }, o.title ? `${o.id} · ${o.title}` : o.id)));
-  return writeForm(panel, `${m.id} has ${m.total} task(s). What happens to them?`,
-    [h("label", { class: "choice" }, move, h("span", {}, "Move them to "), to),
-      h("label", { class: "choice" }, del, h("span", {}, "Delete them, with their audit trail")),
-      h("p", { class: "muted small" }, "Deleting is refused while an agent holds one of them; tasks elsewhere that depend on a deleted one lose that dependency.")],
-    "Remove the blueprint", () => post(url, del.checked ? { tasks: "delete" } : { tasks: "move", move_to: to.value }));
 }
 
 // --- tasks: grouped by blueprint, with progress ---
@@ -3839,16 +4833,16 @@ async function viewTasks(p, opts, sec) {
     if (!(opts && opts.live)) setTimeout(() => document.getElementById(`task-${linked.id}`)?.scrollIntoView({ block: "start" }), 0);
   }
   const counts = Object.fromEntries(TASK_STATUSES.map((s) => [s, all.filter((x) => x.status === s).length]));
-  const blueprints = [...new Set([...(mres.blueprints || []).map((m) => m.id), ...all.map((x) => x.blueprint || "—")])];
+  const milestones = [...new Set([...(mres.blueprints || []).map((m) => m.id), ...all.map((x) => x.blueprint || "—")])];
   const body = h("div", {});
   const list = h("div", {});
 
   function drawTasks() {
-    const shown = all.filter((x) => x === linked || (t.statuses.has(x.status) && (!t.blueprint || (x.blueprint || "—") === t.blueprint)));
+    const shown = all.filter((x) => x === linked || (t.statuses.has(x.status) && (!t.milestone || (x.blueprint || "—") === t.milestone)));
     // Deferred tasks are set aside by a decision: unless asked for, each
     // blueprint shows them as one line per reason instead of one row each.
     const deferred = t.statuses.has("deferred") ? [] :
-      all.filter((x) => x.status === "deferred" && x !== linked && (!t.blueprint || (x.blueprint || "—") === t.blueprint));
+      all.filter((x) => x.status === "deferred" && x !== linked && (!t.milestone || (x.blueprint || "—") === t.milestone));
     if (!shown.length && !deferred.length) {
       const hiddenDone = !t.statuses.has("done") && counts.done > 0;
       return fill(list, h("p", { class: "empty" },
@@ -3858,7 +4852,7 @@ async function viewTasks(p, opts, sec) {
     const inM = (m) => (x) => (x.blueprint || "—") === m;
     // Blueprints with something to work on first; those holding only
     // deferred tasks after them.
-    const order = [...blueprints.filter((m) => shown.some(inM(m))), ...blueprints.filter((m) => !shown.some(inM(m)) && deferred.some(inM(m)))];
+    const order = [...milestones.filter((m) => shown.some(inM(m))), ...milestones.filter((m) => !shown.some(inM(m)) && deferred.some(inM(m)))];
     fill(list, ...order.map((m) => {
       const mine = all.filter(inM(m));
       const rows = shown.filter(inM(m));
@@ -3867,7 +4861,7 @@ async function viewTasks(p, opts, sec) {
       const done = mine.filter((x) => x.status === "done").length;
       const open = !t.collapsed.has(m);
       const mi = info[m];
-      return h("section", { class: "mstone" },
+      return dropZone(h("section", { class: "mstone" },
         h("button", {
           class: "mhead", "aria-expanded": String(open),
           onclick: () => { open ? t.collapsed.add(m) : t.collapsed.delete(m); drawTasks(); },
@@ -3877,16 +4871,53 @@ async function viewTasks(p, opts, sec) {
           h("span", { class: "mcount" }, `${rows.length} shown` + (reasons.size ? `, ${[...reasons.values()].reduce((n, xs) => n + xs.length, 0)} deferred` : "")),
           h("span", { class: "mprog" }, meter(done, mine.length, `${done} of ${mine.length} tasks done`))),
         open && mi && mi.goal && h("p", { class: "mgoal" }, mi.goal),
-        open && rows.length > 0 && h("div", { class: "tlist" }, rows.map((x) => taskRow(x, drawTasks))),
+        open && rows.length > 0 && h("div", { class: "tlist" }, rows.map((x) => draggableTask(taskRow(x, drawTasks), x))),
+        open && h("button", { class: "taddrow", type: "button", onclick: () => newTaskDialog(p, mres.blueprints || [], m === "—" ? "" : m) }, icon("plus"), "Add task"),
         open && [...reasons].map(([reason, xs]) => h("div", { class: "deferredline" },
-          statusPill("deferred"), h("span", { class: "dcount" }, `${xs.length} task(s)`),
+          statusPill("deferred"), h("span", { class: "dcount" }, plural(xs.length, "task")),
           h("span", { class: "dreason" }, reason || "no reason given"),
-          h("button", { class: "linkbtn", onclick: () => { t.statuses.add("deferred"); renderMain(); } }, "show"))));
-    }));
+          h("button", { class: "linkbtn", onclick: () => { t.statuses.add("deferred"); renderMain(); } }, "show")))), m);
+    }),
+    // while a task is dragged: the blueprints with nothing shown, as targets
+    h("div", { class: "dropstrip" }, h("span", { class: "muted small" }, "Move to:"),
+      [...milestones.filter((m) => !order.includes(m)), ...(milestones.includes("—") ? [] : ["—"])].map((m) => dropZone(h("span", { class: "dropchip" }, m === "—" ? "no blueprint" : info[m] && info[m].title ? `${m} · ${info[m].title}` : m), m))));
+  }
+  // dragging a task onto a blueprint moves it there
+  function draggableTask(row, x) {
+    row.draggable = true;
+    row.classList.add("draggable");
+    row.addEventListener("dragstart", (ev) => { ev.dataTransfer.setData("text/x-task", x.id); ev.dataTransfer.effectAllowed = "move"; list.classList.add("dragging"); });
+    row.addEventListener("dragend", () => list.classList.remove("dragging"));
+    return row;
+  }
+  function dropZone(el, m) {
+    // types is an array in some browsers, a DOMStringList in others
+    el.addEventListener("dragover", (ev) => { if (Array.from(ev.dataTransfer.types || []).includes("text/x-task")) { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; el.classList.add("dropover"); } });
+    el.addEventListener("dragleave", () => el.classList.remove("dropover"));
+    el.addEventListener("drop", async (ev) => {
+      ev.preventDefault();
+      el.classList.remove("dropover");
+      list.classList.remove("dragging");
+      const id = ev.dataTransfer.getData("text/x-task");
+      const task = all.find((x) => x.id === id);
+      const to = m === "—" ? "" : m;
+      if (!task || (task.blueprint || "") === to) return;
+      try { await post(projectAPI(p, `tasks/${enc(id)}/blueprint`), { blueprint: to }); toast(`${id} moved to ${to || "no blueprint"}`); await afterWrite(); }
+      catch (e) { toast(e.message, true); }
+    });
+    return el;
   }
 
-  function drawBlueprints() {
-    const ms = blueprints.map((id) => info[id] || { id, title: "", goal: "", exit: [], tasks: {}, total: all.filter((x) => (x.blueprint || "—") === id).length });
+  function drawMilestones() {
+    // tasks without a blueprint (and blueprints the backlog does not
+    // describe) are counted from the tasks themselves
+    const ms = milestones.map((id) => {
+      if (info[id]) return info[id];
+      const mine = all.filter((x) => (x.blueprint || "—") === id);
+      const tasks = {};
+      for (const x of mine) tasks[x.status] = (tasks[x.status] || 0) + 1;
+      return { id, title: "", goal: "", exit: [], tasks, total: mine.length };
+    });
     const stateOf = (m) => {
       const n = (s) => (m.tasks || {})[s] || 0;
       if (!m.total) return ["none", "○", "no tasks"];
@@ -3897,31 +4928,27 @@ async function viewTasks(p, opts, sec) {
       if (n("done") + n("claimed") + n("in_progress") + n("review") > 0) return ["active", "◐", "in progress"];
       return ["todo", "○", "not started"];
     };
-    const filt = t.mfilter || "open";
     const kind = (m) => ({ done: "done", deferred: "deferred" })[stateOf(m)[0]] || "open";
+    // open blueprints by default; all of them when none is open
+    const filt = t.mfilter || (ms.some((m) => kind(m) === "open") ? "open" : "all");
     const shown = ms.filter((m) => filt === "all" || kind(m) === filt);
     const chips = [["open", "Open"], ["done", "Done"], ["deferred", "Deferred"], ["all", "All"]].map(([k, label]) => h("button", {
-      class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawBlueprints(); },
+      class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawMilestones(); },
     }, label, h("span", { class: "count" }, k === "all" ? ms.length : ms.filter((m) => kind(m) === k).length)));
-    const newPanel = h("div", { class: "mpanel" });
-    const add = h("button", { class: "primary newtask", onclick: () => fill(newPanel, newBlueprintForm(p, newPanel)) }, "New blueprint…");
-    fill(body, h("div", { class: "filters" }, chips, add), newPanel,
+    fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
       shown.length ? h("div", { class: "mcards" }, shown.map((m) => {
         const [cls, ico, label] = stateOf(m);
         const n = (s) => (m.tasks || {})[s] || 0;
-        // "—" gathers the tasks without a blueprint: nothing to edit there
-        const own = m.id !== "—";
-        const panel = h("div", { class: "mpanel" });
         const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
         return h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
-            h("span", { class: "mid" }, m.id),
-            h("h3", {}, m.title || h("span", { class: "muted" }, own ? "(not described yet)" : "(tasks without a blueprint)")),
+            m.id !== "—" && h("span", { class: "mid" }, m.id),
+            h("h3", {}, m.title || h("span", { class: "muted" }, m.id === "—" ? "Without a blueprint" : "Not described in the backlog")),
             h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
-            own && h("span", { class: "mcacts" },
-              h("button", { class: "ghost", onclick: () => fill(panel, editBlueprintForm(p, panel, m)) }, m.title ? "Edit…" : "Describe…"),
-              h("button", { class: "ghost", onclick: () => fill(panel, removeBlueprintForm(p, panel, m, others)) }, "Remove…"))),
-          panel,
+          m.id !== "—" && h("button", { class: "iconbtn mcedit", type: "button", title: m.title ? `Edit blueprint ${m.id}` : `Describe blueprint ${m.id}`, "aria-label": `Edit blueprint ${m.id}`,
+            onclick: () => blueprintDialog(p, m) }, icon("edit")),
+          m.id !== "—" && h("button", { class: "iconbtn mcdel", type: "button", title: `Remove blueprint ${m.id}`, "aria-label": `Remove blueprint ${m.id}`,
+            onclick: () => removeBlueprintDialog(p, m, others) }, icon("trash"))),
           m.goal && h("p", { class: "mcgoal" }, m.goal),
           m.total > 0 && h("div", { class: "mcprog" }, meter(n("done"), m.total, `${n("done")} of ${m.total} tasks done`),
             h("span", { class: "counts" }, ["ready", "in_progress", "review", "blocked", "backlog", "deferred"].filter((s) => n(s)).map((s) => [statusPill(s), " ", n(s), " "]))),
@@ -3930,9 +4957,9 @@ async function viewTasks(p, opts, sec) {
           m.notes && h("p", { class: "mcnote" }, m.notes),
           m.total > 0 && h("button", {
             class: "mclink", onclick: () => {
-              t.blueprint = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
+              t.milestone = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
             },
-          }, `Show its ${m.total} task(s) →`));
+          }, `Show its ${plural(m.total, "task")} →`));
       })) : h("p", { class: "empty" }, "No blueprints match."));
   }
 
@@ -3944,16 +4971,17 @@ async function viewTasks(p, opts, sec) {
       drawTasks();
     },
   }, statusPill(s), h("span", { class: "count" }, counts[s])));
-  const msSel = h("select", { "aria-label": "Blueprint", onchange: (ev) => { t.blueprint = ev.target.value; drawTasks(); } },
+  const msSel = h("select", { "aria-label": "Blueprint", onchange: (ev) => { t.milestone = ev.target.value; drawTasks(); } },
     h("option", { value: "" }, "all blueprints"),
-    blueprints.map((m) => h("option", { value: m, selected: m === t.blueprint }, info[m] && info[m].title ? `${m} · ${info[m].title}` : m)));
+    milestones.map((m) => h("option", { value: m, selected: m === t.milestone }, info[m] && info[m].title ? `${m} · ${info[m].title}` : m)));
   if (sec === "tasks") {
     const panel = h("div", { class: "mpanel" });
-    const add = h("button", { class: "primary newtask", onclick: () => fill(panel, newTaskForm(p, panel, mres.blueprints || [])) }, "New task…");
-    fill(body, h("div", { class: "filters" }, chips, msSel, add), panel, list);
+    const add = h("button", { class: "primary newtask", onclick: () => newTaskDialog(p, mres.blueprints || []) }, "New task…");
+    fill(body, h("div", { class: "filters" }, chips, msSel, add), panel,
+      h("p", { class: "muted small draghint" }, "Drag a task onto another blueprint to move it; 'harness tasks export' writes the moves into the backlog file."), list);
     drawTasks();
   } else {
-    drawBlueprints();
+    drawMilestones();
   }
   const done = counts.done;
   const stuck = attention(p, all);
@@ -3966,11 +4994,11 @@ async function viewTasks(p, opts, sec) {
         taskBar(all, true)),
       stuck
         ? h("a", { class: `card pad attncard lv-${stuck.worst}`, href: "#stuck", onclick: (ev) => { ev.preventDefault(); document.getElementById("stuck").scrollIntoView({ block: "center" }); } },
-          h("div", { class: "label" }, "Needs attention"),
+          h("div", { class: "label" }, "Blocked or stale"),
           h("div", { class: "value" }, h("span", { class: "ico", "aria-hidden": "true" }, stuck.worst === "problem" ? "✕" : "▲"), stuck.count),
           h("div", { class: "note" }, `task${stuck.count === 1 ? "" : "s"} stuck`))
         : h("div", { class: "card pad attncard lv-ok" },
-          h("div", { class: "label" }, "Needs attention"),
+          h("div", { class: "label" }, "Blocked or stale"),
           h("div", { class: "value" }, h("span", { class: "ico", "aria-hidden": "true" }, "✓"), "0"),
           h("div", { class: "note", title: "nothing blocked, no stale claims, no failed criteria" }, "nothing blocked or stale"))),
     stuck && stuck.el, body);
@@ -3987,7 +5015,7 @@ function attention(p, all) {
     if (x.claim && cls) items.push([cls, x, `${x.status.replace("_", " ")} by ${x.claim.claimant}: ${left}`]);
     if (x.status === "done") {
       const failed = (x.acceptance || []).filter((c) => c.result === "fail").length + ((x.completion && x.completion.checks) || []).filter((c) => c.result === "fail").length;
-      if (failed) items.push(["warn", x, `done with ${failed} failed criterion/check(s)`]);
+      if (failed) items.push(["warn", x, `done with ${failed} failed ${failed === 1 ? "criterion or check" : "criteria or checks"}`]);
     }
   }
   if (!items.length) return null;
@@ -4015,16 +5043,6 @@ function taskRow(x, redraw) {
   const acc = x.acceptance || [];
   const passed = acc.filter((c) => c.result === "pass" || c.result === "n/a").length;
   const toggle = () => { open ? t.open.delete(x.id) : t.open.add(x.id); redraw(); };
-  // Edit… is always in the header; only a ready or backlog task can be
-  // restated, so for the others it stays disabled. It opens the task with
-  // its form.
-  const editable = taskEditable(x);
-  const edit = h("button", {
-    class: "ghost tedit", disabled: !editable,
-    title: editable ? "Restate this task" : "Only a ready or backlog task can be edited: once claimed, its definition is fixed",
-    onclick: (ev) => { ev.stopPropagation(); t.open.add(x.id); t.editing = x.id; redraw(); },
-    onkeydown: (ev) => ev.stopPropagation(),
-  }, "Edit…");
   const row = h("div", {
     class: "trow" + (open ? " open" : ""), role: "button", tabindex: "0", "aria-expanded": String(open),
     onclick: toggle, onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } },
@@ -4037,14 +5055,26 @@ function taskRow(x, redraw) {
     })()),
     // Always present (empty without criteria) so the columns line up.
     h("span", { class: "tacc", title: acc.length ? "acceptance criteria met" : "" }, acc.length ? `${passed}/${acc.length}` : ""),
-    h("span", { class: `prio p-${x.priority}` }, x.priority),
+    h("span", { class: `prio p-${x.priority}`, title: `${x.priority} priority` }, icon("p-" + x.priority), x.priority),
     statusPill(x.status),
-    edit);
+    h("button", { class: "iconbtn tedit", type: "button", disabled: !taskEditable(x), "aria-label": `Edit ${x.id}`,
+      title: taskEditable(x) ? `Edit ${x.id}` : "Only a ready or backlog task can be edited: once claimed, its definition is fixed",
+      onclick: (ev) => { ev.stopPropagation(); editTaskDialog({ id: route().id }, x); }, onkeydown: (ev) => ev.stopPropagation() }, icon("edit")),
+    // delete at the row's end, shown on hover (its click is not the row's)
+    h("button", { class: "iconbtn rowdel", type: "button", title: `Delete ${x.id}`, "aria-label": `Delete ${x.id}`,
+      onclick: (ev) => { ev.stopPropagation(); deleteTaskDialog(x); }, onkeydown: (ev) => ev.stopPropagation() }, icon("trash")));
   return h("div", { class: "task" + (open ? " open" : ""), id: `task-${x.id}` }, row, open && taskDetail(x, passed));
 }
 
-function taskEditable(x) {
-  return x.status === "ready" || x.status === "backlog";
+// deleteTask asks, then deletes a task (harness ui only).
+function deleteTaskDialog(x) {
+  confirmDelete({
+    title: `Delete ${x.id}?`, what: x.title,
+    lines: ["The task goes with its acceptance criteria, results and audit trail; this cannot be undone.",
+      "Refused while it is claimed or while other tasks depend on it.",
+      "A backlog file that still has it brings it back on the next import: 'harness tasks export' writes the deletion into the file."],
+    confirm: "Delete task", send: () => post(projectAPI({ id: route().id }, `tasks/${encodeURIComponent(x.id)}/delete`), {}), done: `${x.id} deleted`,
+  });
 }
 
 // auditBlock loads a task's audit trail on request (harness tasks show --events).
@@ -4070,26 +5100,24 @@ function auditBlock(x) {
   return out;
 }
 
+// confirmDelete asks before deleting, saying what goes, then does it.
+function confirmDelete({ title, what, lines, confirm, send, done }) {
+  const dlg = dialog({ title });
+  const err = h("p", { class: "error", hidden: true });
+  const ok = h("button", { class: "danger", type: "button", onclick: async () => {
+    ok.disabled = true;
+    try { await send(); dlg.close(); toast(done); await afterWrite(); }
+    catch (e) { err.textContent = e.message; err.hidden = false; ok.disabled = false; }
+  } }, confirm);
+  dlg.set(null, [what && h("p", { class: "dpname" }, what), h("ul", { class: "dchanges" }, lines.map((l) => h("li", {}, l))), err],
+    [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), ok]);
+}
+
 function taskDetail(x, passed) {
   const acc = x.acceptance || [];
   const resIcon = { pass: "✓", fail: "✕", pending: "○", "n/a": "–" };
-  const panel = h("div", { class: "mpanel" });
-  const edit = async () => {
-    const opening = h("div", { class: "aform" }, h("p", { class: "hint" }, "Loading task…"));
-    fill(panel, opening);
-    try {
-      const form = await editTaskForm({ id: route().id }, panel, x);
-      if (opening.parentNode === panel) fill(panel, form);
-    } catch (e) { if (opening.parentNode === panel) fill(panel, h("p", { class: "error" }, e.message)); }
-  };
-  // Opened by the header's Edit…: show the form once.
-  if (state.tasks.editing === x.id) {
-    state.tasks.editing = "";
-    if (taskEditable(x)) edit();
-  }
   return h("div", { class: "tdetail" },
     h("div", { class: "tmain" },
-      panel,
       x.blocked_reason && (x.status === "deferred"
         ? h("div", { class: "callout" }, h("b", {}, "Deferred: "), x.blocked_reason)
         : h("div", { class: "callout bad" }, h("b", {}, "Blocked: "), x.blocked_reason)),
@@ -4183,9 +5211,10 @@ const LIVE_QUIET = 500, LIVE_GAP = 3000;
 const live = { pending: null, timer: 0, last: 0 };
 
 function queueLive(c) {
-  const p = live.pending || (live.pending = { registry: false, workspaces: false, all: false, kinds: {} });
+  const p = live.pending || (live.pending = { registry: false, workspaces: false, all: false, kinds: {}, levels: [] });
   p.registry = p.registry || !!c.registry;
   p.workspaces = p.workspaces || !!c.workspaces;
+  p.levels = [...new Set([...p.levels, ...(c.levels || [])])];
   p.all = p.all || !!c.all;
   for (const id of c.projects || []) {
     const ks = (c.kinds && c.kinds[id]) || ["all"];

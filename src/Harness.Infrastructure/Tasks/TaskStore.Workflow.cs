@@ -44,7 +44,7 @@ public sealed partial class TaskStore
             throw new InvalidOperationException($"{d.Id}: task already exists");
         }
 
-        if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+        if (TaskWorkflow.Local(d.DependsOn).FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
         {
             throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
         }
@@ -65,6 +65,53 @@ public sealed partial class TaskStore
         RecomputeReadiness(c, t);
         return Get(c, t, d.Id);
     }
+
+    /// <summary>
+    /// Deletes a task with its acceptance criteria, dependencies and audit trail: harness ui's only (no command or
+    /// agent tool deletes). Refused while it is claimed or while other tasks depend on it, naming them.
+    /// </summary>
+    public void DeleteTask(string id, CancellationToken cancellationToken = default) =>
+        database.WithTransaction(
+            (c, t) =>
+            {
+                var task = Get(c, t, id);
+                if (TaskWorkflow.HoldsClaim(task.Status))
+                {
+                    throw new InvalidOperationException(
+                        $"{task.Id} is {task.Status.Replace('_', ' ')}: release the claim before deleting it"
+                    );
+                }
+
+                List<string> dependents = [];
+                using (
+                    var command = Command(
+                        c,
+                        t,
+                        "SELECT task_id FROM task_dependencies WHERE depends_on=$id ORDER BY task_id",
+                        ("$id", task.Id)
+                    )
+                )
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        dependents.Add(reader.GetString(0));
+                    }
+                }
+
+                if (dependents.Count is not 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{task.Id} cannot be deleted: {string.Join(", ", dependents)} depend{(dependents.Count is 1 ? "s" : "")} on it"
+                    );
+                }
+
+                DeleteTasks(c, t, [task.Id], task.Definition.Blueprint, "", Stamp());
+                RecomputeReadiness(c, t);
+                return 0;
+            },
+            cancellationToken
+        );
 
     /// <summary>
     /// Restates an unclaimed (ready or backlog) task's definition. Its id, validation and notes stay; once claimed,
@@ -101,12 +148,12 @@ public sealed partial class TaskStore
                 ).Normalize();
                 d.Validate();
                 var (existing, edges) = LoadGraph(c, t);
-                if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+                if (TaskWorkflow.Local(d.DependsOn).FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
                 {
                     throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
                 }
 
-                edges[d.Id] = d.DependsOn;
+                edges[d.Id] = TaskWorkflow.Local(d.DependsOn);
                 if (FindCycle(edges) is { } cycle)
                 {
                     throw new ArgumentException("dependency cycle: " + string.Join(" -> ", cycle));

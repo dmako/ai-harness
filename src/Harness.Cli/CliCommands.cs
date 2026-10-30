@@ -281,32 +281,12 @@ internal static class CliCommands
         );
         Add(
             root,
-            "metrics",
-            null,
-            CommandBindings.BindTelemetrySettings,
-            (settings, token) =>
-                ActivatorUtilities
-                    .CreateInstance<Harness.Cli.Telemetry.MetricsCommand>(services)
-                    .ExecuteAsync(settings, token)
-        );
-        Add(
-            root,
             "report",
             null,
             CommandBindings.BindReportSettings,
             (settings, token) =>
                 ActivatorUtilities
                     .CreateInstance<Harness.Cli.Telemetry.ReportCommand>(services)
-                    .ExecuteAsync(settings, token)
-        );
-        Add(
-            Group(root, groups, "context"),
-            "stats",
-            null,
-            CommandBindings.BindTelemetrySettings,
-            (settings, token) =>
-                ActivatorUtilities
-                    .CreateInstance<Harness.Cli.Telemetry.ContextStatsCommand>(services)
                     .ExecuteAsync(settings, token)
         );
         Add(

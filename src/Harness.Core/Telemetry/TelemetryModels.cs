@@ -346,3 +346,22 @@ public interface IContextObserver
 {
     void Observe(ContextObservation observation);
 }
+
+/// <summary>
+/// One day of a project's headline numbers: the get_context answers scored that day with their mean hit rate (tests
+/// apart, as the context statistics count them) and the tasks completed.
+/// </summary>
+public sealed record TrendDay
+{
+    [JsonPropertyName("day")]
+    public string Day { get; set; } = "";
+
+    [JsonPropertyName("answers")]
+    public int Answers { get; set; }
+
+    [JsonPropertyName("hit_rate")]
+    public double HitRate { get; set; }
+
+    [JsonPropertyName("done")]
+    public int Done { get; set; }
+}

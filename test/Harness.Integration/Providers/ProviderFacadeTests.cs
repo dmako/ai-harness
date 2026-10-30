@@ -263,7 +263,7 @@ public sealed class ProviderFacadeTests
         Directory.Exists(Path.Combine(fixture.Root, ".harness")).Should().BeFalse();
         using (var database = HarnessDatabase.Open(location.DatabasePath, cancellationToken: Token))
         {
-            database.SchemaVersion().Should().Be(21);
+            database.SchemaVersion().Should().Be(22);
         }
 
         await using (var recorder = new ProviderCallRecorder(location.DatabasePath))

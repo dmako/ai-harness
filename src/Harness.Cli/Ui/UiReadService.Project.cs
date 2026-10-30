@@ -43,8 +43,9 @@ internal sealed partial class UiReadService
         var tasks = new TaskStore(database);
         return endpoint switch
         {
-            "context" => UiJson.Node(telemetry.ContextStats(DateTimeOffset.UtcNow.AddDays(-Days(request)))),
-            "metrics" => UiJson.Node(telemetry.Metrics(DateTimeOffset.UtcNow.AddDays(-Days(request)))),
+            "trends" => UiJson.Node(
+                new JsonObjectMap { ["days"] = telemetry.Trends(Days(request), DateTimeOffset.UtcNow) }
+            ),
             "report" => await ReportAsync(project, database, request, token),
             "providers" => await ProvidersAsync(project, database, request, token),
             "hooks" => await HooksAsync(project, database, token),
@@ -236,6 +237,7 @@ internal sealed partial class UiReadService
         );
         report.Id = UiProjectCatalog.Text(project, "id");
         report.Root = root;
-        return UiJson.Node(report);
+        // the user's findings; the developer's and the tuning numbers go only to the opt-in telemetry
+        return UiJson.Node(report.ForUser());
     }
 }

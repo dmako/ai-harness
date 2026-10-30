@@ -47,7 +47,17 @@ code or Git history already says, temporary notes, transcripts.
 
 To start a project's memory, work with an agent for a while and review the
 Inbox; or tell an agent the five things every newcomer should know and ask
-it to record them.
+it to record them. You can also add knowledge yourself: a project's
+Knowledge › Add knowledge records it as yours, at the project or a path,
+subsystem or branch.
+
+Each statement has one of seven types (goal, constraint, decision,
+convention, warning, fact, open question), and the type decides where it
+reaches agents: `decisions_for` returns an area's constraints, decisions,
+conventions and warnings; `get_context` brings those with the code it
+returns, and the facts and open questions that apply there too. An open
+question is yours to settle: agents are told to ask, not to decide it. The
+reference's Knowledge types section has each type's meaning and an example.
 
 ## How to define work
 
@@ -87,20 +97,35 @@ Work can also start without the backlog file:
   even one not described yet.
 
 Until an agent claims a task, you can restate it in harness ui: Work ›
-Tasks, Edit… in the task's row (disabled once an agent claims it). The
-form is the one used to approve a proposal; the id, validation and notes
-stay. A task that is also in the backlog file is restated from the file
-again at its next import.
+Tasks, the pencil in the task's row (disabled once an agent claims it)
+opens the same form as New task; the id, validation and notes stay. A task
+that is also in the backlog file is restated from the file again at its
+next import. Drag a task onto another blueprint's group to move it there;
+the move is in its audit trail.
+
+To delete a task, use the bin at the end of its row: a dialog says what
+goes (the task, its criteria, its dependencies and its audit trail) before
+anything does. Deleting is refused while an agent holds the task or while
+other tasks depend on it, naming them. Only harness ui deletes a task; no
+command or agent tool does.
 
 Blueprints are kept in harness ui too: Work › Blueprints › New blueprint
-starts with the next free id (M17 after M16, or BP-001) and a placeholder
-name; Edit… changes its name, goal, exit criteria and notes, not its id.
-Remove… asks you to confirm; for a blueprint with tasks it also asks what
-happens to them: moved to another blueprint (or to none), or deleted with their
-audit trail. Deleting is refused while an agent holds one of the tasks, and
-a task elsewhere that depended on a deleted one loses that dependency. A
-blueprint or task still in the backlog file comes back at its next import:
-remove it there as well.
+starts with the next free id (M17 after M16, or BP-001); the pencil on a
+blueprint's card changes its name, goal, exit criteria and notes, not its
+id. The bin removes it after you confirm; for a blueprint with tasks it
+also asks what happens to them: moved to another blueprint (or to none), or
+deleted with their audit trail. Deleting is refused while an agent holds
+one of the tasks, and a task elsewhere that depended on a deleted one loses
+that dependency. A blueprint or task still in the backlog file comes back
+at its next import: remove it there as well.
+
+A task can wait for a task of another project on this machine, written
+`<project>:<task id>` (the project by its short name, folder name,
+parent/folder or id): in a backlog file, with `harness tasks add
+--depends`, from an agent's `task_propose`, or in harness ui's New task,
+whose dependency search offers the open tasks of the workspace's other
+projects. The task stays in the backlog until the other one is done, and
+goes back if it reopens; the other project is only read, never changed.
 
 The same is done on the command line: `harness tasks blueprints add`,
 `edit <id>` (what you do not give stays) and `remove <id>` (with
@@ -109,6 +134,30 @@ Agents read the blueprints (`task_blueprints`) but do not change them: they
 propose a new blueprint or a change to one (`task_blueprint_propose`), and
 the proposal waits in Work › Inbox, or `harness tasks proposals`, beside the
 proposed tasks.
+
+## What harness ui shows
+
+Each project opens on its Overview: rings for the tasks done and how well
+`get_context` answered, each with its trend over the window; what is in
+flight or next; and what needs a person, most urgent first. Then:
+
+- **Architecture:** Structure (projects or packages and their smells),
+  Layers, Complexity (every function by cyclomatic complexity, the most
+  complex named) and Change coupling.
+- **Knowledge:** the memories by type, what applies to a path, and the
+  Inbox of proposals to approve.
+- **Work:** Blueprints, Tasks and the Inbox of proposed tasks, blueprints
+  and architecture work.
+- **Agents:** how harness serves your agents and what you can change so it
+  serves them better.
+- **Health:** the checks `harness doctor` runs; a check harness can fix
+  itself has Fix it, and a stale index has Sync now.
+
+A workspace has the same views over its members. Machine holds this page's
+settings, the C# sessions, and the switch for the opt-in developer
+telemetry. How harness itself performs (relevance per provider, latency)
+is for the harness developer: it is not shown here, only sent in that
+telemetry if you turn it on.
 
 ## Several checkouts of the same code
 
@@ -127,7 +176,11 @@ proposed tasks.
   configuration and every provider, and says how to fix what it finds.
 - `harness status` shows the project's state; harness ui shows the same
   per project, with the agents' tool calls and how well `get_context`
-  answered.
+  answered. Health's Fix it runs a check's fix when harness can do it
+  itself.
+- `harness report` lists what you can change so harness serves your agents
+  better (providers, hooks, instructions, knowledge), each with what to
+  do.
 - If agents do not use harness, check that CLAUDE.md (or AGENTS.md for
   Codex) holds or imports the harness section (`harness instructions`
   adds it) and that the session-start hook is installed

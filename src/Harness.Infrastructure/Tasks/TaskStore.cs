@@ -9,8 +9,16 @@ using Microsoft.Data.Sqlite;
 
 namespace Harness.Infrastructure.Tasks;
 
-/// <summary>Task state over a caller-owned database. Fresh reads use deferred read transactions.</summary>
-public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? timeProvider = null)
+/// <summary>
+/// Task state over a caller-owned database. Fresh reads use deferred read transactions. Other projects' tasks
+/// (dependencies written &lt;project&gt;:&lt;task id&gt;) are read through <paramref name="externalTasks"/>, by default
+/// the machine registry's.
+/// </summary>
+public sealed partial class TaskStore(
+    HarnessDatabase database,
+    TimeProvider? timeProvider = null,
+    ExternalTaskReader? externalTasks = null
+)
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -105,10 +113,14 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
                     t,
                     """
                     SELECT EXISTS(SELECT 1 FROM tasks WHERE status IN ('claimed','in_progress','review') AND lease_until IS NOT NULL AND lease_until <= $now)
-                    OR EXISTS(SELECT 1 FROM tasks t WHERE t.status IN ('backlog','ready') AND (t.status='ready') = EXISTS(
-                        SELECT 1 FROM task_dependencies d JOIN tasks dt ON dt.id=d.depends_on WHERE d.task_id=t.id AND dt.status <> 'done'))
+                    OR EXISTS(SELECT 1 FROM tasks t WHERE t.status IN ('backlog','ready') AND (t.status='ready') = (EXISTS(
+                        SELECT 1 FROM task_dependencies d JOIN tasks dt ON dt.id=d.depends_on WHERE d.task_id=t.id AND dt.status <> 'done')
+                        OR EXISTS(SELECT 1 FROM task_external_dependencies e WHERE e.task_id=t.id AND e.status <> 'done')))
+                    OR EXISTS(SELECT 1 FROM task_external_dependencies e JOIN tasks t ON t.id=e.task_id
+                        WHERE t.status IN ('backlog','ready') AND (e.checked_at IS NULL OR e.checked_at <= $before))
                     """,
-                    ("$now", Stamp())
+                    ("$now", Stamp()),
+                    ("$before", ExternalBefore())
                 );
                 stale =
                     Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture)
@@ -159,6 +171,8 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
             }
         }
 
+        RefreshExternal(c, t);
+
         foreach (var item in expired)
         {
             ClearClaim(c, t, item.Id, "ready", now);
@@ -186,6 +200,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
                 t,
                 """
                 SELECT t.id,t.status,(SELECT COUNT(*) FROM task_dependencies d JOIN tasks dt ON dt.id=d.depends_on WHERE d.task_id=t.id AND dt.status<>'done')
+                    + (SELECT COUNT(*) FROM task_external_dependencies e WHERE e.task_id=t.id AND e.status<>'done')
                 FROM tasks t WHERE t.status IN ('backlog','ready') ORDER BY t.ordinal,t.id
                 """
             )
@@ -347,6 +362,23 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
             }
         }
 
+        // other projects' tasks, as last read
+        using (
+            var command = Command(
+                c,
+                t,
+                "SELECT project || ':' || depends_on,status FROM task_external_dependencies WHERE task_id=$id ORDER BY project,depends_on",
+                ("$id", id)
+            )
+        )
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                dependencies.Add(new(reader.GetString(0), reader.GetString(1)));
+            }
+        }
+
         List<TaskCriterion> criteria = [];
         using (
             var command = Command(
@@ -370,7 +402,7 @@ public sealed partial class TaskStore(HarnessDatabase database, TimeProvider? ti
             Criteria = criteria,
             Definition = record.Definition with
             {
-                DependsOn = dependencies.Select(d => d.Id).ToArray(),
+                DependsOn = dependencies.Select(d => d.Id).Order(StringComparer.Ordinal).ToArray(),
                 Acceptance = criteria.Select(x => x.Criterion).ToArray(),
             },
         };

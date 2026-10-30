@@ -20,7 +20,14 @@ internal sealed partial class UiReadService
 
     private JsonNode? Machine()
     {
-        JsonObject telemetry = new() { ["enabled"] = false };
+        // the opt-in's public part, its defaults before it was ever turned on
+        JsonObject telemetry = new()
+        {
+            ["enabled"] = false,
+            ["endpoint"] = "",
+            ["last_sent"] = null,
+            ["projects"] = 0,
+        };
         var path = Path.Combine(GlobalDirectory, "telemetry.json");
         try
         {
@@ -28,7 +35,7 @@ internal sealed partial class UiReadService
             {
                 telemetry["enabled"] = state["enabled"]?.DeepClone() ?? JsonValue.Create(false);
                 telemetry["endpoint"] = state["endpoint"]?.DeepClone() ?? JsonValue.Create("");
-                telemetry["last_sent"] = state["last_sent"]?.DeepClone() ?? JsonValue.Create("0001-01-01T00:00:00Z");
+                telemetry["last_sent"] = state["last_sent"]?.DeepClone();
                 telemetry["projects"] = state["projects"] is JsonObject projects ? projects.Count : 0;
             }
         }
