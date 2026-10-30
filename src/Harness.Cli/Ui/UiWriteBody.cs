@@ -33,13 +33,18 @@ internal sealed class UiWriteBody
             name.ToUpperInvariant() switch
             {
                 "TASK" or "EDIT" => value is JsonObject,
-                "PROJECT_IDS" or "DEPENDS_ON" or "ACCEPTANCE" or "SCOPE" or "SUPERSEDES" or "EXIT" => value
-                    is JsonArray items
-                    && items.All(item => item is null || item is JsonValue scalar && scalar.TryGetValue<string>(out _)),
-                "KEEP_BOTH" or "DRY_RUN" or "FORCE" => value is JsonValue flag && flag.TryGetValue<bool>(out _),
+                "PROJECT_IDS" or "DEPENDS_ON" or "ACCEPTANCE" or "SUPERSEDES" or "EXIT" => Strings(value),
+                // a task's paths, or a memory's one scope
+                "SCOPE" => Strings(value) || value is JsonValue one && one.TryGetValue<string>(out _),
+                "KEEP_BOTH" or "DRY_RUN" or "FORCE" or "ENABLED" or "SYNC" => value is JsonValue flag
+                    && flag.TryGetValue<bool>(out _),
                 _ => value is JsonValue text && text.TryGetValue<string>(out _),
             }
         );
+
+    private static bool Strings(JsonNode value) =>
+        value is JsonArray items
+        && items.All(item => item is null || item is JsonValue scalar && scalar.TryGetValue<string>(out _));
 
     internal string Text(string name) => _values.GetValueOrDefault(name)?.GetValue<string>() ?? "";
 
@@ -48,7 +53,12 @@ internal sealed class UiWriteBody
     internal bool Flag(string name) => _values.GetValueOrDefault(name)?.GetValue<bool>() ?? false;
 
     internal string[] List(string name) =>
-        _values.GetValueOrDefault(name)?.AsArray().Select(n => n?.GetValue<string>() ?? "").ToArray() ?? [];
+        _values.GetValueOrDefault(name) switch
+        {
+            null => [],
+            JsonArray items => items.Select(n => n?.GetValue<string>() ?? "").ToArray(),
+            _ => throw new UiRequestException(400, "invalid request body: wrong type for \"" + name + "\""),
+        };
 
     internal JsonObject? Object(string name) => _values.GetValueOrDefault(name)?.AsObject();
 }

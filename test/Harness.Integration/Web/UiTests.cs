@@ -172,6 +172,7 @@ public sealed class UiTests
                 "tasks/TASK-9999/events",
                 "tasks-next-id",
                 "blueprints-next-id",
+                "trends?days=7",
                 "task-proposals",
                 "blueprint-proposals",
                 "arch-proposals",

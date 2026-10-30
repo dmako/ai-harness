@@ -410,6 +410,57 @@ public sealed partial class TaskStore
             cancellationToken
         );
 
+    /// <summary>
+    /// Moves one task to another blueprint (empty: none), whatever its status, with the move in its audit trail: a
+    /// drag between blueprints in harness ui.
+    /// </summary>
+    public TaskRecord MoveToBlueprint(
+        string id,
+        string blueprint,
+        string by,
+        CancellationToken cancellationToken = default
+    ) =>
+        database.WithTransaction(
+            (c, t) =>
+            {
+                var task = Get(c, t, id);
+                var to = blueprint.Trim();
+                var from = task.Definition.Blueprint;
+                if (to == from)
+                {
+                    return task;
+                }
+
+                if (to.Length is not 0 && !BlueprintIds(c, t).Contains(to))
+                {
+                    throw new ArgumentException($"unknown blueprint {to}");
+                }
+
+                var stamp = Stamp();
+                Execute(
+                    c,
+                    t,
+                    "UPDATE tasks SET blueprint=$to,updated_at=$stamp WHERE id=$id",
+                    ("$to", to),
+                    ("$stamp", stamp),
+                    ("$id", task.Id)
+                );
+                AddEvent(
+                    c,
+                    t,
+                    task.Id,
+                    "moved",
+                    task.Status,
+                    task.Status,
+                    by,
+                    $"moved from {(from.Length is 0 ? "no blueprint" : from)} to {(to.Length is 0 ? "no blueprint" : to)}",
+                    stamp
+                );
+                return Get(c, t, task.Id);
+            },
+            cancellationToken
+        );
+
     private static List<(string Id, string Status)> BlueprintTaskStates(
         SqliteConnection c,
         SqliteTransaction t,

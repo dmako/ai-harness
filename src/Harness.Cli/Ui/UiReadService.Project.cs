@@ -45,6 +45,9 @@ internal sealed partial class UiReadService
         {
             "context" => UiJson.Node(telemetry.ContextStats(DateTimeOffset.UtcNow.AddDays(-Days(request)))),
             "metrics" => UiJson.Node(telemetry.Metrics(DateTimeOffset.UtcNow.AddDays(-Days(request)))),
+            "trends" => UiJson.Node(
+                new JsonObjectMap { ["days"] = telemetry.Trends(Days(request), DateTimeOffset.UtcNow) }
+            ),
             "report" => await ReportAsync(project, database, request, token),
             "providers" => await ProvidersAsync(project, database, request, token),
             "hooks" => await HooksAsync(project, database, token),

@@ -537,6 +537,112 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task RingsTrendKnowledgeIsAddedTelemetryToggledATaskDraggedAndAFixRun()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.CreateBlueprint(new("M1", "First"), "test", Token);
+        tasks.Create(new TaskDefinition { Id = "UI-0001", Title = "Done today" }, "", origin, Token);
+        var claim = tasks.Claim("UI-0001", new("claude"), cancellationToken: Token);
+        tasks.Complete("UI-0001", new("claude", claim.Token), new("done"), Token);
+        tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "To drag" }, "", origin, Token);
+        tasks.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0003",
+                Title = "Already in M1",
+                Blueprint = "M1",
+            },
+            "",
+            origin,
+            Token
+        );
+        // Claude Code has run once on this machine: its user config exists, for harness install to add to
+        var claude = Path.Combine(fixture.DirectoryRoot, "claude", ".claude.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(claude)!);
+        await File.WriteAllTextAsync(claude, "{}", Token);
+        static string Click(string text) =>
+            $"[...document.querySelectorAll('button')].find(b => b.textContent === '{text}').click()";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/overview" }
+                );
+                // a task done today: the tasks ring carries its trend
+                await page.WaitAsync("!!document.querySelector('.ringlegend li[data-r=r-tasks] .rspark')");
+
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/knowledge'");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'Add knowledge')"
+                );
+                await page.EvaluateAsync(Click("Add knowledge"));
+                await page.WaitAsync("!!document.querySelector('textarea[name=content]')");
+                await page.EvaluateAsync(
+                    "document.querySelector('textarea[name=content]').value = 'Added from the knowledge page'"
+                );
+                await page.EvaluateAsync(Click("Add"));
+                await ProviderFixture.EventuallyAsync(() =>
+                    new MemoryStore(database)
+                        .Search(new() { Text = "Added from the knowledge page" }, Token)
+                        .Any(m => m.Source.Type is "user")
+                );
+
+                await page.EvaluateAsync("location.hash = '#/machine'");
+                await page.WaitAsync("!!document.querySelector('.telcard .switch')");
+                await page.EvaluateAsync("document.querySelector('.telcard .switch').click()");
+                await page.WaitAsync("!!document.querySelector('input[aria-label=\"Collector endpoint\"]')");
+                await page.EvaluateAsync(
+                    "document.querySelector('input[aria-label=\"Collector endpoint\"]').value = 'http://127.0.0.1:9/v1/report'"
+                );
+                await page.EvaluateAsync(Click("Turn on"));
+                await page.WaitAsync(
+                    "document.querySelector('.telcard .switch')?.getAttribute('aria-checked') === 'true'"
+                );
+                await page.EvaluateAsync("document.querySelector('.telcard .switch').click()");
+                await page.WaitAsync(
+                    "document.querySelector('.telcard .switch')?.getAttribute('aria-checked') === 'false'"
+                );
+
+                // a task dropped on another blueprint's group moves there
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/work/tasks'");
+                await page.WaitAsync("!!document.querySelector('#task-UI-0002 .trow')");
+                await page.EvaluateAsync(
+                    """
+                    (() => {
+                      const dt = new DataTransfer();
+                      const row = document.querySelector('#task-UI-0002 .trow');
+                      const target = [...document.querySelectorAll('section.mstone')].find(s => s.querySelector('.mname')?.textContent.startsWith('M1'));
+                      row.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }));
+                      target.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+                      target.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+                    })()
+                    """
+                );
+                await ProviderFixture.EventuallyAsync(() => tasks.Get("UI-0002", Token).Definition.Blueprint is "M1");
+
+                // Health's Fix it runs the client check's own fix
+                await page.EvaluateAsync("location.hash = '#/p/" + id + "/health'");
+                const string ClaudeFix =
+                    "[...document.querySelectorAll('.chk')].find(c => c.querySelector('.cname')?.textContent.startsWith('claude-code'))?.querySelector('.fixbtn')";
+                await page.WaitAsync($"!!{ClaudeFix}");
+                await page.EvaluateAsync($"{ClaudeFix}.click()");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('harness install --client claude-code done'))"
+                );
+                (await File.ReadAllTextAsync(claude, Token)).Should().Contain("harness");
+            }
+        );
+    }
+
+    [Fact]
     public async Task EveryPageLoadsWithoutAScriptError()
     {
         var executable = Browser();
