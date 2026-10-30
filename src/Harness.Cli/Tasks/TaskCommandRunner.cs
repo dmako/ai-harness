@@ -471,7 +471,7 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                 Type = settings.Type,
                 Priority = settings.Priority,
                 Blueprint = settings.Blueprint,
-                DependsOn = Split(settings.Depends).Select(dependency => dependency.ToUpperInvariant()).ToArray(),
+                DependsOn = Split(settings.Depends).Select(TaskWorkflow.NormalizeDependency).ToArray(),
                 Scope = Split(settings.Scope),
                 Acceptance = settings
                     .Accept.Select(criterion => criterion.Trim())

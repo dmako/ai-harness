@@ -186,6 +186,25 @@ public static partial class TaskWorkflow
 
     public static bool ValidId(string id) => IdPattern.IsMatch(id);
 
+    /// <summary>A dependency on another project's task, written &lt;project&gt;:&lt;task id&gt;.</summary>
+    public static bool External(string dependency, out string project, out string id)
+    {
+        var colon = dependency.IndexOf(':', StringComparison.Ordinal);
+        project = colon > 0 ? dependency[..colon].Trim() : "";
+        id = colon > 0 ? dependency[(colon + 1)..].Trim() : "";
+        return project.Length is not 0 && id.Length is not 0;
+    }
+
+    /// <summary>A dependency as stored: task ids in capitals, another project's name as written.</summary>
+    public static string NormalizeDependency(string dependency) =>
+        External(dependency, out var project, out var id)
+            ? project + ":" + id.ToUpperInvariant()
+            : dependency.Trim().ToUpperInvariant();
+
+    /// <summary>The dependencies on this project's own tasks.</summary>
+    public static IReadOnlyList<string> Local(IEnumerable<string> dependencies) =>
+        dependencies.Where(d => !External(d, out _, out _)).ToArray();
+
     public static string ParseStatus(string value)
     {
         return Statuses.FirstOrDefault(s => string.Equals(s, value.Trim(), StringComparison.OrdinalIgnoreCase))

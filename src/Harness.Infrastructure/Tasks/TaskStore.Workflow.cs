@@ -44,7 +44,7 @@ public sealed partial class TaskStore
             throw new InvalidOperationException($"{d.Id}: task already exists");
         }
 
-        if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+        if (TaskWorkflow.Local(d.DependsOn).FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
         {
             throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
         }
@@ -148,12 +148,12 @@ public sealed partial class TaskStore
                 ).Normalize();
                 d.Validate();
                 var (existing, edges) = LoadGraph(c, t);
-                if (d.DependsOn.FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
+                if (TaskWorkflow.Local(d.DependsOn).FirstOrDefault(dep => !existing.Contains(dep)) is { } missing)
                 {
                     throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
                 }
 
-                edges[d.Id] = d.DependsOn;
+                edges[d.Id] = TaskWorkflow.Local(d.DependsOn);
                 if (FindCycle(edges) is { } cycle)
                 {
                     throw new ArgumentException("dependency cycle: " + string.Join(" -> ", cycle));

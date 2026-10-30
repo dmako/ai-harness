@@ -81,7 +81,7 @@ public sealed class McpProcessTests
             }
 
             using var database = HarnessDatabase.OpenReadOnly(path);
-            database.SchemaVersion().Should().Be(21);
+            database.SchemaVersion().Should().Be(22);
             database.GetDiagnostic("Unicode 🧪").Should().Be("žluťoučký");
             errors.Should().NotContain(line => line.Contains("Unhandled exception", StringComparison.Ordinal));
         }

@@ -572,6 +572,7 @@ public sealed partial class TaskStore
         string[] statements =
         [
             "DELETE FROM task_dependencies WHERE task_id=$id OR depends_on=$id",
+            "DELETE FROM task_external_dependencies WHERE task_id=$id",
             "DELETE FROM task_acceptance WHERE task_id=$id",
             "DELETE FROM task_events WHERE task_id=$id",
             "DELETE FROM tasks WHERE id=$id",

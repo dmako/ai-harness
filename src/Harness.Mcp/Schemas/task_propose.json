@@ -40,7 +40,7 @@
         "items": {
           "type": "string"
         },
-        "description": "ids of tasks it waits for"
+        "description": "ids of tasks it waits for; another project's task as <project>:<task id> (a registered project's short name, folder, parent/folder or id)"
       },
       "scope": {
         "type": [

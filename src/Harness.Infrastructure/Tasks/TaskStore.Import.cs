@@ -27,15 +27,19 @@ public sealed partial class TaskStore
             (c, t) =>
             {
                 var (existing, edges) = LoadGraph(c, t);
+                // a dependency on another project's task is no edge here
                 foreach (var d in defs)
                 {
-                    edges[d.Id] = d.DependsOn;
+                    edges[d.Id] = TaskWorkflow.Local(d.DependsOn);
                 }
 
                 foreach (var d in defs)
                 {
                     if (
-                        d.DependsOn.FirstOrDefault(dep => !seen.Contains(dep) && !existing.Contains(dep)) is { } missing
+                        TaskWorkflow
+                            .Local(d.DependsOn)
+                            .FirstOrDefault(dep => !seen.Contains(dep) && !existing.Contains(dep)) is
+                        { } missing
                     )
                     {
                         throw new ArgumentException($"{d.Id} depends on unknown task {missing}");
@@ -332,10 +336,11 @@ public sealed partial class TaskStore
         return true;
     }
 
-    private static void ReplaceDependencies(SqliteConnection c, SqliteTransaction t, TaskDefinition d)
+    private void ReplaceDependencies(SqliteConnection c, SqliteTransaction t, TaskDefinition d)
     {
+        ReplaceExternal(c, t, d);
         Execute(c, t, "DELETE FROM task_dependencies WHERE task_id=$id", ("$id", d.Id));
-        foreach (var dep in d.DependsOn)
+        foreach (var dep in TaskWorkflow.Local(d.DependsOn))
         {
             Execute(
                 c,

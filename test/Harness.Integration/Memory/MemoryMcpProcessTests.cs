@@ -22,7 +22,7 @@ public sealed class MemoryMcpProcessTests
                 )
             )
             {
-                database.SchemaVersion().Should().Be(21);
+                database.SchemaVersion().Should().Be(22);
             }
 
             await using var claude = await StartAsync(root, "claude-code");

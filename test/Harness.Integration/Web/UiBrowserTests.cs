@@ -917,6 +917,66 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task DependencySearchOffersTheWorkspacesOtherProjectsTasks()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var theirs = await Harness.Integration.Tasks.ExternalDependencyTests.TheirsAsync(fixture);
+        var projects = fixture.Lifecycle.Registry.Load()["projects"]!.AsArray();
+        var mine = UiWriteTests.ProjectId(fixture);
+        var other = projects.Single(p => p!["name"]?.GetValue<string>() == "theirs")!["id"]!.GetValue<string>();
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync("Page.navigate", new { url = server.Client.BaseAddress + "#/" });
+                await page.WaitAsync("!!document.querySelector('#main h2, #main .card')");
+                await page.EvaluateAsync(
+                    $$"""
+                    fetch('/api/workspaces', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Harness-UI': '1' },
+                      body: JSON.stringify({ name: 'both', project_ids: ['{{mine}}', '{{other}}'] }) })
+                    """
+                );
+                await Task.Delay(500, Token);
+                await page.EvaluateAsync("location.hash = '#/p/" + mine + "/work/tasks'; location.reload()");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'New task…')"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'New task…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('dialog[open] input[aria-label=\"Depends on\"]')");
+                await page.EvaluateAsync(
+                    "document.querySelector('dialog[open] input[aria-label=Title]').value = 'Waits for theirs'"
+                );
+                await page.EvaluateAsync(
+                    "document.querySelector('dialog[open] input[aria-label=\"Depends on\"]').dispatchEvent(new FocusEvent('focus'))"
+                );
+                const string Theirs =
+                    "[...document.querySelectorAll('dialog[open] .tpopt')].find(o => o.textContent.includes('OT-0001'))";
+                await page.WaitAsync($"!!({Theirs})");
+                (await ValueAsync(page, "document.querySelector('dialog[open] .tphead')?.textContent"))
+                    .Should()
+                    .Contain("other projects");
+                await page.EvaluateAsync($"({Theirs}).click()");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent === 'Add the task').click()"
+                );
+                using var database = fixture.Database();
+                var tasks = new TaskStore(database);
+                await ProviderFixture.EventuallyAsync(
+                    () => tasks.List(cancellationToken: Token).Any(t => t.Definition.Title == "Waits for theirs"),
+                    TimeSpan.FromSeconds(15)
+                );
+                var task = tasks.List(cancellationToken: Token).Single(t => t.Definition.Title == "Waits for theirs");
+                task.Definition.DependsOn.Should().Equal("theirs:OT-0001");
+                task.Status.Should().Be("backlog", "their task is not done");
+            }
+        );
+    }
+
+    [Fact]
     public async Task EveryPageLoadsWithoutAScriptError()
     {
         var executable = Browser();

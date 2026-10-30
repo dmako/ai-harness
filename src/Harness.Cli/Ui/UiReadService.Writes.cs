@@ -285,7 +285,7 @@ internal sealed partial class UiReadService : IUiWriteApi
             Blueprint = fields.Text("blueprint").Trim(),
             DependsOn = fields
                 .List("depends_on")
-                .Select(s => s.Trim().ToUpperInvariant())
+                .Select(TaskWorkflow.NormalizeDependency)
                 .Where(s => s.Length > 0)
                 .ToArray(),
             Acceptance = Clean(fields.List("acceptance")),
