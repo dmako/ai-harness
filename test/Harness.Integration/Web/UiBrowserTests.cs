@@ -634,10 +634,19 @@ public sealed class UiBrowserTests
                     "[...document.querySelectorAll('.chk')].find(c => c.querySelector('.cname')?.textContent.startsWith('claude-code'))?.querySelector('.fixbtn')";
                 await page.WaitAsync($"!!{ClaudeFix}");
                 await page.EvaluateAsync($"{ClaudeFix}.click()");
-                await page.WaitAsync(
-                    "[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('harness install --client claude-code done'))"
-                );
-                (await File.ReadAllTextAsync(claude, Token)).Should().Contain("harness");
+                // the install runs as its own process; its toast lasts two seconds, so the config is what is waited for
+                bool Installed()
+                {
+                    try
+                    {
+                        return File.ReadAllText(claude).Contains("harness", StringComparison.Ordinal);
+                    }
+                    catch (IOException)
+                    {
+                        return false; // being written
+                    }
+                }
+                await ProviderFixture.EventuallyAsync(Installed, TimeSpan.FromSeconds(60));
             }
         );
     }
@@ -679,6 +688,232 @@ public sealed class UiBrowserTests
                 tasks.List(new(), Token).Should().BeEmpty();
             }
         );
+    }
+
+    /// <summary>
+    /// Every page, at a desktop and a phone width, dark and light, with every fold closed and open, passes the Go
+    /// harness's layout and accessibility checks (checks.js: overflow, overlapping or clipped text, squeezed columns,
+    /// controls under 24 px, contrast under WCAG AA, sections showing an error) and raises no script error.
+    /// </summary>
+    [Fact]
+    public async Task EveryPagePassesTheUiChecksInBothThemesAtBothWidths()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "example.csproj",
+            """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"""
+        );
+        fixture.Write(
+            "Router.cs",
+            "namespace Example;\npublic class Router\n{\n    public int Huge(int a)\n    {\n"
+                + string.Concat(Enumerable.Repeat("        if (a > 0) { a--; }\n", 29))
+                + "        return a;\n    }\n}\n"
+        );
+        await fixture.CommitAsync("a project");
+        await fixture.RunAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            var origin = new TaskOrigin("test", "test", "fixture");
+            tasks.CreateBlueprint(new("M1", "First", "What it is for", ["it is done"]), "test", Token);
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0001",
+                    Title = "A task in the blueprint",
+                    Goal = "Its goal",
+                    Blueprint = "M1",
+                    Acceptance = ["checked"],
+                },
+                "",
+                origin,
+                Token
+            );
+            tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "A loose task" }, "", origin, Token);
+            tasks.Propose(
+                new TaskDefinition
+                {
+                    Title = "A proposed task",
+                    Goal = "Found while working",
+                    Acceptance = ["it works"],
+                },
+                "seen",
+                "codex",
+                Token
+            );
+            new MemoryStore(database).Put(
+                new()
+                {
+                    Type = "decision",
+                    Content = "The router stays small",
+                    Source = new("user", "test", "test"),
+                },
+                Token
+            );
+        }
+
+        string checks;
+        using (var stream = typeof(UiBrowserTests).Assembly.GetManifestResourceStream("checks.js")!)
+        using (var reader = new StreamReader(stream))
+        {
+            checks = await reader.ReadToEndAsync(Token);
+        }
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync("Page.enable", new { });
+                await page.CommandAsync(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    new
+                    {
+                        source = """
+                        window.__errors = [];
+                        addEventListener('error', (e) => window.__errors.push(String(e.message || e.error)));
+                        addEventListener('unhandledrejection', (e) => window.__errors.push('rejected: ' + String(e.reason && (e.reason.stack || e.reason))));
+                        """,
+                    }
+                );
+                var root = server.Client.BaseAddress!.ToString().TrimEnd('/');
+                await page.CommandAsync("Page.navigate", new { url = root + "/#/" });
+                await page.WaitAsync("!!document.querySelector('#main h2, #main .card')");
+                await page.EvaluateAsync(
+                    $$"""
+                    fetch('/api/workspaces', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Harness-UI': '1' },
+                      body: JSON.stringify({ name: 'pages', project_ids: ['{{id}}'] }) })
+                    """
+                );
+                await Task.Delay(500, Token);
+                List<string> pages = ["", "search", "knowledge", "machine", "docs"];
+                pages.AddRange(
+                    new[]
+                    {
+                        "overview",
+                        "architecture",
+                        "architecture/layers",
+                        "architecture/complexity",
+                        "architecture/coupling",
+                        "knowledge",
+                        "knowledge/inbox",
+                        "work",
+                        "work/tasks",
+                        "work/inbox",
+                        "agents",
+                        "agents/tools",
+                        "health",
+                    }.Select(view => $"p/{id}/{view}")
+                );
+                pages.AddRange(
+                    new[]
+                    {
+                        "overview",
+                        "architecture",
+                        "architecture/build",
+                        "architecture/libraries",
+                        "knowledge",
+                        "issues",
+                        "issues/versions",
+                        "members",
+                    }.Select(view => "w/pages/" + view)
+                );
+                List<string> faults = [];
+                foreach (var theme in new[] { "dark", "light" })
+                {
+                    foreach (var width in new[] { 1400, 390 })
+                    {
+                        await page.CommandAsync(
+                            "Emulation.setDeviceMetricsOverride",
+                            new
+                            {
+                                width,
+                                height = 900,
+                                deviceScaleFactor = 1,
+                                mobile = width < 600,
+                            }
+                        );
+                        await page.CommandAsync(
+                            "Emulation.setEmulatedMedia",
+                            new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                        );
+                        foreach (var path in pages)
+                        {
+                            var at = $"{path} {width} {theme}";
+                            await page.CommandAsync("Page.navigate", new { url = "about:blank" });
+                            await page.CommandAsync("Page.navigate", new { url = root + "/#/" + path });
+                            if (!await SettleAsync(page))
+                            {
+                                faults.Add(at + ": still loading after 20 s");
+                            }
+                            var closed = await ChecksAsync(page, checks);
+                            await page.EvaluateAsync(
+                                "document.querySelectorAll('details').forEach((d) => { d.open = true; })"
+                            );
+                            await SettleAsync(page);
+                            var open = await ChecksAsync(page, checks);
+                            faults.AddRange(
+                                closed
+                                    .Concat(open.Except(closed).Select(f => f + " (with every fold open)"))
+                                    .Select(f => $"{at}: {f}")
+                            );
+                            var errors = await ValueAsync(page, "(window.__errors || ['no error log']).join(' | ')");
+                            if (errors.Length > 0)
+                            {
+                                faults.Add($"{at}: script error {errors}");
+                            }
+                        }
+                    }
+                }
+
+                faults.Should().BeEmpty(string.Join("\n", faults.Take(60)));
+
+                // the checks do report: a control too small to hit
+                await page.EvaluateAsync(
+                    "document.body.append(Object.assign(document.createElement('button'), { textContent: 'x', style: 'width:10px;height:10px;padding:0' }))"
+                );
+                (await ChecksAsync(page, checks))
+                    .Should()
+                    .Contain(f => f.StartsWith("small-target", StringComparison.Ordinal));
+            }
+        );
+    }
+
+    /// <summary>The page has loaded, its sections drawn and its fonts in, twice in a row; false after 20 s.</summary>
+    private static async Task<bool> SettleAsync(BrowserPage page)
+    {
+        await Task.Delay(400, Token);
+        var still = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ready = await ValueAsync(
+                page,
+                "document.readyState === 'complete' && !document.querySelector('.loadbar') && !document.getElementById('splash') && document.fonts.status === 'loaded'"
+            );
+            still = ready is "True" ? still + 1 : 0;
+            if (still >= 2)
+            {
+                return true;
+            }
+            await Task.Delay(250, Token);
+        }
+        return false;
+    }
+
+    /// <summary>The checks' faults on the page as it is: rule, element, its text and the detail.</summary>
+    private static async Task<IReadOnlyList<string>> ChecksAsync(BrowserPage page, string checks)
+    {
+        var json = await ValueAsync(page, "JSON.stringify(" + checks.Trim().TrimEnd(';') + ")");
+        using var document = JsonDocument.Parse(json);
+        return document
+            .RootElement.EnumerateArray()
+            .Select(f =>
+                $"{f.GetProperty("rule").GetString()} {f.GetProperty("el").GetString()} \"{f.GetProperty("text").GetString()}\" {f.GetProperty("detail").GetString()}"
+            )
+            .ToArray();
     }
 
     [Fact]

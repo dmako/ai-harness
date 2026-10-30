@@ -18,5 +18,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="AwesomeAssertions" />
     <Compile Remove="Storage/Worker/**/*.cs" />
+    <!-- the Go harness's layout and accessibility checks (cmd/harness-uicheck/checks.js at 283e6ab), unchanged -->
+    <EmbeddedResource Include="Web/checks.js" LogicalName="checks.js" />
   </ItemGroup>
 </Project>
