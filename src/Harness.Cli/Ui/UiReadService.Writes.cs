@@ -99,6 +99,7 @@ internal sealed partial class UiReadService : IUiWriteApi
         return endpoint switch
         {
             "memories" => AddMemory(store, request.Body, token),
+            "tasks/{tid}/delete" => DeleteTask(database, request, token),
             "tasks/{tid}/blueprint" => UiJson.Node(
                 new JsonObjectMap
                 {
@@ -154,6 +155,14 @@ internal sealed partial class UiReadService : IUiWriteApi
             ),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
+    }
+
+    // Deleting a task is harness ui's only; the body is empty.
+    private static JsonNode? DeleteTask(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
+    {
+        _ = new UiWriteBody(request.Body);
+        new TaskStore(database).DeleteTask(request.Route.Value("tid"), token);
+        return UiJson.Node(new JsonObjectMap { ["deleted"] = request.Route.Value("tid") });
     }
 
     private static JsonNode? CorrectMemory(

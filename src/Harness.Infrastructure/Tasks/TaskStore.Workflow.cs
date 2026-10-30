@@ -67,6 +67,53 @@ public sealed partial class TaskStore
     }
 
     /// <summary>
+    /// Deletes a task with its acceptance criteria, dependencies and audit trail: harness ui's only (no command or
+    /// agent tool deletes). Refused while it is claimed or while other tasks depend on it, naming them.
+    /// </summary>
+    public void DeleteTask(string id, CancellationToken cancellationToken = default) =>
+        database.WithTransaction(
+            (c, t) =>
+            {
+                var task = Get(c, t, id);
+                if (TaskWorkflow.HoldsClaim(task.Status))
+                {
+                    throw new InvalidOperationException(
+                        $"{task.Id} is {task.Status.Replace('_', ' ')}: release the claim before deleting it"
+                    );
+                }
+
+                List<string> dependents = [];
+                using (
+                    var command = Command(
+                        c,
+                        t,
+                        "SELECT task_id FROM task_dependencies WHERE depends_on=$id ORDER BY task_id",
+                        ("$id", task.Id)
+                    )
+                )
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        dependents.Add(reader.GetString(0));
+                    }
+                }
+
+                if (dependents.Count is not 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{task.Id} cannot be deleted: {string.Join(", ", dependents)} depend{(dependents.Count is 1 ? "s" : "")} on it"
+                    );
+                }
+
+                DeleteTasks(c, t, [task.Id], task.Definition.Blueprint, "", Stamp());
+                RecomputeReadiness(c, t);
+                return 0;
+            },
+            cancellationToken
+        );
+
+    /// <summary>
     /// Restates an unclaimed (ready or backlog) task's definition. Its id, validation and notes stay; once claimed,
     /// the definition is what the claimant works to.
     /// </summary>

@@ -17,6 +17,7 @@ public static class UiRoutes
         "/api/projects/{id}/tasks",
         "/api/projects/{id}/tasks/{tid}/edit",
         "/api/projects/{id}/tasks/{tid}/blueprint",
+        "/api/projects/{id}/tasks/{tid}/delete",
         "/api/projects/{id}/memories",
         "/api/projects/{id}/fix",
         "/api/telemetry",

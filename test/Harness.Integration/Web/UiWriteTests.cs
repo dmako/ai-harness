@@ -685,6 +685,54 @@ public sealed class UiWriteTests
         (await RefusedAsync(root + "/fix", """{"check":"config"}""")).Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task TaskIsDeletedFromTheUiUnlessAnotherDependsOnIt()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        var origin = new TaskOrigin("test", "test", "fixture");
+        tasks.Create(new TaskDefinition { Id = "UI-0001", Title = "Needed" }, "", origin, Token);
+        tasks.Create(
+            new TaskDefinition
+            {
+                Id = "UI-0002",
+                Title = "Waits",
+                DependsOn = ["UI-0001"],
+            },
+            "",
+            origin,
+            Token
+        );
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}/tasks";
+
+        using (var request = Request(server.Client, root + "/UI-0001/delete", "{}"))
+        using (var response = await server.Client.SendAsync(request, Token))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            JsonNode.Parse(await response.Content.ReadAsStringAsync(Token))!["error"]!
+                .GetValue<string>()
+                .Should()
+                .Be("UI-0001 cannot be deleted: UI-0002 depends on it");
+        }
+        using (var request = Request(server.Client, root + "/UI-0002/delete", """{"force":true}"""))
+        using (var response = await server.Client.SendAsync(request, Token))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "the body is empty");
+        }
+
+        (await PostAsync(server.Client, root + "/UI-0002/delete", "{}"))["deleted"]!
+            .GetValue<string>()
+            .Should()
+            .Be("UI-0002");
+        (await PostAsync(server.Client, root + "/UI-0001/delete", "{}"))["deleted"]!
+            .GetValue<string>()
+            .Should()
+            .Be("UI-0001");
+        tasks.List(new(), Token).Should().BeEmpty();
+    }
+
     internal static string ProjectId(SyncFixture fixture) =>
         fixture.Lifecycle.Registry.Load()["projects"]![0]!["id"]!.GetValue<string>();
 

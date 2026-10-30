@@ -288,6 +288,66 @@ public sealed class TaskStoreTests
     }
 
     [Fact]
+    public void TaskIsDeletedWithItsCriteriaEdgesAndTrailUnlessClaimedOrDependedOn()
+    {
+        using var s = new State();
+        s.Store.Import(
+            [
+                new TaskDefinition { Id = "T-1", Title = "Base" },
+                new TaskDefinition
+                {
+                    Id = "T-2",
+                    Title = "Gone",
+                    Acceptance = ["one", "two"],
+                    DependsOn = ["T-1"],
+                },
+                new TaskDefinition
+                {
+                    Id = "T-3",
+                    Title = "Waits",
+                    DependsOn = ["T-4"],
+                },
+                new TaskDefinition { Id = "T-4", Title = "Needed" },
+            ],
+            "fixture",
+            cancellationToken: Token
+        );
+        // the task's rows: itself, its criteria, its edges either way, its audit trail
+        long[] Rows(string id)
+        {
+            using var connection = s.Database.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT (SELECT COUNT(*) FROM tasks WHERE id=$id),(SELECT COUNT(*) FROM task_acceptance WHERE task_id=$id),
+                (SELECT COUNT(*) FROM task_dependencies WHERE task_id=$id OR depends_on=$id),(SELECT COUNT(*) FROM task_events WHERE task_id=$id)
+                """;
+            command.Parameters.AddWithValue("$id", id);
+            using var reader = command.ExecuteReader();
+            reader.Read();
+            return [reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3)];
+        }
+
+        Rows("T-2").Should().OnlyContain(n => n > 0);
+        s.Store.DeleteTask("T-2", Token);
+        Rows("T-2").Should().Equal(0, 0, 0, 0);
+        s.Store.Get("T-1", Token).Status.Should().Be("ready", "what it depended on stays");
+
+        FluentActions
+            .Invoking(() => s.Store.DeleteTask("T-4", Token))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("T-4 cannot be deleted: T-3 depends on it");
+        s.Store.Claim("T-1", new("claude"), cancellationToken: Token);
+        FluentActions
+            .Invoking(() => s.Store.DeleteTask("T-1", Token))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("T-1 is claimed: release the claim before deleting it");
+        FluentActions.Invoking(() => s.Store.DeleteTask("T-404", Token)).Should().Throw<KeyNotFoundException>();
+        Rows("T-4")[0].Should().Be(1, "a refused delete changes nothing");
+    }
+
+    [Fact]
     public void BlueprintsAreCreatedEditedAndRemovedWithTheirTasksMovedOrDeleted()
     {
         using var s = new State();

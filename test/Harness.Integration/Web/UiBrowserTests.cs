@@ -643,6 +643,45 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task TaskIsDeletedFromItsRowAfterTheDialogSaysWhatGoes()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        tasks.Create(
+            new TaskDefinition { Id = "UI-0001", Title = "To delete" },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/tasks" }
+                );
+                await page.WaitAsync("!!document.querySelector('#task-UI-0001 .rowdel')");
+                await page.EvaluateAsync("document.querySelector('#task-UI-0001 .rowdel').click()");
+                await page.WaitAsync("!!document.querySelector('dialog[open] .dchanges')");
+                (await ValueAsync(page, "document.querySelector('dialog[open]').textContent"))
+                    .Should()
+                    .Contain("Delete UI-0001?")
+                    .And.Contain("'harness tasks export' writes the deletion into the file");
+                tasks.List(new(), Token).Should().ContainSingle("nothing goes before it is confirmed");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent === 'Delete task').click()"
+                );
+                await page.WaitAsync("!document.querySelector('#task-UI-0001')");
+                tasks.List(new(), Token).Should().BeEmpty();
+            }
+        );
+    }
+
+    [Fact]
     public async Task EveryPageLoadsWithoutAScriptError()
     {
         var executable = Browser();
