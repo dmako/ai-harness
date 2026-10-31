@@ -100,7 +100,12 @@ internal sealed partial class UiReadService : IUiWriteApi
         var written = endpoint switch
         {
             "memories" => AddMemory(store, request.Body, token),
-            "memories/{mid}/share" or "memories/{mid}/withdraw" => ShareMemory(database, root, request, token),
+            "memories/{mid}/share" or "memories/{mid}/withdraw" => await ShareMemoryAsync(
+                database,
+                root,
+                request,
+                token
+            ),
             "tasks/{tid}/delete" => DeleteTask(database, request, token),
             "tasks/{tid}/blueprint" => UiJson.Node(
                 new JsonObjectMap
@@ -179,7 +184,7 @@ internal sealed partial class UiReadService : IUiWriteApi
     }
 
     // Sharing writes .harness/knowledge.toml at once; committing it stays with Git. The body is empty.
-    private static JsonNode? ShareMemory(
+    private static async Task<JsonNode?> ShareMemoryAsync(
         HarnessDatabase database,
         string root,
         UiWriteRequest request,
@@ -192,11 +197,15 @@ internal sealed partial class UiReadService : IUiWriteApi
         var memory = shared
             ? SharedKnowledgeSync.Share(database, root, id, HumanActor.Current(), token)
             : SharedKnowledgeSync.Withdraw(database, root, id, HumanActor.Current(), token);
+        // a rule ignoring the file keeps it from the team: say so where the author shared it
+        var rule = shared ? await SharedKnowledgeSync.IgnoreRuleAsync(root, token) : "";
         return UiJson.Node(
             new JsonObjectMap
             {
                 ["memory"] = MemoryViews.Memory(memory),
                 ["shared"] = shared ? SharedState.Project : SharedState.Local,
+                ["warning"] = rule.Length is 0 ? null : SharedKnowledgeSync.Ignored(rule),
+                ["fix"] = rule.Length is 0 ? null : SharedKnowledgeSync.IgnoreFix,
             }
         );
     }

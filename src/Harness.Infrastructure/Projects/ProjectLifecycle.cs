@@ -203,6 +203,11 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
 
         var location = new ProjectLocation(root, state, loaded.Value.ResolveDatabasePath(state), repository, loaded);
         var inspection = new ProjectInspection(location, head, gitError, configError);
+        if (repository is not null && File.Exists(Memory.SharedKnowledgeSync.PathIn(root)))
+        {
+            inspection = inspection with { Knowledge = await KnowledgeCheckAsync(repository, cancellationToken) };
+        }
+
         if (!location.Initialized)
         {
             return inspection;
@@ -256,5 +261,32 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         }
 
         return inspection;
+    }
+
+    /// <summary>Sharing knowledge needs Git to carry .harness/knowledge.toml; a rule ignoring it keeps it local.</summary>
+    private static async Task<HealthCheck> KnowledgeCheckAsync(GitRepository repository, CancellationToken token)
+    {
+        try
+        {
+            var rule = await repository
+                .IgnoreRuleAsync(".harness/" + Memory.KnowledgeFile.FileName, token)
+                .ConfigureAwait(false);
+            return rule.Length is 0
+                ? new("knowledge", "ok", ".harness/knowledge.toml is shared through Git")
+                : new(
+                    "knowledge",
+                    "warn",
+                    Memory.SharedKnowledgeSync.Ignored(rule),
+                    Memory.SharedKnowledgeSync.IgnoreFix
+                );
+        }
+        catch (IOException error)
+        {
+            return new(
+                "knowledge",
+                "warn",
+                "cannot tell whether Git ignores .harness/knowledge.toml: " + error.Message
+            );
+        }
     }
 }

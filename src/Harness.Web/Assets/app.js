@@ -3689,7 +3689,7 @@ function healthReport(r, p, reload) {
   // Checks by area; what is wrong first, with its fix, then the passing
   // ones as a compact grid (the detail on hover and a second line).
   const AREA = { binary: "Installation", config: "Installation", permissions: "Installation",
-    git: "Project", project: "Project", storage: "Project", database: "Project", "claude-code": "Agents' clients", codex: "Agents' clients" };
+    git: "Project", project: "Project", storage: "Project", database: "Project", knowledge: "Project", "claude-code": "Agents' clients", codex: "Agents' clients" };
   const check = (c) => {
     // a failing check's detail without the file it read: that is on hover
     const at = c.level !== "ok" && /\s*\((?:checked|read|in) ([^)]+)\)/.exec(c.detail || "");

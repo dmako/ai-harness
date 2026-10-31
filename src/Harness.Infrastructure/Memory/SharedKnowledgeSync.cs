@@ -158,6 +158,37 @@ public static class SharedKnowledgeSync
         store.MarkProject(shared, cancellationToken);
     }
 
+    /// <summary>How to keep only the database out of Git when an ignore rule hides the shared file.</summary>
+    public const string IgnoreFix =
+        "replace a '.harness/' rule in .gitignore with '.harness/*' followed by '!.harness/knowledge.toml', or drop "
+        + "it: .harness/.gitignore already keeps the database out of Git";
+
+    /// <summary>
+    /// The rule that makes Git ignore the shared file, as "source:line:pattern", typically a root .gitignore ignoring
+    /// the whole .harness folder (Git cannot re-include a file in an ignored directory). Empty when Git does not
+    /// ignore it, or outside Git.
+    /// </summary>
+    public static async Task<string> IgnoreRuleAsync(string worktreeRoot, CancellationToken cancellationToken)
+    {
+        Git.GitRepository repository;
+        try
+        {
+            repository = await Git.GitRepository.DiscoverAsync(worktreeRoot, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Git.NotRepositoryException)
+        {
+            return "";
+        }
+
+        return await repository
+            .IgnoreRuleAsync(".harness/" + KnowledgeFile.FileName, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>What an ignore rule means for sharing.</summary>
+    public static string Ignored(string rule) =>
+        $"Git ignores .harness/{KnowledgeFile.FileName} (rule {rule}): teammates do not get the shared knowledge";
+
     private static SharedKnowledge Readable(string path)
     {
         var file = KnowledgeFile.Read(path);

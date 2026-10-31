@@ -31,7 +31,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
 
             if (verb is "share" or "withdraw")
             {
-                return await ShareAsync(service, verb, settings, cancellationToken);
+                return await ShareAsync(service, location.Root, verb, settings, cancellationToken);
             }
 
             var detail = settings is MemoryRetireSettings retire
@@ -88,6 +88,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
 
     private async Task<int> ShareAsync(
         MemoryService service,
+        string root,
         string verb,
         MemoryIdSettings settings,
         CancellationToken cancellationToken
@@ -97,6 +98,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         var memory = shared
             ? await service.ShareAsync(settings.Id, HumanActor.Current(), cancellationToken)
             : await service.WithdrawAsync(settings.Id, HumanActor.Current(), cancellationToken);
+        var rule = shared ? await SharedKnowledgeSync.IgnoreRuleAsync(root, cancellationToken) : "";
         if (settings.Json)
         {
             await JsonAsync(
@@ -105,6 +107,8 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
                     ["memory"] = MemoryViews.Memory(memory),
                     ["shared"] = shared ? SharedState.Project : SharedState.Local,
                     ["file"] = ".harness/" + KnowledgeFile.FileName,
+                    ["warning"] = rule.Length is 0 ? null : SharedKnowledgeSync.Ignored(rule),
+                    ["fix"] = rule.Length is 0 ? null : SharedKnowledgeSync.IgnoreFix,
                 }
             );
             return 0;
@@ -118,6 +122,12 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         await output.WriteLineAsync(
             $"Commit .harness/{KnowledgeFile.FileName} to {(shared ? "share it with" : "withdraw it from")} the team."
         );
+        if (rule.Length is not 0)
+        {
+            await output.WriteLineAsync($"Warning: {SharedKnowledgeSync.Ignored(rule)}.");
+            await output.WriteLineAsync($"Fix: {SharedKnowledgeSync.IgnoreFix}.");
+        }
+
         return 0;
     }
 
