@@ -761,6 +761,9 @@ table.libpk .meter { min-width: 10rem; }
 .obars { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: var(--space-4); margin: var(--space-2) 0 var(--space-3); }
 .obars h5 { margin: 0 0 0.375rem; font-size: var(--text-sm); color: var(--ink-2); }
 .mem .scope.lvl { background: var(--accent-wash); color: var(--ink); }
+/* project knowledge shared through Git (C#-only) */
+.mem .prov .shared { padding: 0 0.375rem; border-radius: var(--radius-sm); background: var(--accent-wash); color: var(--ink); font-weight: 600; letter-spacing: 0.04em; }
+.mem .prov .shared.removed { background: none; border: 1px solid var(--warning); font-weight: 500; letter-spacing: 0; }
 .mem .overrides { margin-top: 0.375rem; font-size: var(--text-sm); color: var(--ink-2); }
 .mem .overrides::before { content: "⇅ "; color: var(--accent); }
 

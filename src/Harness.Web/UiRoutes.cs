@@ -9,6 +9,7 @@ public static class UiRoutes
         "/api/projects/{id}/memories/{mid}/promote",
         "/api/projects/{id}/memories/{mid}/share",
         "/api/projects/{id}/memories/{mid}/withdraw",
+        "/api/projects/{id}/memories/{mid}/keep",
         "/api/knowledge/memories",
         "/api/knowledge/memories/{mid}/supersede",
         "/api/knowledge/memories/{mid}/retire",

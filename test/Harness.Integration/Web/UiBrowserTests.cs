@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text.Json;
 using AwesomeAssertions;
+using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Tasks;
@@ -690,6 +691,91 @@ public sealed class UiBrowserTests
         );
     }
 
+    [Fact]
+    public async Task ProjectKnowledgeIsSharedAndWithdrawnAndRemovedMemoriesAreAnsweredInTheInbox()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var memories = new MemoryStore(database);
+        string Put(string content) =>
+            memories
+                .Put(
+                    new()
+                    {
+                        Type = "decision",
+                        Content = content,
+                        Source = new("user", "test", "test"),
+                    },
+                    Token
+                )
+                .Memory!.Id;
+        var local = Put("Knowledge cards can be shared");
+        var kept = Put("Pagination uses cursors");
+        var retired = Put("Exports run nightly at two");
+        memories.SetShared(kept, SharedState.Removed, Token);
+        memories.SetShared(retired, SharedState.Removed, Token);
+        string Card(string id) =>
+            $"[...document.querySelectorAll('article.mem')].find(a => a.querySelector('[title*=\"{id}\"]'))";
+        string Click(string id, string label) =>
+            $"[...{Card(id)}.querySelectorAll('button')].find(b => b.textContent === '{label}').click()";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var project = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + project + "/knowledge" }
+                );
+                await page.WaitAsync($"!!{Card(local)}");
+                (await ValueAsync(page, $"{Card(kept)}.querySelector('.shared.removed')?.textContent"))
+                    .Should()
+                    .Be("removed from project");
+
+                await page.EvaluateAsync(Click(local, "Share with project"));
+                await page.WaitAsync($"!!{Card(local)}.querySelector('form.aform')");
+                (await ValueAsync(page, $"{Card(local)}.querySelector('form.aform').textContent"))
+                    .Should()
+                    .Contain("writes it to .harness/knowledge.toml now");
+                await page.EvaluateAsync(Click(local, "Share"));
+                await page.WaitAsync($"{Card(local)}?.querySelector('.shared')?.textContent === 'PROJECT'");
+                memories.SharedStates(Token)[local].Should().Be(SharedState.Project);
+                // the fixture's .gitignore hides the .harness folder: the author is told at once
+                (await ValueAsync(page, "document.querySelector('.toast.bad')?.textContent"))
+                    .Should()
+                    .Contain("Git ignores the file");
+
+                await page.EvaluateAsync(Click(local, "Withdraw from project"));
+                await page.WaitAsync($"!!{Card(local)}.querySelector('form.aform')");
+                (await ValueAsync(page, $"{Card(local)}.querySelector('form.aform').textContent"))
+                    .Should()
+                    .Contain("keeps it as your local memory");
+                await page.EvaluateAsync(Click(local, "Withdraw"));
+                await page.WaitAsync($"!{Card(local)}?.querySelector('.shared')");
+                memories.SharedStates(Token).Should().NotContainKey(local);
+
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + project + "/knowledge/inbox" }
+                );
+                await page.WaitAsync($"!!document.querySelector('[data-removed=\"{kept}\"]')");
+                await page.EvaluateAsync(
+                    $"[...document.querySelector('[data-removed=\"{kept}\"]').querySelectorAll('button')].find(b => b.textContent === 'Keep as local').click()"
+                );
+                await page.WaitAsync($"!document.querySelector('[data-removed=\"{kept}\"]')");
+                await page.EvaluateAsync(
+                    $"[...document.querySelector('[data-removed=\"{retired}\"]').querySelectorAll('button')].find(b => b.textContent === 'Retire').click()"
+                );
+                await page.WaitAsync($"!document.querySelector('[data-removed=\"{retired}\"]')");
+                memories.SharedStates(Token).Should().BeEmpty("deciding clears both Inbox items");
+                memories.Get(kept, Token).Current(new(DateTimeOffset.UtcNow)).Should().BeTrue();
+                memories.Get(retired, Token).Current(new(DateTimeOffset.UtcNow)).Should().BeFalse();
+            }
+        );
+    }
+
     /// <summary>
     /// Every page, at a desktop and a phone width, dark and light, with every fold closed and open, passes the Go
     /// harness's layout and accessibility checks (checks.js: overflow, overlapping or clipped text, squeezed columns,
@@ -742,7 +828,8 @@ public sealed class UiBrowserTests
                 "codex",
                 Token
             );
-            new MemoryStore(database).Put(
+            var memories = new MemoryStore(database);
+            memories.Put(
                 new()
                 {
                     Type = "decision",
@@ -751,6 +838,24 @@ public sealed class UiBrowserTests
                 },
                 Token
             );
+            // the team's knowledge: one shared, one a Git change took out of it (a Knowledge Inbox item)
+            foreach (
+                var (content, shared) in new[] { ("Routes are tested", "project"), ("Routes are cached", "removed") }
+            )
+            {
+                var id = memories
+                    .Put(
+                        new()
+                        {
+                            Type = "convention",
+                            Content = content,
+                            Source = new("user", "test", "test"),
+                        },
+                        Token
+                    )
+                    .Memory!.Id;
+                memories.SetShared(id, shared, Token);
+            }
         }
 
         string checks;

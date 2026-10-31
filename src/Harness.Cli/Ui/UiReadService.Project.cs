@@ -122,17 +122,38 @@ internal sealed partial class UiReadService
             Limit = limit,
         };
         var store = new MemoryStore(database);
+        var view = SharedView(store, token);
+        // shared=removed: the memories a Git change took out of project knowledge, the Knowledge Inbox's items
+        var shared = request.Parameter("shared");
+        Func<MemoryRecord, bool> wanted = shared.Length is 0
+            ? _ => true
+            : memory => string.Equals(view(memory)["shared"] as string, shared, StringComparison.Ordinal);
         if (request.Parameter("levels") is "1")
         {
             using var layers = Levels.OpenLayers(store, UiProjectCatalog.Text(project, "id"), token);
             return UiJson.Node(
                 new JsonObjectMap
                 {
-                    ["memories"] = layers.Layers.Search(query, token).Memories.Select(MemoryViews.Memory),
+                    ["memories"] = layers.Layers.Search(query, token).Memories.Where(wanted).Select(view),
                 }
             );
         }
-        return UiJson.Node(new JsonObjectMap { ["memories"] = store.Search(query, token).Select(MemoryViews.Memory) });
+        return UiJson.Node(new JsonObjectMap { ["memories"] = store.Search(query, token).Where(wanted).Select(view) });
+    }
+
+    /// <summary>A memory's view with whether it is the team's: project, removed (from it by Git) or local ("").</summary>
+    private static Func<MemoryRecord, Dictionary<string, object?>> SharedView(
+        MemoryStore store,
+        CancellationToken token
+    )
+    {
+        var states = store.SharedStates(token);
+        return memory =>
+        {
+            var view = MemoryViews.Memory(memory);
+            view["shared"] = states.GetValueOrDefault(memory.Id, SharedState.Local);
+            return view;
+        };
     }
 
     private static JsonNode? MemoryDetail(HarnessDatabase database, string id, CancellationToken token)
@@ -160,14 +181,15 @@ internal sealed partial class UiReadService
             project["live"]?["branch"]?.GetValue<string>() ?? "",
             token
         );
+        var view = SharedView(new MemoryStore(database), token);
         return UiJson.Node(
             new JsonObjectMap
             {
                 ["scope"] = result.Scope,
                 ["branch"] = result.Branch,
-                ["goals"] = result.Goals.Select(MemoryViews.Memory),
-                ["constraints"] = result.Constraints.Select(MemoryViews.Memory),
-                ["decisions"] = result.Decisions.Select(MemoryViews.Memory),
+                ["goals"] = result.Goals.Select(view),
+                ["constraints"] = result.Constraints.Select(view),
+                ["decisions"] = result.Decisions.Select(view),
             }
         );
     }

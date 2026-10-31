@@ -106,6 +106,7 @@ internal sealed partial class UiReadService : IUiWriteApi
                 request,
                 token
             ),
+            "memories/{mid}/keep" => KeepMemory(store, request, token),
             "tasks/{tid}/delete" => DeleteTask(database, request, token),
             "tasks/{tid}/blueprint" => UiJson.Node(
                 new JsonObjectMap
@@ -181,6 +182,14 @@ internal sealed partial class UiReadService : IUiWriteApi
         }
 
         return written;
+    }
+
+    // A memory a Git change removed from project knowledge stays as a local one; the body is empty.
+    private static JsonNode? KeepMemory(MemoryStore store, UiWriteRequest request, CancellationToken token)
+    {
+        _ = new UiWriteBody(request.Body);
+        var memory = store.KeepLocal(request.Route.Value("mid"), HumanActor.Current(), token);
+        return UiJson.Node(new JsonObjectMap { ["memory"] = MemoryViews.Memory(memory) });
     }
 
     // Sharing writes .harness/knowledge.toml at once; committing it stays with Git. The body is empty.
