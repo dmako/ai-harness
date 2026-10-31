@@ -1259,8 +1259,10 @@ a.tile.link:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); bo
 .wsrow .nname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* complexity: the most complex functions beside the chart; hotspots (TASK-0057) */
-.cxrow { display: flex; gap: var(--space-5); align-items: flex-start; flex-wrap: wrap; }
-.cxtop { flex: 1; min-width: 16.25rem; }
+/* the chart across the card, the most complex functions under it: side by side the chart got only what the list
+   left and a long tail drew it too small to read */
+.cxrow { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.cxtop { min-width: 0; }
 .cxtop h5 { margin: 0 0 0.375rem; color: var(--muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .cxtop ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.375rem; }
 .cxtop li { display: flex; gap: var(--space-2); align-items: flex-start; min-width: 0; }

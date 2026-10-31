@@ -3150,7 +3150,9 @@ function complexityChart(l, width) {
     return el;
   };
   const bins = l.bins, n = bins.length, top = Math.max(...bins.map((b) => b.count), 1);
-  const W = Math.max(320, n * 22), band = 30, plot = 120, axis = 18, H = band + plot + axis;
+  // a drawing width within 720..960 whatever the tail: a long one gets thinner bars, not a chart scaled down to
+  // fit the card with its labels; it spans the card above the most complex functions
+  const W = Math.min(960, Math.max(720, n * 22)), band = 30, plot = 120, axis = 18, H = band + plot + axis;
   const bw = W / n;
   // heights on a square-root scale: the many simple functions would
   // flatten the few complex ones; every bar says its count
