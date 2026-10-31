@@ -51,6 +51,31 @@ public sealed class SharedKnowledgeStoreTests
     }
 
     [Fact]
+    public async Task TheFileReachedByAnotherPathHasTheSameRecordedHash()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        await fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: Token);
+        using var database = fixture.Database();
+        var store = new MemoryStore(database);
+        var state = Path.Combine(fixture.Root, ".harness");
+        string other;
+        if (OperatingSystem.IsWindows())
+        {
+            other = state.ToUpperInvariant();
+        }
+        else
+        {
+            // as macOS reaches its temporary folder through /var and /private/var
+            other = Path.Combine(fixture.DirectoryRoot, "linked");
+            Directory.CreateSymbolicLink(other, state);
+        }
+
+        store.RecordKnowledgeFile(KnowledgeFile.In(state), "abc", Token);
+
+        store.KnowledgeFileHash(KnowledgeFile.In(other), Token).Should().Be("abc");
+    }
+
+    [Fact]
     public async Task InitLeavesTheSharedKnowledgeFileTrackedByGit()
     {
         using var fixture = await SyncFixture.CreateAsync();

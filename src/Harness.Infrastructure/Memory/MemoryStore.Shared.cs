@@ -48,7 +48,7 @@ public sealed partial class MemoryStore
                     connection,
                     transaction,
                     "SELECT hash FROM knowledge_files WHERE path = $path",
-                    ("$path", Path.GetFullPath(path))
+                    ("$path", FileKey(path))
                 );
                 return command.ExecuteScalar() as string ?? "";
             },
@@ -219,6 +219,27 @@ public sealed partial class MemoryStore
             },
             cancellationToken
         );
+
+    /// <summary>
+    /// The file's key in knowledge_files: its physical path, so one checkout reached by different paths (macOS
+    /// /var and /private/var, a symlinked folder, a drive letter's case on Windows) records one hash.
+    /// </summary>
+    private static string FileKey(string path)
+    {
+        var full = Path.GetFullPath(path);
+        try
+        {
+            full = Path.Combine(
+                Git.GitRepository.PhysicalDirectory(Path.GetDirectoryName(full)!),
+                Path.GetFileName(full)
+            );
+        }
+        catch (IOException)
+        { /* A folder that does not exist yet has no links to resolve. */
+        }
+
+        return OperatingSystem.IsWindows() ? full.ToUpperInvariant() : full;
+    }
 
     private static MemoryRecord Latest(SqliteConnection connection, SqliteTransaction transaction, MemoryRecord memory)
     {
@@ -403,7 +424,7 @@ public sealed partial class MemoryStore
             INSERT INTO knowledge_files (path, hash, read_at) VALUES ($path, $hash, $at)
             ON CONFLICT(path) DO UPDATE SET hash = excluded.hash, read_at = excluded.read_at
             """,
-            ("$path", Path.GetFullPath(path)),
+            ("$path", FileKey(path)),
             ("$hash", hash),
             ("$at", Harness.Infrastructure.Storage.HarnessDatabase.FormatTime(_time.GetUtcNow()))
         );
