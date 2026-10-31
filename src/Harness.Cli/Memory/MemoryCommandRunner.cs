@@ -305,7 +305,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             throw new IOException("project not initialized (run 'harness init'): " + location.DatabasePath);
         }
 
-        return HarnessDatabase.Open(
+        var database = HarnessDatabase.Open(
             location.DatabasePath,
             new StorageOptions
             {
@@ -313,6 +313,15 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             },
             cancellationToken
         );
+        try
+        {
+            SharedKnowledgeSync.Refresh(database, location.Root, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        { /* The knowledge merged last still answers; the next read or sync tries again. */
+        }
+
+        return database;
     }
 
     private MemoryService Service(HarnessDatabase database, ProjectLocation location) =>

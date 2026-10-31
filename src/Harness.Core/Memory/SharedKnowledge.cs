@@ -34,3 +34,20 @@ public static class SharedState
     public const string Project = "project";
     public const string Removed = "removed";
 }
+
+/// <summary>
+/// What merging the shared knowledge file changed: memories added with the entry's id, local ones superseded by a
+/// changed entry or linked to an equal one, memories marked removed (they wait in the Knowledge Inbox) or back in
+/// the file again, and the file's problems.
+/// </summary>
+public sealed record SharedKnowledgeMerge(
+    IReadOnlyList<string> Added,
+    IReadOnlyList<string> Updated,
+    IReadOnlyList<string> Linked,
+    IReadOnlyList<string> Removed,
+    IReadOnlyList<string> Restored,
+    IReadOnlyList<SharedKnowledgeProblem> Problems
+)
+{
+    public bool Changed => Added.Count + Updated.Count + Linked.Count + Removed.Count + Restored.Count > 0;
+}

@@ -111,12 +111,43 @@ internal sealed class SyncCommand(
             await PrintFindingsAsync(finding);
         }
 
+        if (result.Knowledge is { } knowledge)
+        {
+            await PrintKnowledgeAsync(knowledge);
+        }
+
         if (result.Metrics.Length > 0)
         {
             await output.WriteLineAsync($"Metrics   exact complexity {result.Metrics}");
         }
 
         await output.WriteLineAsync("\nSynced.");
+    }
+
+    private async Task PrintKnowledgeAsync(Harness.Core.Memory.SharedKnowledgeMerge knowledge)
+    {
+        string[] parts =
+        [
+            .. new (int Count, string Label)[]
+            {
+                (knowledge.Added.Count, "added"),
+                (knowledge.Updated.Count, "updated"),
+                (knowledge.Linked.Count, "linked to an equal local memory"),
+                (knowledge.Restored.Count, "back in the file"),
+                (knowledge.Removed.Count, "removed from the file (see Knowledge › Inbox)"),
+            }
+                .Where(part => part.Count > 0)
+                .Select(part => $"{part.Count} {part.Label}"),
+        ];
+        await output.WriteLineAsync(
+            "Knowledge project knowledge " + (parts.Length is 0 ? "unchanged" : string.Join(", ", parts))
+        );
+        foreach (var problem in knowledge.Problems)
+        {
+            await output.WriteLineAsync(
+                $"Problem   .harness/knowledge.toml{(problem.Line > 0 ? ":" + problem.Line : "")}: {problem.Message}"
+            );
+        }
     }
 
     private async Task PrintFindingsAsync(FindingSync finding)
