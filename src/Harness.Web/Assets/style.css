@@ -911,7 +911,7 @@ details.more[open] > summary { margin-bottom: var(--space-3); }
 .anode.role-data { border-left-color: var(--c-constraint); }
 .anode.role-logic { border-left-color: var(--c-decision); }
 .anode.role-api { border-left-color: var(--c-convention); }
-.anode.role-test { border-left-color: var(--grid); }
+.anode.role-test { border-left-color: var(--c-warning); }
 .anode.role-base { border-left-color: var(--c-fact); }
 .anode.role-hooks { border-left-color: var(--c-open_question); }
 .anode.role-ui { border-left-color: var(--c-goal); }
