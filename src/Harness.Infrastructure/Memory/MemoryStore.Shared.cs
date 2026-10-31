@@ -159,6 +159,78 @@ public sealed partial class MemoryStore
             cancellationToken
         );
 
+    /// <summary>The memory a shared entry stands for: the last one along the supersede chain from this id.</summary>
+    public MemoryRecord? Latest(string id, CancellationToken cancellationToken = default) =>
+        database.ReadTransaction(
+            (connection, transaction) =>
+                Find(connection, transaction, id) is { } memory ? Latest(connection, transaction, memory) : null,
+            cancellationToken
+        );
+
+    /// <summary>Marks a memory shared with the project or withdrawn from it, recording who did.</summary>
+    public void MarkShared(string id, bool shared, string by, CancellationToken cancellationToken = default) =>
+        database.WithTransaction(
+            (connection, transaction) =>
+            {
+                _ = Get(connection, transaction, id);
+                Mark(connection, transaction, id, shared ? SharedState.Project : SharedState.Local);
+                AddEvent(
+                    connection,
+                    transaction,
+                    id,
+                    shared ? "shared" : "withdrawn",
+                    "",
+                    by,
+                    KnowledgeFile.FileName,
+                    Now().ToString()
+                );
+                return 0;
+            },
+            cancellationToken
+        );
+
+    /// <summary>
+    /// Marks the memories the file's entries stand for as the project's; the earlier ones along their chains, and
+    /// project memories no longer current, become local.
+    /// </summary>
+    public void MarkProject(IReadOnlyCollection<string> ids, CancellationToken cancellationToken = default) =>
+        database.WithTransaction(
+            (connection, transaction) =>
+            {
+                var now = Now();
+                foreach (var (id, state) in States(connection, transaction))
+                {
+                    if (
+                        state is SharedState.Project
+                        && !ids.Contains(id)
+                        && !Get(connection, transaction, id).Current(now)
+                    )
+                    {
+                        Mark(connection, transaction, id, SharedState.Local);
+                    }
+                }
+
+                foreach (var id in ids)
+                {
+                    Mark(connection, transaction, id, SharedState.Project);
+                }
+
+                return 0;
+            },
+            cancellationToken
+        );
+
+    private static MemoryRecord Latest(SqliteConnection connection, SqliteTransaction transaction, MemoryRecord memory)
+    {
+        HashSet<string> seen = new(StringComparer.Ordinal) { memory.Id };
+        while (memory.SupersededBy.Length is not 0 && seen.Add(memory.SupersededBy))
+        {
+            memory = Get(connection, transaction, memory.SupersededBy);
+        }
+
+        return memory;
+    }
+
     private (string? Target, string Change) MergeEntry(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -183,13 +255,7 @@ public sealed partial class MemoryStore
         );
         if (Find(connection, transaction, entry.Id) is { } known)
         {
-            var current = known;
-            HashSet<string> seen = new(StringComparer.Ordinal) { current.Id };
-            while (current.SupersededBy.Length is not 0 && seen.Add(current.SupersededBy))
-            {
-                current = Get(connection, transaction, current.SupersededBy);
-            }
-
+            var current = Latest(connection, transaction, known);
             if (current.Type == input.Type && current.Scope == input.Scope && current.Content == input.Content)
             {
                 // a memory retired here stays retired while the team's entry is unchanged

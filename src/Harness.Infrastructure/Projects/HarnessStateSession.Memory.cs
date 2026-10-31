@@ -12,7 +12,8 @@ public sealed partial class HarnessStateSession
             ExistingMemoryDatabaseAsync,
             new KnowledgeLevels(globalConfigurationPath ?? ConfigurationPaths.GlobalPath(), registry),
             CurrentMemoryBranchAsync,
-            MemoryProjectIdAsync
+            MemoryProjectIdAsync,
+            location.Root
         );
 
     private async Task<string> MemoryProjectIdAsync(CancellationToken cancellationToken)

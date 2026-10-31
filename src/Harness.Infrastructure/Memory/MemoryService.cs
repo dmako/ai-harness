@@ -22,9 +22,63 @@ public sealed partial class MemoryService(
     Func<CancellationToken, Task<HarnessDatabase>> existingDatabase,
     KnowledgeLevels levels,
     Func<CancellationToken, Task<string>> branch,
-    Func<CancellationToken, Task<string>>? projectIdentity = null
+    Func<CancellationToken, Task<string>>? projectIdentity = null,
+    string worktreeRoot = ""
 ) : IMemorySession
 {
+    /// <summary>Shares a current project memory with the team through .harness/knowledge.toml.</summary>
+    public async Task<MemoryRecord> ShareAsync(string id, string by, CancellationToken cancellationToken)
+    {
+        var database = await SharedDatabaseAsync(id, "shared", cancellationToken);
+        return SharedKnowledgeSync.Share(database, worktreeRoot, id, by, cancellationToken);
+    }
+
+    /// <summary>Withdraws a memory from the team's knowledge; it stays as a local memory.</summary>
+    public async Task<MemoryRecord> WithdrawAsync(string id, string by, CancellationToken cancellationToken)
+    {
+        var database = await SharedDatabaseAsync(id, "withdrawn", cancellationToken);
+        return SharedKnowledgeSync.Withdraw(database, worktreeRoot, id, by, cancellationToken);
+    }
+
+    /// <summary>Keeps a memory a Git change removed from project knowledge as a local one.</summary>
+    public async Task<MemoryRecord> KeepLocalAsync(string id, string by, CancellationToken cancellationToken) =>
+        new MemoryStore(await existingDatabase(cancellationToken)).KeepLocal(id, by, cancellationToken);
+
+    private async Task<HarnessDatabase> SharedDatabaseAsync(string id, string verb, CancellationToken cancellationToken)
+    {
+        if (worktreeRoot.Length is 0)
+        {
+            throw new InvalidOperationException("project knowledge is " + verb + " from a project's worktree");
+        }
+
+        var database = await existingDatabase(cancellationToken);
+        var project = new MemoryStore(database);
+        using var opened = await LayersAsync(project, cancellationToken);
+        var located = opened.Layers.Find(id, cancellationToken);
+        return located.Scope is { } scope
+            ? throw new InvalidOperationException(
+                $"{id} is a {scope} memory: only this project's own knowledge is {verb} through Git"
+            )
+            : database;
+    }
+
+    /// <summary>Keeps the shared knowledge file in step with a knowledge write; best effort.</summary>
+    private async Task PublishAsync(CancellationToken cancellationToken)
+    {
+        if (worktreeRoot.Length is 0)
+        {
+            return;
+        }
+
+        try
+        {
+            SharedKnowledgeSync.Publish(await existingDatabase(cancellationToken), worktreeRoot, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        { /* The next knowledge write or sync tries again. */
+        }
+    }
+
     public async Task<Harness.Core.Retrieval.RetrievalMemories> SearchContextAsync(
         MemoryQuery query,
         CancellationToken cancellationToken
@@ -130,7 +184,9 @@ public sealed partial class MemoryService(
             );
         }
 
-        return store.Supersede(id, input, cancellationToken);
+        var superseded = store.Supersede(id, input, cancellationToken);
+        await PublishAsync(cancellationToken);
+        return superseded;
     }
 
     public async Task<MemoryDetail> ReadMemoryAsync(string id, bool history, CancellationToken cancellationToken)
@@ -160,6 +216,11 @@ public sealed partial class MemoryService(
         var located = opened.Layers.Find(id, cancellationToken);
         var store = (MemoryStore)located.Store;
         store.Retire(id, by, reason, cancellationToken);
+        if (located.Scope is null)
+        {
+            await PublishAsync(cancellationToken);
+        }
+
         var detail = store.Details(id, history: true, cancellationToken);
         // Relabel the selected memory only; its history keeps the stored project scopes.
         return located.Scope is null ? detail : detail with { Memory = detail.Memory with { Scope = located.Scope } };
@@ -258,7 +319,12 @@ public sealed partial class MemoryService(
         string id,
         MemoryApprovalInput input,
         CancellationToken cancellationToken
-    ) => new MemoryStore(await existingDatabase(cancellationToken)).Approve(id, input, cancellationToken);
+    )
+    {
+        var approved = new MemoryStore(await existingDatabase(cancellationToken)).Approve(id, input, cancellationToken);
+        await PublishAsync(cancellationToken);
+        return approved;
+    }
 
     public async Task<MemoryProposal> RejectMemoryAsync(
         string id,
@@ -338,6 +404,7 @@ public sealed partial class MemoryService(
         }
 
         store.Retire(id, by, "promoted to " + scope + " as " + result.Memory!.Id, cancellationToken);
+        await PublishAsync(cancellationToken);
         return new MemoryPromotion(
             memory,
             scope.ToString(),
