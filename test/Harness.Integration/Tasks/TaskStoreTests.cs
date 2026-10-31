@@ -518,7 +518,7 @@ public sealed class TaskStoreTests
         }
 
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
-        database.SchemaVersion().Should().Be(22);
+        database.SchemaVersion().Should().Be(23);
         var store = new TaskStore(database);
         var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
         blueprint.Id.Should().Be("M1");
@@ -560,6 +560,7 @@ public sealed class TaskStoreTests
     [InlineData(20)]
     [InlineData(21)]
     [InlineData(22)]
+    [InlineData(23)]
     public void HistoricalSchemasRetainTaskStateThroughExportImport(int version)
     {
         using var s = new State();
