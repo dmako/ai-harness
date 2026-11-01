@@ -59,6 +59,45 @@ returns, and the facts and open questions that apply there too. An open
 question is yours to settle: agents are told to ask, not to decide it. The
 reference's Knowledge types section has each type's meaning and an example.
 
+## Sharing knowledge with the team
+
+Each clone keeps its own knowledge. To give your teammates' agents the
+same decisions, constraints and conventions, share them through Git: the
+shared ones live in `.harness/knowledge.toml`, a file in the repository
+that is committed, reviewed and merged like code.
+
+- **What belongs there**: what holds for everyone working on the project,
+  such as the rules the code follows, the decisions behind it and the traps
+  in it. Personal preferences, notes about your own setup and anything you
+  have not settled stay local.
+- **Share** a memory with its card's Share with project (Knowledge) or
+  `harness memory share <id>`. Harness writes it to the file at once and
+  marks it PROJECT; commit and push the file when you are ready. Only you
+  share: agents read shared knowledge but never share or withdraw it.
+- **Withdraw** it with Withdraw from project or `harness memory withdraw
+  <id>`. It leaves the file and stays as your local memory.
+- **Correcting** a PROJECT memory rewrites its entry with the new
+  statement; **retiring** it removes the entry. Commit the file to pass the
+  change on.
+
+After a pull, checkout or merge, the Git hooks run `harness sync`, which
+reads the file when it changed. (Without the hooks, the next agent
+knowledge read or `harness sync` does it.) Then:
+
+- New entries become memories with the same ids, marked PROJECT. A local
+  memory that says the same thing is linked to the entry, not duplicated.
+- A changed entry supersedes your copy; the old statement stays in its
+  history.
+- When an entry is gone from the file, its memory stays current but is
+  marked removed from the project. Knowledge › Inbox asks you to keep it as
+  local or retire it.
+
+Git must be able to see the file. A root `.gitignore` that ignores the
+whole `.harness/` folder hides it, and Git cannot re-include a file from an
+ignored folder. Sharing, `harness doctor` and Health say so and how to fix
+the rule: ignore `.harness/*` and add `!.harness/knowledge.toml`, or drop
+the rule, because `.harness/.gitignore` already keeps the database out.
+
 ## How to define work
 
 Work is a list of tasks, grouped into blueprints, kept in a backlog file
@@ -144,8 +183,10 @@ flight or next; and what needs a person, most urgent first. Then:
 - **Architecture:** Structure (projects or packages and their smells),
   Layers, Complexity (every function by cyclomatic complexity, the most
   complex named) and Change coupling.
-- **Knowledge:** the memories by type, what applies to a path, and the
-  Inbox of proposals to approve.
+- **Knowledge:** the memories by type (the team's marked PROJECT, with
+  Share with project or Withdraw from project on each card), what applies
+  to a path, and the Inbox: proposals to approve and memories a Git change
+  removed from project knowledge.
 - **Work:** Blueprints, Tasks and the Inbox of proposed tasks, blueprints
   and architecture work.
 - **Agents:** how harness serves your agents and what you can change so it
@@ -165,7 +206,8 @@ telemetry if you turn it on.
   one `.harness/` database, one memory, one task queue. This is the way to
   work on several branches at once.
 - **Separate clones** are separate projects, each with its own `.harness/`.
-  Their knowledge does not mix. To share knowledge between related
+  Their knowledge does not mix, except what you share through
+  `.harness/knowledge.toml` (see Sharing knowledge with the team). To share knowledge between related
   repositories (a service and its library), put them in a workspace
   (`harness workspace`): workspace-level knowledge applies to all members,
   and searches can span them.

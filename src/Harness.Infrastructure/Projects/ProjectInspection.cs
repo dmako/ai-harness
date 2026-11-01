@@ -23,6 +23,9 @@ public sealed record ProjectInspection(
     /// <summary>The exact-complexity worker, when [architecture.complexity.metrics] enables it.</summary>
     public HealthCheck? Metrics { get; init; }
 
+    /// <summary>Whether Git carries the shared knowledge file to the team, when the worktree has one.</summary>
+    public HealthCheck? Knowledge { get; init; }
+
     public object Status() =>
         new JsonObjectMap
         {
@@ -115,6 +118,11 @@ public sealed record ProjectInspection(
         if (Metrics is not null)
         {
             checks.Add(Metrics);
+        }
+
+        if (Knowledge is not null)
+        {
+            checks.Add(Knowledge);
         }
 
         return checks;

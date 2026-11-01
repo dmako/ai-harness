@@ -503,6 +503,26 @@ internal static class CliCommands
         );
         Add(
             Group(root, groups, "memory"),
+            "share",
+            "Share a project memory with the team through .harness/knowledge.toml",
+            CommandBindings.BindMemoryIdSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Memory.MemoryShareCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            Group(root, groups, "memory"),
+            "withdraw",
+            "Withdraw a memory from the team's knowledge; it stays local",
+            CommandBindings.BindMemoryIdSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Memory.MemoryWithdrawCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            Group(root, groups, "memory"),
             "promote",
             "Promote a project memory to workspace or user scope",
             CommandBindings.BindMemoryPromoteSettings,

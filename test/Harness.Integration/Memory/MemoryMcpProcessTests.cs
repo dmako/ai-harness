@@ -22,13 +22,20 @@ public sealed class MemoryMcpProcessTests
                 )
             )
             {
-                database.SchemaVersion().Should().Be(22);
+                database.SchemaVersion().Should().Be(23);
             }
 
             await using var claude = await StartAsync(root, "claude-code");
             await using var codex = await StartAsync(root, "codex");
             var tools = await claude.ListToolsAsync(cancellationToken: Token);
             tools.Count.Should().Be(32);
+            tools
+                .Select(tool => tool.Name)
+                .Should()
+                .NotContain(
+                    name => name.Contains("share") || name.Contains("withdraw"),
+                    "only the author shares knowledge"
+                );
             var created = await Call(
                 claude,
                 "memory_put",

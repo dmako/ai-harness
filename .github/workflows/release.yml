@@ -6,7 +6,7 @@ on:
         description: Release Draft Version
         required: true
         type: string
-        default: '0.5'
+        default: '0.6'
 permissions:
   contents: read
 jobs:

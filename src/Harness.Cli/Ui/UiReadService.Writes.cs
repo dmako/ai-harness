@@ -96,9 +96,17 @@ internal sealed partial class UiReadService : IUiWriteApi
         using var database = Open(project, tasks: true);
         var store = new MemoryStore(database);
         var human = HumanActor.Current();
-        return endpoint switch
+        var root = UiProjectCatalog.Text(project, "root");
+        var written = endpoint switch
         {
             "memories" => AddMemory(store, request.Body, token),
+            "memories/{mid}/share" or "memories/{mid}/withdraw" => await ShareMemoryAsync(
+                database,
+                root,
+                request,
+                token
+            ),
+            "memories/{mid}/keep" => KeepMemory(store, request, token),
             "tasks/{tid}/delete" => DeleteTask(database, request, token),
             "tasks/{tid}/blueprint" => UiJson.Node(
                 new JsonObjectMap
@@ -155,6 +163,60 @@ internal sealed partial class UiReadService : IUiWriteApi
             ),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
+        if (
+            endpoint
+            is "memories/{mid}/supersede"
+                or "memories/{mid}/retire"
+                or "memories/{mid}/promote"
+                or "proposals/{pid}/approve"
+        )
+        {
+            try
+            {
+                // a correction or retirement of a PROJECT memory rewrites or removes its shared entry
+                SharedKnowledgeSync.Publish(database, root, token);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            { /* The next knowledge write or sync tries again. */
+            }
+        }
+
+        return written;
+    }
+
+    // A memory a Git change removed from project knowledge stays as a local one; the body is empty.
+    private static JsonNode? KeepMemory(MemoryStore store, UiWriteRequest request, CancellationToken token)
+    {
+        _ = new UiWriteBody(request.Body);
+        var memory = store.KeepLocal(request.Route.Value("mid"), HumanActor.Current(), token);
+        return UiJson.Node(new JsonObjectMap { ["memory"] = MemoryViews.Memory(memory) });
+    }
+
+    // Sharing writes .harness/knowledge.toml at once; committing it stays with Git. The body is empty.
+    private static async Task<JsonNode?> ShareMemoryAsync(
+        HarnessDatabase database,
+        string root,
+        UiWriteRequest request,
+        CancellationToken token
+    )
+    {
+        _ = new UiWriteBody(request.Body);
+        var id = request.Route.Value("mid");
+        var shared = request.Route.Endpoint.EndsWith("/share", StringComparison.Ordinal);
+        var memory = shared
+            ? SharedKnowledgeSync.Share(database, root, id, HumanActor.Current(), token)
+            : SharedKnowledgeSync.Withdraw(database, root, id, HumanActor.Current(), token);
+        // a rule ignoring the file keeps it from the team: say so where the author shared it
+        var rule = shared ? await SharedKnowledgeSync.IgnoreRuleAsync(root, token) : "";
+        return UiJson.Node(
+            new JsonObjectMap
+            {
+                ["memory"] = MemoryViews.Memory(memory),
+                ["shared"] = shared ? SharedState.Project : SharedState.Local,
+                ["warning"] = rule.Length is 0 ? null : SharedKnowledgeSync.Ignored(rule),
+                ["fix"] = rule.Length is 0 ? null : SharedKnowledgeSync.IgnoreFix,
+            }
+        );
     }
 
     // Deleting a task is harness ui's only; the body is empty.

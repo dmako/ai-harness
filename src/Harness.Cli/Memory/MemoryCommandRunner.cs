@@ -29,6 +29,11 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
                 return await PromoteAsync(service, promote, target!, cancellationToken);
             }
 
+            if (verb is "share" or "withdraw")
+            {
+                return await ShareAsync(service, location.Root, verb, settings, cancellationToken);
+            }
+
             var detail = settings is MemoryRetireSettings retire
                 ? await service.RetireAsync(settings.Id, HumanActor.Current(), retire.Reason, cancellationToken)
                 : await service.ReadCliAsync(settings.Id, cancellationToken);
@@ -57,7 +62,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             var location = await lifecycle.LocateAsync(settings.Project, cancellationToken: cancellationToken);
             using var database = Open(location, cancellationToken);
             var store = new MemoryStore(database);
-            return await (
+            var code = await (
                 verb switch
                 {
                     "list" => ListProposalsAsync((ProposalListSettings)settings, store, cancellationToken),
@@ -66,12 +71,64 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
                     _ => RejectProposalAsync((ProposalNoteSettings)settings, store, cancellationToken),
                 }
             );
+            if (verb is "approve")
+            {
+                // an approval superseding a PROJECT memory rewrites its shared entry
+                SharedKnowledgeSync.Publish(database, location.Root, cancellationToken);
+            }
+
+            return code;
         }
         catch (Exception exception) when (IsExpected(exception))
         {
             await error.Writer.WriteLineAsync($"harness proposals {verb}: {exception.Message}");
             return 1;
         }
+    }
+
+    private async Task<int> ShareAsync(
+        MemoryService service,
+        string root,
+        string verb,
+        MemoryIdSettings settings,
+        CancellationToken cancellationToken
+    )
+    {
+        var shared = verb is "share";
+        var memory = shared
+            ? await service.ShareAsync(settings.Id, HumanActor.Current(), cancellationToken)
+            : await service.WithdrawAsync(settings.Id, HumanActor.Current(), cancellationToken);
+        var rule = shared ? await SharedKnowledgeSync.IgnoreRuleAsync(root, cancellationToken) : "";
+        if (settings.Json)
+        {
+            await JsonAsync(
+                new JsonObjectMap
+                {
+                    ["memory"] = MemoryViews.Memory(memory),
+                    ["shared"] = shared ? SharedState.Project : SharedState.Local,
+                    ["file"] = ".harness/" + KnowledgeFile.FileName,
+                    ["warning"] = rule.Length is 0 ? null : SharedKnowledgeSync.Ignored(rule),
+                    ["fix"] = rule.Length is 0 ? null : SharedKnowledgeSync.IgnoreFix,
+                }
+            );
+            return 0;
+        }
+
+        await output.WriteLineAsync(
+            shared
+                ? $"Shared {memory.Id} with the project in .harness/{KnowledgeFile.FileName}."
+                : $"Withdrew {memory.Id} from project knowledge; it stays as a local memory."
+        );
+        await output.WriteLineAsync(
+            $"Commit .harness/{KnowledgeFile.FileName} to {(shared ? "share it with" : "withdraw it from")} the team."
+        );
+        if (rule.Length is not 0)
+        {
+            await output.WriteLineAsync($"Warning: {SharedKnowledgeSync.Ignored(rule)}.");
+            await output.WriteLineAsync($"Fix: {SharedKnowledgeSync.IgnoreFix}.");
+        }
+
+        return 0;
     }
 
     private static MemoryScope PromotionTarget(MemoryPromoteSettings settings)
@@ -305,7 +362,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             throw new IOException("project not initialized (run 'harness init'): " + location.DatabasePath);
         }
 
-        return HarnessDatabase.Open(
+        var database = HarnessDatabase.Open(
             location.DatabasePath,
             new StorageOptions
             {
@@ -313,13 +370,23 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             },
             cancellationToken
         );
+        try
+        {
+            SharedKnowledgeSync.Refresh(database, location.Root, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        { /* The knowledge merged last still answers; the next read or sync tries again. */
+        }
+
+        return database;
     }
 
     private MemoryService Service(HarnessDatabase database, ProjectLocation location) =>
         new(
             _ => Task.FromResult(database),
             new KnowledgeLevels(lifecycle.GlobalConfigurationPath, lifecycle.Registry),
-            async token => location.Repository is null ? "" : (await location.Repository.ReadHeadAsync(token)).Branch
+            async token => location.Repository is null ? "" : (await location.Repository.ReadHeadAsync(token)).Branch,
+            worktreeRoot: location.Root
         );
 
     private Task JsonAsync(object? value) => output.WriteLineAsync(HarnessJson.Serialize(value, JsonOptions));

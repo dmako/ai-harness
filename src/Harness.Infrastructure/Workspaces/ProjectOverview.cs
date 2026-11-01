@@ -29,6 +29,7 @@ public static class ProjectOverview
             ["pending_arch_proposals"] = 0,
             ["pending_task_proposals"] = 0,
             ["pending_blueprint_proposals"] = 0,
+            ["removed_from_project"] = 0,
             ["checks_failed"] = 0,
             ["checks_warned"] = 0,
         };
@@ -118,7 +119,8 @@ public static class ProjectOverview
             SELECT (SELECT COUNT(*) FROM memory_proposals WHERE status='pending'),
                    (SELECT COUNT(*) FROM finding_proposals WHERE status='pending'),
                    (SELECT COUNT(*) FROM task_proposals WHERE status='pending'),
-                   (SELECT COUNT(*) FROM blueprint_proposals WHERE status='pending')
+                   (SELECT COUNT(*) FROM blueprint_proposals WHERE status='pending'),
+                   (SELECT COUNT(*) FROM memories WHERE shared='removed')
             """;
         using var counts = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         await counts.ReadAsync(token).ConfigureAwait(false);
@@ -126,6 +128,8 @@ public static class ProjectOverview
         live["pending_arch_proposals"] = counts.GetInt32(1);
         live["pending_task_proposals"] = counts.GetInt32(2);
         live["pending_blueprint_proposals"] = counts.GetInt32(3);
+        // memories a Git change took out of project knowledge wait in the Knowledge Inbox
+        live["removed_from_project"] = counts.GetInt32(4);
     }
 
     /// <summary>The last 30 days' context answers and their mean hit rate over changed non-test files.</summary>

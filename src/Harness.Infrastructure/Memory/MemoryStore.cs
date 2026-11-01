@@ -66,7 +66,7 @@ public sealed partial class MemoryStore(HarnessDatabase database, TimeProvider? 
                 Execute(
                     connection,
                     transaction,
-                    "UPDATE memories SET valid_until=$stamp, updated_at=$stamp WHERE id=$id",
+                    "UPDATE memories SET valid_until=$stamp, updated_at=$stamp, shared='' WHERE id=$id",
                     ("$stamp", stamp),
                     ("$id", id)
                 );
@@ -251,7 +251,8 @@ public sealed partial class MemoryStore(HarnessDatabase database, TimeProvider? 
         SqliteConnection connection,
         SqliteTransaction transaction,
         MemoryInput input,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        string? id = null
     )
     {
         var now = Now();
@@ -296,14 +297,14 @@ public sealed partial class MemoryStore(HarnessDatabase database, TimeProvider? 
             }
         }
 
-        foreach (var id in input.Supersedes)
+        foreach (var oldId in input.Supersedes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var old = Get(connection, transaction, id);
+            var old = Get(connection, transaction, oldId);
             if (old.SupersededBy.Length is not 0)
             {
                 throw new InvalidOperationException(
-                    $"{id} is already superseded by {old.SupersededBy}; supersede that one instead"
+                    $"{oldId} is already superseded by {old.SupersededBy}; supersede that one instead"
                 );
             }
         }
@@ -317,8 +318,8 @@ public sealed partial class MemoryStore(HarnessDatabase database, TimeProvider? 
             }
         }
 
-        var newId = "mem_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-        foreach (var id in input.Supersedes)
+        var newId = id ?? "mem_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        foreach (var oldId in input.Supersedes)
         {
             Execute(
                 connection,
@@ -327,9 +328,18 @@ public sealed partial class MemoryStore(HarnessDatabase database, TimeProvider? 
                 ("$new", newId),
                 ("$reason", NullIfEmpty(input.SupersedeReason)),
                 ("$stamp", stamp),
-                ("$id", id)
+                ("$id", oldId)
             );
-            AddEvent(connection, transaction, id, "superseded", newId, input.Source.By, input.SupersedeReason, stamp);
+            AddEvent(
+                connection,
+                transaction,
+                oldId,
+                "superseded",
+                newId,
+                input.Source.By,
+                input.SupersedeReason,
+                stamp
+            );
         }
 
         Execute(

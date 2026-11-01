@@ -19,6 +19,9 @@ public sealed record ProjectSyncResult(
 
     /// <summary>What the exact-complexity worker does for HEAD, if enabled: started, measuring, ready, ...</summary>
     public string Metrics { get; init; } = "";
+
+    /// <summary>What merging the team's shared knowledge changed; null when the file did not change.</summary>
+    public Harness.Core.Memory.SharedKnowledgeMerge? Knowledge { get; init; }
 }
 
 public sealed class ProjectSynchronizer(
@@ -80,6 +83,14 @@ public sealed class ProjectSynchronizer(
             ?? SyncStore.LoadState(database, worktree)
             ?? throw new InvalidDataException("load sync state: no recorded state");
         var removed = RemoveGoneWorktrees(database, worktree, token);
+        Harness.Core.Memory.SharedKnowledgeMerge? knowledge = null;
+        try
+        {
+            knowledge = Memory.SharedKnowledgeSync.Refresh(database, location.Root, token);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { /* An unreadable file is read again on the next sync or knowledge read. */
+        }
         try
         {
             await lifecycle
@@ -151,6 +162,7 @@ public sealed class ProjectSynchronizer(
         {
             Findings = findings,
             Metrics = metrics,
+            Knowledge = knowledge,
         };
     }
 

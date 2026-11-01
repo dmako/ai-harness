@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Harness.Core.Sync;
 
 namespace Harness.Infrastructure.Git;
@@ -153,6 +154,26 @@ public sealed partial record GitRepository
         added.Clear();
         added.AddRange(remaining);
     }
+
+    /// <summary>
+    /// The rule that makes Git ignore this path of the worktree, as "source:line:pattern"; empty when Git does not
+    /// ignore it.
+    /// </summary>
+    public async Task<string> IgnoreRuleAsync(string path, CancellationToken token)
+    {
+        var result = await RunAsync(Root, ["check-ignore", "-v", "--", path], token).ConfigureAwait(false);
+        var rule = result.Output.Split('\t')[0].Trim();
+        return result.Code switch
+        {
+            // with -v Git also reports a matching negation ("!pattern"), which re-includes the path
+            0 when IgnoreRule.Match(rule) is { Success: true } match && !match.Groups[1].Value.StartsWith('!') => rule,
+            0 or 1 => "",
+            _ => throw new IOException("git check-ignore: " + result.Error.Trim()),
+        };
+    }
+
+    [GeneratedRegex(@"\A.+?:\d+:(.*)\z", RegexOptions.CultureInvariant | RegexOptions.Singleline, 1000)]
+    private static partial Regex IgnoreRule { get; }
 
     private async Task<string> ReadGitAsync(string[] arguments, CancellationToken token)
     {

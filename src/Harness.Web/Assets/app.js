@@ -346,7 +346,9 @@ function applyTheme() {
 // It is the sum of the project's tab badges (Knowledge, Work, Health),
 // plus one when its state cannot be read.
 const workProposals = (l) => (l.pending_arch_proposals || 0) + (l.pending_task_proposals || 0) + (l.pending_blueprint_proposals || 0);
-const waitingIn = (p) => (p.live.pending_proposals || 0) + workProposals(p.live) + (p.live.checks_failed || 0) + (p.live.state !== "ok" ? 1 : 0);
+// the Knowledge Inbox: proposals, and memories a Git change took out of project knowledge
+const knowledgeWaiting = (l) => (l.pending_proposals || 0) + (l.removed_from_project || 0);
+const waitingIn = (p) => knowledgeWaiting(p.live) + workProposals(p.live) + (p.live.checks_failed || 0) + (p.live.state !== "ok" ? 1 : 0);
 
 function navProject(p, ws, r) {
   const n = waitingIn(p);
@@ -676,7 +678,7 @@ function projectHead(p) {
         p.workspaces.map((w) => h("a", { class: "wschip", href: workspaceHref(w), title: "Open this workspace", onclick: () => { state.lastWs = w; } }, wtitle(w))))),
     facts.length > 0 && h("p", { class: "metaline" }, facts),
     l.detail && h("p", { class: "detail" }, l.detail));
-  const badges = { knowledge: l.pending_proposals, work: workProposals(l), health: l.checks_failed };
+  const badges = { knowledge: knowledgeWaiting(l), work: workProposals(l), health: l.checks_failed };
   const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Views" },
     PROJECT_VIEWS.map(([v, label]) => h("a", { href: projectHref(id, v), role: "tab", "aria-selected": String(v === view) },
       label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
@@ -729,7 +731,7 @@ async function projectView(p, view, item, opts) {
     case "health": return viewHealth(p);
     case "knowledge": {
       const inbox = item === "inbox";
-      const nav = subnav(base, [["memories", "Memories"], ["inbox", "Inbox", p.live.pending_proposals]], inbox ? "inbox" : "memories");
+      const nav = subnav(base, [["memories", "Memories"], ["inbox", "Inbox", knowledgeWaiting(p.live)]], inbox ? "inbox" : "memories");
       return h("div", {}, nav, inbox ? await viewProposals(p) : await viewKnowledge(p));
     }
     case "agents": {
@@ -1766,7 +1768,7 @@ function membersSummary(w, members) {
 }
 function memberTile(p) {
   const l = p.live, n = waitingIn(p);
-  const parts = [l.pending_proposals && `${l.pending_proposals} knowledge`, workProposals(l) && `${workProposals(l)} tasks`, l.checks_failed && `${l.checks_failed} failing`].filter(Boolean);
+  const parts = [knowledgeWaiting(l) && `${knowledgeWaiting(l)} knowledge`, workProposals(l) && `${workProposals(l)} tasks`, l.checks_failed && `${l.checks_failed} failing`].filter(Boolean);
   return h("a", { class: `mtile k-${stateKind(l)}`, href: projectHref(p.id) },
     h("div", { class: "mt-top" }, projectMark(p), h("b", { class: "mt-name" }, pname(p)), stateGlyph(l),
       (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id]))),
@@ -1787,7 +1789,7 @@ async function renderHome(main) {
   const tiles = mount({ anyProject: true, kinds: ["summary", "proposals", "sync", "workspaces"], draw: () => {
     const ps = state.projects, wss = state.workspaces || [];
     const inWs = new Set(wss.flatMap((w) => w.members.map((m) => m.project_id)));
-    const know = ps.reduce((n, p) => n + (p.live.pending_proposals || 0), 0);
+    const know = ps.reduce((n, p) => n + knowledgeWaiting(p.live), 0);
     const work = ps.reduce((n, p) => n + workProposals(p.live), 0);
     const failing = ps.filter((p) => p.live.checks_failed > 0 || p.live.state !== "ok").length;
     const waiting = ps.filter((p) => waitingIn(p) > 0);
@@ -2075,6 +2077,7 @@ async function viewOverview(p) {
   const done = all.filter((x) => x.status === "done").length;
   const items = [];
   if (l.pending_proposals > 0) items.push(["warn", `${plural(l.pending_proposals, "knowledge proposal")} ${l.pending_proposals === 1 ? "waits" : "wait"} for review`, projectHref(p.id, "knowledge", "inbox")]);
+  if (l.removed_from_project > 0) items.push(["warn", `${plural(l.removed_from_project, "memory")} left project knowledge in a Git change: keep ${l.removed_from_project === 1 ? "it" : "them"} local or retire`, projectHref(p.id, "knowledge", "inbox")]);
   if (workProposals(l) > 0) items.push(["warn", `${plural(workProposals(l), "task proposal")} ${workProposals(l) === 1 ? "waits" : "wait"} for review`, projectHref(p.id, "work", "inbox")]);
   if (l.checks_failed > 0) items.push(["problem", `${plural(l.checks_failed, "doctor check")} failing`, projectHref(p.id, "health")]);
   // an index going stale is the header's badge (its sentence on hover), not a row here
@@ -3150,7 +3153,9 @@ function complexityChart(l, width) {
     return el;
   };
   const bins = l.bins, n = bins.length, top = Math.max(...bins.map((b) => b.count), 1);
-  const W = Math.max(320, n * 22), band = 30, plot = 120, axis = 18, H = band + plot + axis;
+  // a drawing width within 720..960 whatever the tail: a long one gets thinner bars, not a chart scaled down to
+  // fit the card with its labels; it spans the card above the most complex functions
+  const W = Math.min(960, Math.max(720, n * 22)), band = 30, plot = 120, axis = 18, H = band + plot + axis;
   const bw = W / n;
   // heights on a square-root scale: the many simple functions would
   // flatten the few complex ones; every bar says its count
@@ -3687,7 +3692,7 @@ function healthReport(r, p, reload) {
   // Checks by area; what is wrong first, with its fix, then the passing
   // ones as a compact grid (the detail on hover and a second line).
   const AREA = { binary: "Installation", config: "Installation", permissions: "Installation",
-    git: "Project", project: "Project", storage: "Project", database: "Project", "claude-code": "Agents' clients", codex: "Agents' clients" };
+    git: "Project", project: "Project", storage: "Project", database: "Project", knowledge: "Project", "claude-code": "Agents' clients", codex: "Agents' clients" };
   const check = (c) => {
     // a failing check's detail without the file it read: that is on hover
     const at = c.level !== "ok" && /\s*\((?:checked|read|in) ([^)]+)\)/.exec(c.detail || "");
@@ -3948,6 +3953,7 @@ function memoryCard(p, m, onLevel) {
       })),
     }, "Retire"),
     !inactive && !level && p && m.scope === "project" && h("button", { title: "Record it for a workspace or for all your projects", onclick: () => fill(panel, promoteForm(p, m, panel)) }, "Promote"),
+    !inactive && !level && p && m.shared !== "removed" && shareButton(p, m, panel),
     h("button", { class: "ghost", onclick: () => openHistory() }, "History"));
   if (state.history.has(m.id)) openHistory(true); // it was open before a redraw
   const [lead, rest] = leadOf(m.content);
@@ -3955,6 +3961,8 @@ function memoryCard(p, m, onLevel) {
     // the point first, the detail after it
     h("div", { class: "content" }, h("b", { class: "mlead" }, lead), rest && h("span", { class: "mrest" }, " " + rest)),
     h("div", { class: "prov" },
+      m.shared === "project" && h("span", { class: "shared", title: "The team's: in .harness/knowledge.toml, shared through Git" }, "PROJECT"),
+      m.shared === "removed" && h("span", { class: "shared removed", title: "A Git change took it out of .harness/knowledge.toml: keep it local or retire it in the Inbox" }, "removed from project"),
       !onLevel && h("span", { class: "scope" + (level ? " lvl" : "") }, level ? (m.scope === "user" ? "you · all your projects" : `workspace · ${wtitle(m.scope.slice(10))}`) : m.scope),
       h("span", { class: "who", title: m.recorded_by || "" }, m.source_type === "user" ? "stated by you" : "recorded by an agent"),
       m.source_ref && h("span", { class: "src", title: m.source_ref }, m.source_ref),
@@ -3968,6 +3976,53 @@ function memoryCard(p, m, onLevel) {
       h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); openHistory(true); }, title: "Show the versions, newest included" }, m.superseded_by),
       m.supersede_reason ? ": " + m.supersede_reason : ""),
     panel);
+}
+
+// shareButton shares a memory with the team through .harness/knowledge.toml,
+// or withdraws it from there; committing the file stays with Git.
+function shareButton(p, m, panel) {
+  const url = (what) => projectAPI(p, `memories/${encodeURIComponent(m.id)}/${what}`);
+  const shared = m.shared === "project";
+  return h("button", {
+    title: shared ? "Take it out of the team's knowledge; it stays as your local memory" : "Share it with the team through .harness/knowledge.toml",
+    onclick: () => fill(panel, actionForm({
+      title: shared
+        ? "Withdraw from project knowledge: harness removes it from .harness/knowledge.toml now and keeps it as your local memory. Commit the file to withdraw it for the team."
+        : "Share with the project: harness writes it to .harness/knowledge.toml now. Commit the file to share it with the team; their harness picks it up after their next pull.",
+      fields: [],
+      submit: shared ? "Withdraw" : "Share",
+      onSubmit: async () => {
+        const r = await post(url(shared ? "withdraw" : "share"), {});
+        if (r.warning) toast("Shared here, but Git ignores the file", true, `${r.warning}. Fix: ${r.fix}`);
+        await afterWrite();
+      },
+      onCancel: () => fill(panel),
+    })),
+  }, shared ? "Withdraw from project" : "Share with project");
+}
+
+// removedCard is a Knowledge Inbox item: a memory a Git change took out of
+// project knowledge, kept as local or retired by the author.
+function removedCard(p, m) {
+  const url = (what) => projectAPI(p, `memories/${encodeURIComponent(m.id)}/${what}`);
+  const err = h("p", { class: "error", hidden: true });
+  const act = (what, body) => async (ev) => {
+    const button = ev.currentTarget;
+    button.disabled = true;
+    try { await post(url(what), body); await afterWrite(); } catch (e) { err.textContent = e.message; err.hidden = false; button.disabled = false; }
+  };
+  const [lead, rest] = leadOf(m.content);
+  return h("article", { class: `mem ty-${m.type}`, "data-removed": m.id },
+    h("div", { class: "content" }, h("b", { class: "mlead" }, lead), rest && h("span", { class: "mrest" }, " " + rest)),
+    h("div", { class: "prov" },
+      h("span", { class: "shared removed" }, "removed from project"),
+      h("span", { class: "scope" }, m.scope),
+      h("span", {}, MEMORY_GROUPS[m.type] || m.type)),
+    h("p", { class: "hint" }, "A Git change took it out of .harness/knowledge.toml. It still applies here until you decide."),
+    h("div", { class: "review" },
+      h("button", { class: "primary", onclick: act("keep", {}) }, "Keep as local"),
+      h("button", { onclick: act("retire", { reason: "removed from project knowledge" }) }, "Retire")),
+    err);
 }
 
 // promoteForm records a project memory for one of the project's
@@ -4330,9 +4385,12 @@ async function viewProposals(p) {
   const st = state.proposals;
   const wrap = h("div", {});
   const list = h("div", { class: "mems" });
+  const removed = h("div", {});
   async function load() {
     fill(list, h("p", { class: "empty" }, "Loading…"));
     try {
+      const gone = (await api(projectAPI(p, `memories?${new URLSearchParams({ type: MEMORY_TYPES.join(","), limit: "500", shared: "removed" })}`))).memories || [];
+      fill(removed, gone.length > 0 && [h("h3", { class: "inboxhead" }, "Removed from project knowledge"), h("div", { class: "mems" }, gone.map((m) => removedCard(p, m))), h("h3", { class: "inboxhead" }, "Proposals")]);
       const res = await api(`/api/projects/${encodeURIComponent(p.id)}/proposals?status=${st.status}`);
       const ps = res.proposals || [];
       fill(list, ...(ps.length ? ps.map((x) => proposalCard(p, x)) : [st.status === "pending" ? emptyState("inbox", "Inbox zero", "No proposal waits for you: agents' suggestions appear here for you to approve.") : h("p", { class: "empty" }, `No ${st.status === "all" ? "" : st.status + " "}proposals.`)]));
@@ -4350,7 +4408,7 @@ async function viewProposals(p) {
     "data-status": s,
   }, s));
   wrap.append(h("p", { class: "hint" }, "Memories agents proposed but nobody confirmed yet. They are not active until approved; approving or rejecting here is recorded as you."),
-    h("div", { class: "filters" }, chips), list);
+    removed, h("div", { class: "filters" }, chips), list);
   await load();
   return wrap;
 }

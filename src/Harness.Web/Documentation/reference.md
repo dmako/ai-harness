@@ -49,6 +49,8 @@ uninstall` alone lets you pick what to remove.
 | `harness instructions` | Adds the harness guidance for agents to AGENTS.md / CLAUDE.md (`--remove`). |
 | `harness hooks` | Optional hooks: Git sync, Claude Code and Codex tool events (`install`, `uninstall`, `status --kind git,claude-code,codex`). |
 | `harness tasks` | The task queue: list, show, next, claim, complete, block, defer, ready, release, import. |
+| `harness memory` | One memory: `show`, `retire --reason`, `promote --to`, `share` and `withdraw` (see Shared knowledge). |
+| `harness proposals` | Knowledge agents proposed: list, show, approve, reject. |
 | `harness projects` | Every repository on this machine that uses harness (`forget <id>` drops one from the list). |
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
@@ -236,6 +238,70 @@ a workspace's Knowledge). The type says how it binds an agent:
 
 History (what was added when) belongs in Git, not in knowledge.
 
+## Shared knowledge
+
+`.harness/knowledge.toml` holds the memories the team shares through Git.
+Harness writes it; you commit, review and merge it like code.
+
+| Command | What it does |
+|---|---|
+| `harness memory share <id> [--json]` | Writes a current project memory (scope project, path, subsystem or branch) to the file and marks it PROJECT. A superseded, retired, workspace or user memory is refused, as is a file with problems (fix it first). Warns when Git ignores the file, with the fix. harness ui: Share with project on the memory's card. |
+| `harness memory withdraw <id> [--json]` | Removes the memory's entry; the memory stays current and local. harness ui: Withdraw from project. |
+
+The file:
+
+```toml
+version = 1
+
+[[memory]]
+id = "mem_3f2a9c0d1e4b5a67"
+type = "convention"
+scope = "path:src/Harness.Core"
+content = "CancellationToken is always the last parameter"
+source_ref = "review of TASK-0042"
+shared_by = "human:dana"
+shared_at = "2026-10-31T21:00:00Z"
+```
+
+- **Fields**: `id` (`mem_` followed by letters, digits, `_` or `-`),
+  `type` (one of the knowledge types), `scope` (`project` if left out, or
+  `path:`, `subsystem:` or `branch:`), `content` (the statement, at most
+  4000 bytes), and optional `source_ref`, `shared_by` and `shared_at`.
+- **Order**: harness writes the entries sorted by id, with the keys in the
+  order above, empty ones left out, LF line endings and no BOM. The same
+  memories always give the same bytes, so concurrent changes merge cleanly.
+- **Ids**: an entry keeps the id its memory had when first shared. A
+  correction rewrites the entry's statement under that id, and on every
+  clone the entry stands for the current memory along that memory's
+  history.
+- **Validation**: a bad entry is reported with its line and skipped while
+  the others load: no or a malformed id, an unknown type, empty or too long
+  content, an invalid scope or a workspace or user one, a value that is not
+  text, or an id listed twice. Unknown keys and tables are reported too.
+  A file that is not valid TOML, or one written by a newer harness
+  (`version` above 1), loads nothing. While the file has problems, nothing
+  is marked removed.
+- **Reading**: `harness sync` (which the Git hooks run) and agents'
+  knowledge reads merge the file when its SHA-256 changed. An unchanged
+  file costs one hash comparison. `harness sync` prints what changed
+  (`Knowledge` line) and the file's problems.
+- **Merging**: a new entry becomes a memory with the entry's id, its
+  source `import` with the entry's `source_ref` and `shared_by`. A local
+  memory with the same type, scope and statement is superseded by it
+  (linked). A changed entry supersedes the current memory, and a memory
+  retired here stays retired while its entry is unchanged. A memory whose
+  entry is gone stays current, marked removed. It waits in Knowledge ›
+  Inbox, where Keep as local or Retire answers it.
+- **Local edits**: correcting a PROJECT memory (`memory_supersede`,
+  harness ui Correct, approving a proposal that supersedes it) rewrites
+  its entry; retiring or promoting it removes the entry.
+- **Git**: `harness doctor` and Health have a `knowledge` check once the
+  file exists. It warns when a `.gitignore` rule hides the file (typically
+  `.harness/` in the root `.gitignore`), with the fix: ignore `.harness/*`
+  and add `!.harness/knowledge.toml`, or drop the rule.
+- **Worktrees** share one database, each with its own file: moving between
+  worktrees whose files differ marks entries removed and back.
+
 ## Workspaces
 
 A workspace groups repositories that belong together (services and the
@@ -283,7 +349,8 @@ proposals to approve), work, how harness serves the agents and what to
 change so it serves them better, architecture findings, health, and the
 Docs. How harness itself performs (relevance per provider, latency) is the
 harness developer's, from opt-in telemetry, and not part of harness ui.
-Changes made there (approving proposals, adding knowledge, creating,
+Changes made there (approving proposals, adding knowledge, sharing it with
+the team or withdrawing it, creating,
 editing, moving or deleting tasks and blueprints, marking findings,
 workspace membership, graphify sessions, Fix it) are recorded as yours.
 

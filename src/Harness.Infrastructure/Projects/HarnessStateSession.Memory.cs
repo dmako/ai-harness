@@ -12,7 +12,8 @@ public sealed partial class HarnessStateSession
             ExistingMemoryDatabaseAsync,
             new KnowledgeLevels(globalConfigurationPath ?? ConfigurationPaths.GlobalPath(), registry),
             CurrentMemoryBranchAsync,
-            MemoryProjectIdAsync
+            MemoryProjectIdAsync,
+            location.Root
         );
 
     private async Task<string> MemoryProjectIdAsync(CancellationToken cancellationToken)
@@ -21,14 +22,24 @@ public sealed partial class HarnessStateSession
         return _registration?.Project.Id ?? "";
     }
 
-    private Task<HarnessDatabase> ExistingMemoryDatabaseAsync(CancellationToken cancellationToken)
+    private async Task<HarnessDatabase> ExistingMemoryDatabaseAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(location.DatabasePath))
         {
             throw new IOException("project not initialized (run 'harness init'): " + location.DatabasePath);
         }
 
-        return DatabaseAsync(cancellationToken);
+        var database = await DatabaseAsync(cancellationToken);
+        try
+        {
+            SharedKnowledgeSync.Refresh(database, location.Root, cancellationToken);
+        }
+        catch (Exception error)
+            when (error is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        { /* Reads go on with the knowledge merged last; the next read or sync tries again. */
+        }
+
+        return database;
     }
 
     private async Task<string> CurrentMemoryBranchAsync(CancellationToken cancellationToken)

@@ -47,6 +47,18 @@ internal sealed class MemoryRetireCommand(MemoryCommandRunner runner)
         runner.MemoryAsync("retire", settings, cancellationToken);
 }
 
+internal sealed class MemoryShareCommand(MemoryCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(MemoryIdSettings settings, CancellationToken cancellationToken) =>
+        runner.MemoryAsync("share", settings, cancellationToken);
+}
+
+internal sealed class MemoryWithdrawCommand(MemoryCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(MemoryIdSettings settings, CancellationToken cancellationToken) =>
+        runner.MemoryAsync("withdraw", settings, cancellationToken);
+}
+
 internal sealed class MemoryPromoteCommand(MemoryCommandRunner runner)
 {
     public Task<int> ExecuteAsync(MemoryPromoteSettings settings, CancellationToken cancellationToken) =>
