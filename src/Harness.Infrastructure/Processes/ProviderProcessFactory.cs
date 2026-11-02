@@ -72,15 +72,16 @@ public sealed class ProviderProcessFactory : IProviderProcessFactory
 
     private static string ResolveExecutable(string command, Dictionary<string, string> environment)
     {
+        var extensions = Extensions(command, environment);
         if (
             command.Contains(Path.DirectorySeparatorChar, StringComparison.Ordinal)
             || command.Contains(Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
         )
         {
-            return Path.GetFullPath(command);
+            var full = Path.GetFullPath(command);
+            return extensions.Select(extension => full + extension).FirstOrDefault(File.Exists) ?? full;
         }
 
-        var extensions = OperatingSystem.IsWindows() ? new[] { "", ".exe", ".com" } : [""];
         foreach (
             var directory in environment
                 .GetValueOrDefault("PATH", "")
@@ -98,5 +99,33 @@ public sealed class ProviderProcessFactory : IProviderProcessFactory
         }
 
         throw new Win32Exception(2, "Provider executable was not found on PATH: " + command);
+    }
+
+    /// <summary>
+    /// The extensions a command is looked up with. Windows finds a bare name as its shell does, by PATHEXT, limited
+    /// to what it can start (.com, .exe, and .bat and .cmd through cmd.exe, as dnx.cmd and npx.cmd are), never as
+    /// an extensionless file: the one beside npx.cmd is a POSIX shell script. A name with such an extension is taken
+    /// as written.
+    /// </summary>
+    internal static string[] Extensions(string command, IReadOnlyDictionary<string, string> environment)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return [""];
+        }
+
+        string[] startable = [".COM", ".EXE", ".BAT", ".CMD"];
+        if (startable.Contains(Path.GetExtension(command), StringComparer.OrdinalIgnoreCase))
+        {
+            return [""];
+        }
+
+        var listed = environment
+            .GetValueOrDefault("PATHEXT", "")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(extension => startable.Contains(extension, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return listed.Length is 0 ? startable : listed;
     }
 }

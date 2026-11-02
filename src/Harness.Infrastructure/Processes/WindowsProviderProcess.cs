@@ -129,10 +129,8 @@ internal sealed class WindowsProviderProcess : IProviderProcess
                     },
                     Attributes = attributes.Pointer,
                 };
-                using var commandLine = new NativeMemory(
-                    string.Join(' ', new[] { executable }.Concat(arguments).Select(Quote)),
-                    unicode: true
-                );
+                var (application, line) = CommandLine(executable, arguments);
+                using var commandLine = new NativeMemory(line, unicode: true);
                 using var block = new NativeMemory(
                     string.Join(
                         '\0',
@@ -144,7 +142,7 @@ internal sealed class WindowsProviderProcess : IProviderProcess
                 );
                 Check(
                     Native.CreateProcessW(
-                        executable,
+                        application,
                         commandLine.Pointer,
                         IntPtr.Zero,
                         IntPtr.Zero,
@@ -238,6 +236,36 @@ internal sealed class WindowsProviderProcess : IProviderProcess
         {
             throw new Win32Exception(Marshal.GetLastPInvokeError());
         }
+    }
+
+    /// <summary>
+    /// What CreateProcess starts. A batch file (.bat, .cmd: dnx, npx) runs in cmd.exe, which re-reads its command
+    /// line: arguments it would expand or split (a quote, %, a line break) are refused rather than passed on.
+    /// </summary>
+    internal static (string Application, string CommandLine) CommandLine(
+        string executable,
+        IReadOnlyList<string> arguments
+    )
+    {
+        var line = string.Join(' ', new[] { executable }.Concat(arguments).Select(Quote));
+        var extension = Path.GetExtension(executable);
+        if (
+            !extension.Equals(".bat", StringComparison.OrdinalIgnoreCase)
+            && !extension.Equals(".cmd", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return (executable, line);
+        }
+
+        if (new[] { executable }.Concat(arguments).Any(value => value.IndexOfAny(['"', '%', '\r', '\n']) >= 0))
+        {
+            throw new ArgumentException(
+                "a batch file's command line cannot carry a quote, % or line break safely: " + executable
+            );
+        }
+
+        var shell = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        return (shell, Quote(shell) + " /d /s /c \"" + line + "\"");
     }
 
     internal static string Quote(string value)
