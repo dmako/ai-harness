@@ -144,15 +144,16 @@ command = "/path/to/rg-fd-mcp"
 
 [providers.graphify-csharp]        # compiler-exact C# callers, references, impact
 command = "/path/to/harness-graphify"
-args = ["--graphify", "/path/to/graphify-csharp"]
+args = ["--graphify", "~/.dotnet/tools/graphify-csharp.exe"]
 
 [providers.nuget]                  # package_api for C# packages
-command = "/path/to/NugetMcpServer"
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes"]
 ```
 
 Install each tool as its own documentation says (graphify-csharp and
 NugetMcpServer are .NET tools: `dotnet tool install -g graphify-csharp`,
-`dotnet tool install -g NugetMcpServer`). Every provider also takes
+`dotnet tool install -g DimonSmart.NugetMcpServer`). Every provider also takes
 `enabled = false` and `timeout_ms`. `harness doctor` checks each one and
 says what is missing.
 

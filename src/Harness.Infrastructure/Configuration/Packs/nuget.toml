@@ -1,5 +1,5 @@
-# NugetMcpServer (https://github.com/DimonSmart/NugetMcpServer), verified
-# with 1.1.9: public API of NuGet packages for package_api.
+# NugetMcpServer (https://www.nuget.org/packages/DimonSmart.NugetMcpServer), verified
+# with 1.1.10: public API of NuGet packages for package_api.
 type = "mcp"
 command = "NugetMcpServer"
 timeout_ms = 60000
