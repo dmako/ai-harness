@@ -41,7 +41,7 @@ uninstall` alone lets you pick what to remove.
 
 | Command | What it does |
 |---|---|
-| `harness init` | Creates `.harness/` for the repository (safe to rerun). |
+| `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
 | `harness doctor` | Checks the installation, database, clients, hooks and providers, with a fix for each problem (`--all`: every project on the machine). |
 | `harness status` | The project, its Git state, database and clients. |
@@ -218,6 +218,16 @@ timeout_ms = 600000                   # a longer run fails and keeps the counted
 
 Providers belong in the global file (executable paths are machine
 specific). `harness doctor` prints which files were read.
+
+`harness init` writes both files with every option commented out, as an
+example to uncomment. Run again after upgrading harness, it brings them up
+to date line by line: an option the new version adds appears, commented
+out, under its table (a missing table at the end); the example of an option
+it no longer has is removed, and so is your setting of an option it dropped.
+Everything else, your settings and comments included, stays as you wrote
+it. A setting harness never had (a typo) still stops `harness init` with an
+error naming the file, before anything is written. A file that is not valid
+TOML is left alone, and `--dry-run` shows what would change.
 
 ## Knowledge types
 

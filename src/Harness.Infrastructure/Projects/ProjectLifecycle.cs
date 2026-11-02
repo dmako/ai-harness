@@ -33,9 +33,6 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
 {
     private const string IgnoreTemplate =
         "# Managed by harness: keep local state out of Git.\n*.db\n*.db-wal\n*.db-shm\n";
-    private const string ConfigurationTemplate =
-        "# Harness project configuration. Values here override the global config.\n# Everything is optional; uncomment to change a default.\n\n# [storage]\n# db_path = \".harness/harness.db\"\n# busy_timeout_ms = 5000\n\n# [log]\n# level = \"info\"\n";
-
     public string GlobalConfigurationPath => globalConfigurationPath ?? ConfigurationPaths.GlobalPath();
     public string Version => version;
     public MachineRegistry Registry =>
@@ -45,6 +42,13 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         string directory,
         bool allowNonGit = false,
         CancellationToken cancellationToken = default
+    ) => await LocateAsync(directory, allowNonGit, null, cancellationToken);
+
+    private async Task<ProjectLocation> LocateAsync(
+        string directory,
+        bool allowNonGit,
+        IReadOnlyDictionary<string, string>? planned,
+        CancellationToken cancellationToken
     )
     {
         GitRepository? repository;
@@ -61,7 +65,8 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         var state = repository?.StateRoot ?? root;
         var configuration = ConfigurationLoader.LoadFiles(
             GlobalConfigurationPath,
-            ConfigurationPaths.ProjectPath(root)
+            ConfigurationPaths.ProjectPath(root),
+            planned
         );
         return new ProjectLocation(
             root,
@@ -78,11 +83,10 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         CancellationToken cancellationToken = default
     )
     {
-        var location = await LocateAsync(directory, cancellationToken: cancellationToken);
-        var repository = location.Repository!;
-        var head = await repository.ReadHeadAsync(cancellationToken);
-        var stateDir = Path.Combine(location.StateRoot, ".harness");
-        var configDir = Path.Combine(location.Root, ".harness");
+        // the configuration is brought up to date before it is read: an option a newer harness dropped refuses it
+        var repository = await GitRepository.DiscoverAsync(directory, cancellationToken);
+        var stateDir = Path.Combine(repository.StateRoot, ".harness");
+        var configDir = Path.Combine(repository.Root, ".harness");
         List<(string Path, string? Content, string Note)> steps =
         [
             (stateDir, null, "harness state directory"),
@@ -93,17 +97,54 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             steps.Add((configDir, null, "worktree config directory"));
         }
 
-        steps.Add(
-            (
-                ConfigurationPaths.ProjectPath(location.Root),
-                ConfigurationTemplate,
-                "project config (all defaults commented out)"
-            )
-        );
         var pending = steps.Where(step => !Path.Exists(step.Path)).ToArray();
         var actions = steps
             .Select(step => new InitAction(Path.Exists(step.Path) ? "exists" : "create", step.Path, step.Note))
             .ToList();
+        var configurations = new[]
+        {
+            ConfigurationFile(
+                ConfigurationPaths.ProjectPath(repository.Root),
+                ConfigurationExample.ProjectHeader,
+                "project config"
+            ),
+            ConfigurationFile(GlobalConfigurationPath, ConfigurationExample.GlobalHeader, "global config"),
+        };
+        actions.AddRange(configurations.Select(configuration => configuration.Action));
+        // the configuration is read as init will leave it, so an invalid one stops init before anything is written
+        var location = await LocateAsync(
+            directory,
+            false,
+            configurations
+                .Where(configuration => configuration.Content is not null)
+                .ToDictionary(configuration => configuration.Action.Path, configuration => configuration.Content!),
+            cancellationToken
+        );
+        if (!dryRun)
+        {
+            foreach (var (path, content, _) in pending)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (content is null)
+                {
+                    StorageFiles.CreateDirectory(path);
+                }
+                else
+                {
+                    using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                    var bytes = Encoding.UTF8.GetBytes(content);
+                    await file.WriteAsync(bytes, cancellationToken);
+                }
+            }
+
+            foreach (var (action, content) in configurations.Where(configuration => configuration.Content is not null))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                WriteConfiguration(action.Path, content!);
+            }
+        }
+
+        var head = await repository.ReadHeadAsync(cancellationToken);
         actions.Add(
             new InitAction(
                 location.Initialized ? "open" : "create",
@@ -115,21 +156,6 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         if (dryRun)
         {
             return new InitResult(location, head, true, actions, null);
-        }
-
-        foreach (var (path, content, _) in pending)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (content is null)
-            {
-                StorageFiles.CreateDirectory(path);
-            }
-            else
-            {
-                using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                var bytes = Encoding.UTF8.GetBytes(content);
-                await file.WriteAsync(bytes, cancellationToken);
-            }
         }
 
         using var database = HarnessDatabase.Open(
@@ -163,6 +189,68 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         }
 
         return new InitResult(location, head, false, actions, registration);
+    }
+
+    /// <summary>
+    /// A config.toml as init leaves it: a new one with every option commented out, an existing one brought up to
+    /// date (options new to this harness added as comments, ones it dropped removed), or left as it is.
+    /// </summary>
+    private static (InitAction Action, string? Content) ConfigurationFile(string path, string header, string note)
+    {
+        string text;
+        try
+        {
+            text = File.ReadAllText(path);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return (new("create", path, note + " (every option, commented out)"), ConfigurationExample.Text(header));
+        }
+
+        var bom = text.StartsWith('\uFEFF') ? "\uFEFF" : "";
+        var update = ConfigurationExample.Update(text[bom.Length..]);
+        if (update.Problem.Length > 0)
+        {
+            return (new("exists", path, note + " not updated: " + update.Problem), null);
+        }
+
+        if (!update.Changed)
+        {
+            return (new("exists", path, note + " (up to date)"), null);
+        }
+
+        List<string> changes = [];
+        if (update.Added.Count > 0)
+        {
+            changes.Add("added " + Listed(update.Added));
+        }
+
+        if (update.Removed.Count > 0)
+        {
+            changes.Add("removed " + Listed(update.Removed));
+        }
+
+        return (new("update", path, note + ": " + string.Join("; ", changes)), bom + update.Text);
+    }
+
+    private static string Listed(IReadOnlyList<string> options) =>
+        options.Count <= 4
+            ? string.Join(", ", options)
+            : string.Join(", ", options.Take(3)) + " and " + (options.Count - 3) + " more";
+
+    private static void WriteConfiguration(string path, string content)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temporary, path, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temporary);
+        }
     }
 
     public async Task<ProjectInspection> InspectAsync(string directory, CancellationToken cancellationToken = default)
