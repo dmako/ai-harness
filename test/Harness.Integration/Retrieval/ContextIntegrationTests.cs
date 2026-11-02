@@ -37,13 +37,13 @@ public sealed class ContextIntegrationTests
         );
         var context = await session.ReadContextProjectAsync(Token);
         var first = await context.Sources.RecentChanges!(["a.cs"], 5, Token);
-        var repeated = await context.Sources.RecentChanges!(["a.cs"], 5, Token);
+        var repeated = await context.Sources.RecentChanges(["a.cs"], 5, Token);
         repeated.Should().BeSameAs(first, "the same immutable commit/path history should avoid another Git subprocess");
-        var other = await context.Sources.RecentChanges!(["b.cs"], 5, Token);
+        var other = await context.Sources.RecentChanges(["b.cs"], 5, Token);
         other.SelectMany(c => c.Paths).Should().OnlyContain(p => p == "b.cs");
         fixture.Write("a.cs", "class Changed {}");
         await fixture.CommitAsync("new context history");
-        var refreshed = await context.Sources.RecentChanges!(["a.cs"], 5, Token);
+        var refreshed = await context.Sources.RecentChanges(["a.cs"], 5, Token);
         refreshed[0].Subject.Should().Be("new context history");
         refreshed.Should().NotBeSameAs(first);
     }

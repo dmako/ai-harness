@@ -61,21 +61,26 @@ internal static class MigrationRunner
         // In an immediate transaction, as each migration: an autocommit statement reads before it writes, and when
         // another process commits in between (one migrating the same new database) WAL fails it at once with
         // "database is locked" instead of waiting out the busy timeout. Taking the write lock first waits.
-        using (var ledger = connection.BeginTransaction(deferred: false))
-        {
-            Execute(
-                connection,
-                """
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    version INTEGER PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    applied_at TEXT NOT NULL
-                ) STRICT
-                """,
-                ledger
-            );
-            ledger.Commit();
-        }
+        WhileMigrationAdvances(
+            connection,
+            () =>
+            {
+                using var ledger = connection.BeginTransaction(deferred: false);
+                Execute(
+                    connection,
+                    """
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        applied_at TEXT NOT NULL
+                    ) STRICT
+                    """,
+                    ledger
+                );
+                ledger.Commit();
+            },
+            cancellationToken
+        );
         CheckApplied(connection, migrations);
         var applied = Version(connection);
         var saved =
@@ -85,7 +90,11 @@ internal static class MigrationRunner
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                Apply(connection, migration, cancellationToken);
+                WhileMigrationAdvances(
+                    connection,
+                    () => Apply(connection, migration, cancellationToken),
+                    cancellationToken
+                );
             }
             catch (Exception exception) when (exception is SqliteException or InvalidDataException)
             {
@@ -99,6 +108,39 @@ internal static class MigrationRunner
 
         CheckApplied(connection, migrations);
     }
+
+    // The busy timeout bounds a stall, not another process's whole migration: SQLite's busy handler is not fair, so
+    // processes migrating the same database take the write lock back to back while a waiter sleeps. Keep waiting as
+    // long as the ledger advances between attempts; a writer that holds the lock without migrating still times out.
+    private static void WhileMigrationAdvances(
+        SqliteConnection connection,
+        Action action,
+        CancellationToken cancellationToken
+    )
+    {
+        var progress = Progress(connection);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                action();
+                return;
+            }
+            catch (SqliteException exception) when (exception.SqliteErrorCode == 5)
+            {
+                var current = Progress(connection);
+                if (current == progress)
+                {
+                    throw;
+                }
+
+                progress = current;
+            }
+        }
+    }
+
+    private static int Progress(SqliteConnection connection) => HasLedger(connection) ? Version(connection) : -1;
 
     private static void Apply(SqliteConnection connection, Migration migration, CancellationToken cancellationToken)
     {

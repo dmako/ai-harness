@@ -37,7 +37,7 @@ public sealed class McpProcessTests
                 )
             )
             {
-                client.ServerInfo.Name.Should().Be("harness");
+                client.ServerInfo!.Name.Should().Be("harness");
                 var ping = await client.CallToolAsync("ping", cancellationToken: TestContext.Current.CancellationToken);
                 ping.StructuredContent!.Value.GetProperty("message").GetString().Should().Be("pong");
                 File.Exists(path).Should().BeFalse();

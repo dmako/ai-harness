@@ -43,9 +43,7 @@ public sealed class McpProcessClient : IAsyncDisposable
     public Task Completion =>
         _client is null ? _process.Completion : Task.WhenAny(_process.Completion, _client.Completion);
     public string ServerVersion =>
-        Alive && _client!.ServerInfo.Version.Length > 0
-            ? _client.ServerInfo.Name + " " + _client.ServerInfo.Version
-            : "";
+        Alive && _client?.ServerInfo is { Version.Length: > 0 } info ? info.Name + " " + info.Version : "";
 
     [SuppressMessage(
         "Reliability",
