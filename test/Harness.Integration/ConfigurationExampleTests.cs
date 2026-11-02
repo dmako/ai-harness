@@ -162,21 +162,31 @@ public sealed class ConfigurationExampleTests
             .Be(ConfigurationExample.Text(ConfigurationExample.GlobalHeader));
 
         var again = await fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: Token);
+        // found by what they are: init names a file by its physical path (macOS /private/var for /var)
         again
-            .Actions.Where(action => action.Path == project || action.Path == global)
+            .Actions.Where(action =>
+                action.Note.StartsWith("project config", StringComparison.Ordinal)
+                || action.Note.StartsWith("global config", StringComparison.Ordinal)
+            )
             .Should()
-            .OnlyContain(action => action.Verb == "exists" && action.Note.EndsWith("(up to date)"));
+            .HaveCount(2)
+            .And.OnlyContain(action => action.Verb == "exists" && action.Note.EndsWith("(up to date)"));
 
         // as an older harness wrote them: an option since dropped, and one not yet there
         await File.WriteAllTextAsync(project, "[log]\nlevel = \"debug\"\n# format = \"json\"\n", Token);
         await File.WriteAllTextAsync(global, "# [storage]\n# busy_timeout_ms = 5000\n", Token);
         var dry = await fixture.Lifecycle.InitAsync(fixture.Root, dryRun: true, Token);
-        dry.Actions.Single(action => action.Path == project).Verb.Should().Be("update");
+        dry.Actions.Single(action => action.Note.StartsWith("project config", StringComparison.Ordinal))
+            .Verb.Should()
+            .Be("update");
         (await File.ReadAllTextAsync(project, Token)).Should().Contain("format", "a dry run changes nothing");
 
         var updated = await fixture.Lifecycle.InitAsync(fixture.Root, cancellationToken: Token);
 
-        updated.Actions.Single(action => action.Path == project).Note.Should().Contain("removed log.format");
+        updated
+            .Actions.Single(action => action.Note.StartsWith("project config", StringComparison.Ordinal))
+            .Note.Should()
+            .Contain("removed log.format");
         var text = await File.ReadAllTextAsync(project, Token);
         text.Should().StartWith("[log]\nlevel = \"debug\"\n").And.NotContain("format");
         text.Should().Contain("# [architecture.complexity.metrics]");
