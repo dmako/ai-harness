@@ -8,6 +8,7 @@ using Harness.Core.Workspaces;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Memory;
+using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Workspaces;
 
@@ -209,15 +210,26 @@ internal sealed partial class UiReadService
         }
         var members = Workspaces.Resolve(workspace.Members);
         var evidence = new WorkspaceEvidenceReader(members);
-        return request.Endpoint.Split('/')[^1] switch
+        var endpoint = request.Endpoint.Split('/')[^1];
+        // a workspace view, from harness ui's view cache while its members are unchanged
+        Task<JsonNode?> View(Func<Task<JsonNode?>> compute) =>
+            views is null
+                ? compute()
+                : views.GetAsync(
+                    "workspace:" + workspace.Name + ":" + endpoint,
+                    members.Select(member => new ViewMember(member.Id, member.Root, member.DatabasePath)).ToArray(),
+                    compute,
+                    token
+                );
+        return endpoint switch
         {
             "snippet" => await WorkspaceSnippetAsync(members, request, token),
-            "dependencies" => UiJson.Node(await evidence.DependencySummaryAsync(token)),
+            "dependencies" => await View(async () => UiJson.Node(await evidence.DependencySummaryAsync(token))),
             "adoption" => UiJson.Node(await evidence.AdoptionAsync(request.Parameter("library"), token)),
-            "issues" => await IssuesAsync(members, evidence, token),
-            "stack" => UiJson.Node(await evidence.WorkspaceStackAsync(token)),
-            "duplicates" => await DuplicatesAsync(workspace.Name, members, evidence, token),
-            "system" => await SystemAsync(workspace.Name, members, token),
+            "issues" => await View(() => IssuesAsync(members, evidence, token)),
+            "stack" => await View(async () => UiJson.Node(await evidence.WorkspaceStackAsync(token))),
+            "duplicates" => await View(() => DuplicatesAsync(workspace.Name, members, evidence, token)),
+            "system" => await View(() => SystemAsync(workspace.Name, members, token)),
             "findings" => WorkspaceFindings(workspace.Name, members, token),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
