@@ -1,5 +1,5 @@
 {
-  "description": "Files that change together, from the Git history. file: its partners (commits shared, share of its commits; from providers offering arch.change_coupling). check: the usual partners (3+ shared commits, half or more of the commits of a file with 5+) of the changed files that the change leaves out — run it before you finish a change; files: the change (default: the uncommitted changes). Neither: the hotspots, the code files that changed most in the last 180 days, with their usual partners. A reminder of what usually changes too, never a rule: decide from the code whether it needs changing.",
+  "description": "Files that change together, from the Git history. file: its partners (commits shared, share of its commits; counted from the last 180 days of history, with providers offering arch.change_coupling added). check: the usual partners (3+ shared commits, half or more of the commits of a file with 5+) of the changed files that the change leaves out — run it before you finish a change; files: the change (default: the uncommitted changes). Neither: the hotspots, the code files that changed most in the last 180 days, with their usual partners. A reminder of what usually changes too, never a rule: decide from the code whether it needs changing.",
   "inputSchema": {
     "type": "object",
     "properties": {

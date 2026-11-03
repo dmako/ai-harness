@@ -109,7 +109,9 @@ internal sealed partial class UiReadService
                         client.Id,
                         "warn",
                         "harness MCP server not configured (checked " + string.Join(", ", status.Checked) + ")",
-                        "harness install --client " + client.Id + " (or see: harness docs connecting-claude-code-and-codex)"
+                        "harness install --client "
+                            + client.Id
+                            + " (or see: harness docs connecting-claude-code-and-codex)"
                     );
                 }
                 if (status.Entries.FirstOrDefault(e => e.Problem.Length > 0) is { } broken)
@@ -244,22 +246,14 @@ internal sealed partial class UiReadService
         );
     }
 
-    private async Task<JsonNode?> CouplingAsync(JsonObject project, UiReadRequest request, CancellationToken token)
+    private static async Task<JsonNode?> CouplingAsync(JsonObject project, CancellationToken token)
     {
-        Trusted(request, "change coupling starts providers");
         RequirePresent(project);
         var root = UiProjectCatalog.Text(project, "root");
-        var location = await lifecycle.LocateAsync(root, cancellationToken: token);
-        await using var registry = ConfiguredProviders.Build(
-            location.Configuration.Value.Providers,
-            root,
-            new ProviderProcessFactory()
-        );
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-        deadline.CancelAfter(TimeSpan.FromSeconds(60));
-        await registry.DiscoverAsync(deadline.Token);
-        var repository = await GitRepository.DiscoverAsync(root, deadline.Token);
-        var hotspots = await ChangeCoupling.HotspotsAsync(repository, registry, 10, 3, deadline.Token);
+        // the partners are counted from the same Git history as the hotspots: no provider is started
+        var repository = await GitRepository.DiscoverAsync(root, token);
+        var history = await ChangeCoupling.HistoryAsync(repository, token);
+        var hotspots = ChangeCoupling.Hotspots(history, root, 10, 3, token);
         var result = UiJson
             .Node(
                 new JsonObjectMap
@@ -267,15 +261,14 @@ internal sealed partial class UiReadService
                     ["hotspots"] = hotspots.Hotspots,
                     ["commits"] = hotspots.Commits,
                     ["window_days"] = 180,
-                    ["providers"] = registry.For(Capabilities.ArchChangeCoupling).Count,
                     ["errors"] = hotspots.Errors,
                 }
             )!
             .AsObject();
-        var changed = await repository.DirtyPathsAsync(deadline.Token);
+        var changed = await repository.DirtyPathsAsync(token);
         if (changed.Count > 0)
         {
-            var check = await ChangeCoupling.CheckAsync(registry, root, changed, deadline.Token);
+            var check = await ChangeCoupling.CheckAsync(history, null, root, changed, token);
             result["changed"] = UiJson.Node(changed);
             result["missing"] = UiJson.Node(check.Missing);
             result["errors"] = UiJson.Node(hotspots.Errors.Concat(check.Errors).ToArray());

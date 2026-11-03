@@ -17,24 +17,43 @@ public static class ChangeCoupling
         && partner.Share >= MinShare
         && partner.Together / partner.Share >= MinHistory - 0.5;
 
+    /// <summary>The window's commits, read once, from which partners are counted.</summary>
+    public static async Task<ChangeHistory> HistoryAsync(
+        GitRepository repository,
+        CancellationToken token,
+        TimeProvider? clock = null
+    ) =>
+        new(
+            await repository
+                .ChurnAsync((clock ?? TimeProvider.System).GetUtcNow() - Window, token)
+                .ConfigureAwait(false)
+        );
+
+    /// <summary>
+    /// A file's partners: counted from the history when there is one, with a configured arch.change_coupling
+    /// provider's answer added (the higher together count of a path wins).
+    /// </summary>
     public static async Task<ChangePartners> PartnersAsync(
         IProviderRegistry? registry,
         string file,
         int limit,
-        CancellationToken token
+        CancellationToken token,
+        ChangeHistory? history = null
     )
     {
-        if (registry is null)
+        Dictionary<string, ChangePartner> byPath = new(StringComparer.Ordinal);
+        foreach (var partner in history?.Partners(file, 0) ?? [])
         {
-            return new([], []);
+            byPath[partner.Path] = partner;
         }
 
-        Dictionary<string, ChangePartner> byPath = new(StringComparer.Ordinal);
         List<string> errors = [];
         foreach (
-            var result in await registry
-                .CallAsync(new(Capabilities.ArchChangeCoupling, file, Limit: limit), cancellationToken: token)
-                .ConfigureAwait(false)
+            var result in registry is null
+                ? []
+                : await registry
+                    .CallAsync(new(Capabilities.ArchChangeCoupling, file, Limit: limit), cancellationToken: token)
+                    .ConfigureAwait(false)
         )
         {
             if (result.Error is not null)
@@ -51,27 +70,36 @@ public static class ChangeCoupling
                 }
             }
         }
-        var partners = byPath
-            .Values.OrderByDescending(partner => partner.Together)
-            .ThenByDescending(partner => partner.Share)
-            .ThenBy(partner => partner.Path, StringComparer.Ordinal);
-        return new((limit > 0 ? partners.Take(limit) : partners).ToArray(), errors);
+        return new(Ranked(byPath.Values, limit), errors);
     }
 
+    /// <summary>The code files changed most in the window, each with the files it changes together with.</summary>
     public static async Task<ChangeHotspots> HotspotsAsync(
         GitRepository repository,
-        IProviderRegistry? registry,
         int limit,
         int partners,
         CancellationToken token,
         TimeProvider? clock = null
+    ) =>
+        Hotspots(
+            await HistoryAsync(repository, token, clock).ConfigureAwait(false),
+            repository.Root,
+            limit,
+            partners,
+            token
+        );
+
+    public static ChangeHotspots Hotspots(
+        ChangeHistory history,
+        string root,
+        int limit,
+        int partners,
+        CancellationToken token
     )
     {
-        var churn = await repository
-            .ChurnAsync((clock ?? TimeProvider.System).GetUtcNow() - Window, token)
-            .ConfigureAwait(false);
-        var files = new AnalysisRepository(repository.Root, [], token);
-        var output = churn
+        ArgumentNullException.ThrowIfNull(history);
+        var files = new AnalysisRepository(root, [], token);
+        var output = history
             .Counts.Where(pair =>
                 Code(pair.Key)
                 && !TaskParsing.IsTestFile(pair.Key)
@@ -79,26 +107,31 @@ public static class ChangeCoupling
                 && pair.Value > 1
                 && files.Exists(pair.Key)
             )
-            .Select(pair => new ChangeHotspot(pair.Key, pair.Value))
-            .OrderByDescending(hotspot => hotspot.Commits)
-            .ThenBy(hotspot => hotspot.Path, StringComparer.Ordinal)
+            .OrderByDescending(pair => pair.Value)
+            .ThenBy(pair => pair.Key, StringComparer.Ordinal)
             .Take(Math.Max(0, limit))
-            .ToArray();
-        List<string> errors = [];
-        if (registry is not null && partners > 0)
-        {
-            for (var index = 0; index < output.Length; index++)
+            .Select(pair =>
             {
-                var result = await PartnersAsync(registry, output[index].Path, partners, token).ConfigureAwait(false);
-                output[index] = output[index] with { Partners = result.Partners.Count is 0 ? null : result.Partners };
-                errors.AddRange(result.Errors.Where(error => !errors.Contains(error, StringComparer.Ordinal)));
-            }
-        }
-
-        return new(output, churn.Commits, errors);
+                var together =
+                    partners > 0
+                        ? history
+                            .Partners(pair.Key, 0)
+                            .Where(partner => !Generated(partner.Path) && files.Exists(partner.Path))
+                            .Take(partners)
+                            .ToArray()
+                        : [];
+                return new ChangeHotspot(pair.Key, pair.Value, together.Length is 0 ? null : together);
+            })
+            .ToArray();
+        return new(output, history.Commits, []);
     }
 
+    /// <summary>
+    /// The usual partners of the changed files that the change leaves out, counted from the history; without one
+    /// (no Git repository), from the configured providers.
+    /// </summary>
     public static async Task<ChangeCheck> CheckAsync(
+        ChangeHistory? history,
         IProviderRegistry? registry,
         string root,
         IReadOnlyList<string> changed,
@@ -111,12 +144,16 @@ public static class ChangeCoupling
         List<string> errors = [];
         foreach (var file in changed.Where(Code).Take(30))
         {
-            var result = await PartnersAsync(registry, file, 20, token).ConfigureAwait(false);
+            var result = await PartnersAsync(history is null ? registry : null, file, 20, token, history)
+                .ConfigureAwait(false);
             errors.AddRange(result.Errors.Where(error => !errors.Contains(error, StringComparer.Ordinal)));
             missing.AddRange(
                 result
                     .Partners.Where(partner =>
-                        Usual(partner) && !included.Contains(partner.Path) && files.Exists(partner.Path)
+                        Usual(partner)
+                        && !Generated(partner.Path)
+                        && !included.Contains(partner.Path)
+                        && files.Exists(partner.Path)
                     )
                     .Select(partner => new MissingChangePartner(file, partner))
             );
@@ -129,6 +166,15 @@ public static class ChangeCoupling
                 .ToArray(),
             errors
         );
+    }
+
+    internal static IReadOnlyList<ChangePartner> Ranked(IEnumerable<ChangePartner> partners, int limit)
+    {
+        var ranked = partners
+            .OrderByDescending(partner => partner.Together)
+            .ThenByDescending(partner => partner.Share)
+            .ThenBy(partner => partner.Path, StringComparer.Ordinal);
+        return (limit > 0 ? ranked.Take(limit) : ranked).ToArray();
     }
 
     private static bool Code(string file) =>
@@ -165,5 +211,72 @@ public static class ChangeCoupling
                     || part.Equals("bin", StringComparison.OrdinalIgnoreCase)
                     || part.Equals("obj", StringComparison.OrdinalIgnoreCase)
                 );
+    }
+}
+
+/// <summary>
+/// The files changed together in the window's commits, counted in-process: a partner's together count is the
+/// commits that changed both files, its share the part of the file's own commits that did. As ripwire's
+/// co-change, a partner needs at least <see cref="ChangeCoupling.MinTogether"/> commits together.
+/// </summary>
+public sealed class ChangeHistory
+{
+    private readonly IReadOnlyList<IReadOnlyList<string>> _changes;
+    private readonly Dictionary<string, List<int>> _commitsOf = new(StringComparer.Ordinal);
+
+    public ChangeHistory(GitChurn churn)
+    {
+        ArgumentNullException.ThrowIfNull(churn);
+        Counts = churn.Counts;
+        Commits = churn.Commits;
+        _changes = churn.Changes;
+        for (var index = 0; index < _changes.Count; index++)
+        {
+            foreach (var file in _changes[index])
+            {
+                if (!_commitsOf.TryGetValue(file, out var commits))
+                {
+                    _commitsOf[file] = commits = [];
+                }
+
+                commits.Add(index);
+            }
+        }
+    }
+
+    public IReadOnlyDictionary<string, int> Counts { get; }
+
+    public int Commits { get; }
+
+    /// <summary>The file's partners, most often together first; limit 0 for all of them.</summary>
+    public IReadOnlyList<ChangePartner> Partners(string file, int limit)
+    {
+        if (!_commitsOf.TryGetValue(file, out var commits))
+        {
+            return [];
+        }
+
+        Dictionary<string, int> together = new(StringComparer.Ordinal);
+        // a file is its own partner in none of its commits; a pair seen fewer than MinTogether times is chance
+        foreach (var index in commits)
+        {
+            foreach (var other in _changes[index].Where(other => other != file))
+            {
+                together[other] = together.GetValueOrDefault(other) + 1;
+            }
+        }
+
+        return ChangeCoupling.Ranked(
+            together
+                .Where(pair => pair.Value >= ChangeCoupling.MinTogether)
+                .Select(pair => new ChangePartner(
+                    pair.Key,
+                    pair.Value,
+                    Math.Round((double)pair.Value / commits.Count, 3, MidpointRounding.AwayFromZero),
+                    "harness",
+                    "git log"
+                )),
+            limit
+        );
     }
 }

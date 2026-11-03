@@ -14,12 +14,21 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
     {
         var limit = request.Limit <= 0 ? 10 : request.Limit;
         List<string> notes = [];
+        // partners are counted from the Git history; a provider offering arch.change_coupling adds to one file's
+        var history = location.Repository is null
+            ? null
+            : await ChangeCoupling.HistoryAsync(location.Repository, token).ConfigureAwait(false);
         if (
-            registry is null
-            || !registry.Capabilities().Any(capability => capability.Capability == Capabilities.ArchChangeCoupling)
+            history is null
+            && (
+                registry is null
+                || !registry.Capabilities().Any(capability => capability.Capability == Capabilities.ArchChangeCoupling)
+            )
         )
         {
-            notes.Add("no provider offers arch.change_coupling (ripwire does): partners are unknown");
+            notes.Add(
+                "no Git history and no provider offers arch.change_coupling (ripwire does): partners are unknown"
+            );
         }
 
         var report = new ChangeCouplingReport();
@@ -27,7 +36,9 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
         if (request.File.Length > 0)
         {
             var file = request.File.StartsWith("./", StringComparison.Ordinal) ? request.File[2..] : request.File;
-            var result = await ChangeCoupling.PartnersAsync(registry, file, limit, token).ConfigureAwait(false);
+            var result = await ChangeCoupling
+                .PartnersAsync(registry, file, limit, token, history)
+                .ConfigureAwait(false);
             report = report with { Partners = result.Partners.Count is 0 ? null : result.Partners };
             errors = result.Errors;
         }
@@ -43,7 +54,9 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
 
                 changed = await location.Repository.DirtyPathsAsync(token).ConfigureAwait(false);
             }
-            var result = await ChangeCoupling.CheckAsync(registry, location.Root, changed, token).ConfigureAwait(false);
+            var result = await ChangeCoupling
+                .CheckAsync(history, registry, location.Root, changed, token)
+                .ConfigureAwait(false);
             report = report with
             {
                 Changed = changed.Count is 0 ? null : changed,
@@ -57,14 +70,12 @@ public sealed partial class HarnessStateSession : IChangeCouplingSession
         }
         else
         {
-            if (location.Repository is null)
+            if (history is null)
             {
                 throw new InvalidOperationException("hotspots need a Git repository");
             }
 
-            var result = await ChangeCoupling
-                .HotspotsAsync(location.Repository, registry, limit, 3, token)
-                .ConfigureAwait(false);
+            var result = ChangeCoupling.Hotspots(history, location.Root, limit, 3, token);
             report = report with
             {
                 Hotspots = result.Hotspots.Count is 0 ? null : result.Hotspots,

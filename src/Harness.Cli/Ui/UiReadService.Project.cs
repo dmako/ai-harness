@@ -22,7 +22,7 @@ internal sealed partial class UiReadService
             "summary" => UiJson.Node(new JsonObjectMap { ["project"] = project }),
             "health" => await HealthAsync(project, request, token),
             "architecture" => await ArchitectureAsync(project, request, token),
-            "coupling" => await CouplingAsync(project, request, token),
+            "coupling" => await CouplingAsync(project, token),
             "snippet" => await SnippetAsync(project, request, token),
             "structure" => await StructureAsync(project, token),
             "complexity" => await ComplexityAsync(project, token),

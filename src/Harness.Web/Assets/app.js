@@ -3503,19 +3503,18 @@ function couplingSection(p) {
         miss.map((m) => h("p", { class: "cline" }, h("code", {}, m.partner.path), " usually changes with ", h("code", {}, m.changed),
           h("span", { class: "muted" }, ` (${m.partner.together} commits together, ${pct(m.partner.share)} of its commits)`)))),
       c.changed && !miss.length && h("p", { class: "okay" }, `✓ Your uncommitted change (${plural(c.changed.length, "file")}) leaves out none of their usual partners.`),
-      !c.providers && hs.length > 0 && h("p", { class: "muted small" }, "No provider offers change coupling (ripwire does), so the files that change together are unknown; the counts are Git's."),
       hs.length > 0 && Object.keys(fileCx).length > 0 && hotspotChart(hs, fileCx, th),
       hs.length ? h("table", { class: "hot" },
-        h("thead", {}, h("tr", {}, h("th", {}, "file"), h("th", {}, "commits"), h("th", { class: "cxcell", title: "its most complex function" }, "complexity"), c.providers ? h("th", {}, "changes together with") : null)),
+        h("thead", {}, h("tr", {}, h("th", {}, "file"), h("th", {}, "commits"), h("th", { class: "cxcell", title: "its most complex function" }, "complexity"), h("th", {}, "changes together with"))),
         h("tbody", {}, hs.map((x) => {
           const bar = h("span", { class: "cbar" }); bar.style.setProperty("--w", `${(100 * x.commits) / most}%`);
           return h("tr", {}, h("td", { class: "cfile" }, filePath(x.path)), h("td", {}, h("div", { class: "cbarcell" }, bar, h("span", { class: "n" }, x.commits))), h("td", { class: "cxcell" }, cxCell(x)),
-            !c.providers ? null : h("td", {}, (x.partners || []).length ? h("div", { class: "cparts" }, x.partners.map(partner)) : h("span", { class: "muted" }, "nothing often")));
+            h("td", {}, (x.partners || []).length ? h("div", { class: "cparts" }, x.partners.map(partner)) : h("span", { class: "muted" }, "nothing often")));
         })))
         : h("p", { class: "empty" }, "No code file changed more than once in the window."),
       (c.errors || []).length > 0 && h("p", { class: "muted small" }, c.errors.join("; ")));
   }).catch((e) => fill(body, h("p", { class: "error" }, e.message)));
-  return section("Change coupling", "Code files changed most in the last 180 days (hotspots: harness's count from Git) and the files that change with them (co-change, from providers offering it; the percentage is the share of the file's commits). A partner that usually changes but was not touched may have been forgotten.", body);
+  return section("Change coupling", "Code files changed most in the last 180 days and the files that change with them, both counted from Git's history (the percentage is the share of the file's commits). A partner that usually changes but was not touched may have been forgotten.", body);
 }
 
 // hotspotChart: each changing file by how often it changed (across) and
