@@ -25,7 +25,15 @@ public static class ConfigurationLoader
             string.IsNullOrEmpty(root) ? "" : ConfigurationPaths.ProjectPath(root)
         );
 
-    public static LoadedConfiguration LoadFiles(string globalPath, string projectPath)
+    public static LoadedConfiguration LoadFiles(string globalPath, string projectPath) =>
+        LoadFiles(globalPath, projectPath, null);
+
+    /// <summary>Loads the layers, reading a file's planned text instead of the file when one is given (a dry run).</summary>
+    internal static LoadedConfiguration LoadFiles(
+        string globalPath,
+        string projectPath,
+        IReadOnlyDictionary<string, string>? planned
+    )
     {
         var effective = HarnessJson.SerializeToNode(new HarnessConfiguration(), JsonOptions)!.AsObject();
         var sources = new string[2];
@@ -41,7 +49,7 @@ public static class ConfigurationLoader
 
             try
             {
-                var text = StrictUtf8.GetString(File.ReadAllBytes(path));
+                var text = planned?.GetValueOrDefault(path) ?? StrictUtf8.GetString(File.ReadAllBytes(path));
                 var layer = Parse(text.StartsWith('\uFEFF') ? text[1..] : text);
                 // Validate unknown keys and types before pack expansion can obscure the source.
                 _ = HarnessJson.Deserialize<HarnessConfiguration>(layer, JsonOptions);
