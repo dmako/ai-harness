@@ -421,7 +421,8 @@ internal sealed partial class UiReadService : IUiWriteApi
     // exit, notes).
     private static JsonNode? ApproveBlueprint(HarnessDatabase database, UiWriteRequest request, CancellationToken token)
     {
-        var edit = new UiWriteBody(request.Body, "edit").Object("edit");
+        var body = new UiWriteBody(request.Body, "edit", "same_name");
+        var edit = body.Object("edit");
         BlueprintDefinition? definition = null;
         if (edit is not null)
         {
@@ -435,10 +436,12 @@ internal sealed partial class UiReadService : IUiWriteApi
             );
         }
 
+        // same_name: merge into the blueprint already titled so, or create a separate one (the author chooses)
         var approved = new TaskStore(database).ApproveBlueprint(
             request.Route.Value("pid"),
             definition,
             HumanActor.Current(),
+            body.Text("same_name"),
             token
         );
         return UiJson.Node(

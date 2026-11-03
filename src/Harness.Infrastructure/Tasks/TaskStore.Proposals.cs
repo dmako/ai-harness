@@ -100,7 +100,21 @@ public sealed partial class TaskStore
                     proposals.Add(ReadProposal(reader));
                 }
 
-                return (IReadOnlyList<TaskProposal>)proposals;
+                // a pending proposal names its blueprint as the blueprints are now: one approved since matches
+                return (IReadOnlyList<TaskProposal>)
+                    proposals
+                        .Select(proposal =>
+                            proposal.Status is "pending"
+                                ? proposal with
+                                {
+                                    Task = proposal.Task with
+                                    {
+                                        Blueprint = ResolveBlueprint(c, t, proposal.Task.Blueprint),
+                                    },
+                                }
+                                : proposal
+                        )
+                        .ToArray();
             },
             cancellationToken
         );
@@ -186,12 +200,17 @@ public sealed partial class TaskStore
                     throw new InvalidOperationException($"{id} was already {proposal.Status}");
                 }
 
+                var definition = edit ?? proposal.Task;
+                var source = "proposal:" + id;
                 var task = Create(
                     c,
                     t,
-                    edit ?? proposal.Task,
+                    definition with
+                    {
+                        Blueprint = BlueprintFor(c, t, definition.Blueprint, source),
+                    },
                     prefix,
-                    new(by, "proposal:" + id, $"proposed by {proposal.ProposedBy} ({id}), approved by {by}")
+                    new(by, source, $"proposed by {proposal.ProposedBy} ({id}), approved by {by}")
                 );
                 return new TaskApproval(Decide(c, t, proposal, "approved", by, "", task.Id, Stamp()), task);
             },

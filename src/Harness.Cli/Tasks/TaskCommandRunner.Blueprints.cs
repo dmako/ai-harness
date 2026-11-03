@@ -157,7 +157,13 @@ internal sealed partial class TaskCommandRunner
         CancellationToken cancellationToken
     )
     {
-        var approved = store.ApproveBlueprint(settings.Id, null, actor.Name, cancellationToken);
+        var approved = store.ApproveBlueprint(
+            settings.Id,
+            null,
+            actor.Name,
+            (settings as TaskApproveSettings)?.SameName ?? "",
+            cancellationToken
+        );
         if (settings.Json)
         {
             await JsonAsync(

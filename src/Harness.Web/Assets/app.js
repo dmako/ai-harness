@@ -4759,8 +4759,24 @@ function blueprintProposalCard(p, x) {
   const isNew = !x.changes;
   const approveForm = () => {
     const f = blueprintFields(p, d, isNew);
+    // a blueprint titled the same may exist already (a task approved first made it): the author says merge or new
+    const same = h("div", {});
+    let sameName = "";
+    if (isNew) api(projectAPI(p, "blueprints")).then((r) => {
+      const title = (d.title || "").trim().toLowerCase();
+      const b = (r.blueprints || []).find((o) => o.defined && (o.title || "").trim().toLowerCase() === title);
+      if (!b) return;
+      const name = "bpsame-" + x.id;
+      const choice = (value, text) => h("label", { class: "choice" },
+        h("input", { type: "radio", name, value, onchange: () => { sameName = value; } }), h("span", {}, text));
+      fill(same, h("p", { class: "hint" }, `A blueprint titled “${b.title}” exists already (${b.id}). Which should this be?`),
+        h("div", { class: "choices" },
+          choice("merge", `Merge into ${b.id}: this restates it; its id and tasks stay`),
+          choice("new", "Create a separate blueprint")));
+    }).catch(() => {});
     return writeForm(panel, isNew ? `Create this blueprint? ${x.proposed_by} is recorded as the proposer.` : `Restate ${x.changes} like this? Its id and tasks stay.`,
-      [f.nodes], isNew ? "Create the blueprint" : "Save the blueprint", () => post(url("approve"), { edit: f.value() }));
+      [f.nodes, same], isNew ? "Create the blueprint" : "Save the blueprint",
+      () => post(url("approve"), { edit: f.value(), ...(sameName ? { same_name: sameName } : {}) }));
   };
   const rejectForm = () => {
     const note = h("textarea", { rows: 2, placeholder: "Why not (optional)" });

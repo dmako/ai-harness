@@ -924,12 +924,20 @@ internal static class CommandBindings
         command.Arguments.Add(idOption);
         var prefixOption = new Option<string>("--prefix") { DefaultValueFactory = _ => "", Description = null };
         command.Options.Add(prefixOption);
+        var sameNameOption = new Option<string>("--same-name")
+        {
+            DefaultValueFactory = _ => "",
+            Description = "A blueprint proposal titled like an existing blueprint: merge (into it) or new",
+        };
+        sameNameOption.AcceptOnlyFromAmong("", "merge", "new");
+        command.Options.Add(sameNameOption);
         return result => new Harness.Cli.Tasks.TaskApproveSettings
         {
             Project = result.GetValue(projectOption) ?? "",
             Json = result.GetValue(jsonOption),
             Id = result.GetValue(idOption) ?? "",
             Prefix = result.GetValue(prefixOption) ?? "",
+            SameName = result.GetValue(sameNameOption) ?? "",
         };
     }
 

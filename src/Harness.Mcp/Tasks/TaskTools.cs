@@ -316,7 +316,7 @@ internal static class TaskTools
             ["note"] =
                 (
                     unknown
-                        ? $"No blueprint {blueprint} exists (task_blueprints lists them); the task would start it. "
+                        ? $"No blueprint {blueprint} exists yet (task_blueprints lists them): when the task is approved it joins the blueprint of that id or title (one you proposed, if approved by then), else one is created. "
                         : ""
                 )
                 + "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not start it until it is a task.",

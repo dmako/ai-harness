@@ -388,6 +388,94 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task ATaskProposedForANewBlueprintJoinsItAndTheBlueprintIsMergedIntoTheOneItsTaskMade()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var tasks = new TaskStore(database);
+        const string Title = "Performance Optimizations";
+        var blueprint = tasks.ProposeBlueprint(
+            "",
+            new("", Title, "Fast views", ["opens in a second"]),
+            "",
+            "codex",
+            Token
+        );
+        TaskProposal Propose(string title) =>
+            tasks.Propose(
+                new TaskDefinition
+                {
+                    Title = title,
+                    Goal = "Know where the time goes",
+                    Acceptance = ["Measured"],
+                    Blueprint = Title,
+                },
+                "seen",
+                "codex",
+                Token
+            );
+        // the first task was approved before its blueprint: it made BP-001, titled as proposed
+        tasks.Approve(Propose("Measure the views").Id, null, "", "author", Token);
+        var second = Propose("Cache the views");
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/inbox" }
+                );
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the task…')"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('select[aria-label=Blueprint]')");
+                (await ValueAsync(page, "document.querySelector('select[aria-label=Blueprint]').value"))
+                    .Should()
+                    .Be("BP-001", "the box shows the blueprint the title matches, by id");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the task').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() => tasks.GetProposal(second.Id, Token).Status is "approved");
+                tasks.Get(tasks.GetProposal(second.Id, Token).Result, Token).Definition.Blueprint.Should().Be("BP-001");
+
+                await page.EvaluateAsync("location.reload()");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('button')].some(b => b.textContent === 'Create the blueprint…')"
+                );
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint…').click()"
+                );
+                await page.WaitAsync("!!document.querySelector('input[name^=bpsame-][value=merge]')");
+                (await ValueAsync(page, "document.querySelector('form.aform').textContent"))
+                    .Should()
+                    .Contain("exists already (BP-001)");
+                // asked, not guessed: without a choice the server refuses
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint').click()"
+                );
+                await page.WaitAsync("!document.querySelector('form.aform .error').hidden");
+                tasks.GetBlueprintProposal(blueprint.Id, Token).Status.Should().Be("pending");
+                await page.EvaluateAsync("document.querySelector('input[name^=bpsame-][value=merge]').click()");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    tasks.GetBlueprintProposal(blueprint.Id, Token).Status is "approved"
+                );
+                var merged = tasks.Blueprints(Token).Should().ContainSingle().Subject;
+                (merged.Definition.Id, merged.Definition.Goal, merged.Total).Should().Be(("BP-001", "Fast views", 2));
+            }
+        );
+    }
+
+    [Fact]
     public async Task ProposedTaskIsApprovedFromTheInboxIntoItsBlueprint()
     {
         var executable = Browser();

@@ -458,10 +458,10 @@ public sealed class TaskStoreTests
             .Should()
             .Equal(created.Id, changed.Id, rejected.Id);
 
-        var approved = s.Store.ApproveBlueprint(created.Id, null, "human", Token);
+        var approved = s.Store.ApproveBlueprint(created.Id, null, "human", cancellationToken: Token);
         approved.Blueprint.Id.Should().Be("M2", "a new one gets the next free id");
         approved.Proposal.Result.Should().Be("M2");
-        s.Store.ApproveBlueprint(changed.Id, new("", "Restated by the author", "goal"), "human", Token)
+        s.Store.ApproveBlueprint(changed.Id, new("", "Restated by the author", "goal"), "human", cancellationToken: Token)
             .Blueprint.Id.Should()
             .Be("M1");
         s.Store.Blueprints(Token)
@@ -470,7 +470,7 @@ public sealed class TaskStoreTests
             .Equal(("M1", "Restated by the author"), ("M2", "Two"));
         s.Store.RejectBlueprint(rejected.Id, " not now ", "human", Token).Note.Should().Be("not now");
         FluentActions
-            .Invoking(() => s.Store.ApproveBlueprint(rejected.Id, null, "human", Token))
+            .Invoking(() => s.Store.ApproveBlueprint(rejected.Id, null, "human", cancellationToken: Token))
             .Should()
             .Throw<InvalidOperationException>();
         FluentActions
@@ -486,7 +486,7 @@ public sealed class TaskStoreTests
         var gone = s.Store.ProposeBlueprint("M2", new("", "Late"), "", "agent", Token);
         s.Store.RemoveBlueprint("M2", BlueprintTasks.Keep, "", "human", Token);
         FluentActions
-            .Invoking(() => s.Store.ApproveBlueprint(gone.Id, null, "human", Token))
+            .Invoking(() => s.Store.ApproveBlueprint(gone.Id, null, "human", cancellationToken: Token))
             .Should()
             .Throw<ArgumentException>("its blueprint was removed meanwhile");
     }

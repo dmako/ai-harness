@@ -26,6 +26,9 @@ internal sealed class TaskProposalListSettings : InspectSettings
 internal sealed class TaskApproveSettings : TaskIdSettings
 {
     public string Prefix { get; init; } = "";
+
+    /// <summary>A blueprint proposal whose title a blueprint has already: merge into it, or new.</summary>
+    public string SameName { get; init; } = "";
 }
 
 internal sealed class TaskClaimCommand(TaskCommandRunner runner)

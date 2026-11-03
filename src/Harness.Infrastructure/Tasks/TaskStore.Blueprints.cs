@@ -240,6 +240,33 @@ public sealed partial class TaskStore
         return command.ExecuteScalar() as string ?? name;
     }
 
+    /// <summary>
+    /// The blueprint an approved task is filed into, matched as the blueprints are now (by id, else by title, any
+    /// case): a proposal names it as its agent did, maybe before the blueprint was approved. A title that matches
+    /// none is created, defined, with the next free id; an id that matches none stays one only tasks name.
+    /// </summary>
+    private string BlueprintFor(SqliteConnection c, SqliteTransaction t, string name, string source)
+    {
+        var resolved = ResolveBlueprint(c, t, name);
+        var ids = BlueprintIds(c, t);
+        // an id nothing has yet stays one only tasks name, as before; a title becomes a blueprint
+        return resolved.Length is 0 || ids.Contains(resolved) || NumberedId.IsMatch(resolved)
+            ? resolved
+            : CreateBlueprint(c, t, new(NextBlueprintId(ids), resolved, "", [], ""), source).Id;
+    }
+
+    /// <summary>The described blueprint with this title, any case; empty when there is none.</summary>
+    private static string TitledBlueprint(SqliteConnection c, SqliteTransaction t, string title)
+    {
+        using var command = Command(
+            c,
+            t,
+            "SELECT id FROM blueprints WHERE title=$title COLLATE NOCASE ORDER BY ordinal,id LIMIT 1",
+            ("$title", title.Trim())
+        );
+        return command.ExecuteScalar() as string ?? "";
+    }
+
     /// <summary>Describes a new blueprint, placed after the others.</summary>
     public BlueprintDefinition CreateBlueprint(
         BlueprintDefinition definition,
