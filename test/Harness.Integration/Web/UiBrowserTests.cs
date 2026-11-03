@@ -394,7 +394,7 @@ public sealed class UiBrowserTests
         using var fixture = await SyncFixture.CreateAsync();
         using var database = fixture.Database();
         var tasks = new TaskStore(database);
-        const string Title = "Performance Optimizations";
+        const string Title = "Awasome Test 1";
         var blueprint = tasks.ProposeBlueprint(
             "",
             new("", Title, "Fast views", ["opens in a second"]),
@@ -453,6 +453,8 @@ public sealed class UiBrowserTests
                     "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint…').click()"
                 );
                 await page.WaitAsync("!!document.querySelector('input[name^=bpsame-][value=merge]')");
+                // the suggested id arrives a moment later; the browser holds the form until it has one
+                await page.WaitAsync("document.querySelector('input[aria-label=Id]')?.value.length > 0");
                 (await ValueAsync(page, "document.querySelector('form.aform').textContent"))
                     .Should()
                     .Contain("exists already (BP-001)");
@@ -1597,7 +1599,15 @@ public sealed class UiBrowserTests
                 || value.ValueKind is not JsonValueKind.True
             )
             {
-                await Task.Delay(100, timeout.Token);
+                try
+                {
+                    await Task.Delay(100, timeout.Token);
+                }
+                catch (OperationCanceledException) when (!Token.IsCancellationRequested)
+                {
+                    // name what the page never showed: a bare cancellation does not say which wait it was
+                    throw new TimeoutException("the page did not reach " + expression + " in 25 s");
+                }
             }
         }
     }

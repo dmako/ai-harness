@@ -104,7 +104,18 @@ public sealed partial class TaskStore
                     proposals.Add(ReadBlueprintProposal(reader));
                 }
 
-                return (IReadOnlyList<BlueprintProposal>)proposals;
+                // a new blueprint whose title a blueprint has since (a task approved first made it) says which
+                return (IReadOnlyList<BlueprintProposal>)
+                    proposals
+                        .Select(proposal =>
+                            proposal is { Status: "pending", Blueprint.Length: 0 }
+                                ? proposal with
+                                {
+                                    SameTitle = TitledBlueprint(c, t, proposal.Definition.Title),
+                                }
+                                : proposal
+                        )
+                        .ToArray();
             },
             cancellationToken
         );

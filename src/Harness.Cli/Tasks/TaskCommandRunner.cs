@@ -240,6 +240,11 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                 await output.WriteLineAsync(
                     $"{proposal.Id}  [{proposal.Status}] {proposal.Task.Title}  (by {proposal.ProposedBy})"
                 );
+                if (proposal.Task.Blueprint.Length is not 0)
+                {
+                    await output.WriteLineAsync("    blueprint: " + proposal.Task.Blueprint);
+                }
+
                 if (proposal.Task.Goal.Length is not 0)
                 {
                     await output.WriteLineAsync("    goal: " + proposal.Task.Goal);

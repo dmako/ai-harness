@@ -4762,18 +4762,15 @@ function blueprintProposalCard(p, x) {
     // a blueprint titled the same may exist already (a task approved first made it): the author says merge or new
     const same = h("div", {});
     let sameName = "";
-    if (isNew) api(projectAPI(p, "blueprints")).then((r) => {
-      const title = (d.title || "").trim().toLowerCase();
-      const b = (r.blueprints || []).find((o) => o.defined && (o.title || "").trim().toLowerCase() === title);
-      if (!b) return;
+    if (isNew && x.same_title) {
       const name = "bpsame-" + x.id;
       const choice = (value, text) => h("label", { class: "choice" },
         h("input", { type: "radio", name, value, onchange: () => { sameName = value; } }), h("span", {}, text));
-      fill(same, h("p", { class: "hint" }, `A blueprint titled “${b.title}” exists already (${b.id}). Which should this be?`),
+      fill(same, h("p", { class: "hint" }, `A blueprint titled “${d.title}” exists already (${x.same_title}). Which should this be?`),
         h("div", { class: "choices" },
-          choice("merge", `Merge into ${b.id}: this restates it; its id and tasks stay`),
+          choice("merge", `Merge into ${x.same_title}: this restates it; its id and tasks stay`),
           choice("new", "Create a separate blueprint")));
-    }).catch(() => {});
+    }
     return writeForm(panel, isNew ? `Create this blueprint? ${x.proposed_by} is recorded as the proposer.` : `Restate ${x.changes} like this? Its id and tasks stay.`,
       [f.nodes, same], isNew ? "Create the blueprint" : "Save the blueprint",
       () => post(url("approve"), { edit: f.value(), ...(sameName ? { same_name: sameName } : {}) }));
@@ -4787,6 +4784,7 @@ function blueprintProposalCard(p, x) {
     h("div", { class: "mtype" }, isNew ? "New blueprint" : "Blueprint change", !isNew && h("span", { class: "tag" }, x.changes),
       x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
     h("h4", { class: "ptitle2" }, d.title),
+    x.same_title && x.status === "pending" && h("p", { class: "why" }, h("b", {}, "Same title as: "), x.same_title, " (approving asks: merge into it, or a separate one)"),
     d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
     x.reason && h("p", { class: "why" }, h("b", {}, "Why proposed: "), x.reason),
     exit.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Done when (${exit.length})`), h("ul", { class: "donewhen" }, exit.map((e) => h("li", {}, e)))),

@@ -50,7 +50,14 @@ public sealed record BlueprintProposal(
     string DecidedAt = "",
     string Note = "",
     string Result = ""
-);
+)
+{
+    /// <summary>
+    /// For a pending new blueprint: the blueprint that has its title already (a task approved first made it), which
+    /// its approval merges into or leaves beside a new one, as the author says.
+    /// </summary>
+    public string SameTitle { get; init; } = "";
+}
 
 public sealed record BlueprintApproval(BlueprintProposal Proposal, BlueprintDefinition Blueprint);
 

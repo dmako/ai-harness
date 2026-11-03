@@ -125,6 +125,68 @@ public sealed class BlueprintMatchingTests
         store.Blueprints(Token).Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task ATitleEndingInANumberIsATitleWhicheverIsApprovedFirst()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+        const string Numbered = "Awasome Test 1";
+        var blueprint = store.ProposeBlueprint("", new("", Numbered, "Try it out"), "", "codex", Token);
+        var waiting = Propose(store, Numbered);
+
+        store
+            .Approve(Propose(store, Numbered).Id, null, "", "author", Token)
+            .Task.Definition.Blueprint.Should()
+            .Be("BP-001");
+
+        var made = store.Blueprints(Token).Should().ContainSingle().Subject.Definition;
+        (made.Id, made.Title).Should().Be(("BP-001", Numbered), "harness makes the id; the name is its title");
+        store.Proposals("pending", Token).Single(p => p.Id == waiting.Id).Task.Blueprint.Should().Be("BP-001");
+        store.BlueprintProposals("pending", Token).Single().SameTitle.Should().Be("BP-001");
+        async Task<(int Code, string Output, string Error)> HarnessAsync(params string[] args) =>
+            await fixture.ProcessAsync("dotnet", [UiFixture.CliPath, "tasks", .. args, "--project", fixture.Root]);
+        var listed = await HarnessAsync("proposals");
+        listed.Code.Should().Be(0, listed.Error);
+        listed.Output.Should().Contain("blueprint: BP-001").And.Contain("BP-001 has this title already");
+        JsonNode.Parse((await HarnessAsync("proposals", "--json")).Output)!["blueprint_proposals"]![0]!["same_title"]!
+            .GetValue<string>()
+            .Should()
+            .Be("BP-001");
+
+        var merged = await HarnessAsync("approve", blueprint.Id, "--same-name", "merge");
+        merged.Code.Should().Be(0, merged.Error);
+        store.Approve(waiting.Id, null, "", "author", Token).Task.Definition.Blueprint.Should().Be("BP-001");
+        var only = store.Blueprints(Token).Should().ContainSingle().Subject;
+        (only.Definition.Id, only.Definition.Goal, only.Total).Should().Be(("BP-001", "Try it out", 2));
+    }
+
+    [Theory]
+    [InlineData("M17", "M17")]
+    [InlineData("BP-007", "BP-007")]
+    [InlineData("Release 2", "BP-001")]
+    [InlineData("Phase-2 cleanup", "BP-001")]
+    [InlineData("v2", "v2")]
+    public async Task OnlyAWellFormedIdMatchingNoBlueprintStaysAnId(string named, string filed)
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        var store = new TaskStore(database);
+
+        var task = store.Approve(Propose(store, named).Id, null, "", "author", Token).Task;
+
+        task.Definition.Blueprint.Should().Be(filed);
+        var blueprint = store.Blueprints(Token).Should().ContainSingle().Subject;
+        if (filed == named)
+        {
+            blueprint.Defined.Should().BeFalse("a well-formed id stays one only tasks name, as before");
+        }
+        else
+        {
+            (blueprint.Defined, blueprint.Definition.Title).Should().Be((true, named));
+        }
+    }
+
     private static TaskProposal Propose(TaskStore store, string blueprint) =>
         store.Propose(
             new TaskDefinition

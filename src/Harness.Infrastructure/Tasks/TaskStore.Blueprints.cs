@@ -242,15 +242,16 @@ public sealed partial class TaskStore
 
     /// <summary>
     /// The blueprint an approved task is filed into, matched as the blueprints are now (by id, else by title, any
-    /// case): a proposal names it as its agent did, maybe before the blueprint was approved. A title that matches
-    /// none is created, defined, with the next free id; an id that matches none stays one only tasks name.
+    /// case): a proposal names it as its agent did, maybe before the blueprint was approved. A name that matches
+    /// none is a title, and its blueprint is created, defined, with the next free id; only a well-formed id (BP-007,
+    /// M17) that matches none stays one only tasks name. 'Awasome Test 1' is a title, though it ends in a number.
     /// </summary>
     private string BlueprintFor(SqliteConnection c, SqliteTransaction t, string name, string source)
     {
         var resolved = ResolveBlueprint(c, t, name);
         var ids = BlueprintIds(c, t);
         // an id nothing has yet stays one only tasks name, as before; a title becomes a blueprint
-        return resolved.Length is 0 || ids.Contains(resolved) || NumberedId.IsMatch(resolved)
+        return resolved.Length is 0 || ids.Contains(resolved) || WellFormedId.IsMatch(resolved)
             ? resolved
             : CreateBlueprint(c, t, new(NextBlueprintId(ids), resolved, "", [], ""), source).Id;
     }
@@ -617,4 +618,8 @@ public sealed partial class TaskStore
 
     [GeneratedRegex(@"\A(.*?)([0-9]+)\z", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex NumberedId { get; }
+
+    /// <summary>What an agent may name as a blueprint id: letters, an optional dash, digits (BP-007, M17).</summary>
+    [GeneratedRegex(@"\A[A-Za-z]+-?[0-9]+\z", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex WellFormedId { get; }
 }

@@ -148,6 +148,7 @@ public static class TaskViews
             ["proposed_at"] = p.ProposedAt,
         };
         Add(view, "changes", p.Blueprint);
+        Add(view, "same_title", p.SameTitle);
         Add(view, "reason", p.Reason);
         Add(view, "decided_by", p.DecidedBy);
         Add(view, "decided_at", p.DecidedAt);
