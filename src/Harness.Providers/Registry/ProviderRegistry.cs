@@ -65,17 +65,15 @@ public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposabl
         }
     }
 
+    /// <summary>Discovers every provider side by side, each within its time budget; a stuck one holds back no other.</summary>
     public Task DiscoverAsync(CancellationToken cancellationToken = default) =>
-        Task.WhenAll(
-            Providers().OfType<IProviderDiscovery>().Select(provider => provider.DiscoverAsync(cancellationToken))
-        );
+        Task.WhenAll(Providers().Select(provider => DiscoverOneAsync(provider, cancellationToken)));
 
     public Task DiscoverContextAsync(CancellationToken cancellationToken = default) =>
         Task.WhenAll(
             Providers()
                 .Where(provider => InContext(provider.Name))
-                .OfType<IProviderDiscovery>()
-                .Select(provider => provider.DiscoverAsync(cancellationToken))
+                .Select(provider => DiscoverOneAsync(provider, cancellationToken))
         );
 
     public IReadOnlyList<CapabilityInfo> ContextCapabilities() =>
@@ -109,18 +107,13 @@ public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposabl
     )
     {
         var included = Providers().Where(provider => skip is null || !skip(provider.Name)).ToArray();
-        await Task.WhenAll(
-                included.OfType<IProviderDiscovery>().Select(provider => provider.DiscoverAsync(cancellationToken))
-            )
-            .ConfigureAwait(false);
-        var providers = included.Where(provider =>
-            provider.Capabilities().Any(info => info.Capability == request.Capability)
-        );
-        // Task.Run also isolates adapters doing synchronous work before their first await.
-        var results = await Task.WhenAll(
-                providers.Select(provider => CallOneAsync(provider, request, cancellationToken))
-            )
-            .ConfigureAwait(false);
+        // each provider is discovered and asked on its own: a slow one holds back no other
+        var results = (
+            await Task.WhenAll(included.Select(provider => DiscoverAndCallAsync(provider, request, cancellationToken)))
+                .ConfigureAwait(false)
+        )
+            .OfType<ProviderResult>()
+            .ToArray();
         Action<ProviderResult, ProviderRequest>? observer;
         Func<string, bool>? skipPath;
         lock (_gate)
@@ -142,6 +135,66 @@ public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposabl
             observer?.Invoke(results[i], request);
         }
         return results;
+    }
+
+    /// <summary>
+    /// Discovers a provider within its time budget: null when done (or nothing to discover), else why it was not,
+    /// a timeout or the caller's deadline.
+    /// </summary>
+    private async Task<ProviderException?> DiscoverOneAsync(IProvider provider, CancellationToken cancellationToken)
+    {
+        if (provider is not IProviderDiscovery discovery)
+        {
+            return null;
+        }
+
+        using var budget = new CancellationTokenSource(_timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, budget.Token);
+        try
+        {
+            await discovery.DiscoverAsync(linked.Token).ConfigureAwait(false);
+            return null;
+        }
+        catch (OperationCanceledException error) when (linked.IsCancellationRequested)
+        {
+            return new ProviderException(
+                provider.Name,
+                budget.IsCancellationRequested
+                    ? $"discovery timed out after {_timeout.TotalSeconds:g}s"
+                    : "operation cancelled",
+                innerException: error
+            );
+        }
+    }
+
+    /// <summary>
+    /// Discovers a provider within its time budget, then asks it when it offers the capability (null when it does
+    /// not). A discovery that does not finish in time, or that the caller's deadline cuts short, is that provider's
+    /// failure, named in its result; the call itself answers with the others.
+    /// </summary>
+    private async Task<ProviderResult?> DiscoverAndCallAsync(
+        IProvider provider,
+        ProviderRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var start = Stopwatch.GetTimestamp();
+        if (await DiscoverOneAsync(provider, cancellationToken).ConfigureAwait(false) is { } failure)
+        {
+            return new()
+            {
+                Error = failure,
+                Provider = provider.Name,
+                Capability = request.Capability,
+                Latency = Stopwatch.GetElapsedTime(start),
+                TimedOut = failure.Message.Contains("timed out", StringComparison.Ordinal),
+            };
+        }
+
+        // Task.Run in CallOneAsync also isolates adapters doing synchronous work before their first await.
+        return provider.Capabilities().Any(info => info.Capability == request.Capability)
+            ? await CallOneAsync(provider, request, cancellationToken).ConfigureAwait(false)
+            : null;
     }
 
     public async Task<(

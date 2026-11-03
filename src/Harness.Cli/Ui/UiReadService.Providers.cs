@@ -217,16 +217,15 @@ internal sealed partial class UiReadService
             root,
             new ProviderProcessFactory()
         );
+        // at the deadline the overview answers with the providers that did, naming the others in its errors
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(60));
-        await registry.DiscoverAsync(deadline.Token);
-        var indexed = registry.IndexedProviders();
         var stale = project["live"]?["stale"]?.GetValue<string>() ?? "";
         List<string> withheld = [];
         var result = await registry.OverviewAsync(
             name =>
             {
-                if (stale.Contains("branch", StringComparison.Ordinal) && indexed.Contains(name))
+                if (stale.Contains("branch", StringComparison.Ordinal) && registry.IndexedProviders().Contains(name))
                 {
                     withheld.Add(name);
                     return true;
