@@ -3,8 +3,10 @@ using System.Net.WebSockets;
 using System.Text.Json;
 using AwesomeAssertions;
 using Harness.Core.Memory;
+using Harness.Core.Providers;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Memory;
+using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Tasks;
 using Harness.Integration.Providers;
 using Harness.Integration.Sync;
@@ -653,6 +655,35 @@ public sealed class UiBrowserTests
     }
 
     [Fact]
+    public async Task ABrowserTestThatFailsMidPageLeavesNoBrowserProcessBehind()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var profile = Path.Combine(Path.GetTempPath(), ProfilePrefix + Guid.NewGuid().ToString("N"));
+        var running = 0;
+
+        await FluentActions
+            .Awaiting(() =>
+                BrowseAsync(
+                    executable,
+                    fixture,
+                    async (page, server) =>
+                    {
+                        await page.CommandAsync("Page.navigate", new { url = server.Client.BaseAddress + "#/" });
+                        running = (await BrowserProcessesAsync(profile)).Count;
+                        throw new InvalidOperationException("a check failed mid-page");
+                    },
+                    profile
+                )
+            )
+            .Should()
+            .ThrowAsync<InvalidOperationException>();
+
+        running.Should().BeGreaterThan(1, "the browser runs with its helper processes");
+        (await BrowserProcessesAsync(profile)).Should().BeEmpty("ending the test ends the browser and every helper");
+    }
+
+    [Fact]
     public async Task TaskIsDeletedFromItsRowAfterTheDialogSaysWhatGoes()
     {
         var executable = Browser();
@@ -1191,54 +1222,69 @@ public sealed class UiBrowserTests
     private static string Browser()
     {
         var executable = Environment.GetEnvironmentVariable("HARNESS_UI_BROWSER");
-        return string.IsNullOrEmpty(executable) || !File.Exists(executable)
-            ? throw Xunit.Sdk.SkipException.ForSkip(
+        if (string.IsNullOrEmpty(executable) || !File.Exists(executable))
+        {
+            throw Xunit.Sdk.SkipException.ForSkip(
                 "Set HARNESS_UI_BROWSER to a Chrome or Edge executable for headless browser review checks."
-            )
-            : executable;
+            );
+        }
+
+        // a 32-bit browser on 64-bit Windows starves the machine: the 64-bit msedge.exe is the one to use
+        return !OperatingSystem.IsWindows() || Is64Bit(executable)
+            ? executable
+            : throw Xunit.Sdk.SkipException.ForSkip(
+                $"HARNESS_UI_BROWSER points at a 32-bit browser ({executable}): use the 64-bit msedge.exe "
+                    + "(installed as C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe)."
+            );
     }
 
-    /// <summary>Serves the fixture's UI, opens it in a headless browser and runs the checks on its page.</summary>
+    /// <summary>Whether a Windows executable is built for x64 or Arm64, read from its PE header.</summary>
+    private static bool Is64Bit(string executable)
+    {
+        using var file = File.OpenRead(executable);
+        using var reader = new BinaryReader(file);
+        file.Position = 0x3C;
+        file.Position = reader.ReadInt32() + 4;
+        return reader.ReadUInt16() is 0x8664 or 0xAA64;
+    }
+
+    /// <summary>
+    /// Serves the fixture's UI, opens it in a headless browser and runs the checks on its page. The browser runs in
+    /// a kill-on-close job (a process group elsewhere): when the test ends, however it ends, so do the browser and
+    /// every helper process it started.
+    /// </summary>
     private static async Task BrowseAsync(
         string executable,
         SyncFixture fixture,
-        Func<BrowserPage, UiFixture, Task> checks
+        Func<BrowserPage, UiFixture, Task> checks,
+        string? profile = null
     )
     {
         await using var server = await UiFixture.StartAsync(fixture);
-        // The profile lives apart from the fixture: Edge's helper processes can outlive the browser and keep its
-        // files open a while (Edge 156), which must not fail the fixture's cleanup.
-        var profile = Path.Combine(Path.GetTempPath(), "harness-edge-" + Guid.NewGuid().ToString("N"));
+        // The profile lives apart from the fixture, so a slow helper exit cannot fail the fixture's cleanup.
+        SweepProfiles();
+        profile ??= Path.Combine(Path.GetTempPath(), ProfilePrefix + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(profile);
-        using var browser = new Process
-        {
-            StartInfo = new(executable)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-            },
-        };
-        foreach (
-            var argument in new[]
-            {
-                "--headless=new",
-                "--disable-gpu",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-background-networking",
-                "--remote-debugging-port=0",
-                "--user-data-dir=" + profile,
-                "about:blank",
-            }
-        )
-        {
-            browser.StartInfo.ArgumentList.Add(argument);
-        }
-        browser.Start();
-        var errors = browser.StandardError.ReadToEndAsync(Token);
-        var output = browser.StandardOutput.ReadToEndAsync(Token);
+        var browser = new ProviderProcessFactory().Start(
+            new(
+                executable,
+                [
+                    "--headless=new",
+                    "--disable-gpu",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-background-networking",
+                    "--remote-debugging-port=0",
+                    "--user-data-dir=" + profile,
+                    "about:blank",
+                ]
+            )
+        );
+        // the browser's own output is not read, only drained so it never blocks on a full pipe
+        var drained = Task.WhenAll(
+            browser.Output.CopyToAsync(Stream.Null, CancellationToken.None),
+            browser.Error.CopyToAsync(Stream.Null, CancellationToken.None)
+        );
         using var handler = new SocketsHttpHandler { UseProxy = false };
         using var client = new HttpClient(handler, disposeHandler: false);
         var port = "";
@@ -1258,50 +1304,141 @@ public sealed class UiBrowserTests
         finally
         {
             await CloseAsync(browser, client, port);
-            await Task.WhenAll(errors, output);
+            // ending the job ends the browser and every helper still running
+            await browser.DisposeAsync();
             try
             {
-                TestDirectory.Delete(profile);
+                await drained;
+            }
+            catch (Exception error) when (error is IOException or ObjectDisposedException)
+            {
+                // The pipes closed with the processes.
+            }
+
+            await DeleteProfileAsync(profile);
+        }
+    }
+
+    private const string ProfilePrefix = "harness-edge-";
+
+    /// <summary>
+    /// Deletes a browser profile (some 200 MB) once its killed processes let go of its files, a moment after the
+    /// job ends; one still held is left for a later test's sweep.
+    /// </summary>
+    private static async Task DeleteProfileAsync(string profile)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (true)
+        {
+            try
+            {
+                Directory.Delete(profile, recursive: true);
+                return;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return;
+            }
+            catch (Exception error)
+                when (error is IOException or UnauthorizedAccessException && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(200, CancellationToken.None);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                // A helper still holding a file leaves the profile in the temporary folder; the test stands.
+                return;
             }
         }
     }
 
-    /// <summary>Closes the browser as a user would (its helpers exit with it), killing it only if that fails.</summary>
-    private static async Task CloseAsync(Process browser, HttpClient client, string port)
+    /// <summary>Removes the profiles earlier browser tests could not delete, so they never pile up.</summary>
+    private static void SweepProfiles()
     {
-        if (port.Length is not 0 && !browser.HasExited)
+        var before = DateTime.UtcNow.AddMinutes(-15);
+        foreach (
+            var directory in new DirectoryInfo(Path.GetTempPath())
+                .EnumerateDirectories(ProfilePrefix + "*")
+                .Where(directory => directory.LastWriteTimeUtc < before)
+        )
         {
             try
             {
-                using var version = JsonDocument.Parse(
-                    await client.GetStringAsync("http://127.0.0.1:" + port + "/json/version", CancellationToken.None)
-                );
-                using var socket = new ClientWebSocket();
-                await socket.ConnectAsync(
-                    new(version.RootElement.GetProperty("webSocketDebuggerUrl").GetString()!),
-                    CancellationToken.None
-                );
-                await new BrowserPage(socket).SendAsync("Browser.close");
-                using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await browser.WaitForExitAsync(wait.Token);
+                directory.Delete(recursive: true);
             }
-            catch (Exception error)
-                when (error is HttpRequestException or WebSocketException or OperationCanceledException)
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                // It did not close by itself: killed below.
+                // Still in use: the next sweep takes it.
             }
         }
+    }
 
-        if (!browser.HasExited)
+    /// <summary>Asks the browser to close as a user would; whatever of it is left ends with its job.</summary>
+    private static async Task CloseAsync(IProviderProcess browser, HttpClient client, string port)
+    {
+        if (port.Length is 0 || browser.Completion.IsCompleted)
         {
-            browser.Kill(entireProcessTree: true);
+            return;
         }
 
-        await browser.WaitForExitAsync(CancellationToken.None);
+        try
+        {
+            using var version = JsonDocument.Parse(
+                await client.GetStringAsync("http://127.0.0.1:" + port + "/json/version", CancellationToken.None)
+            );
+            using var socket = new ClientWebSocket();
+            await socket.ConnectAsync(
+                new(version.RootElement.GetProperty("webSocketDebuggerUrl").GetString()!),
+                CancellationToken.None
+            );
+            await new BrowserPage(socket).SendAsync("Browser.close");
+            await browser.Completion.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+        }
+        catch (Exception error)
+            when (error is HttpRequestException or WebSocketException or TimeoutException or OperationCanceledException)
+        {
+            // It did not close by itself: its job ends it.
+        }
+    }
+
+    /// <summary>The ids of the browser processes (the browser and its helpers) that use this profile directory.</summary>
+    private static async Task<IReadOnlyList<int>> BrowserProcessesAsync(string profile)
+    {
+        var (command, arguments) = OperatingSystem.IsWindows()
+            ? (
+                "powershell",
+                new[]
+                {
+                    "-NoProfile",
+                    "-Command",
+                    "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('"
+                        + profile.Replace("'", "''", StringComparison.Ordinal)
+                        + "') -and $_.Name -ne 'powershell.exe' } | ForEach-Object { $_.ProcessId }",
+                }
+            )
+            : ("ps", new[] { "-eo", "pid=,args=" });
+        using var process = new Process
+        {
+            StartInfo = new(command)
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            },
+        };
+        foreach (var argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
+        process.Start();
+        var output = await process.StandardOutput.ReadToEndAsync(Token);
+        await process.WaitForExitAsync(Token);
+        return output
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => OperatingSystem.IsWindows() || line.Contains(profile, StringComparison.Ordinal))
+            .Select(line => int.Parse(line.Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture))
+            .Where(id => id != Environment.ProcessId)
+            .ToArray();
     }
 
     private sealed class BrowserPage(ClientWebSocket socket)
