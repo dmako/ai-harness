@@ -636,15 +636,33 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 (await ValueAsync(page, $"!!{Card("—")}.querySelector('.bpmove') || {Card("—")}.draggable"))
                     .Should()
                     .Be("False");
-                // a card's id in its blueprint's coloured frame; none on the card without a blueprint
-                (
-                    await ValueAsync(
-                        page,
-                        $"[{Card("M1")}.querySelector('.mid .bpframe')?.className, !!{Card("—")}.querySelector('.bpframe')].join()"
-                    )
-                )
-                    .Should()
-                    .Be("bpframe bpc-teal,false");
+                // a card's id in its blueprint's coloured frame, on its own in the top row (no .mid chip around
+                // it), centred with the title wide and on a phone; none on the card without a blueprint
+                var frame = $$"""
+                    (() => {
+                      const f = {{Card("M1")}}.querySelector('.mctop > .bpframe');
+                      const mid = (e) => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+                      return [f?.className, !!f?.closest('.mid') || !!{{Card("M1")}}.querySelector('.mid'),
+                        Math.abs(mid(f) - mid({{Card("M1")}}.querySelector('.mctop h3'))) < 3, !!{{Card(
+                        "—"
+                    )}}.querySelector('.bpframe')].join();
+                    })()
+                    """;
+                (await ValueAsync(page, frame)).Should().Be("bpframe bpc-teal,false,true,false");
+                await page.CommandAsync(
+                    "Emulation.setDeviceMetricsOverride",
+                    new
+                    {
+                        width = 390,
+                        height = 900,
+                        deviceScaleFactor = 1,
+                        mobile = true,
+                    }
+                );
+                await page.WaitAsync("innerWidth <= 400");
+                (await ValueAsync(page, frame)).Should().Be("bpframe bpc-teal,false,true,false", "at 390 px");
+                await page.CommandAsync("Emulation.clearDeviceMetricsOverride", new { });
+                await page.WaitAsync("innerWidth > 400");
                 // the bar where a card would land shows in light and dark alike (the drag is not dropped)
                 foreach (var theme in new[] { "light", "dark" })
                 {

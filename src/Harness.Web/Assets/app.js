@@ -5203,8 +5203,9 @@ async function viewTasks(p, opts, sec) {
         const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
         const card = h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
-            // the id framed in the blueprint's colour, as everywhere (from the C# rewrite)
-            m.id !== "—" && h("span", { class: "mid" }, bpFrame(m.id, "", m.color)),
+            // the id framed in the blueprint's colour, as everywhere, on its own: Go's .mid
+            // chip around it outlined it twice (from the C# rewrite)
+            m.id !== "—" && bpFrame(m.id, "", m.color),
             h("h3", {}, m.title || h("span", { class: "muted" }, m.id === "—" ? "Without a blueprint" : "Not described in the backlog")),
             h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
           m.id !== "—" && bpArrows(p, milestones, movable, m.id),
