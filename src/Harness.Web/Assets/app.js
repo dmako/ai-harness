@@ -4894,6 +4894,80 @@ function archProposalCard(p, x) {
     panel);
 }
 
+// --- blueprint order (from the C# rewrite: TASK-0078, TASK-0083) ---
+// The author orders the blueprints in Work › Tasks and Work › Blueprints
+// alike: Move up / Move down beside a blueprint, or dragging it before or
+// after another (a bar shows where it lands). A move among the blueprints
+// shown keeps the hidden ones' places in the whole order; "—" (no
+// blueprint) is never ordered. The order is saved for every listing.
+
+// bpPlace is the whole order with m moved before or after target.
+function bpPlace(all, m, target, where) {
+  const rest = all.filter((x) => x !== "—" && x !== m);
+  rest.splice(rest.indexOf(target) + (where === "after" ? 1 : 0), 0, m);
+  return rest;
+}
+async function bpSaveOrder(p, ids) {
+  try {
+    await post(projectAPI(p, "blueprints-order"), { order: ids });
+    toast("Blueprint order saved");
+    await afterWrite();
+  } catch (e) { state.tasks.refocus = null; toast(e.message, true); }
+}
+// bpArrows are m's Move up / Move down among the shown blueprints.
+function bpArrows(p, all, shown, m) {
+  const at = shown.indexOf(m);
+  const move = (dir, label) => h("button", {
+    class: `iconbtn bpmove bpmove-${dir}`, type: "button", title: `${label} ${m}`, "aria-label": `${label} ${m}`,
+    disabled: dir === "up" ? at === 0 : at === shown.length - 1,
+    onclick: () => { state.tasks.refocus = { m, dir }; bpSaveOrder(p, bpPlace(all, m, shown[at + (dir === "up" ? -1 : 1)], dir === "up" ? "before" : "after")); },
+  }, icon(dir));
+  return [move("up", "Move up"), move("down", "Move down")];
+}
+// bpDraggable lets handle drag m and target take another blueprint dropped
+// on it. Sections stack, so the bar is above or below; cards in a grid of
+// several columns take it on their left or right side.
+function bpDraggable(p, all, container, handle, target, m) {
+  const marks = ["bpdrop-before", "bpdrop-after", "bpside"];
+  const unmark = () => container.querySelectorAll(".bpdrop-before, .bpdrop-after").forEach((s) => s.classList.remove(...marks));
+  const isBlueprint = (ev) => Array.from(ev.dataTransfer.types || []).includes("text/x-blueprint");
+  handle.draggable = true;
+  handle.addEventListener("dragstart", (ev) => { ev.dataTransfer.setData("text/x-blueprint", m); ev.dataTransfer.effectAllowed = "move"; container.classList.add("bpdragging"); });
+  handle.addEventListener("dragend", () => { container.classList.remove("bpdragging"); unmark(); });
+  target.addEventListener("dragover", (ev) => {
+    if (!isBlueprint(ev)) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "move";
+    const box = target.getBoundingClientRect();
+    const side = getComputedStyle(target.parentElement).gridTemplateColumns.split(" ").filter(Boolean).length > 1;
+    const after = side ? ev.clientX > box.left + box.width / 2 : ev.clientY > box.top + box.height / 2;
+    const mark = after ? "bpdrop-after" : "bpdrop-before";
+    if (!target.classList.contains(mark) || target.classList.contains("bpside") !== side) { unmark(); target.classList.add(mark); if (side) target.classList.add("bpside"); }
+  });
+  target.addEventListener("dragleave", (ev) => { if (!target.contains(ev.relatedTarget)) target.classList.remove(...marks); });
+  target.addEventListener("drop", (ev) => {
+    const dragged = ev.dataTransfer.getData("text/x-blueprint");
+    if (!dragged) return; // a task: its own drop zone moves it
+    ev.preventDefault();
+    const after = target.classList.contains("bpdrop-after");
+    unmark();
+    container.classList.remove("bpdragging");
+    if (dragged !== m) bpSaveOrder(p, bpPlace(all, dragged, m, after ? "after" : "before"));
+  });
+}
+// bpRefocus puts the focus back on the arrow a move was made with, once
+// the redrawn view is in the page (a detached button takes no focus).
+function bpRefocus(container, fallback) {
+  if (!state.tasks.refocus) return;
+  const { m, dir } = state.tasks.refocus;
+  state.tasks.refocus = null;
+  const target = [...container.querySelectorAll("[data-blueprint]")].find((s) => s.dataset.blueprint === m);
+  const btn = target && target.querySelector(`.bpmove-${dir}`);
+  const el = btn && !btn.disabled ? btn : target && target.querySelector(fallback);
+  const focus = (tries) => { if (el && el.isConnected) el.focus(); else if (el && tries > 0) requestAnimationFrame(() => focus(tries - 1)); };
+  focus(60);
+}
+
 // --- tasks: grouped by blueprint, with progress ---
 async function viewTasks(p, opts, sec) {
   const t = state.tasks;
@@ -4947,13 +5021,8 @@ async function viewTasks(p, opts, sec) {
         h("span", { class: "mcount" }, `${rows.length} shown` + (reasons.size ? `, ${[...reasons.values()].reduce((n, xs) => n + xs.length, 0)} deferred` : "")),
         h("span", { class: "mprog" }, meter(done, mine.length, `${done} of ${mine.length} tasks done`)));
       const at = movable.indexOf(m);
-      const move = (dir, label) => h("button", {
-        class: `iconbtn bpmove bpmove-${dir}`, type: "button", title: `${label} ${m}`, "aria-label": `${label} ${m}`,
-        disabled: dir === "up" ? at === 0 : at === movable.length - 1,
-        onclick: () => { t.refocus = { m, dir }; saveOrder(place(m, movable[at + (dir === "up" ? -1 : 1)], dir === "up" ? "before" : "after")); },
-      }, icon(dir));
       const section = h("section", { class: "mstone", "data-blueprint": m },
-        at >= 0 ? h("div", { class: "mheadrow" }, head, move("up", "Move up"), move("down", "Move down")) : head,
+        at >= 0 ? h("div", { class: "mheadrow" }, head, bpArrows(p, milestones, movable, m)) : head,
         open && mi && mi.goal && h("p", { class: "mgoal" }, mi.goal),
         open && rows.length > 0 && h("div", { class: "tlist" }, rows.map((x) => draggableTask(taskRow(x, drawTasks), x))),
         open && h("button", { class: "taddrow", type: "button", onclick: () => newTaskDialog(p, mres.blueprints || [], m === "—" ? "" : m) }, icon("plus"), "Add task"),
@@ -4961,63 +5030,14 @@ async function viewTasks(p, opts, sec) {
           statusPill("deferred"), h("span", { class: "dcount" }, plural(xs.length, "task")),
           h("span", { class: "dreason" }, reason || "no reason given"),
           h("button", { class: "linkbtn", onclick: () => { t.statuses.add("deferred"); renderMain(); } }, "show"))));
-      if (at >= 0) draggableBlueprint(head, section, m);
+      if (at >= 0) bpDraggable(p, milestones, list, head, section, m);
       return dropZone(section, m);
     }),
     // while a task is dragged: the blueprints with nothing shown, as targets
     h("div", { class: "dropstrip" }, h("span", { class: "muted small" }, "Move to:"),
       [...milestones.filter((m) => !order.includes(m)), ...(milestones.includes("—") ? [] : ["—"])].map((m) => dropZone(h("span", { class: "dropchip" }, m === "—" ? "no blueprint" : info[m] && info[m].title ? `${m} · ${info[m].title}` : m), m))));
-    // a blueprint moved with the keyboard keeps the focus on its button
-    // (once the redrawn view is in the page: a detached button takes no focus)
-    if (t.refocus) {
-      const { m, dir } = t.refocus;
-      t.refocus = null;
-      const target = [...list.querySelectorAll(".mstone")].find((s) => s.dataset.blueprint === m);
-      const btn = target && target.querySelector(`.bpmove-${dir}`);
-      const el = btn && !btn.disabled ? btn : target && target.querySelector(".mhead");
-      const focus = (tries) => { if (el && el.isConnected) el.focus(); else if (el && tries > 0) requestAnimationFrame(() => focus(tries - 1)); };
-      focus(60);
-    }
-  }
-  // place moves a blueprint before or after another in the whole list
-  // (blueprints with nothing shown keep their places among the rest)
-  function place(m, target, where) {
-    const rest = milestones.filter((x) => x !== "—" && x !== m);
-    rest.splice(rest.indexOf(target) + (where === "after" ? 1 : 0), 0, m);
-    return rest;
-  }
-  async function saveOrder(ids) {
-    try {
-      await post(projectAPI(p, "blueprints-order"), { order: ids });
-      toast("Blueprint order saved");
-      await afterWrite();
-    } catch (e) { t.refocus = null; toast(e.message, true); }
-  }
-  // dragging a blueprint by its header reorders it; a bar shows where it lands
-  function draggableBlueprint(head, section, m) {
-    const unmark = () => list.querySelectorAll(".bpdrop-before, .bpdrop-after").forEach((s) => s.classList.remove("bpdrop-before", "bpdrop-after"));
-    const isBlueprint = (ev) => Array.from(ev.dataTransfer.types || []).includes("text/x-blueprint");
-    head.draggable = true;
-    head.addEventListener("dragstart", (ev) => { ev.dataTransfer.setData("text/x-blueprint", m); ev.dataTransfer.effectAllowed = "move"; list.classList.add("bpdragging"); });
-    head.addEventListener("dragend", () => { list.classList.remove("bpdragging"); unmark(); });
-    section.addEventListener("dragover", (ev) => {
-      if (!isBlueprint(ev)) return;
-      ev.preventDefault();
-      ev.dataTransfer.dropEffect = "move";
-      const box = section.getBoundingClientRect();
-      const after = ev.clientY > box.top + box.height / 2;
-      if (!section.classList.contains(after ? "bpdrop-after" : "bpdrop-before")) { unmark(); section.classList.add(after ? "bpdrop-after" : "bpdrop-before"); }
-    });
-    section.addEventListener("dragleave", (ev) => { if (!section.contains(ev.relatedTarget)) section.classList.remove("bpdrop-before", "bpdrop-after"); });
-    section.addEventListener("drop", (ev) => {
-      const dragged = ev.dataTransfer.getData("text/x-blueprint");
-      if (!dragged) return; // a task: dropZone moves it
-      ev.preventDefault();
-      const after = section.classList.contains("bpdrop-after");
-      unmark();
-      list.classList.remove("bpdragging");
-      if (dragged !== m) saveOrder(place(dragged, m, after ? "after" : "before"));
-    });
+    // a blueprint moved with the keyboard keeps the focus on its arrow
+    bpRefocus(list, ".mhead");
   }
   // dragging a task onto a blueprint moves it there
   function draggableTask(row, x) {
@@ -5072,16 +5092,19 @@ async function viewTasks(p, opts, sec) {
     const chips = [["open", "Open"], ["done", "Done"], ["deferred", "Deferred"], ["all", "All"]].map(([k, label]) => h("button", {
       class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawMilestones(); },
     }, label, h("span", { class: "count" }, k === "all" ? ms.length : ms.filter((m) => kind(m) === k).length)));
-    fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
-      shown.length ? h("div", { class: "mcards" }, shown.map((m) => {
+    // the author orders the shown cards as the Tasks view orders sections (from the C# rewrite)
+    const movable = shown.map((m) => m.id).filter((id) => id !== "—");
+    const grid = h("div", { class: "mcards" });
+    fill(grid, shown.map((m) => {
         const [cls, ico, label] = stateOf(m);
         const n = (s) => (m.tasks || {})[s] || 0;
         const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
-        return h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
+        const card = h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
             m.id !== "—" && h("span", { class: "mid" }, m.id),
             h("h3", {}, m.title || h("span", { class: "muted" }, m.id === "—" ? "Without a blueprint" : "Not described in the backlog")),
             h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
+          m.id !== "—" && bpArrows(p, milestones, movable, m.id),
           m.id !== "—" && h("button", { class: "iconbtn mcedit", type: "button", title: m.title ? `Edit blueprint ${m.id}` : `Describe blueprint ${m.id}`, "aria-label": `Edit blueprint ${m.id}`,
             onclick: () => blueprintDialog(p, m) }, icon("edit")),
           m.id !== "—" && h("button", { class: "iconbtn mcdel", type: "button", title: `Remove blueprint ${m.id}`, "aria-label": `Remove blueprint ${m.id}`,
@@ -5097,7 +5120,13 @@ async function viewTasks(p, opts, sec) {
               t.milestone = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
             },
           }, `Show its ${plural(m.total, "task")} →`));
-      })) : h("p", { class: "empty" }, "No blueprints match."));
+        // the card is dragged as a whole; its buttons still take clicks
+        if (m.id !== "—") bpDraggable(p, milestones, grid, card, card, m.id);
+        return card;
+      }));
+    fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
+      shown.length ? grid : h("p", { class: "empty" }, "No blueprints match."));
+    bpRefocus(grid, ".bpmove:not(:disabled)");
   }
 
   const chips = TASK_STATUSES.map((s) => h("button", {

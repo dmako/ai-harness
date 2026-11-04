@@ -552,6 +552,141 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task BlueprintCardsAreReorderedAsTheTasksSectionsAreAndShareTheirOrder()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            var origin = new TaskOrigin("test", "test", "fixture");
+            tasks.ImportBlueprints(
+                [new("M1", "One"), new("M2", "Two"), new("M3", "Three")],
+                "test",
+                cancellationToken: Token
+            );
+            // M2's only task is done: the Open filter hides its card
+            tasks.Import(
+                [
+                    new TaskDefinition
+                    {
+                        Id = "UI-0001",
+                        Title = "Open in M1",
+                        Blueprint = "M1",
+                    },
+                    new TaskDefinition
+                    {
+                        Id = "UI-0002",
+                        Title = "Done in M2",
+                        Blueprint = "M2",
+                        Status = "done",
+                    },
+                    new TaskDefinition
+                    {
+                        Id = "UI-0003",
+                        Title = "Open in M3",
+                        Blueprint = "M3",
+                    },
+                ],
+                "test",
+                cancellationToken: Token
+            );
+            tasks.Create(new TaskDefinition { Id = "UI-0004", Title = "No blueprint" }, "", origin, Token);
+        }
+
+        const string Cards = "[...document.querySelectorAll('#main .mcard')].map(c => c.dataset.blueprint).join()";
+        const string Sections = "[...document.querySelectorAll('#main .mstone')].map(s => s.dataset.blueprint).join()";
+        string Card(string m) => $"document.querySelector('#main .mcard[data-blueprint=\"{m}\"]')";
+        string Saved()
+        {
+            using var database = fixture.Database();
+            return string.Join(
+                ",",
+                new TaskStore(database).Blueprints(Token).Select(b => $"{b.Definition.Id}@{b.Order}")
+            );
+        }
+
+        await BrowsePagesAsync(
+            executable,
+            fixture,
+            2,
+            async (pages, server) =>
+            {
+                var page = pages[0];
+                var id = UiWriteTests.ProjectId(fixture);
+                var work = server.Client.BaseAddress + "#/p/" + id + "/work/";
+                await page.CommandAsync("Page.navigate", new { url = work + "blueprints" });
+                await page.WaitAsync(Cards + " === 'M1,M3,—'");
+                await page.EvaluateAsync(
+                    """
+                    window.drag = (from, to, after) => {
+                      const dt = new DataTransfer();
+                      from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+                      const box = to.getBoundingClientRect();
+                      const at = { bubbles: true, cancelable: true, dataTransfer: dt, clientX: after ? box.right - 2 : box.left + 2, clientY: after ? box.bottom - 2 : box.top + 2 };
+                      to.dispatchEvent(new DragEvent('dragover', at));
+                      const marked = [...to.classList].filter(c => c.startsWith('bp')).join();
+                      to.dispatchEvent(new DragEvent('drop', at));
+                      from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+                      return marked;
+                    };
+                    """
+                );
+                // the card without a blueprint is not ordered
+                (await ValueAsync(page, $"!!{Card("—")}.querySelector('.bpmove') || {Card("—")}.draggable"))
+                    .Should()
+                    .Be("False");
+
+                // dragged before M1 under the Open filter: hidden M2 keeps its place after M1
+                (await ValueAsync(page, $"drag({Card("M3")}, {Card("M1")}, false)"))
+                    .Should()
+                    .StartWith("bpdrop-before");
+                await page.WaitAsync(Cards + " === 'M3,M1,—'");
+                Saved().Should().Be("M3@0,M1@1,M2@2");
+
+                // the arrows: moved to the end, the focus stays on the card's arrow that still works
+                await page.EvaluateAsync($"{Card("M3")}.querySelector('.bpmove-down').click()");
+                await page.WaitAsync(Cards + " === 'M1,M3,—'");
+                await page.WaitAsync(
+                    "document.activeElement && document.activeElement.getAttribute('aria-label') === 'Move up M3'"
+                );
+                Saved().Should().Be("M1@0,M3@1,M2@2");
+
+                // with every card shown, the done one moves among them too
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('#main .chip')].find(c => c.textContent.startsWith('All')).click()"
+                );
+                await page.WaitAsync(Cards + " === 'M1,M3,M2,—'");
+                await page.EvaluateAsync($"{Card("M2")}.querySelector('.bpmove-up').click()");
+                await page.WaitAsync(Cards + " === 'M1,M2,M3,—'");
+                Saved().Should().Be("M1@0,M2@1,M3@2");
+
+                // a card's own buttons still answer a click
+                await page.EvaluateAsync($"{Card("M1")}.querySelector('.mcedit').click()");
+                await page.WaitAsync("!!document.querySelector('dialog[open]')");
+                await page.EvaluateAsync("document.querySelector('dialog[open]').close()");
+
+                // the Tasks view lists the sections in the same order, in this browser and another, from a new harness ui
+                await page.EvaluateAsync($"location.hash = '#/p/{id}/work/tasks'");
+                await page.WaitAsync(Sections + " === 'M1,M3,—'");
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync(Sections + " === 'M1,M3,—'");
+                await using var restarted = await UiFixture.StartAsync(fixture);
+                await pages[1]
+                    .CommandAsync(
+                        "Page.navigate",
+                        new { url = restarted.Client.BaseAddress + "#/p/" + id + "/work/blueprints" }
+                    );
+                await pages[1].WaitAsync(Cards + " === 'M1,M3,—'");
+
+                // Show its tasks still opens the blueprint's tasks
+                await pages[1].EvaluateAsync($"{Card("M3")}.querySelector('.mclink').click()");
+                await pages[1].WaitAsync(Sections + " === 'M3'");
+            }
+        );
+    }
+
+    [Fact]
     public async Task BlueprintsAreCreatedEditedAndRemovedOnceConfirmedAskingAboutTheirTasks()
     {
         var executable = Browser();

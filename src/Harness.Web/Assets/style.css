@@ -1820,3 +1820,14 @@ table.dups { min-width: 45rem; }
 .aform label.choice, .aprop .aform label.choice { display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap; font-size: var(--text-md); }
 .aform .choice input[type=radio] { width: auto; padding: 0; border: none; margin: 0; flex: none; }
 .choice > span:last-child { flex: 1 1 auto; min-width: 0; }
+/* reordering blueprint cards in Work › Blueprints (TASK-0083): the Tasks
+   view's arrows in the card's top row, the card dragged as a whole, a bar
+   where it lands: above or below, or on its side in a grid of columns */
+.mctop .bpmove { flex: none; }
+.mctop .bpmove:disabled { opacity: 0.35; cursor: default; }
+.mcard[draggable=true] { cursor: grab; }
+.mcard[draggable=true] :is(button, a) { cursor: pointer; }
+.mcard.bpdrop-before { box-shadow: var(--card-shadow), 0 -3px 0 0 var(--accent); }
+.mcard.bpdrop-after { box-shadow: var(--card-shadow), 0 3px 0 0 var(--accent); }
+.mcard.bpdrop-before.bpside { box-shadow: var(--card-shadow), -3px 0 0 0 var(--accent); }
+.mcard.bpdrop-after.bpside { box-shadow: var(--card-shadow), 3px 0 0 0 var(--accent); }
