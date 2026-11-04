@@ -170,6 +170,7 @@ public static class TaskViews
         Add(view, "goal", m.Definition.Goal);
         Add(view, "exit", m.Definition.Exit ?? []);
         Add(view, "notes", m.Definition.Notes);
+        Add(view, "color", m.Definition.Color);
         if (m.Order is { } order)
         {
             view["order"] = order;

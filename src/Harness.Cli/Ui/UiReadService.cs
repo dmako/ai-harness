@@ -87,6 +87,7 @@ internal sealed partial class UiReadService(
                 "/api/workspaces" => await WorkspacesAsync(token),
                 "/api/workspaces/discover" => Discover(request),
                 "/api/machine" => Machine(),
+                "/api/board-defaults" => BoardDefaults(),
                 "/api/search" => await SearchAsync(request, token),
                 "/api/activity" => await ActivityAsync(request, token),
                 "/api/stacks" => await StacksAsync(token),

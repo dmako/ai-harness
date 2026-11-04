@@ -78,13 +78,14 @@ public static class BacklogCodec
             var blueprints = Sequence(Renamed(root, "blueprints", "milestones"))
                 .Select(node =>
                 {
-                    var d = Mapping(node, ["id", "title", "goal", "exit", "notes"]);
+                    var d = Mapping(node, ["id", "title", "goal", "exit", "notes", "color"]);
                     return new BlueprintDefinition(
                         Text(d, "id"),
                         Text(d, "title"),
                         Text(d, "goal"),
                         Strings(d, "exit"),
-                        Text(d, "notes")
+                        Text(d, "notes"),
+                        Text(d, "color")
                     );
                 })
                 .ToArray();
@@ -241,6 +242,7 @@ public static class BacklogCodec
         Add(map, "goal", d.Goal);
         Add(map, "exit", d.Exit ?? []);
         Add(map, "notes", d.Notes);
+        Add(map, "color", d.Color);
         return map;
     }
 

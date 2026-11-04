@@ -3,6 +3,7 @@ using System.Text.Json;
 using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Core.Tasks;
+using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Tasks;
 using Xunit;
@@ -348,6 +349,89 @@ public sealed class TaskStoreTests
     }
 
     [Fact]
+    public void BlueprintsGetTheFirstFreeColourKeepItAndTakeTheOneTheAuthorPicks()
+    {
+        using var s = new State();
+        string Colors() =>
+            string.Join(" ", s.Store.Blueprints(Token).Select(b => b.Definition.Id + "=" + b.Definition.Color));
+        // imported, created and described blueprints each take the first colour no other uses
+        s.Store.ImportBlueprints(
+            [new("M1", "One"), new("M2", "Two", Color: "rose")],
+            "fixture",
+            cancellationToken: Token
+        );
+        s.Store.CreateBlueprint(new("M3", "Three"), "ui", Token);
+        s.Store.Import([Definition("T-1") with { Blueprint = "M9" }], "fixture", cancellationToken: Token);
+        Colors().Should().Be("M1=teal M2=rose M3=orange M9=", "a blueprint only tasks name has no colour yet");
+        s.Store.EditBlueprint("M9", new("", "Nine"), "ui", Token);
+        Colors().Should().Be("M1=teal M2=rose M3=orange M9=blue");
+
+        // an edit without a colour keeps it; one with a colour sets it; an unknown one is refused
+        s.Store.EditBlueprint("M1", new("", "One again"), "ui", Token);
+        s.Store.EditBlueprint("M3", new("", "Three", Color: "Violet"), "ui", Token);
+        Colors().Should().Be("M1=teal M2=rose M3=violet M9=blue");
+        FluentActions
+            .Invoking(() => s.Store.EditBlueprint("M3", new("", "Three", Color: "mauve"), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*mauve*");
+        FluentActions
+            .Invoking(() =>
+                s.Store.ImportBlueprints([new("M5", "Five", Color: "mauve")], "fixture", cancellationToken: Token)
+            )
+            .Should()
+            .Throw<ArgumentException>();
+
+        // the backlog file carries the colour; one re-imported without colours keeps the blueprints' own
+        var path = Path.Combine(s.Directory, "backlog.yaml");
+        s.Store.Export(path, cancellationToken: Token);
+        BacklogCodec.Read(path).Blueprints.Select(b => b.Id + "=" + b.Color).Should().Contain(["M3=violet", "M2=rose"]);
+        s.Store.ImportBlueprints([new("M1", "One again"), new("M2", "Two")], "fixture", cancellationToken: Token);
+        Colors().Should().StartWith("M1=teal M2=rose");
+
+        // all 16 used: the set starts again from the first
+        s.Store.ImportBlueprints(
+            [.. Enumerable.Range(10, 12).Select(i => new BlueprintDefinition("B" + i, "Filler " + i))],
+            "fixture",
+            cancellationToken: Token
+        );
+        s.Store.Blueprints(Token).Select(b => b.Definition.Color).Distinct().Should().HaveCount(16);
+        s.Store.CreateBlueprint(new("M40", "Seventeenth"), "ui", Token).Id.Should().Be("M40");
+        s.Store.Blueprints(Token).Single(b => b.Definition.Id == "M40").Definition.Color.Should().Be("teal");
+        TaskViews.Blueprint(s.Store.Blueprints(Token)[0]).Should().ContainKey("color");
+    }
+
+    [Fact]
+    public async Task BoardChoicesAreKeptOnTheMachinePerProjectWithMachineDefaults()
+    {
+        using var s = new State();
+        var settings = new UiPreferences(s.Directory);
+        settings
+            .Board("prj_a")
+            .Should()
+            .Be(new BoardSettings("priority", 7, ""), "nothing chosen: the Board's defaults");
+        await settings.SetBoardDefaultsAsync("changed", 3, Token);
+        await settings.SetBoardAsync("prj_a", "name", null, "M2", Token);
+        // a new instance reads the file again, as another browser or a restarted harness ui does
+        var again = new UiPreferences(s.Directory);
+        again
+            .Board("prj_a")
+            .Should()
+            .Be(new BoardSettings("name", 3, "M2"), "its own sort and filter, the default done-age");
+        again.Board("prj_b").Should().Be(new BoardSettings("changed", 3, ""));
+        again.BoardDefaults().Should().Be(new BoardSettings("changed", 3, ""));
+        await FluentActions
+            .Awaiting(() => again.SetBoardAsync("prj_a", "random", null, null, Token))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+        await FluentActions
+            .Awaiting(() => again.SetBoardDefaultsAsync(null, 5, Token))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+        File.Exists(Path.Combine(s.Directory, "ui.json")).Should().BeTrue();
+    }
+
+    [Fact]
     public void BlueprintsKeepTheOrderTheAuthorGaveThemAndUnorderedOnesFollow()
     {
         using var s = new State();
@@ -582,7 +666,7 @@ public sealed class TaskStoreTests
         }
 
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
-        database.SchemaVersion().Should().Be(24);
+        database.SchemaVersion().Should().Be(25);
         var store = new TaskStore(database);
         var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
         blueprint.Id.Should().Be("M1");

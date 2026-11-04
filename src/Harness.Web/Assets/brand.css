@@ -302,3 +302,26 @@ pre.block {
 }
 
 .muted { color: var(--muted); }
+
+/* blueprint colours (the C# rewrite's own, TASK-0081): the 16 a blueprint can
+   have, a light variant and a dark one, each at WCAG AA (4.5:1) on a surface */
+:root {
+  --bp-teal: #0f766e; --bp-orange: #c2410c; --bp-blue: #1d4ed8; --bp-rose: #be123c;
+  --bp-green: #15803d; --bp-violet: #6d28d9; --bp-amber: #b45309; --bp-cyan: #0e7490;
+  --bp-pink: #be185d; --bp-lime: #4d7c0f; --bp-indigo: #4338ca; --bp-red: #b91c1c;
+  --bp-fuchsia: #a21caf; --bp-yellow: #a16207; --bp-slate: #475569; --bp-purple: #7e22ce;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bp-teal: #5eead4; --bp-orange: #fdba74; --bp-blue: #93c5fd; --bp-rose: #fda4af;
+    --bp-green: #86efac; --bp-violet: #c4b5fd; --bp-amber: #fcd34d; --bp-cyan: #67e8f9;
+    --bp-pink: #f9a8d4; --bp-lime: #bef264; --bp-indigo: #a5b4fc; --bp-red: #fca5a5;
+    --bp-fuchsia: #f0abfc; --bp-yellow: #fde047; --bp-slate: #cbd5e1; --bp-purple: #d8b4fe;
+  }
+}
+:root[data-theme="dark"] {
+  --bp-teal: #5eead4; --bp-orange: #fdba74; --bp-blue: #93c5fd; --bp-rose: #fda4af;
+  --bp-green: #86efac; --bp-violet: #c4b5fd; --bp-amber: #fcd34d; --bp-cyan: #67e8f9;
+  --bp-pink: #f9a8d4; --bp-lime: #bef264; --bp-indigo: #a5b4fc; --bp-red: #fca5a5;
+  --bp-fuchsia: #f0abfc; --bp-yellow: #fde047; --bp-slate: #cbd5e1; --bp-purple: #d8b4fe;
+}

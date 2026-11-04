@@ -60,6 +60,7 @@ internal sealed class BlueprintSaveSettings : InspectSettings
     public string? Goal { get; init; }
     public string[]? Exit { get; init; }
     public string? Notes { get; init; }
+    public string? Color { get; init; }
 }
 
 internal sealed class BlueprintRemoveSettings : InspectSettings

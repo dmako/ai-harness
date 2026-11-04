@@ -722,6 +722,14 @@ internal static class CommandBindings
         command.Options.Add(exitOption);
         var notesOption = new Option<string>("--notes") { Description = null };
         command.Options.Add(notesOption);
+        var colorOption = new Option<string>("--color")
+        {
+            Description =
+                "Its colour in harness ui, one of "
+                + string.Join(", ", Harness.Core.Tasks.BlueprintColors.Names)
+                + " (a new blueprint gets the first one no other uses)",
+        };
+        command.Options.Add(colorOption);
         return (result, id) =>
             new Harness.Cli.Tasks.BlueprintSaveSettings
             {
@@ -732,6 +740,7 @@ internal static class CommandBindings
                 Goal = result.GetResult(goalOption) is null ? null : result.GetValue(goalOption) ?? "",
                 Exit = result.GetResult(exitOption) is null ? null : result.GetValue(exitOption) ?? [],
                 Notes = result.GetResult(notesOption) is null ? null : result.GetValue(notesOption) ?? "",
+                Color = result.GetValue(colorOption),
             };
     }
 

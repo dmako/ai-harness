@@ -251,7 +251,9 @@ const chevron = (open) => h("span", { class: "chev" + (open ? " open" : ""), "ar
 //   #/search?q=…                    search
 // Links of the earlier layout (#/<project>/<tab>, #/workspaces/<name>)
 // redirect to their new places.
-const PROJECT_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["work", "Work"], ["agents", "Agents"], ["health", "Health"]];
+const PROJECT_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["work", "Work"], ["board", "Board"], ["agents", "Agents"], ["health", "Health"]];
+// the views a tab shows an icon for (from the C# rewrite: the Board, TASK-0081)
+const VIEW_ICON = { board: "board" };
 // A workspace's views mirror a project's: Architecture second, Issues where
 // a project has Health; each groups its parts as sub-views.
 const WORKSPACE_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["issues", "Issues"], ["members", "Members"]];
@@ -681,7 +683,7 @@ function projectHead(p) {
   const badges = { knowledge: knowledgeWaiting(l), work: workProposals(l), health: l.checks_failed };
   const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Views" },
     PROJECT_VIEWS.map(([v, label]) => h("a", { href: projectHref(id, v), role: "tab", "aria-selected": String(v === view) },
-      label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
+      VIEW_ICON[v] && icon(VIEW_ICON[v]), label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
   return [head, tabs];
 }
 
@@ -689,7 +691,7 @@ function projectHead(p) {
 // runs doctor's checks when opened or refreshed).
 const VIEW_KINDS = {
   overview: ["summary", "tasks", "knowledge", "proposals", "findings", "sync"], architecture: ["findings", "sync"],
-  "work/inbox": ["proposals"], work: ["tasks", "proposals"], health: [], "knowledge/inbox": ["proposals"], knowledge: ["knowledge", "levels"],
+  "work/inbox": ["proposals"], work: ["tasks", "proposals"], board: ["tasks"], health: [], "knowledge/inbox": ["proposals"], knowledge: ["knowledge", "levels"],
   "agents/tools": ["activity", "sync"], agents: ["activity", "knowledge", "proposals"],
 };
 
@@ -728,6 +730,7 @@ async function projectView(p, view, item, opts) {
       const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", workProposals(p.live)]], sec);
       return h("div", {}, nav, sec === "inbox" ? await viewArchProposals(p) : await viewTasks(p, opts, sec));
     }
+    case "board": return viewBoard(p);
     case "health": return viewHealth(p);
     case "knowledge": {
       const inbox = item === "inbox";
@@ -1176,6 +1179,7 @@ const ICONS = {
   check: ["M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z", "m8 12.5 2.7 2.7L16.5 9.5"],
   inbox: ["M3 13h5l1.5 3h5L16 13h5", "M5.5 5h13L21 13v6H3v-6z"],
   calm: ["M3 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0", "M3 17c2-3 4-3 6 0s4 3 6 0 4-3 6 0", "M12 3v3"],
+  board: ["M4 4h4v16H4z", "M10 4h4v10h-4z", "M16 4h4v13h-4z"],
 };
 // iconButton is a small button that is only its icon; label names it
 // for the tooltip and screen readers.
@@ -2137,6 +2141,7 @@ async function renderMachine(main) {
         seg("Theme", THEMES.map((t) => [t, t === "system" ? "System" : t[0].toUpperCase() + t.slice(1)]), store.get("theme", "system"), (v) => { store.set("theme", v); applyTheme(); })),
       h("div", { class: "setrow" }, h("div", {}, h("b", {}, "Open projects on"), h("p", { class: "muted small" }, "The view a project opens on from the sidebar.")),
         seg("Default project view", PROJECT_VIEWS, defaultView(), (v) => store.set("projectView", v))))),
+    section("Board", "Kept on this machine: how a project's Board starts until it is set there.", boardDefaults()),
     section("Developer telemetry", "Anonymous, aggregated numbers for the harness developer: how well harness serves agents. Never code, paths, queries or names.", tel),
     section("C# sessions (graphify-csharp)", "Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone.",
       graphifySessions(null)),
@@ -2147,6 +2152,23 @@ async function renderMachine(main) {
         [k, v && h("code", { title: v }, paths.global && v.startsWith(paths.global + "/") ? v.slice(paths.global.length + 1) : v)]),
     ]))),
     h("p", { class: "muted small buildline" }, `harness ${b.version || "?"}`, b.commit && ` · ${b.commit.slice(0, 12)}`, b.date && ` · built ${b.date.slice(0, 10)}`, b.platform && ` · ${b.platform}`, b.runtime && ` · ${b.runtime}`));
+}
+
+// boardDefaults sets the Board's sort and done-age for projects without
+// their own (from the C# rewrite: TASK-0081).
+function boardDefaults() {
+  const box = h("div", { class: "card pad settings" }, h("p", { class: "empty" }, "Loading…"));
+  const draw = (d) => {
+    const choice = (label, hint, opts, cur, key, conv) => h("div", { class: "setrow" }, h("div", {}, h("b", {}, label), h("p", { class: "muted small" }, hint)),
+      h("select", { "aria-label": label, onchange: async (ev) => {
+        try { draw((await post("/api/board-defaults", { [key]: conv ? conv(ev.target.value) : ev.target.value })).defaults); toast("Board default saved"); } catch (e) { toast(e.message, true); }
+      } }, opts.map(([v, text]) => h("option", { value: String(v), selected: String(v) === String(cur) }, text))));
+    fill(box,
+      choice("Sort cards by", "Within every column.", Object.entries(BOARD_SORTS), d.sort, "sort"),
+      choice("Hide done tasks older than", "By when each was done.", [1, 3, 7, 14].map((n) => [n, plural(n, "day")]), d.hide_done_days, "hide_done_days", Number));
+  };
+  api("/api/board-defaults").then((r) => draw(r.defaults || {})).catch((e) => fill(box, h("p", { class: "error" }, e.message)));
+  return box;
 }
 
 // telemetryCard is the opt-in as a switch: on asks for the collector's
@@ -4695,10 +4717,13 @@ function blueprintFields(p, init, isNew) {
   const goal = h("textarea", { rows: 3, placeholder: "What it is for: the outcome, and why now", "aria-label": "Goal" }, init.goal || "");
   const exit = listBuilder(init.exit || [], "A criterion that says it is done", "round");
   const notes = h("textarea", { rows: 2, "aria-label": "Notes" }, init.notes || "");
+  // its colour on the Board and in Work › Tasks (from the C# rewrite)
+  const color = colorPicker(init.color, isNew || !init.color);
   return {
     nodes: [isNew ? h("div", { class: "frow2 bphead" }, field("Id", id, "Suggested: the next one."), field("Title", title)) : field("Title", title),
-      field("Goal", goal), h("fieldset", { class: "fgroup" }, h("legend", {}, "Done when"), exit.el), field("Notes", notes)],
-    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value.trim(), goal: goal.value.trim(), exit: exit.value(), notes: notes.value.trim() }),
+      field("Goal", goal), h("fieldset", { class: "fgroup" }, h("legend", {}, "Done when"), exit.el), field("Notes", notes),
+      h("fieldset", { class: "fgroup" }, h("legend", {}, "Colour"), color.el)],
+    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value.trim(), goal: goal.value.trim(), exit: exit.value(), notes: notes.value.trim(), ...(color.value() ? { color: color.value() } : {}) }),
   };
 }
 
@@ -4894,6 +4919,80 @@ function archProposalCard(p, x) {
     panel);
 }
 
+// --- blueprint colours and the Board (from the C# rewrite: TASK-0081) ---
+// BP_COLORS are the 16 a blueprint can have (BlueprintColors.Names, in the
+// order they are given out); style.css draws each as --bp-<name>, a light
+// and a dark variant readable on a card, set on an element by bpc-<name>
+// (a class: the page's policy allows no inline styles).
+const BP_COLORS = ["teal", "orange", "blue", "rose", "green", "violet", "amber", "cyan", "pink", "lime", "indigo", "red", "fuchsia", "yellow", "slate", "purple"];
+const bpClass = (color) => (BP_COLORS.includes(color) ? ` bpc-${color}` : "");
+// bpFrame is a blueprint's id and title in an outlined frame of its colour
+// (neutral for one without, as a blueprint only tasks name).
+function bpFrame(id, title, color) {
+  return h("span", { class: "bpframe" + bpClass(color), title: color ? `${id} · ${color}` : id },
+    h("span", { class: "bpid mono" }, id), title && h("span", { class: "bptitle" }, title));
+}
+// colorPicker chooses a blueprint's colour from swatches; a new blueprint
+// may leave it to harness (the first colour no other uses).
+function colorPicker(cur, allowAuto) {
+  let v = cur || "";
+  const box = h("div", { class: "bpswatches", role: "radiogroup", "aria-label": "Colour" });
+  const draw = () => fill(box, [...(allowAuto ? [""] : []), ...BP_COLORS].map((c) => h("button", {
+    type: "button", role: "radio", class: "bpswatch" + (c ? bpClass(c) : " auto"), "aria-checked": String(c === v),
+    title: c || "The first colour no other blueprint uses", "aria-label": c || "next free colour",
+    onclick: () => { v = c; draw(); },
+  }, c ? h("span", { class: "dot", "aria-hidden": "true" }) : "auto")));
+  draw();
+  return { el: box, value: () => v };
+}
+
+const BOARD_SORTS = { priority: "Priority", id: "Id", name: "Name", created: "Created", changed: "Last changed" };
+// viewBoard is a project's tasks as a read-only board: a column per status,
+// a card per task; its sort, done-age and blueprint filter are kept on
+// this machine for the project (sort and done-age default to Machine › Board).
+async function viewBoard(p) {
+  const res = await api(projectAPI(p, "board"));
+  const s = res.settings || {};
+  const info = Object.fromEntries((res.blueprints || []).map((b) => [b.id, b]));
+  const save = async (change) => {
+    try { await post(projectAPI(p, "board"), change); await renderMain(); } catch (e) { toast(e.message, true); }
+  };
+  const choice = (label, opts, cur, pick) => h("label", { class: "bsel" }, h("span", {}, label),
+    h("select", { "aria-label": label, onchange: (ev) => pick(ev.target.value) },
+      opts.map(([v, text]) => h("option", { value: String(v), selected: String(v) === String(cur) }, text))));
+  const bar = h("div", { class: "filters boardbar" },
+    choice("Sort by:", (res.sorts || []).map((x) => [x, BOARD_SORTS[x] || x]), s.sort, (v) => save({ sort: v })),
+    choice("Hide done tasks older than:", (res.hide_done_days_options || []).map((d) => [d, plural(d, "day")]), s.hide_done_days, (v) => save({ hide_done_days: Number(v) })),
+    choice("Blueprint:", [["", "all blueprints"], ...(res.blueprints || []).map((b) => [b.id, b.title ? `${b.id} · ${b.title}` : b.id]), ["—", "no blueprint"]], s.blueprint || "", (v) => save({ blueprint: v })));
+  const columns = (res.columns || []).map((col) => h("section", { class: "bcol", "data-status": col.status, "aria-label": `${col.status.replace("_", " ")}: ${col.tasks.length}` },
+    h("h3", { class: "bhead" }, statusPill(col.status), h("span", { class: "count" }, col.tasks.length)),
+    h("div", { class: "bcards" }, col.tasks.length ? col.tasks.map((x) => boardCard(p, x, info)) : h("p", { class: "empty small" }, "None"))));
+  return h("div", {}, bar, h("div", { class: "board", role: "region", "aria-label": "Board", tabindex: "0" }, columns));
+}
+function boardCard(p, x, info) {
+  const b = x.blueprint && info[x.blueprint];
+  return h("article", { class: "bcard", "data-task": x.id },
+    h("div", { class: "bctop" },
+      typeMark(x.type),
+      h("button", { class: "linkbtn tid mono", type: "button", title: `Open ${x.id}`, onclick: () => taskDialog(p, x) }, x.id),
+      h("span", { class: "bctitle" }, x.title),
+      h("span", { class: `prio p-${x.priority}`, title: `${x.priority} priority` }, icon("p-" + x.priority), x.priority)),
+    x.blueprint && h("div", { class: "bcbp" }, bpFrame(x.blueprint, b && b.title, b && b.color)));
+}
+// taskDialog is a task as Work › Tasks shows it opened: its definition,
+// criteria and audit trail, with Edit and Delete where Work allows them.
+function taskDialog(p, x) {
+  const acc = x.acceptance || [];
+  const passed = acc.filter((c) => c.result === "pass" || c.result === "n/a").length;
+  const dlg = dialog({ title: `${x.id} · ${x.title}`, sub: x.blueprint ? `In blueprint ${x.blueprint}` : "Without a blueprint", wide: true });
+  dlg.set(null, [h("div", { class: "taskdlg" }, taskDetail(x, passed))], [
+    h("button", { class: "ghost danger", type: "button", onclick: () => { dlg.close(); deleteTaskDialog(x); } }, icon("trash"), "Delete…"),
+    h("button", { class: "ghost", type: "button", disabled: !taskEditable(x), title: taskEditable(x) ? "" : "Only a ready or backlog task can be edited: once claimed, its definition is fixed",
+      onclick: () => { dlg.close(); editTaskDialog({ id: p.id }, x); } }, icon("edit"), "Edit…"),
+    h("button", { class: "primary", type: "button", onclick: () => dlg.close() }, "Close")]);
+  setTimeout(() => dlg.el.querySelector(".dlg-foot .primary")?.focus(), 0);
+}
+
 // --- blueprint order (from the C# rewrite: TASK-0078, TASK-0083) ---
 // The author orders the blueprints in Work › Tasks and Work › Blueprints
 // alike: Move up / Move down beside a blueprint, or dragging it before or
@@ -5017,7 +5116,8 @@ async function viewTasks(p, opts, sec) {
         onclick: () => { open ? t.collapsed.add(m) : t.collapsed.delete(m); drawTasks(); },
       },
         chevron(open),
-        h("span", { class: "mname" }, m, mi && mi.title && h("span", { class: "mtitle" }, mi.title)),
+        // the blueprint in its colour's frame, as on the Board (from the C# rewrite)
+        h("span", { class: "mname" }, m === "—" ? m : bpFrame(m, mi && mi.title, mi && mi.color)),
         h("span", { class: "mcount" }, `${rows.length} shown` + (reasons.size ? `, ${[...reasons.values()].reduce((n, xs) => n + xs.length, 0)} deferred` : "")),
         h("span", { class: "mprog" }, meter(done, mine.length, `${done} of ${mine.length} tasks done`)));
       const at = movable.indexOf(m);

@@ -17,7 +17,15 @@ public sealed partial class TaskStore
     {
         ArgumentNullException.ThrowIfNull(definitions);
         var defs = definitions
-            .Select(d => d with { Id = d.Id.Trim(), Title = d.Title.Trim(), Exit = d.Exit ?? [] })
+            .Select(d =>
+                d with
+                {
+                    Id = d.Id.Trim(),
+                    Title = d.Title.Trim(),
+                    Exit = d.Exit ?? [],
+                    Color = BlueprintColors.Normalize(d.Color),
+                }
+            )
             .ToArray();
         HashSet<string> seen = new(StringComparer.Ordinal);
         for (var i = 0; i < defs.Length; i++)
@@ -52,7 +60,7 @@ public sealed partial class TaskStore
                         var command = Command(
                             c,
                             t,
-                            "SELECT title,goal,exit,notes,ordinal FROM blueprints WHERE id=$id",
+                            "SELECT title,goal,exit,notes,ordinal,color FROM blueprints WHERE id=$id",
                             ("$id", d.Id)
                         )
                     )
@@ -60,11 +68,13 @@ public sealed partial class TaskStore
                     {
                         if (reader.Read())
                         {
+                            // a backlog without a colour keeps the blueprint's own
                             same =
                                 reader.GetString(0) == d.Title
                                 && reader.GetString(1) == d.Goal
                                 && reader.GetString(2) == Json(d.Exit)
-                                && reader.GetString(3) == d.Notes;
+                                && reader.GetString(3) == d.Notes
+                                && (d.Color.Length is 0 || reader.GetString(5) == d.Color);
                             ordinal = reader.GetInt32(4);
                         }
                     }
@@ -88,8 +98,8 @@ public sealed partial class TaskStore
                         c,
                         t,
                         """
-                        INSERT INTO blueprints(id,title,goal,exit,notes,source,ordinal,updated_at) VALUES($id,$title,$goal,$exit,$notes,$source,$ordinal,$stamp)
-                        ON CONFLICT(id) DO UPDATE SET title=excluded.title,goal=excluded.goal,exit=excluded.exit,notes=excluded.notes,source=excluded.source,ordinal=excluded.ordinal,updated_at=excluded.updated_at
+                        INSERT INTO blueprints(id,title,goal,exit,notes,source,ordinal,color,updated_at) VALUES($id,$title,$goal,$exit,$notes,$source,$ordinal,$color,$stamp)
+                        ON CONFLICT(id) DO UPDATE SET title=excluded.title,goal=excluded.goal,exit=excluded.exit,notes=excluded.notes,source=excluded.source,ordinal=excluded.ordinal,color=excluded.color,updated_at=excluded.updated_at
                         """,
                         ("$id", d.Id),
                         ("$title", d.Title),
@@ -98,6 +108,7 @@ public sealed partial class TaskStore
                         ("$notes", d.Notes),
                         ("$source", source),
                         ("$ordinal", i),
+                        ("$color", ColorFor(c, t, d.Id, d.Color)),
                         ("$stamp", stamp)
                     );
                 }
@@ -116,7 +127,11 @@ public sealed partial class TaskStore
                 Dictionary<string, BlueprintProgress> byId = new(StringComparer.Ordinal);
                 List<string> order = [];
                 using (
-                    var command = Command(c, t, "SELECT id,title,goal,exit,notes FROM blueprints ORDER BY ordinal,id")
+                    var command = Command(
+                        c,
+                        t,
+                        "SELECT id,title,goal,exit,notes,color FROM blueprints ORDER BY ordinal,id"
+                    )
                 )
                 using (var reader = command.ExecuteReader())
                 {
@@ -127,7 +142,8 @@ public sealed partial class TaskStore
                             reader.GetString(1),
                             reader.GetString(2),
                             HarnessJson.Deserialize<string[]>(reader.GetString(3)) ?? [],
-                            reader.GetString(4)
+                            reader.GetString(4),
+                            reader.GetString(5)
                         );
                         byId[d.Id] = new(d, true, new Dictionary<string, int>(StringComparer.Ordinal));
                         order.Add(d.Id);
@@ -412,6 +428,7 @@ public sealed partial class TaskStore
             Goal = d.Goal.Trim(),
             Exit = (d.Exit ?? []).Select(e => e.Trim()).Where(e => e.Length is not 0).ToArray(),
             Notes = d.Notes.Trim(),
+            Color = BlueprintColors.Normalize(d.Color),
         };
         if (d.Id.Length is 0)
         {
@@ -431,9 +448,9 @@ public sealed partial class TaskStore
             c,
             t,
             """
-            INSERT INTO blueprints(id,title,goal,exit,notes,source,ordinal,updated_at)
-            VALUES($id,$title,$goal,$exit,$notes,$source,(SELECT COALESCE(MAX(ordinal),-1)+1 FROM blueprints),$stamp)
-            ON CONFLICT(id) DO UPDATE SET title=excluded.title,goal=excluded.goal,exit=excluded.exit,notes=excluded.notes,source=excluded.source,updated_at=excluded.updated_at
+            INSERT INTO blueprints(id,title,goal,exit,notes,source,ordinal,color,updated_at)
+            VALUES($id,$title,$goal,$exit,$notes,$source,(SELECT COALESCE(MAX(ordinal),-1)+1 FROM blueprints),$color,$stamp)
+            ON CONFLICT(id) DO UPDATE SET title=excluded.title,goal=excluded.goal,exit=excluded.exit,notes=excluded.notes,source=excluded.source,color=excluded.color,updated_at=excluded.updated_at
             """,
             ("$id", d.Id),
             ("$title", d.Title),
@@ -441,8 +458,39 @@ public sealed partial class TaskStore
             ("$exit", Json(d.Exit)),
             ("$notes", d.Notes),
             ("$source", source),
+            ("$color", ColorFor(c, t, d.Id, d.Color)),
             ("$stamp", Stamp())
         );
+
+    /// <summary>
+    /// The colour a saved blueprint has: the one given, else the one it has, else the next one the set gives out
+    /// among the project's other blueprints.
+    /// </summary>
+    private static string ColorFor(SqliteConnection c, SqliteTransaction t, string id, string given)
+    {
+        if (given.Length is not 0)
+        {
+            return given;
+        }
+
+        List<string> others = [];
+        var own = "";
+        using var command = Command(c, t, "SELECT id,color FROM blueprints");
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.GetString(0) == id)
+            {
+                own = reader.GetString(1);
+            }
+            else
+            {
+                others.Add(reader.GetString(1));
+            }
+        }
+
+        return own.Length is not 0 ? own : BlueprintColors.Next(others);
+    }
 
     /// <summary>
     /// Removes a blueprint. Its tasks, if any, are moved to <paramref name="moveTo"/> ("" for none) or deleted;

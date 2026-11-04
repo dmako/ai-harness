@@ -69,7 +69,7 @@ internal sealed partial class UiReadService
         CancellationToken token
     )
     {
-        using var database = Open(project, endpoint is "tasks" or "tasks-next-id");
+        using var database = Open(project, endpoint is "tasks" or "tasks-next-id" or "board");
         var telemetry = new TelemetryStore(database);
         var tasks = new TaskStore(database);
         return endpoint switch
@@ -85,6 +85,7 @@ internal sealed partial class UiReadService
             "applies" => Applying(project, database, request, token),
             "proposals" => Proposals(database, request, token),
             "tasks" => Tasks(tasks, request, token),
+            "board" => Board(UiProjectCatalog.Text(project, "id"), tasks, token),
             "blueprints" => UiJson.Node(
                 new JsonObjectMap { ["blueprints"] = tasks.Blueprints(token).Select(TaskViews.Blueprint) }
             ),

@@ -72,12 +72,15 @@ public sealed record TaskDefinition
     }
 }
 
+/// <param name="Color">One of <see cref="BlueprintColors.Names"/>; "" asks for one to be given out (or, when
+/// editing, keeps the current one).</param>
 public sealed record BlueprintDefinition(
     string Id,
     string Title,
     string Goal = "",
     IReadOnlyList<string>? Exit = null,
-    string Notes = ""
+    string Notes = "",
+    string Color = ""
 );
 
 /// <summary>What removing a blueprint did to its tasks: moved to another (or none), or deleted, and the outside tasks

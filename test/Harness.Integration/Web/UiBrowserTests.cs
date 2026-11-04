@@ -687,6 +687,274 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task TheBoardShowsEveryTaskInItsStatusColumnWithBlueprintColoursAndKeepsItsChoices()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            tasks.ImportBlueprints(
+                [new("M1", "One"), new("M2", "Two", Color: "rose")],
+                "test",
+                cancellationToken: Token
+            );
+            tasks.Import(
+                [
+                    new TaskDefinition
+                    {
+                        Id = "UI-0001",
+                        Title = "Zed fix",
+                        Blueprint = "M1",
+                        Type = "bug",
+                        Priority = "high",
+                        Acceptance = ["it works"],
+                    },
+                    new TaskDefinition
+                    {
+                        Id = "UI-0002",
+                        Title = "Later",
+                        Blueprint = "M2",
+                        // waits for UI-0001, so it stays in the backlog
+                        DependsOn = ["UI-0001"],
+                    },
+                    new TaskDefinition
+                    {
+                        Id = "UI-0003",
+                        Title = "Just done",
+                        Status = "done",
+                    },
+                    new TaskDefinition
+                    {
+                        Id = "UI-0004",
+                        Title = "Done long ago",
+                        Status = "done",
+                    },
+                    new TaskDefinition
+                    {
+                        Id = "UI-0005",
+                        Title = "Alpha docs",
+                        Blueprint = "M2",
+                        Type = "docs",
+                        Priority = "low",
+                    },
+                ],
+                "test",
+                cancellationToken: Token
+            );
+        }
+
+        fixture.Sql(
+            "UPDATE tasks SET completed_at='"
+                + DateTimeOffset
+                    .UtcNow.AddDays(-10)
+                    .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)
+                + "' WHERE id='UI-0004'"
+        );
+        const string Columns = """
+            [...document.querySelectorAll('#main .bcol')].map(c => c.dataset.status + ':' + [...c.querySelectorAll('.bcard')].map(k => k.dataset.task).join('+')).join(' ')
+            """;
+        await BrowsePagesAsync(
+            executable,
+            fixture,
+            2,
+            async (pages, server) =>
+            {
+                var page = pages[0];
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/board" }
+                );
+                await page.WaitAsync("document.querySelectorAll('#main .bcol').length === 8");
+                // the tab sits between Work and Agents, with its icon
+                (await ValueAsync(page, "[...document.querySelectorAll('.tabs a')].map(a => a.textContent).join()"))
+                    .Should()
+                    .Contain("Work,Board,Agents");
+                (await ValueAsync(page, "!!document.querySelector('.tabs a[aria-selected=true] svg.icon')"))
+                    .Should()
+                    .Be("True");
+
+                // a column per status in Work's order, each card in its own; done 10 days ago is hidden at 7 days
+                (await ValueAsync(page, Columns))
+                    .Should()
+                    .Be(
+                        "ready:UI-0001+UI-0005 claimed: in_progress: review: blocked: backlog:UI-0002 done:UI-0003 deferred:"
+                    );
+                (await ValueAsync(page, "document.querySelector('#main .bcol[data-status=ready] .bhead').textContent"))
+                    .Should()
+                    .Contain("2");
+
+                // a card: type icon, id, title, priority; the blueprint framed in its colour; none without one
+                (
+                    await ValueAsync(
+                        page,
+                        """
+                        (() => {
+                          const c = document.querySelector('.bcard[data-task=UI-0001] .bctop');
+                          const parts = [...c.children].map(e => e.classList[0]).join('>');
+                          const frame = document.querySelector('.bcard[data-task=UI-0001] .bpframe');
+                          const probe = document.createElement('span'); probe.style.color = 'var(--bp-teal)'; document.body.append(probe);
+                          const teal = getComputedStyle(probe).color; probe.remove();
+                          return [parts, frame.textContent, getComputedStyle(frame).borderTopColor === teal && getComputedStyle(frame).color === teal,
+                            !!document.querySelector('.bcard[data-task=UI-0003] .bpframe'), c.querySelector('.ttype').getAttribute('aria-label')].join('|');
+                        })()
+                        """
+                    )
+                )
+                    .Should()
+                    .Be("ttype>linkbtn>bctitle>prio|M1One|true|false|bug");
+
+                // the id opens the task as Work › Tasks does, with Edit and Delete; Escape closes it back to the board
+                await page.EvaluateAsync("document.querySelector('.bcard[data-task=UI-0001] .tid').click()");
+                await page.WaitAsync("!!document.querySelector('dialog[open] .tdetail')");
+                (
+                    await ValueAsync(
+                        page,
+                        "(() => { const d = document.querySelector('dialog[open]'); return [d.textContent.includes('it works'), d.contains(document.activeElement),"
+                            + " [...d.querySelectorAll('.dlg-foot button')].map(b => b.textContent + (b.disabled ? '(off)' : '')).join()].join('|'); })()"
+                    )
+                )
+                    .Should()
+                    .Be("true|true|Delete…,Edit…,Close");
+                await page.CommandAsync(
+                    "Input.dispatchKeyEvent",
+                    new
+                    {
+                        type = "keyDown",
+                        key = "Escape",
+                        code = "Escape",
+                        windowsVirtualKeyCode = 27,
+                    }
+                );
+                await page.WaitAsync("!document.querySelector('dialog[open]') && location.hash.endsWith('/board')");
+
+                // sort, done-age and blueprint filter, each saved for the project on this machine
+                async Task Choose(string label, string value) =>
+                    await page.EvaluateAsync(
+                        $"(() => {{ const s = document.querySelector('select[aria-label=\"{label}\"]'); s.value = '{value}'; s.dispatchEvent(new Event('change')); }})()"
+                    );
+                await Choose("Sort by:", "name");
+                await page.WaitAsync(Columns + ".startsWith('ready:UI-0005+UI-0001')");
+                await Choose("Hide done tasks older than:", "14");
+                await page.WaitAsync(Columns + ".includes('done:UI-0004+UI-0003')");
+                await Choose("Blueprint:", "M2");
+                await page.WaitAsync(
+                    Columns
+                        + " === 'ready:UI-0005 claimed: in_progress: review: blocked: backlog:UI-0002 done: deferred:'"
+                );
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync(
+                    Columns
+                        + " === 'ready:UI-0005 claimed: in_progress: review: blocked: backlog:UI-0002 done: deferred:'"
+                );
+                await using var restarted = await UiFixture.StartAsync(fixture);
+                await pages[1]
+                    .CommandAsync("Page.navigate", new { url = restarted.Client.BaseAddress + "#/p/" + id + "/board" });
+                await pages[1].WaitAsync("document.querySelectorAll('#main .bcol').length === 8");
+                (
+                    await ValueAsync(
+                        pages[1],
+                        "['Sort by:', 'Hide done tasks older than:', 'Blueprint:'].map(l => document.querySelector(`select[aria-label=\"${l}\"]`).value).join()"
+                    )
+                )
+                    .Should()
+                    .Be("name,14,M2", "the choices are kept on the machine, not in the browser");
+
+                // Machine › Board sets the defaults for projects without their own
+                await page.EvaluateAsync("location.hash = '#/machine'");
+                await page.WaitAsync("!!document.querySelector('select[aria-label=\"Sort cards by\"]')");
+                await page.EvaluateAsync(
+                    "(() => { const s = document.querySelector('select[aria-label=\"Sort cards by\"]'); s.value = 'changed'; s.dispatchEvent(new Event('change')); })()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                    File.Exists(Path.Combine(fixture.Global, "ui.json"))
+                    && File.ReadAllText(Path.Combine(fixture.Global, "ui.json"))
+                        .Contains("\"changed\"", StringComparison.Ordinal)
+                );
+
+                // Work › Tasks frames each blueprint section as the cards do; the colour is picked from swatches
+                await page.EvaluateAsync($"location.hash = '#/p/{id}/work/tasks'");
+                await page.WaitAsync("!!document.querySelector('#main .mstone[data-blueprint=M2] .mhead .bpframe')");
+                await page.EvaluateAsync($"location.hash = '#/p/{id}/work/blueprints'");
+                await page.WaitAsync("!!document.querySelector('#main .mcard[data-blueprint=M2] .mcedit')");
+                await page.EvaluateAsync("document.querySelector('#main .mcard[data-blueprint=M2] .mcedit').click()");
+                await page.WaitAsync("document.querySelectorAll('dialog[open] .bpswatch').length === 16");
+                (
+                    await ValueAsync(
+                        page,
+                        "document.querySelector('dialog[open] .bpswatch[aria-checked=true]').getAttribute('aria-label')"
+                    )
+                )
+                    .Should()
+                    .Be("rose");
+                await page.EvaluateAsync("document.querySelector('dialog[open] .bpswatch[aria-label=violet]').click()");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent === 'Save blueprint').click()"
+                );
+                await ProviderFixture.EventuallyAsync(() =>
+                {
+                    using var database = fixture.Database();
+                    return new TaskStore(database)
+                        .Blueprints(Token)
+                        .Single(b => b.Definition.Id == "M2")
+                        .Definition.Color
+                        is "violet";
+                });
+                (
+                    await ValueAsync(
+                        page,
+                        $"fetch('/api/projects/{id}/blueprints/M2/edit', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json', 'X-Harness-UI': '1' }},"
+                            + " body: JSON.stringify({ title: 'Two', color: 'mauve' }) }).then(r => r.status + ' ' + r.statusText)"
+                    )
+                )
+                    .Should()
+                    .StartWith("400", "an unknown colour is refused");
+
+                // every colour readable on a card and a section header, light and dark
+                const string Contrast = """
+                    (() => {
+                      const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+                      const g = cv.getContext('2d', { willReadFrequently: true });
+                      const px = (...cs) => { g.clearRect(0, 0, 1, 1); for (const c of cs) { g.fillStyle = c; g.fillRect(0, 0, 1, 1); } return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+                      const lum = (rgb) => { const [r, gr, b] = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * gr + 0.0722 * b; };
+                      const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+                      const probe = (v) => { const d = document.createElement('div'); d.style.color = v; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+                      const surface = probe('var(--surface)');
+                      const bgs = [px(surface), px(surface, probe('var(--surface-2)'))];
+                      return BP_COLORS.map((c) => [c, Math.min(...bgs.map((b) => ratio(px(surface, probe(`var(--bp-${c})`)), b)))])
+                        .filter(([, r]) => r < 4.5).map(([c, r]) => `${c} ${r.toFixed(2)}`).join(', ');
+                    })()
+                    """;
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    (await ValueAsync(page, Contrast)).Should().BeEmpty(theme);
+                }
+
+                (await ValueAsync(page, "BP_COLORS.join()")).Should().Be(string.Join(",", BlueprintColors.Names));
+            }
+        );
+
+        // the CLI picks the colour too, and refuses one not in the set
+        (await fixture.CliAsync("tasks", "blueprints", "edit", "M1", "--color", "mauve"))
+            .Code.Should()
+            .NotBe(0);
+        (await fixture.CliAsync("tasks", "blueprints", "edit", "M1", "--color", "lime")).Code.Should().Be(0);
+        using (var database = fixture.Database())
+        {
+            new TaskStore(database)
+                .Blueprints(Token)
+                .Single(b => b.Definition.Id == "M1")
+                .Definition.Color.Should()
+                .Be("lime");
+        }
+    }
+
+    [Fact]
     public async Task BlueprintsAreCreatedEditedAndRemovedOnceConfirmedAskingAboutTheirTasks()
     {
         var executable = Browser();
@@ -1566,6 +1834,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                         "work",
                         "work/tasks",
                         "work/inbox",
+                        "board",
                         "agents",
                         "agents/tools",
                         "health",
@@ -1818,6 +2087,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                     $"#/p/{id}/work/tasks",
                     $"#/p/{id}/work/inbox",
                     $"#/p/{id}/work/UI-0001",
+                    $"#/p/{id}/board",
                     $"#/p/{id}/agents/serving",
                     $"#/p/{id}/agents/tools",
                     $"#/p/{id}/health",

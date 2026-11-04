@@ -161,8 +161,8 @@ command or agent tool does.
 
 Blueprints are kept in harness ui too: Work › Blueprints › New blueprint
 starts with the next free id (M17 after M16, or BP-001); the pencil on a
-blueprint's card changes its name, goal, exit criteria and notes, not its
-id. The bin removes it after you confirm; for a blueprint with tasks it
+blueprint's card changes its name, goal, exit criteria, notes and colour,
+not its id. The bin removes it after you confirm; for a blueprint with tasks it
 also asks what happens to them: moved to another blueprint (or to none), or
 deleted with their audit trail. Deleting is refused while an agent holds
 one of the tasks, and a task elsewhere that depended on a deleted one loses
@@ -200,13 +200,26 @@ flight or next; and what needs a person, most urgent first. Then:
   removed from project knowledge.
 - **Work:** Blueprints, Tasks and the Inbox of proposed tasks, blueprints
   and architecture work.
+- **Board:** the tasks as a read-only board, a column per status and a card
+  per task: its type, id, title, priority and blueprint. The task's id opens
+  it as Work › Tasks does (with Edit and Delete where Work allows them).
+  Sort the cards by priority, id, name, created or last changed, hide done
+  tasks finished more than 1, 3, 7 or 14 days ago, and show one blueprint's
+  tasks; the choices are kept for the project on this machine.
 - **Agents:** how harness serves your agents and what you can change so it
   serves them better.
 - **Health:** the checks `harness doctor` runs; a check harness can fix
   itself has Fix it, and a stale index has Sync now.
 
+Each blueprint has a colour, one of 16: its id and title are framed in it on
+the Board and in Work › Tasks. A new blueprint gets the first colour no other
+uses (once all 16 are, they start again from the first); pick another in its
+edit dialog, with `harness tasks blueprints edit <id> --color <name>`, or as
+`color:` in the backlog file.
+
 A workspace has the same views over its members. Machine holds this page's
-settings, the C# sessions, and the switch for the opt-in developer
+settings, the Board's defaults (the sort and done-age of a project that has
+not chosen its own), the C# sessions, and the switch for the opt-in developer
 telemetry. How harness itself performs (relevance per provider, latency)
 is for the harness developer: it is not shown here, only sent in that
 telemetry if you turn it on.
