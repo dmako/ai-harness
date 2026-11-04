@@ -636,6 +636,43 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 (await ValueAsync(page, $"!!{Card("—")}.querySelector('.bpmove') || {Card("—")}.draggable"))
                     .Should()
                     .Be("False");
+                // a card's id in its blueprint's coloured frame; none on the card without a blueprint
+                (
+                    await ValueAsync(
+                        page,
+                        $"[{Card("M1")}.querySelector('.mid .bpframe')?.className, !!{Card("—")}.querySelector('.bpframe')].join()"
+                    )
+                )
+                    .Should()
+                    .Be("bpframe bpc-teal,false");
+                // the bar where a card would land shows in light and dark alike (the drag is not dropped)
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    (
+                        await ValueAsync(
+                            page,
+                            $$"""
+                            (() => {
+                              const from = {{Card("M3")}}, to = {{Card("M1")}}, dt = new DataTransfer();
+                              from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+                              const box = to.getBoundingClientRect();
+                              to.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: box.left + 2, clientY: box.top + 2 }));
+                              const probe = document.createElement('span'); probe.style.color = 'var(--accent)'; document.body.append(probe);
+                              const accent = getComputedStyle(probe).color; probe.remove();
+                              const shadow = getComputedStyle(to).boxShadow;
+                              from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+                              return shadow.includes(accent) ? 'bar' : 'no bar: ' + shadow;
+                            })()
+                            """
+                        )
+                    ).Should().Be("bar", theme);
+                }
+
+                await page.CommandAsync("Emulation.setEmulatedMedia", new { features = Array.Empty<object>() });
 
                 // dragged before M1 under the Open filter: hidden M2 keeps its place after M1
                 (await ValueAsync(page, $"drag({Card("M3")}, {Card("M1")}, false)"))
@@ -695,7 +732,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
         {
             var tasks = new TaskStore(database);
             tasks.ImportBlueprints(
-                [new("M1", "One"), new("M2", "Two", Color: "rose")],
+                [new("M1", "One"), new("M2", "Two, with a title far too long to fit on one card line", Color: "rose")],
                 "test",
                 cancellationToken: Token
             );
@@ -766,44 +803,74 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                     "Page.navigate",
                     new { url = server.Client.BaseAddress + "#/p/" + id + "/board" }
                 );
-                await page.WaitAsync("document.querySelectorAll('#main .bcol').length === 8");
-                // the tab sits between Work and Agents, with its icon
+                await page.WaitAsync("document.querySelectorAll('#main .bcol').length === 7");
+                // the tab sits between Work and Agents, its text only like the others
                 (await ValueAsync(page, "[...document.querySelectorAll('.tabs a')].map(a => a.textContent).join()"))
                     .Should()
                     .Contain("Work,Board,Agents");
-                (await ValueAsync(page, "!!document.querySelector('.tabs a[aria-selected=true] svg.icon')"))
-                    .Should()
-                    .Be("True");
+                (await ValueAsync(page, "!!document.querySelector('.tabs a svg')")).Should().Be("False");
 
-                // a column per status in Work's order, each card in its own; done 10 days ago is hidden at 7 days
+                // a column per status as work moves, blocked last, no deferred one; done 10 days ago hidden at 7 days
                 (await ValueAsync(page, Columns))
                     .Should()
-                    .Be(
-                        "ready:UI-0001+UI-0005 claimed: in_progress: review: blocked: backlog:UI-0002 done:UI-0003 deferred:"
-                    );
+                    .Be("backlog:UI-0002 ready:UI-0001+UI-0005 claimed: in_progress: review: done:UI-0003 blocked:");
                 (await ValueAsync(page, "document.querySelector('#main .bcol[data-status=ready] .bhead').textContent"))
                     .Should()
                     .Contain("2");
 
-                // a card: type icon, id, title, priority; the blueprint framed in its colour; none without one
+                // a card: type icon and id left, priority right, centred on one line; the title below; the
+                // blueprint's title (not its id) framed in its colour on one line, cut with an ellipsis; none without one
                 (
                     await ValueAsync(
                         page,
                         """
                         (() => {
-                          const c = document.querySelector('.bcard[data-task=UI-0001] .bctop');
+                          const card = document.querySelector('.bcard[data-task=UI-0001]');
+                          const c = card.querySelector('.bctop');
                           const parts = [...c.children].map(e => e.classList[0]).join('>');
-                          const frame = document.querySelector('.bcard[data-task=UI-0001] .bpframe');
+                          const mid = (e) => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+                          const centred = [...c.children].every(e => Math.abs(mid(e) - mid(c)) < 2);
+                          const right = Math.abs(c.querySelector('.prio').getBoundingClientRect().right - c.getBoundingClientRect().right) < 2;
+                          const lines = [...card.children].map(e => e.classList[0]).join('>');
+                          const frame = card.querySelector('.bpframe');
                           const probe = document.createElement('span'); probe.style.color = 'var(--bp-teal)'; document.body.append(probe);
                           const teal = getComputedStyle(probe).color; probe.remove();
-                          return [parts, frame.textContent, getComputedStyle(frame).borderTopColor === teal && getComputedStyle(frame).color === teal,
-                            !!document.querySelector('.bcard[data-task=UI-0003] .bpframe'), c.querySelector('.ttype').getAttribute('aria-label')].join('|');
+                          const long = document.querySelector('.bcard[data-task=UI-0005] .bpframe');
+                          const t = long.querySelector('.bptitle');
+                          const oneLine = long.getBoundingClientRect().height < 2 * parseFloat(getComputedStyle(long).lineHeight) + 4;
+                          return [parts, centred, right, lines, frame.textContent, frame.getAttribute('aria-label'),
+                            getComputedStyle(frame).borderTopColor === teal && getComputedStyle(frame).color === teal,
+                            oneLine && t.scrollWidth > t.clientWidth && getComputedStyle(t).textOverflow === 'ellipsis',
+                            !!document.querySelector('.bcard[data-task=UI-0003] .bcbp'), c.querySelector('.ttype').getAttribute('aria-label')].join('|');
                         })()
                         """
                     )
                 )
                     .Should()
-                    .Be("ttype>linkbtn>bctitle>prio|M1One|true|false|bug");
+                    .Be("ttype>linkbtn>prio|true|true|bctop>bctitle>bcbp|One|Blueprint M1 · One|true|true|false|bug");
+
+                // narrower columns: seven fit where six 16rem ones did (1920 px wide), no sideways scroll
+                await page.CommandAsync(
+                    "Emulation.setDeviceMetricsOverride",
+                    new
+                    {
+                        width = 1920,
+                        height = 1000,
+                        deviceScaleFactor = 1,
+                        mobile = false,
+                    }
+                );
+                await page.WaitAsync("innerWidth === 1920");
+                (
+                    await ValueAsync(
+                        page,
+                        "(() => { const b = document.querySelector('#main .board'); const six = 6 * 16 * 16 + 5 * 12;"
+                            + " return [b.clientWidth >= six, b.scrollWidth <= b.clientWidth, b.querySelectorAll('.bcol').length].join(); })()"
+                    )
+                )
+                    .Should()
+                    .Be("true,true,7");
+                await page.CommandAsync("Emulation.clearDeviceMetricsOverride", new { });
 
                 // the id opens the task as Work › Tasks does, with Edit and Delete; Escape closes it back to the board
                 await page.EvaluateAsync("document.querySelector('.bcard[data-task=UI-0001] .tid').click()");
@@ -817,6 +884,42 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 )
                     .Should()
                     .Be("true|true|Delete…,Edit…,Close");
+                // the detail block inset on every side and rounded; Delete readable at rest and highlighted
+                (
+                    await ValueAsync(
+                        page,
+                        """
+                        (() => {
+                          const d = document.querySelector('dialog[open] .tdetail'), cs = getComputedStyle(d);
+                          return [parseFloat(cs.paddingLeft) >= 12, cs.paddingLeft === cs.paddingRight, parseFloat(cs.borderTopLeftRadius) > 0].join();
+                        })()
+                        """
+                    )
+                )
+                    .Should()
+                    .Be("true,true,true");
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    foreach (var hover in new[] { false, true })
+                    {
+                        await ForcePseudoStateAsync(page, "dialog[open] .dlg-foot .danger", hover ? ["hover"] : []);
+                        // buttons ease their background in: measure once it has settled
+                        await page.EvaluateAsync(
+                            "Promise.all(document.querySelector('dialog[open] .dlg-foot .danger').getAnimations().map(a => a.finished))"
+                                + ".then(() => new Promise(r => setTimeout(r, 50)))"
+                        );
+                        (await ValueAsync(page, ButtonContrast("dialog[open] .dlg-foot .danger")))
+                            .Should()
+                            .Be("ok", $"Delete in {theme}{(hover ? ", highlighted" : "")}");
+                    }
+                }
+
+                await ForcePseudoStateAsync(page, "dialog[open] .dlg-foot .danger", []);
+                await page.CommandAsync("Emulation.setEmulatedMedia", new { features = Array.Empty<object>() });
                 await page.CommandAsync(
                     "Input.dispatchKeyEvent",
                     new
@@ -835,23 +938,21 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                         $"(() => {{ const s = document.querySelector('select[aria-label=\"{label}\"]'); s.value = '{value}'; s.dispatchEvent(new Event('change')); }})()"
                     );
                 await Choose("Sort by:", "name");
-                await page.WaitAsync(Columns + ".startsWith('ready:UI-0005+UI-0001')");
+                await page.WaitAsync(Columns + ".includes('ready:UI-0005+UI-0001')");
                 await Choose("Hide done tasks older than:", "14");
                 await page.WaitAsync(Columns + ".includes('done:UI-0004+UI-0003')");
                 await Choose("Blueprint:", "M2");
                 await page.WaitAsync(
-                    Columns
-                        + " === 'ready:UI-0005 claimed: in_progress: review: blocked: backlog:UI-0002 done: deferred:'"
+                    Columns + " === 'backlog:UI-0002 ready:UI-0005 claimed: in_progress: review: done: blocked:'"
                 );
                 await page.CommandAsync("Page.reload", new { ignoreCache = true });
                 await page.WaitAsync(
-                    Columns
-                        + " === 'ready:UI-0005 claimed: in_progress: review: blocked: backlog:UI-0002 done: deferred:'"
+                    Columns + " === 'backlog:UI-0002 ready:UI-0005 claimed: in_progress: review: done: blocked:'"
                 );
                 await using var restarted = await UiFixture.StartAsync(fixture);
                 await pages[1]
                     .CommandAsync("Page.navigate", new { url = restarted.Client.BaseAddress + "#/p/" + id + "/board" });
-                await pages[1].WaitAsync("document.querySelectorAll('#main .bcol').length === 8");
+                await pages[1].WaitAsync("document.querySelectorAll('#main .bcol').length === 7");
                 (
                     await ValueAsync(
                         pages[1],
@@ -2117,6 +2218,38 @@ public sealed class UiBrowserTests(SharedBrowser browser)
             }
         );
     }
+
+    /// <summary>Forces CSS pseudo-classes (hover, focus) on the element a selector finds, or clears them.</summary>
+    private static async Task ForcePseudoStateAsync(BrowserPage page, string selector, string[] states)
+    {
+        await page.CommandAsync("DOM.enable", new { });
+        await page.CommandAsync("CSS.enable", new { });
+        var root = (await page.CommandAsync("DOM.getDocument", new { depth = 0 }))
+            .GetProperty("root")
+            .GetProperty("nodeId")
+            .GetInt32();
+        var node = (await page.CommandAsync("DOM.querySelector", new { nodeId = root, selector }))
+            .GetProperty("nodeId")
+            .GetInt32();
+        await page.CommandAsync("CSS.forcePseudoState", new { nodeId = node, forcedPseudoClasses = states });
+    }
+
+    /// <summary>"ok" when a button's text has WCAG AA contrast (4.5:1) on what is behind it, else the ratio.</summary>
+    private static string ButtonContrast(string selector) =>
+        $$"""
+            (() => {
+              const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+              const g = cv.getContext('2d', { willReadFrequently: true });
+              const px = (...cs) => { g.clearRect(0, 0, 1, 1); for (const c of cs) { g.fillStyle = c; g.fillRect(0, 0, 1, 1); } return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+              const lum = (rgb) => { const [r, gr, b] = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * gr + 0.0722 * b; };
+              const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+              const b = document.querySelector('{{selector}}');
+              const layers = []; for (let e = b; e; e = e.parentElement) layers.unshift(getComputedStyle(e).backgroundColor);
+              const back = px(...layers);
+              const r = ratio(px(...layers, getComputedStyle(b).color), back);
+              return r >= 4.5 ? 'ok' : r.toFixed(2) + ' ' + getComputedStyle(b).color + ' on ' + getComputedStyle(b).backgroundColor;
+            })()
+            """;
 
     private static async Task<string> ValueAsync(BrowserPage page, string expression) =>
         (await page.EvaluateAsync(expression)).GetProperty("result").GetProperty("value").ToString();

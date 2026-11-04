@@ -40,19 +40,20 @@ public sealed class TaskBoardTests
         string.Join(",", columns.Single(c => c.Status == status).Tasks.Select(t => t.Id));
 
     [Fact]
-    public void EveryStatusHasAColumnAndEveryTaskIsInItsOwnOnce()
+    public void EveryStatusButDeferredHasAColumnInWorkOrderAndEveryTaskIsInItsOwnOnce()
     {
-        TaskBoard.Statuses.Should().BeEquivalentTo(TaskWorkflow.Statuses, "a column for each status, none else");
-        TaskBoard
-            .Statuses.Should()
-            .Equal("ready", "claimed", "in_progress", "review", "blocked", "backlog", "done", "deferred");
+        TaskBoard.Statuses.Should().Equal("backlog", "ready", "claimed", "in_progress", "review", "done", "blocked");
+        TaskBoard.Statuses.Should().BeSubsetOf(TaskWorkflow.Statuses).And.NotContain("deferred");
         TaskRecord[] tasks =
         [
             .. TaskWorkflow.Statuses.Select((s, i) => Task("T-" + i, s, completedDaysAgo: s is "done" ? 0.5 : null)),
         ];
         var columns = TaskBoard.Columns(tasks, TaskBoard.Defaults, Now);
         columns.Select(c => c.Status).Should().Equal(TaskBoard.Statuses);
-        columns.SelectMany(c => c.Tasks).Should().BeEquivalentTo(tasks, "every task shows exactly once");
+        columns
+            .SelectMany(c => c.Tasks)
+            .Should()
+            .BeEquivalentTo(tasks.Where(t => t.Status is not "deferred"), "every task but the deferred shows once");
         columns.Should().AllSatisfy(c => c.Tasks.Should().AllSatisfy(t => t.Status.Should().Be(c.Status)));
     }
 

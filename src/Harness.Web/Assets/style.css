@@ -1827,10 +1827,12 @@ table.dups { min-width: 45rem; }
 .mctop .bpmove:disabled { opacity: 0.35; cursor: default; }
 .mcard[draggable=true] { cursor: grab; }
 .mcard[draggable=true] :is(button, a) { cursor: pointer; }
-.mcard.bpdrop-before { box-shadow: var(--card-shadow), 0 -3px 0 0 var(--accent); }
-.mcard.bpdrop-after { box-shadow: var(--card-shadow), 0 3px 0 0 var(--accent); }
-.mcard.bpdrop-before.bpside { box-shadow: var(--card-shadow), -3px 0 0 0 var(--accent); }
-.mcard.bpdrop-after.bpside { box-shadow: var(--card-shadow), 3px 0 0 0 var(--accent); }
+/* the bar alone (TASK-0084): --card-shadow is 'none' in dark themes, and a
+   list holding 'none' is invalid, which dropped the bar there */
+.mcard.bpdrop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.mcard.bpdrop-after { box-shadow: 0 3px 0 0 var(--accent); }
+.mcard.bpdrop-before.bpside { box-shadow: -3px 0 0 0 var(--accent); }
+.mcard.bpdrop-after.bpside { box-shadow: 3px 0 0 0 var(--accent); }
 /* blueprint colours and the Board (TASK-0081): 16 colours (--bp-<name> in the
    palette, brand.css), each a light and a dark variant at WCAG AA (4.5:1) on a
    card; a blueprint's id and title in an outlined frame of its colour, on
@@ -1852,21 +1854,36 @@ table.dups { min-width: 45rem; }
 }
 .bpswatch .dot { width: 1rem; height: 1rem; border-radius: var(--radius-pill); background: var(--bpc); }
 .bpswatch[aria-checked="true"] { border-color: var(--bpc, var(--accent)); box-shadow: 0 0 0 2px var(--bpc, var(--accent)); color: var(--ink); }
-.tabs a .icon { width: 14px; height: 14px; margin-right: 0.3125rem; vertical-align: -2px; }
 .boardbar { align-items: center; }
 .boardbar .bsel { display: inline-flex; align-items: center; gap: 0.375rem; font-size: var(--text-sm); color: var(--ink-2); }
 .boardbar select { width: auto; }
 /* one column per status side by side; on a narrow screen the board scrolls
    sideways inside itself, never the page; each column scrolls on its own */
-.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(16rem, 1fr); gap: 0.75rem; overflow-x: auto; padding-bottom: 0.5rem; margin-top: 0.75rem; max-width: 100%; }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(13.5rem, 1fr); gap: 0.75rem; overflow-x: auto; padding-bottom: 0.5rem; margin-top: 0.75rem; max-width: 100%; }
 .bcol { display: flex; flex-direction: column; min-width: 0; max-height: 75vh; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .bhead { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0; padding: 0.625rem 0.75rem; font-size: var(--text-sm); }
 .bcards { display: grid; align-content: start; gap: 0.5rem; padding: 0 0.5rem 0.5rem; overflow-y: auto; min-height: 0; }
 .bcard { display: grid; gap: 0.375rem; padding: 0.5rem 0.625rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--card-shadow); min-width: 0; }
-.bctop { display: grid; grid-template-columns: 1rem auto minmax(0, 1fr) auto; gap: 0.5rem; align-items: start; }
+/* a card (TASK-0084): type and id left, priority right, centred on one line;
+   the title below, wrapping; the blueprint's title on one line, cut with an
+   ellipsis when it does not fit */
+.bctop { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .bctop .tid { padding: 0; min-height: 1.5rem; font-size: var(--text-xs); }
-.bctitle { overflow-wrap: anywhere; font-size: var(--text-sm); min-width: 0; }
-.bctop .prio { white-space: nowrap; }
-.bcbp { min-width: 0; }
-.taskdlg .tdetail { padding-left: 0; }
+.bctop .prio { margin-left: auto; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem; }
+.bctitle { margin: 0; overflow-wrap: anywhere; font-size: var(--text-sm); min-width: 0; }
+.bcbp { min-width: 0; display: flex; }
+.bcbp .bpframe { min-width: 0; max-width: 100%; }
+.bcbp .bptitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+/* the task dialog: wider, its detail block inset on every side and rounded */
+.dlg.wide:has(.taskdlg) { width: min(880px, calc(100vw - 32px)); }
+.taskdlg .tdetail { padding: 1rem; border: 1px solid var(--grid); border-radius: var(--radius-lg); }
+/* a ghost button that deletes: the danger colour as its text, filled once
+   highlighted (.ghost.danger kept .danger's white text on no fill) */
+.ghost.danger { background: transparent; color: color-mix(in srgb, var(--critical) 80%, var(--ink)); border-color: color-mix(in srgb, var(--critical) 45%, var(--border)); }
+.ghost.danger:hover, .ghost.danger:focus-visible { background: var(--critical); border-color: var(--critical); color: var(--on-fill); filter: none; }
+/* dark themes fill with a light red, so the highlighted text is the palette's near black */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ghost.danger:hover, :root:not([data-theme="light"]) .ghost.danger:focus-visible { color: var(--on-gold); }
+}
+:root[data-theme="dark"] .ghost.danger:hover, :root[data-theme="dark"] .ghost.danger:focus-visible { color: var(--on-gold); }
 @media (max-width: 47.5em) { .board { grid-auto-columns: minmax(15rem, 85vw); } }

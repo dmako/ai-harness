@@ -200,9 +200,13 @@ flight or next; and what needs a person, most urgent first. Then:
   removed from project knowledge.
 - **Work:** Blueprints, Tasks and the Inbox of proposed tasks, blueprints
   and architecture work.
-- **Board:** the tasks as a read-only board, a column per status and a card
-  per task: its type, id, title, priority and blueprint. The task's id opens
-  it as Work › Tasks does (with Edit and Delete where Work allows them).
+- **Board:** the tasks as a read-only board, a card per task in a column
+  per status: backlog, ready, claimed, in progress, review, done and blocked.
+  Deferred tasks are not on the Board: only `harness tasks defer` sets a task
+  aside, and Work › Tasks lists them. A card shows the task's type, id and
+  priority, its title, and its blueprint's title in the blueprint's colour.
+  The task's id opens it as Work › Tasks does (with Edit and Delete where
+  Work allows them).
   Sort the cards by priority, id, name, created or last changed, hide done
   tasks finished more than 1, 3, 7 or 14 days ago, and show one blueprint's
   tasks; the choices are kept for the project on this machine.

@@ -252,8 +252,6 @@ const chevron = (open) => h("span", { class: "chev" + (open ? " open" : ""), "ar
 // Links of the earlier layout (#/<project>/<tab>, #/workspaces/<name>)
 // redirect to their new places.
 const PROJECT_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["work", "Work"], ["board", "Board"], ["agents", "Agents"], ["health", "Health"]];
-// the views a tab shows an icon for (from the C# rewrite: the Board, TASK-0081)
-const VIEW_ICON = { board: "board" };
 // A workspace's views mirror a project's: Architecture second, Issues where
 // a project has Health; each groups its parts as sub-views.
 const WORKSPACE_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["issues", "Issues"], ["members", "Members"]];
@@ -683,7 +681,7 @@ function projectHead(p) {
   const badges = { knowledge: knowledgeWaiting(l), work: workProposals(l), health: l.checks_failed };
   const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Views" },
     PROJECT_VIEWS.map(([v, label]) => h("a", { href: projectHref(id, v), role: "tab", "aria-selected": String(v === view) },
-      VIEW_ICON[v] && icon(VIEW_ICON[v]), label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
+      label, badges[v] > 0 && h("span", { class: v === "health" ? "badge bad" : "badge" }, badges[v]))));
   return [head, tabs];
 }
 
@@ -1179,7 +1177,6 @@ const ICONS = {
   check: ["M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z", "m8 12.5 2.7 2.7L16.5 9.5"],
   inbox: ["M3 13h5l1.5 3h5L16 13h5", "M5.5 5h13L21 13v6H3v-6z"],
   calm: ["M3 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0", "M3 17c2-3 4-3 6 0s4 3 6 0 4-3 6 0", "M12 3v3"],
-  board: ["M4 4h4v16H4z", "M10 4h4v10h-4z", "M16 4h4v13h-4z"],
 };
 // iconButton is a small button that is only its icon; label names it
 // for the tooltip and screen readers.
@@ -4927,10 +4924,13 @@ function archProposalCard(p, x) {
 const BP_COLORS = ["teal", "orange", "blue", "rose", "green", "violet", "amber", "cyan", "pink", "lime", "indigo", "red", "fuchsia", "yellow", "slate", "purple"];
 const bpClass = (color) => (BP_COLORS.includes(color) ? ` bpc-${color}` : "");
 // bpFrame is a blueprint's id and title in an outlined frame of its colour
-// (neutral for one without, as a blueprint only tasks name).
-function bpFrame(id, title, color) {
-  return h("span", { class: "bpframe" + bpClass(color), title: color ? `${id} · ${color}` : id },
-    h("span", { class: "bpid mono" }, id), title && h("span", { class: "bptitle" }, title));
+// (neutral for one without, as a blueprint only tasks name); titleOnly
+// leaves the id out of view (the frame still names both).
+function bpFrame(id, title, color, titleOnly) {
+  const name = title ? `${id} · ${title}` : id;
+  const only = titleOnly && title;
+  return h("span", { class: "bpframe" + bpClass(color) + (only ? " bponly" : ""), title: color ? `${name} (${color})` : name, "aria-label": only ? `Blueprint ${name}` : null },
+    !only && h("span", { class: "bpid mono" }, id), title && h("span", { class: "bptitle" }, title));
 }
 // colorPicker chooses a blueprint's colour from swatches; a new blueprint
 // may leave it to harness (the first colour no other uses).
@@ -4971,13 +4971,15 @@ async function viewBoard(p) {
 }
 function boardCard(p, x, info) {
   const b = x.blueprint && info[x.blueprint];
+  // the type and id on the left, the priority on the right; the title below,
+  // wrapping; the blueprint's title on one line under it
   return h("article", { class: "bcard", "data-task": x.id },
     h("div", { class: "bctop" },
       typeMark(x.type),
       h("button", { class: "linkbtn tid mono", type: "button", title: `Open ${x.id}`, onclick: () => taskDialog(p, x) }, x.id),
-      h("span", { class: "bctitle" }, x.title),
       h("span", { class: `prio p-${x.priority}`, title: `${x.priority} priority` }, icon("p-" + x.priority), x.priority)),
-    x.blueprint && h("div", { class: "bcbp" }, bpFrame(x.blueprint, b && b.title, b && b.color)));
+    h("p", { class: "bctitle" }, x.title),
+    x.blueprint && h("div", { class: "bcbp" }, bpFrame(x.blueprint, b && b.title, b && b.color, true)));
 }
 // taskDialog is a task as Work › Tasks shows it opened: its definition,
 // criteria and audit trail, with Edit and Delete where Work allows them.
@@ -5201,7 +5203,8 @@ async function viewTasks(p, opts, sec) {
         const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
         const card = h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
-            m.id !== "—" && h("span", { class: "mid" }, m.id),
+            // the id framed in the blueprint's colour, as everywhere (from the C# rewrite)
+            m.id !== "—" && h("span", { class: "mid" }, bpFrame(m.id, "", m.color)),
             h("h3", {}, m.title || h("span", { class: "muted" }, m.id === "—" ? "Without a blueprint" : "Not described in the backlog")),
             h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
           m.id !== "—" && bpArrows(p, milestones, movable, m.id),

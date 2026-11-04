@@ -12,11 +12,15 @@ public sealed record BoardSettings(string Sort = "priority", int HideDoneDays = 
 /// <summary>A Board column: one task status and its cards, in order.</summary>
 public sealed record BoardColumn(string Status, IReadOnlyList<TaskRecord> Tasks);
 
-/// <summary>The Board's columns (one per status, as harness ui's TASK_STATUSES lists them) and its choices.</summary>
+/// <summary>
+/// The Board's columns and its choices: a column per status in the order work moves through them, blocked last.
+/// Deferred tasks are not on the Board for now: only 'harness tasks defer' sets a task aside, nothing in harness ui
+/// or MCP does.
+/// </summary>
 public static class TaskBoard
 {
     public static IReadOnlyList<string> Statuses { get; } =
-    ["ready", "claimed", "in_progress", "review", "blocked", "backlog", "done", "deferred"];
+    ["backlog", "ready", "claimed", "in_progress", "review", "done", "blocked"];
 
     /// <summary>priority (highest first), id, name (title), created and changed (newest first).</summary>
     public static IReadOnlyList<string> Sorts { get; } = ["priority", "id", "name", "created", "changed"];
@@ -42,8 +46,9 @@ public static class TaskBoard
             );
 
     /// <summary>
-    /// Every status's column, each task in exactly one (its status's), sorted by <paramref name="settings"/>;
-    /// a done task whose completion (else its last change) is older than the done-age is left out.
+    /// Every shown status's column, each of its tasks in exactly one (its status's), sorted by
+    /// <paramref name="settings"/>; a done task whose completion (else its last change) is older than the done-age
+    /// is left out, and so is every deferred one (it has no column).
     /// </summary>
     public static IReadOnlyList<BoardColumn> Columns(
         IReadOnlyList<TaskRecord> tasks,
