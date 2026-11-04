@@ -346,6 +346,45 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 )
                     .Should()
                     .Be("True", "the row fits a phone with its type icon in view");
+
+                // each type in the Type picker's colour, at least 3:1 against the row, its hover and the open row
+                const string Colours = """
+                    (() => {
+                      const cv = document.createElement('canvas'); cv.width = cv.height = 1;
+                      const g = cv.getContext('2d', { willReadFrequently: true });
+                      const px = (...colors) => { g.clearRect(0, 0, 1, 1); for (const c of colors) { g.fillStyle = c; g.fillRect(0, 0, 1, 1); } return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+                      const lum = (rgb) => { const [r, gr, b] = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * gr + 0.0722 * b; };
+                      const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+                      const probe = (v) => { const d = document.createElement('div'); d.style.color = v; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+                      const surface = probe('var(--surface)');
+                      const bgs = { row: px(surface), hover: px(surface, probe('var(--surface-2)')), open: px(surface, probe('var(--selected)')) };
+                      const picker = segmented('Type', TASK_TYPES.map((t) => [t, t]), 'feature', 'types', (k) => k).el;
+                      document.body.append(picker);
+                      const colourOf = (el) => getComputedStyle(el.querySelector('.icon')).color;
+                      const faults = TASK_TYPES.map((t) => {
+                        const m = typeMark(t); document.body.append(m);
+                        const c = colourOf(m), pc = colourOf(picker.querySelector('.opt-' + t)); m.remove();
+                        const low = Object.entries(bgs).map(([k, b]) => [k, ratio(px(surface, c), b)]).filter(([, r]) => r < 3);
+                        return c !== pc ? `${t} ${c} is not the picker's ${pc}` : low.length ? `${t} ${c}: ${low.map(([k, r]) => k + ' ' + r.toFixed(2)).join(' ')}` : '';
+                      });
+                      // the rows themselves: a bug as the picker's bug, no type as the feature, unknown neutral
+                      const row = (id) => colourOf(document.querySelector(`#task-${id} .ttype`));
+                      if (row('UI-0001') !== colourOf(picker.querySelector('.opt-bug'))) faults.push('bug row ' + row('UI-0001'));
+                      if (row('UI-0002') !== colourOf(picker.querySelector('.opt-feature'))) faults.push('untyped row ' + row('UI-0002'));
+                      const other = typeMark('research'); document.body.append(other);
+                      if (colourOf(other) !== probe('var(--ink-2)')) faults.push('unknown ' + colourOf(other));
+                      other.remove(); picker.remove();
+                      return faults.filter(Boolean).join('; ');
+                    })()
+                    """;
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    (await ValueAsync(page, Colours)).Should().BeEmpty(theme);
+                }
             }
         );
     }

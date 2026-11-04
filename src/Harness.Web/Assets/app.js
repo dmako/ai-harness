@@ -5180,7 +5180,8 @@ function lease(claim) {
 function typeMark(type) {
   const t = type || "feature";
   const known = TASK_TYPES.includes(t);
-  return h("span", { class: `ttype ty-${known ? t : "other"}`, role: "img", title: t, "aria-label": t }, icon(known ? t : "type-other"));
+  // opt-<type> is the Type picker's class: it gives the icon the picker's colour (--oc)
+  return h("span", { class: `ttype ty-${known ? `${t} opt-${t}` : "other"}`, role: "img", title: t, "aria-label": t }, icon(known ? t : "type-other"));
 }
 
 function taskRow(x, redraw) {
