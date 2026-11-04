@@ -1792,3 +1792,11 @@ table.dups { min-width: 45rem; }
 .choice { display: flex; align-items: center; justify-content: flex-start; gap: 0.5rem; flex-wrap: wrap; font-size: var(--text-md); }
 .choice input[type=radio] { width: auto; margin: 0; flex: none; }
 .choice select { width: auto; min-width: 12em; }
+/* a task row's type icon between its id and title (TASK-0080), the Type
+   picker's icon in the id's colour; a column of its own so rows line up */
+.trow { grid-template-columns: 1rem 5.75rem 1rem minmax(0, 1fr) 2.75rem 4.25rem 6.875rem 1.75rem 1.75rem; }
+.ttype { display: inline-flex; align-items: center; justify-content: center; width: 1rem; color: var(--ink-2); }
+.ttype .icon { width: 1rem; height: 1rem; }
+@media (max-width: 56.25em) {
+  .trow { grid-template-columns: 1rem 1rem minmax(0, 1fr) auto auto auto; }
+}

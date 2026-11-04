@@ -1165,6 +1165,7 @@ const ICONS = {
   spike: ["M13 2 5 13.5h6L10 22l8-11.5h-6z"],
   test: ["M9 3h6", "M10 3v6l-5 9.5A2 2 0 0 0 6.8 21h10.4a2 2 0 0 0 1.8-2.5L14 9V3", "M7.5 15h9"],
   process: ["M20 11a8 8 0 0 0-14.3-4.9", "M4 4v4h4", "M4 13a8 8 0 0 0 14.3 4.9", "M20 20v-4h-4"],
+  "type-other": ["M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8z"],
   // priorities
   "p-low": ["M12 5v14", "m6 13 6 6 6-6"],
   "p-medium": ["M5 9h14", "M5 15h14"],
@@ -5109,6 +5110,15 @@ function lease(claim) {
   return [text, left < 60 ? "warn" : ""];
 }
 
+// typeMark (from the C# rewrite) is a task's type as the Type picker's icon,
+// named by the type; no type is the default feature, an unknown one a
+// neutral dot.
+function typeMark(type) {
+  const t = type || "feature";
+  const known = TASK_TYPES.includes(t);
+  return h("span", { class: `ttype ty-${known ? t : "other"}`, role: "img", title: t, "aria-label": t }, icon(known ? t : "type-other"));
+}
+
 function taskRow(x, redraw) {
   const t = state.tasks;
   const open = t.open.has(x.id);
@@ -5121,6 +5131,7 @@ function taskRow(x, redraw) {
   },
     chevron(open),
     h("a", { class: "tid mono", href: projectHref(route().id, "work", x.id), onclick: (ev) => ev.stopPropagation(), title: "Link to this task" }, x.id),
+    typeMark(x.type),
     h("span", { class: "ttitle" }, x.title, x.claim && (() => {
       const [left, cls] = lease(x.claim);
       return h("span", { class: `claimtag ${cls}`, title: `claimed ${x.claim.claimed_at || ""}` }, `${x.claim.claimant}${left ? " · " + left : ""}`);

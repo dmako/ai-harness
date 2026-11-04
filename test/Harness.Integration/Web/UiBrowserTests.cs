@@ -249,6 +249,108 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task TaskRowsShowTheirTypeIconBetweenIdAndTitle()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            var origin = new TaskOrigin("test", "test", "fixture");
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0001",
+                    Title = "A bug",
+                    Type = "bug",
+                },
+                "",
+                origin,
+                Token
+            );
+            tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "No type given" }, "", origin, Token);
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0010",
+                    Title = "Some docs with a much longer title that has to wrap on a phone",
+                    Type = "docs",
+                },
+                "",
+                origin,
+                Token
+            );
+        }
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/tasks" }
+                );
+                await page.WaitAsync("document.querySelectorAll('.trow .ttype').length === 3");
+                // between the id and the title, named by its type, drawn as the Type picker draws it
+                (
+                    await ValueAsync(
+                        page,
+                        """
+                        [...document.querySelectorAll('.trow')].map(r => {
+                          const t = r.querySelector('.tid + .ttype + .ttitle') && r.querySelector('.ttype');
+                          if (!t) return 'misplaced';
+                          const d = [...t.querySelectorAll('path')].map(p => p.getAttribute('d')).join();
+                          const same = d === ICONS[t.getAttribute('aria-label')].join();
+                          return `${t.getAttribute('aria-label')}/${t.title}/${t.getAttribute('role')}/${same}`;
+                        }).join(' ')
+                        """
+                    )
+                )
+                    .Should()
+                    .Be("bug/bug/img/true feature/feature/img/true docs/docs/img/true");
+                // an unknown type gets a neutral mark, still named, and no error
+                (
+                    await ValueAsync(
+                        page,
+                        "(() => { const m = typeMark('research'); return m.getAttribute('aria-label') + ' ' + m.querySelectorAll('path').length; })()"
+                    )
+                )
+                    .Should()
+                    .Be("research 1");
+                const string Aligned = """
+                    ['.ttype', '.ttitle'].map(s => new Set([...document.querySelectorAll('.trow ' + s)]
+                      .map(e => Math.round(e.getBoundingClientRect().left))).size).join()
+                    """;
+                (await ValueAsync(page, Aligned)).Should().Be("1,1", "icons and titles line up across rows");
+                await page.CommandAsync(
+                    "Emulation.setDeviceMetricsOverride",
+                    new
+                    {
+                        width = 390,
+                        height = 900,
+                        deviceScaleFactor = 1,
+                        mobile = true,
+                    }
+                );
+                await page.WaitAsync("document.querySelector('.trow').getBoundingClientRect().width < 400");
+                (await ValueAsync(page, Aligned)).Should().Be("1,1");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.trow')].every(r => r.scrollWidth <= r.clientWidth"
+                            + " && r.querySelector('.ttype').getBoundingClientRect().width > 0)"
+                            + " && document.documentElement.scrollWidth <= innerWidth"
+                    )
+                )
+                    .Should()
+                    .Be("True", "the row fits a phone with its type icon in view");
+            }
+        );
+    }
+
+    [Fact]
     public async Task BlueprintsAreCreatedEditedAndRemovedOnceConfirmedAskingAboutTheirTasks()
     {
         var executable = Browser();
