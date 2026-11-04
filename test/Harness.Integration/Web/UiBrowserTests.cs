@@ -252,7 +252,10 @@ public sealed class UiBrowserTests
         using var fixture = await SyncFixture.CreateAsync();
         using var database = fixture.Database();
         var tasks = new TaskStore(database);
-        tasks.CreateBlueprint(new("EMPTY", "Nothing in it"), "test", Token);
+        // a word id, as an older harness or a backlog import left it: it still works, and no generated id follows it
+        fixture.Sql(
+            "INSERT INTO blueprints(id,title,goal,exit,notes,source,ordinal,updated_at) VALUES('EMPTY','Nothing in it','','[]','','import',0,'2026-01-01T00:00:00Z')"
+        );
         static string Click(string text) =>
             $"[...document.querySelectorAll('button')].find(b => b.textContent === '{text}').click()";
         static string Card(string id) => $"document.querySelector('.mcard[data-blueprint=\"{id}\"]')";

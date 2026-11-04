@@ -173,7 +173,8 @@ public sealed partial class TaskStore
 
     private static string NextBlueprintId(IReadOnlyList<string> ids)
     {
-        var numbered = ids.Select(id => NumberedId.Match(id)).Where(m => m.Success).ToArray();
+        // only well-formed ids give the next one: an invalid id left by an older harness must not
+        var numbered = ids.Select(id => WellFormedId.Match(id)).Where(m => m.Success).ToArray();
         if (numbered.Length is 0)
         {
             return "BP-001";
@@ -282,6 +283,16 @@ public sealed partial class TaskStore
         string source
     )
     {
+        // a new blueprint's id is checked for its form first, so the refusal says which form is expected
+        var id = definition.Id.Trim();
+        if (id.Length is not 0 && !WellFormedId.IsMatch(id))
+        {
+            throw new ArgumentException(
+                $"blueprint id {TaskWorkflow.Quote(id)} is not valid: use letters, an optional dash and digits, "
+                    + $"e.g. {NextBlueprintId(BlueprintIds(c, t))}"
+            );
+        }
+
         var d = CleanBlueprint(definition);
         using (var exists = Command(c, t, "SELECT 1 FROM blueprints WHERE id=$id", ("$id", d.Id)))
         {
@@ -616,10 +627,10 @@ public sealed partial class TaskStore
         return outside.Select(x => x.Task).Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    [GeneratedRegex(@"\A(.*?)([0-9]+)\z", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex NumberedId { get; }
-
-    /// <summary>What an agent may name as a blueprint id: letters, an optional dash, digits (BP-007, M17).</summary>
-    [GeneratedRegex(@"\A[A-Za-z]+-?[0-9]+\z", RegexOptions.CultureInvariant, 1000)]
+    /// <summary>
+    /// A valid blueprint id: letters, an optional dash, digits (BP-007, M17); its prefix and number give the next
+    /// one. New blueprints get only such ids; existing ones (Metrics, from an older harness) keep theirs.
+    /// </summary>
+    [GeneratedRegex(@"\A([A-Za-z]+-?)([0-9]+)\z", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex WellFormedId { get; }
 }

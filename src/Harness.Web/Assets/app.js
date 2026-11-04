@@ -4685,7 +4685,8 @@ function taskEditable(x) {
 // has an id (the next free one suggested, as 'harness tasks blueprints
 // add' gives it), an edited one keeps its id; value() reads it back.
 function blueprintFields(p, init, isNew) {
-  const id = isNew && h("input", { type: "text", value: "", required: true, class: "mono", "aria-label": "Id" });
+  const id = isNew && h("input", { type: "text", value: "", required: true, class: "mono", "aria-label": "Id",
+    pattern: "[A-Za-z]+-?[0-9]+", title: "Letters, an optional dash and digits, e.g. BP-012" });
   if (isNew) api(projectAPI(p, "blueprints-next-id")).then((r) => { if (!id.value) id.value = r.id; }).catch(() => {});
   const title = h("input", { type: "text", value: init.title || "", required: true, class: "tbig", placeholder: "e.g. Search works offline", "aria-label": "Title" });
   const goal = h("textarea", { rows: 3, placeholder: "What it is for: the outcome, and why now", "aria-label": "Goal" }, init.goal || "");
