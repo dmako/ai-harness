@@ -1811,3 +1811,9 @@ table.dups { min-width: 45rem; }
 .mstone.bpdrop-before { box-shadow: 0 -3px 0 0 var(--accent); }
 .mstone.bpdrop-after { box-shadow: 0 3px 0 0 var(--accent); }
 .bpdragging .mstone { transition: box-shadow 80ms ease-out; }
+/* the merge-or-new choice in the Inbox's approve form (TASK-0077): it sits in
+   an .aform, whose labels are grids and inputs full width, so .choice is
+   restated there; a long label wraps beside its radio, not below it */
+.aform label.choice, .aprop .aform label.choice { display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap; font-size: var(--text-md); }
+.aform .choice input[type=radio] { width: auto; padding: 0; border: none; margin: 0; flex: none; }
+.choice > span:last-child { flex: 1 1 auto; min-width: 0; }

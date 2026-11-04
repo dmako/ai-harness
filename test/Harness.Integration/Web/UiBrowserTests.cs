@@ -728,6 +728,40 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 (await ValueAsync(page, "document.querySelector('form.aform').textContent"))
                     .Should()
                     .Contain("exists already (BP-001)");
+                // each radio at the start of its line, its text beside it, centred with it; at a phone's width
+                // the long merge label wraps beside its radio, not below it
+                const string Beside = """
+                    [...document.querySelectorAll('form.aform label.choice')].map(l => {
+                      const r = l.querySelector('input[type=radio]').getBoundingClientRect();
+                      const t = l.querySelector('span').getBoundingClientRect();
+                      const ok = r.width < 30 && r.left - l.getBoundingClientRect().left < 4 && t.left > r.right
+                        && t.left - r.right < 16 && t.top <= r.top && t.bottom >= r.bottom
+                        && Math.abs((t.top + t.bottom) - (r.top + r.bottom)) < 12;
+                      return ok ? 'beside' : `apart ${JSON.stringify([r.left, r.top, r.right, r.bottom, t.left, t.top, t.right, t.bottom])}`;
+                    }).join()
+                    """;
+                (await ValueAsync(page, Beside)).Should().Be("beside,beside");
+                await page.CommandAsync(
+                    "Emulation.setDeviceMetricsOverride",
+                    new
+                    {
+                        width = 390,
+                        height = 900,
+                        deviceScaleFactor = 1,
+                        mobile = true,
+                    }
+                );
+                await page.WaitAsync("innerWidth <= 400");
+                (await ValueAsync(page, Beside)).Should().Be("beside,beside");
+                (
+                    await ValueAsync(
+                        page,
+                        "(() => { const t = document.querySelector('form.aform label.choice span'); return t.getBoundingClientRect().height > 1.5 * parseFloat(getComputedStyle(t).lineHeight || '20'); })()"
+                    )
+                )
+                    .Should()
+                    .Be("True", "the long label takes more than one line at 390 px");
+                await page.CommandAsync("Emulation.clearDeviceMetricsOverride", new { });
                 // asked, not guessed: without a choice the server refuses
                 await page.EvaluateAsync(
                     "[...document.querySelectorAll('button')].find(b => b.textContent === 'Create the blueprint').click()"
