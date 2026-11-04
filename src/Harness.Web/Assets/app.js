@@ -3503,19 +3503,18 @@ function couplingSection(p) {
         miss.map((m) => h("p", { class: "cline" }, h("code", {}, m.partner.path), " usually changes with ", h("code", {}, m.changed),
           h("span", { class: "muted" }, ` (${m.partner.together} commits together, ${pct(m.partner.share)} of its commits)`)))),
       c.changed && !miss.length && h("p", { class: "okay" }, `✓ Your uncommitted change (${plural(c.changed.length, "file")}) leaves out none of their usual partners.`),
-      !c.providers && hs.length > 0 && h("p", { class: "muted small" }, "No provider offers change coupling (ripwire does), so the files that change together are unknown; the counts are Git's."),
       hs.length > 0 && Object.keys(fileCx).length > 0 && hotspotChart(hs, fileCx, th),
       hs.length ? h("table", { class: "hot" },
-        h("thead", {}, h("tr", {}, h("th", {}, "file"), h("th", {}, "commits"), h("th", { class: "cxcell", title: "its most complex function" }, "complexity"), c.providers ? h("th", {}, "changes together with") : null)),
+        h("thead", {}, h("tr", {}, h("th", {}, "file"), h("th", {}, "commits"), h("th", { class: "cxcell", title: "its most complex function" }, "complexity"), h("th", {}, "changes together with"))),
         h("tbody", {}, hs.map((x) => {
           const bar = h("span", { class: "cbar" }); bar.style.setProperty("--w", `${(100 * x.commits) / most}%`);
           return h("tr", {}, h("td", { class: "cfile" }, filePath(x.path)), h("td", {}, h("div", { class: "cbarcell" }, bar, h("span", { class: "n" }, x.commits))), h("td", { class: "cxcell" }, cxCell(x)),
-            !c.providers ? null : h("td", {}, (x.partners || []).length ? h("div", { class: "cparts" }, x.partners.map(partner)) : h("span", { class: "muted" }, "nothing often")));
+            h("td", {}, (x.partners || []).length ? h("div", { class: "cparts" }, x.partners.map(partner)) : h("span", { class: "muted" }, "nothing often")));
         })))
         : h("p", { class: "empty" }, "No code file changed more than once in the window."),
       (c.errors || []).length > 0 && h("p", { class: "muted small" }, c.errors.join("; ")));
   }).catch((e) => fill(body, h("p", { class: "error" }, e.message)));
-  return section("Change coupling", "Code files changed most in the last 180 days (hotspots: harness's count from Git) and the files that change with them (co-change, from providers offering it; the percentage is the share of the file's commits). A partner that usually changes but was not touched may have been forgotten.", body);
+  return section("Change coupling", "Code files changed most in the last 180 days and the files that change with them, both counted from Git's history (the percentage is the share of the file's commits). A partner that usually changes but was not touched may have been forgotten.", body);
 }
 
 // hotspotChart: each changing file by how often it changed (across) and
@@ -4686,7 +4685,8 @@ function taskEditable(x) {
 // has an id (the next free one suggested, as 'harness tasks blueprints
 // add' gives it), an edited one keeps its id; value() reads it back.
 function blueprintFields(p, init, isNew) {
-  const id = isNew && h("input", { type: "text", value: "", required: true, class: "mono", "aria-label": "Id" });
+  const id = isNew && h("input", { type: "text", value: "", required: true, class: "mono", "aria-label": "Id",
+    pattern: "[A-Za-z]+-?[0-9]+", title: "Letters, an optional dash and digits, e.g. BP-012" });
   if (isNew) api(projectAPI(p, "blueprints-next-id")).then((r) => { if (!id.value) id.value = r.id; }).catch(() => {});
   const title = h("input", { type: "text", value: init.title || "", required: true, class: "tbig", placeholder: "e.g. Search works offline", "aria-label": "Title" });
   const goal = h("textarea", { rows: 3, placeholder: "What it is for: the outcome, and why now", "aria-label": "Goal" }, init.goal || "");
@@ -4760,8 +4760,21 @@ function blueprintProposalCard(p, x) {
   const isNew = !x.changes;
   const approveForm = () => {
     const f = blueprintFields(p, d, isNew);
+    // a blueprint titled the same may exist already (a task approved first made it): the author says merge or new
+    const same = h("div", {});
+    let sameName = "";
+    if (isNew && x.same_title) {
+      const name = "bpsame-" + x.id;
+      const choice = (value, text) => h("label", { class: "choice" },
+        h("input", { type: "radio", name, value, onchange: () => { sameName = value; } }), h("span", {}, text));
+      fill(same, h("p", { class: "hint" }, `A blueprint titled “${d.title}” exists already (${x.same_title}). Which should this be?`),
+        h("div", { class: "choices" },
+          choice("merge", `Merge into ${x.same_title}: this restates it; its id and tasks stay`),
+          choice("new", "Create a separate blueprint")));
+    }
     return writeForm(panel, isNew ? `Create this blueprint? ${x.proposed_by} is recorded as the proposer.` : `Restate ${x.changes} like this? Its id and tasks stay.`,
-      [f.nodes], isNew ? "Create the blueprint" : "Save the blueprint", () => post(url("approve"), { edit: f.value() }));
+      [f.nodes, same], isNew ? "Create the blueprint" : "Save the blueprint",
+      () => post(url("approve"), { edit: f.value(), ...(sameName ? { same_name: sameName } : {}) }));
   };
   const rejectForm = () => {
     const note = h("textarea", { rows: 2, placeholder: "Why not (optional)" });
@@ -4772,6 +4785,7 @@ function blueprintProposalCard(p, x) {
     h("div", { class: "mtype" }, isNew ? "New blueprint" : "Blueprint change", !isNew && h("span", { class: "tag" }, x.changes),
       x.status !== "pending" && h("span", { class: "muted" }, ` · ${x.status}${x.result ? ` → ${x.result}` : ""}`)),
     h("h4", { class: "ptitle2" }, d.title),
+    x.same_title && x.status === "pending" && h("p", { class: "why" }, h("b", {}, "Same title as: "), x.same_title, " (approving asks: merge into it, or a separate one)"),
     d.goal && h("p", { class: "why" }, h("b", {}, "Goal: "), d.goal),
     x.reason && h("p", { class: "why" }, h("b", {}, "Why proposed: "), x.reason),
     exit.length > 0 && h("details", { class: "evfold", open: true }, h("summary", {}, `Done when (${exit.length})`), h("ul", { class: "donewhen" }, exit.map((e) => h("li", {}, e)))),

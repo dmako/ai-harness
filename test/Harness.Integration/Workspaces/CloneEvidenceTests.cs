@@ -8,9 +8,12 @@ using Harness.Core.Architecture;
 using Harness.Core.Providers;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Architecture.Clones;
+using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Git;
+using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Workspaces;
 using Harness.Integration.Sync;
+using Harness.Providers.Packs;
 using Harness.Providers.Registry;
 using Xunit;
 
@@ -210,16 +213,18 @@ public sealed class CloneEvidenceTests
 
         var partners = await ChangeCoupling.PartnersAsync(registry, "api.cs", 10, Token);
         partners.Partners.Should().Contain(partner => partner.Path == "renamed.cs");
-        var missing = await ChangeCoupling.CheckAsync(registry, fixture.Root, ["api.cs"], Token);
+        // without a Git history, the check asks the providers
+        var missing = await ChangeCoupling.CheckAsync(null, registry, fixture.Root, ["api.cs"], Token);
         missing.Missing.Should().Contain(item => item.Partner.Path == "renamed.cs");
         var complete = await ChangeCoupling.CheckAsync(
+            null,
             registry,
             fixture.Root,
             ["api.cs", "renamed.cs", "README.md"],
             Token
         );
         complete.Missing.Should().BeEmpty();
-        var hotspots = await ChangeCoupling.HotspotsAsync(repo, registry, 10, 2, Token);
+        var hotspots = await ChangeCoupling.HotspotsAsync(repo, 10, 2, Token);
         hotspots
             .Hotspots.Should()
             .NotContain(hotspot =>
@@ -228,6 +233,27 @@ public sealed class CloneEvidenceTests
                     StringComparer.Ordinal
                 )
             );
+        hotspots.Hotspots.Select(hotspot => hotspot.Path).Should().Equal("api.cs", "renamed.cs");
+        hotspots.Hotspots[0].Partners!.Select(partner => partner.Path).Should().Equal("README.md", "test/ApiTests.cs");
+
+        // counted from the history, a rename followed: handler.cs's commits are renamed.cs's
+        var history = await ChangeCoupling.HistoryAsync(repo, Token);
+        history.Counts.Should().ContainKey("renamed.cs").WhoseValue.Should().Be(5);
+        history.Counts.Should().NotContainKey("handler.cs");
+        history
+            .Partners("api.cs", 0)
+            .Should()
+            .ContainEquivalentOf(new ChangePartner("renamed.cs", 3, 0.6, "harness", "git log"));
+        history
+            .Partners("renamed.cs", 0)
+            .Should()
+            .ContainEquivalentOf(new ChangePartner("api.cs", 3, 0.6, "harness", "git log"));
+        var counted = await ChangeCoupling.CheckAsync(history, null, fixture.Root, ["api.cs"], Token);
+        counted.Missing.Select(item => item.Partner.Path).Should().Contain("renamed.cs").And.NotContain("models.g.cs");
+        // one file's partners merge a provider's answer with the counted ones: the higher together count wins
+        var merged = await ChangeCoupling.PartnersAsync(registry, "api.cs", 10, Token, history);
+        merged.Partners.Single(partner => partner.Path == "renamed.cs").Provider.Should().Be("harness");
+        merged.Partners.Single(partner => partner.Path == "gone.cs").Provider.Should().Be("a");
         ChangeCoupling.Usual(new("x", 3, 1, "", "")).Should().BeFalse();
         ChangeCoupling.Usual(new("x", 3, 0.6, "", "")).Should().BeTrue();
     }
@@ -359,6 +385,69 @@ public sealed class CloneEvidenceTests
         "S4036:Searching OS commands in PATH is security-sensitive",
         Justification = "Isolated fixture invokes installed Git directly with argument list and synthetic commit dates."
     )]
+    [Fact]
+    public async Task CountedPartnersMatchRipwiresCoChangeOnTheSameHistory()
+    {
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        Assert.SkipUnless(
+            path.Split(Path.PathSeparator)
+                .Any(directory =>
+                    directory.Length > 0
+                    && (
+                        File.Exists(Path.Combine(directory, "ripwire"))
+                        || File.Exists(Path.Combine(directory, "ripwire.exe"))
+                    )
+                ),
+            "ripwire is not installed on this machine"
+        );
+        using var fixture = await SyncFixture.CreateAsync();
+        string[][] commits =
+        [
+            ["core.cs", "api.cs", "handler.cs"],
+            ["core.cs", "api.cs"],
+            ["core.cs", "handler.cs", "store.cs"],
+            ["api.cs", "store.cs"],
+            ["core.cs", "api.cs", "store.cs"],
+            ["handler.cs"],
+            ["core.cs", "store.cs"],
+            ["x.cs", "y.cs"],
+            ["x.cs", "y.cs"],
+        ];
+        for (var index = 0; index < commits.Length; index++)
+        {
+            foreach (var file in commits[index])
+            {
+                fixture.Write(file, file + " " + index.ToString(CultureInfo.InvariantCulture));
+            }
+
+            await CommitAsync(fixture, DateTimeOffset.UtcNow.AddDays(-30 + index));
+        }
+
+        var repo = await GitRepository.DiscoverAsync(fixture.Root, Token);
+        var history = await ChangeCoupling.HistoryAsync(repo, Token);
+        var configuration = Path.Combine(fixture.DirectoryRoot, "ripwire.toml");
+        await File.WriteAllTextAsync(configuration, "[providers.ripwire]\ncommand = \"ripwire\"\n", Token);
+        await using var registry = ConfiguredProviders.Build(
+            ConfigurationLoader.LoadFiles("", configuration).Value.Providers,
+            fixture.Root,
+            new ProviderProcessFactory()
+        );
+
+        foreach (var file in new[] { "core.cs", "api.cs", "handler.cs", "store.cs", "x.cs", "y.cs" })
+        {
+            var ripwire = await ChangeCoupling.PartnersAsync(registry, file, 50, Token);
+            ripwire.Errors.Should().BeEmpty();
+            history
+                .Partners(file, 0)
+                .Select(partner => (partner.Path, partner.Together))
+                .Should()
+                .BeEquivalentTo(
+                    ripwire.Partners.Select(partner => (partner.Path, partner.Together)),
+                    file + ": the same partners, changed together as often"
+                );
+        }
+    }
+
     private static async Task CommitAsync(SyncFixture fixture, DateTimeOffset date)
     {
         await fixture.GitAsync("add", ".");

@@ -30,7 +30,7 @@
       },
       "blueprint": {
         "type": "string",
-        "description": "the blueprint id (task_blueprints lists them); a title is matched to its blueprint"
+        "description": "the blueprint id (task_blueprints lists them) or its title, also of a blueprint you propose now: it is matched by id or title when the task is approved, else created"
       },
       "depends_on": {
         "type": [

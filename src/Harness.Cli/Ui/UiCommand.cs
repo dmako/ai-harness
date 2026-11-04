@@ -23,10 +23,12 @@ internal sealed class UiCommand(
 {
     public async Task<int> ExecuteAsync(UiSettings settings, CancellationToken cancellationToken)
     {
+        // one view cache for the process: the read services are made per request
+        using var views = new ViewCache(lifecycle);
         await using var app = UiHost.Create(
             settings.Address,
-            _ => new UiReadService(lifecycle, catalog, sessions),
-            _ => new UiReadService(lifecycle, catalog, sessions),
+            _ => new UiReadService(lifecycle, catalog, sessions, views),
+            _ => new UiReadService(lifecycle, catalog, sessions, views),
             () => new UiChangeSource(lifecycle, catalog)
         );
         await app.StartAsync(cancellationToken);

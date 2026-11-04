@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Core.Web;
 using Harness.Infrastructure.Projects;
+using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
 namespace Harness.Cli.Ui;
@@ -12,15 +13,6 @@ namespace Harness.Cli.Ui;
 /// <summary>One read-only connection per project; unchanged ticks read data_version only.</summary>
 internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalog catalog) : IUiChangeSource
 {
-    private static readonly (string Kind, string[] Tables, bool AppendOnly)[] Kinds =
-    [
-        ("tasks", ["tasks", "task_events", "task_dependencies", "task_acceptance", "blueprints"], false),
-        ("knowledge", ["memories", "memory_events"], false),
-        ("proposals", ["memory_proposals", "finding_proposals", "task_proposals", "blueprint_proposals"], false),
-        ("findings", ["findings", "finding_snapshots", "finding_marks"], false),
-        ("activity", ["tool_calls", "provider_calls", "context_calls", "context_outcomes", "tool_events"], true),
-        ("sync", ["sync_state", "sync_runs", "files", "worktrees"], false),
-    ];
     private readonly Dictionary<string, DatabaseWatch> _databases = new(StringComparer.Ordinal);
     private Dictionary<string, JsonObject> _entries = new(StringComparer.Ordinal);
     private string _registryStamp = "";
@@ -178,7 +170,7 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
         private long _version;
         private bool _failed;
         private DateTimeOffset _retryAt;
-        private readonly Dictionary<string, string> _queries = new(StringComparer.Ordinal);
+        private Dictionary<string, string> _queries = new(StringComparer.Ordinal);
         private Dictionary<string, string> _prints = new(StringComparer.Ordinal);
 
         internal string[] Check()
@@ -201,22 +193,28 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
                         }.ToString()
                     );
                     _connection.Open();
-                    Probes();
-                    _version = Convert.ToInt64(Scalar("PRAGMA data_version"), CultureInfo.InvariantCulture);
-                    _prints = Fingerprints();
+                    _queries = DatabaseFingerprint.Probes(_connection);
+                    _version = Convert.ToInt64(
+                        DatabaseFingerprint.Scalar(_connection, "PRAGMA data_version"),
+                        CultureInfo.InvariantCulture
+                    );
+                    _prints = DatabaseFingerprint.Prints(_connection, _queries);
                     var recovered = _failed;
                     _failed = false;
                     return recovered ? ["all"] : [];
                 }
-                var version = Convert.ToInt64(Scalar("PRAGMA data_version"), CultureInfo.InvariantCulture);
+                var version = Convert.ToInt64(
+                    DatabaseFingerprint.Scalar(_connection, "PRAGMA data_version"),
+                    CultureInfo.InvariantCulture
+                );
                 if (version == _version)
                 {
                     return [];
                 }
                 _version = version;
-                var prints = Fingerprints();
-                var changed = Kinds
-                    .Where(k => prints.GetValueOrDefault(k.Kind) != _prints.GetValueOrDefault(k.Kind))
+                var prints = DatabaseFingerprint.Prints(_connection, _queries);
+                var changed = DatabaseFingerprint
+                    .Kinds.Where(k => prints.GetValueOrDefault(k.Kind) != _prints.GetValueOrDefault(k.Kind))
                     .Select(k => k.Kind)
                     .ToArray();
                 _prints = prints;
@@ -228,68 +226,6 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
                 _failed = true;
                 _retryAt = DateTimeOffset.UtcNow.AddSeconds(10);
                 return [];
-            }
-        }
-
-        [SuppressMessage(
-            "Security",
-            "CA2100:Review SQL queries for security vulnerabilities",
-            Justification = "Queries use a fixed table allowlist and quoted schema column identifiers; no request values enter SQL."
-        )]
-        private object? Scalar(string sql)
-        {
-            using var command = _connection!.CreateCommand();
-            command.CommandText = sql;
-            return command.ExecuteScalar();
-        }
-
-        private Dictionary<string, string> Fingerprints() =>
-            _queries.ToDictionary(
-                p => p.Key,
-                p => Convert.ToString(Scalar(p.Value), CultureInfo.InvariantCulture) ?? "",
-                StringComparer.Ordinal
-            );
-
-        private void Probes()
-        {
-            _queries.Clear();
-            foreach (var kind in Kinds)
-            {
-                List<string> parts = [];
-                foreach (var table in kind.Tables)
-                {
-                    using var command = _connection!.CreateCommand();
-                    command.CommandText = "SELECT name FROM pragma_table_info($table)";
-                    command.Parameters.AddWithValue("$table", table);
-                    using var reader = command.ExecuteReader();
-                    List<string> columns = [];
-                    while (reader.Read())
-                    {
-                        columns.Add(reader.GetString(0));
-                    }
-                    if (columns.Count is 0)
-                    {
-                        continue;
-                    }
-                    var expression = new StringBuilder(
-                        kind.AppendOnly ? "COALESCE(MAX(rowid), 0)" : "COUNT(*) || ':' || COALESCE(MAX(rowid), 0)"
-                    );
-                    if (!kind.AppendOnly)
-                    {
-                        foreach (var column in columns.Where(c => c.EndsWith("_at", StringComparison.Ordinal)))
-                        {
-                            expression
-                                .Append(" || ':' || COALESCE(MAX(\"")
-                                .Append(column.Replace("\"", "\"\"", StringComparison.Ordinal))
-                                .Append("\"), '')");
-                        }
-                    }
-                    parts.Add("(SELECT " + expression + " FROM " + table + ")");
-                }
-                if (parts.Count > 0)
-                {
-                    _queries[kind.Kind] = "SELECT " + string.Join(" || '|' || ", parts);
-                }
             }
         }
 

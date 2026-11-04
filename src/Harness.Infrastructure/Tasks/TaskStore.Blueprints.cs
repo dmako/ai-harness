@@ -173,7 +173,8 @@ public sealed partial class TaskStore
 
     private static string NextBlueprintId(IReadOnlyList<string> ids)
     {
-        var numbered = ids.Select(id => NumberedId.Match(id)).Where(m => m.Success).ToArray();
+        // only well-formed ids give the next one: an invalid id left by an older harness must not
+        var numbered = ids.Select(id => WellFormedId.Match(id)).Where(m => m.Success).ToArray();
         if (numbered.Length is 0)
         {
             return "BP-001";
@@ -240,6 +241,34 @@ public sealed partial class TaskStore
         return command.ExecuteScalar() as string ?? name;
     }
 
+    /// <summary>
+    /// The blueprint an approved task is filed into, matched as the blueprints are now (by id, else by title, any
+    /// case): a proposal names it as its agent did, maybe before the blueprint was approved. A name that matches
+    /// none is a title, and its blueprint is created, defined, with the next free id; only a well-formed id (BP-007,
+    /// M17) that matches none stays one only tasks name. 'Awasome Test 1' is a title, though it ends in a number.
+    /// </summary>
+    private string BlueprintFor(SqliteConnection c, SqliteTransaction t, string name, string source)
+    {
+        var resolved = ResolveBlueprint(c, t, name);
+        var ids = BlueprintIds(c, t);
+        // an id nothing has yet stays one only tasks name, as before; a title becomes a blueprint
+        return resolved.Length is 0 || ids.Contains(resolved) || WellFormedId.IsMatch(resolved)
+            ? resolved
+            : CreateBlueprint(c, t, new(NextBlueprintId(ids), resolved, "", [], ""), source).Id;
+    }
+
+    /// <summary>The described blueprint with this title, any case; empty when there is none.</summary>
+    private static string TitledBlueprint(SqliteConnection c, SqliteTransaction t, string title)
+    {
+        using var command = Command(
+            c,
+            t,
+            "SELECT id FROM blueprints WHERE title=$title COLLATE NOCASE ORDER BY ordinal,id LIMIT 1",
+            ("$title", title.Trim())
+        );
+        return command.ExecuteScalar() as string ?? "";
+    }
+
     /// <summary>Describes a new blueprint, placed after the others.</summary>
     public BlueprintDefinition CreateBlueprint(
         BlueprintDefinition definition,
@@ -254,6 +283,16 @@ public sealed partial class TaskStore
         string source
     )
     {
+        // a new blueprint's id is checked for its form first, so the refusal says which form is expected
+        var id = definition.Id.Trim();
+        if (id.Length is not 0 && !WellFormedId.IsMatch(id))
+        {
+            throw new ArgumentException(
+                $"blueprint id {TaskWorkflow.Quote(id)} is not valid: use letters, an optional dash and digits, "
+                    + $"e.g. {NextBlueprintId(BlueprintIds(c, t))}"
+            );
+        }
+
         var d = CleanBlueprint(definition);
         using (var exists = Command(c, t, "SELECT 1 FROM blueprints WHERE id=$id", ("$id", d.Id)))
         {
@@ -588,6 +627,10 @@ public sealed partial class TaskStore
         return outside.Select(x => x.Task).Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    [GeneratedRegex(@"\A(.*?)([0-9]+)\z", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex NumberedId { get; }
+    /// <summary>
+    /// A valid blueprint id: letters, an optional dash, digits (BP-007, M17); its prefix and number give the next
+    /// one. New blueprints get only such ids; existing ones (Metrics, from an older harness) keep theirs.
+    /// </summary>
+    [GeneratedRegex(@"\A([A-Za-z]+-?)([0-9]+)\z", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex WellFormedId { get; }
 }

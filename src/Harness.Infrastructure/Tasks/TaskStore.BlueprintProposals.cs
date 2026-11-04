@@ -104,7 +104,18 @@ public sealed partial class TaskStore
                     proposals.Add(ReadBlueprintProposal(reader));
                 }
 
-                return (IReadOnlyList<BlueprintProposal>)proposals;
+                // a new blueprint whose title a blueprint has since (a task approved first made it) says which
+                return (IReadOnlyList<BlueprintProposal>)
+                    proposals
+                        .Select(proposal =>
+                            proposal is { Status: "pending", Blueprint.Length: 0 }
+                                ? proposal with
+                                {
+                                    SameTitle = TitledBlueprint(c, t, proposal.Definition.Title),
+                                }
+                                : proposal
+                        )
+                        .ToArray();
             },
             cancellationToken
         );
@@ -152,28 +163,50 @@ public sealed partial class TaskStore
 
     /// <summary>
     /// Creates or restates the proposed blueprint, as proposed or as the author restated it. A new one without an
-    /// id gets the next free one.
+    /// id gets the next free one. When a blueprint with the new one's title exists already (a task approved first
+    /// made it), the author says what to do: <paramref name="sameName"/> "merge" restates that one, keeping its id
+    /// and tasks, "new" creates a separate blueprint; without either it is refused.
     /// </summary>
     public BlueprintApproval ApproveBlueprint(
         string id,
         BlueprintDefinition? edit,
         string by,
+        string sameName = "",
         CancellationToken cancellationToken = default
     ) =>
         database.WithTransaction(
             (c, t) =>
             {
+                if (sameName is not ("" or "merge" or "new"))
+                {
+                    throw new ArgumentException("same-name must be merge or new");
+                }
+
                 var proposal = PendingBlueprintProposal(c, t, id);
                 var source = "proposal:" + id;
                 var d = edit ?? proposal.Definition;
-                if (proposal.Blueprint.Length is 0 && d.Id.Trim().Length is 0)
+                var target = proposal.Blueprint;
+                if (target.Length is 0 && TitledBlueprint(c, t, d.Title) is { Length: > 0 } existing)
+                {
+                    target = sameName switch
+                    {
+                        "merge" => existing,
+                        "new" => "",
+                        _ => throw new InvalidOperationException(
+                            $"a blueprint titled \"{d.Title.Trim()}\" exists already ({existing}): merge into it "
+                                + "(same-name merge: its id and tasks stay) or create a separate one (same-name new)"
+                        ),
+                    };
+                }
+
+                if (target.Length is 0 && d.Id.Trim().Length is 0)
                 {
                     d = d with { Id = NextBlueprintId(BlueprintIds(c, t)) };
                 }
 
-                var saved = proposal.Blueprint.Length is 0
+                var saved = target.Length is 0
                     ? CreateBlueprint(c, t, d, source)
-                    : EditBlueprint(c, t, proposal.Blueprint, d, source);
+                    : EditBlueprint(c, t, target, d with { Id = target }, source);
                 return new BlueprintApproval(
                     DecideBlueprint(c, t, proposal, "approved", by, "", saved.Id, Stamp()),
                     saved

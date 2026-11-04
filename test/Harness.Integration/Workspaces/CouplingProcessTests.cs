@@ -47,7 +47,9 @@ public sealed class CouplingProcessTests
         ToolSchema.AssertMatches(tools.Single(tool => tool.Name == "change_coupling"));
         var file = await CallAsync(new() { ["file"] = "./a.cs", ["check"] = true });
         file.TryGetProperty("changed", out _).Should().BeFalse();
-        file.GetProperty("note").GetString().Should().Contain("partners are unknown");
+        // counted from the Git history without a provider: a.cs, committed once, has no usual partner
+        file.TryGetProperty("partners", out _).Should().BeFalse();
+        file.TryGetProperty("note", out _).Should().BeFalse("partners are known from Git");
         var check = await CallAsync(new() { ["check"] = true });
         check.GetProperty("changed").EnumerateArray().Select(value => value.GetString()).Should().Equal("a.cs");
         check.GetProperty("note").GetString().Should().Contain("no usual partner is left out");

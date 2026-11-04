@@ -123,6 +123,13 @@ internal sealed partial class TaskCommandRunner
             await output.WriteLineAsync(
                 $"{proposal.Id}  [{proposal.Status}] {what}: {d.Title}  (by {proposal.ProposedBy})"
             );
+            if (proposal.SameTitle.Length is not 0)
+            {
+                await output.WriteLineAsync(
+                    $"    {proposal.SameTitle} has this title already: approve with --same-name merge (into it) or --same-name new"
+                );
+            }
+
             if (d.Goal.Length is not 0)
             {
                 await output.WriteLineAsync("    goal: " + d.Goal);
@@ -157,7 +164,13 @@ internal sealed partial class TaskCommandRunner
         CancellationToken cancellationToken
     )
     {
-        var approved = store.ApproveBlueprint(settings.Id, null, actor.Name, cancellationToken);
+        var approved = store.ApproveBlueprint(
+            settings.Id,
+            null,
+            actor.Name,
+            (settings as TaskApproveSettings)?.SameName ?? "",
+            cancellationToken
+        );
         if (settings.Json)
         {
             await JsonAsync(

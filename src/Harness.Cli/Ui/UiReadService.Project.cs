@@ -5,6 +5,7 @@ using Harness.Core.Tasks;
 using Harness.Core.Web;
 using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Memory;
+using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Tasks;
 using Harness.Infrastructure.Telemetry;
@@ -22,13 +23,43 @@ internal sealed partial class UiReadService
             "summary" => UiJson.Node(new JsonObjectMap { ["project"] = project }),
             "health" => await HealthAsync(project, request, token),
             "architecture" => await ArchitectureAsync(project, request, token),
-            "coupling" => await CouplingAsync(project, request, token),
+            "coupling" => await ViewAsync(project, endpoint, () => CouplingAsync(project, token), token),
             "snippet" => await SnippetAsync(project, request, token),
-            "structure" => await StructureAsync(project, token),
-            "complexity" => await ComplexityAsync(project, token),
-            "stack" => await ProjectStackAsync(project, token),
+            "structure" => await ViewAsync(project, endpoint, () => StructureAsync(project, token), token),
+            "complexity" => await ViewAsync(project, endpoint, () => ComplexityAsync(project, token), token),
+            "stack" => await ViewAsync(project, endpoint, () => ProjectStackAsync(project, token), token),
             _ => await ProjectDatabaseAsync(project, endpoint, request, token),
         };
+    }
+
+    /// <summary>
+    /// A project's architecture view, from harness ui's view cache while the project and its workspaces' members
+    /// are unchanged.
+    /// </summary>
+    private Task<JsonNode?> ViewAsync(
+        JsonObject project,
+        string endpoint,
+        Func<Task<JsonNode?>> compute,
+        CancellationToken token
+    )
+    {
+        if (views is null)
+        {
+            return compute();
+        }
+
+        var id = UiProjectCatalog.Text(project, "id");
+        List<ViewMember> members =
+        [
+            new(id, UiProjectCatalog.Text(project, "root"), UiProjectCatalog.Text(project, "db_path")),
+        ];
+        members.AddRange(
+            Workspaces
+                .Members(id)
+                .Where(member => member.Id != id)
+                .Select(member => new ViewMember(member.Id, member.Root, member.DatabasePath))
+        );
+        return views.GetAsync("project:" + id + ":" + endpoint, members, compute, token);
     }
 
     private async Task<JsonNode?> ProjectDatabaseAsync(

@@ -134,7 +134,8 @@ public sealed class UiTests
             );
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
-        foreach (var endpoint in new[] { "architecture", "coupling", "health?probe=1" })
+        // only the endpoints that start providers need harness ui's own header; coupling reads Git alone
+        foreach (var endpoint in new[] { "architecture", "health?probe=1" })
         {
             using var response = await server.Client.GetAsync($"/api/projects/{id}/{endpoint}", Token);
             response.StatusCode.Should().Be(HttpStatusCode.Forbidden);

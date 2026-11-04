@@ -59,8 +59,12 @@ internal static class UiJson
         value is JsonNode node ? node.DeepClone() : HarnessJson.SerializeToNode(value, Options);
 }
 
-internal sealed partial class UiReadService(ProjectLifecycle lifecycle, UiProjectCatalog catalog, UiSessions sessions)
-    : IUiReadApi
+internal sealed partial class UiReadService(
+    ProjectLifecycle lifecycle,
+    UiProjectCatalog catalog,
+    UiSessions sessions,
+    ViewCache? views = null
+) : IUiReadApi
 {
     private WorkspaceStore Workspaces => new(lifecycle.GlobalConfigurationPath, lifecycle.Registry);
     private string GlobalDirectory => Path.GetDirectoryName(Path.GetFullPath(lifecycle.GlobalConfigurationPath))!;
