@@ -348,6 +348,65 @@ public sealed class TaskStoreTests
     }
 
     [Fact]
+    public void BlueprintsKeepTheOrderTheAuthorGaveThemAndUnorderedOnesFollow()
+    {
+        using var s = new State();
+        s.Store.ImportBlueprints(
+            [new("M1", "One"), new("M2", "Two"), new("M3", "Three")],
+            "fixture",
+            cancellationToken: Token
+        );
+        // M7 is only named by a task: it can be ordered too
+        s.Store.Import([Definition("T-1") with { Blueprint = "M7" }], "fixture", cancellationToken: Token);
+        string Listed() =>
+            string.Join(
+                " ",
+                s.Store.Blueprints(Token).Select(b => b.Definition.Id + (b.Order is { } o ? "@" + o : ""))
+            );
+        Listed().Should().Be("M1 M2 M3 M7", "nothing is ordered yet: the backlog's order");
+
+        s.Store.ReorderBlueprints(["M7", "M3"], Token)
+            .Select(b => b.Definition.Id)
+            .Should()
+            .Equal("M7", "M3", "M1", "M2");
+        Listed().Should().Be("M7@0 M3@1 M1 M2", "unordered blueprints follow, in their usual order");
+
+        // a new blueprint has no place yet; re-importing the backlog keeps the author's order
+        s.Store.CreateBlueprint(new("M4", "Four"), "ui", Token);
+        s.Store.ImportBlueprints(
+            [new("M1", "One"), new("M2", "Two"), new("M3", "Three edited")],
+            "fixture",
+            cancellationToken: Token
+        );
+        Listed().Should().Be("M7@0 M3@1 M1 M2 M4");
+
+        // a new order replaces the old one whole; removing a blueprint takes its place with it
+        s.Store.ReorderBlueprints(["M2", "M4", "M1", "M3", "M7"], Token);
+        s.Store.RemoveBlueprint("M4", BlueprintTasks.Keep, "", "human", Token);
+        s.Store.CreateBlueprint(new("M4", "Four again"), "ui", Token);
+        Listed().Should().Be("M2@0 M1@2 M3@3 M7@4 M4", "the recreated M4 starts unordered");
+        new TaskStore(s.Database)
+            .Blueprints(Token)
+            .Select(b => b.Definition.Id)
+            .Should()
+            .Equal(["M2", "M1", "M3", "M7", "M4"], "the order is stored, not held by one store");
+
+        FluentActions
+            .Invoking(() => s.Store.ReorderBlueprints(["M1", "M404"], Token))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*M404*");
+        FluentActions
+            .Invoking(() => s.Store.ReorderBlueprints(["M1", "M1"], Token))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*twice*");
+        Listed().Should().Be("M2@0 M1@2 M3@3 M7@4 M4", "a refused order changes nothing");
+        TaskViews.Blueprint(s.Store.Blueprints(Token)[0]).Should().ContainKey("order").WhoseValue.Should().Be(0);
+        TaskViews.Blueprint(s.Store.Blueprints(Token)[^1]).Should().NotContainKey("order");
+    }
+
+    [Fact]
     public void BlueprintsAreCreatedEditedAndRemovedWithTheirTasksMovedOrDeleted()
     {
         using var s = new State();
@@ -461,7 +520,12 @@ public sealed class TaskStoreTests
         var approved = s.Store.ApproveBlueprint(created.Id, null, "human", cancellationToken: Token);
         approved.Blueprint.Id.Should().Be("M2", "a new one gets the next free id");
         approved.Proposal.Result.Should().Be("M2");
-        s.Store.ApproveBlueprint(changed.Id, new("", "Restated by the author", "goal"), "human", cancellationToken: Token)
+        s.Store.ApproveBlueprint(
+                changed.Id,
+                new("", "Restated by the author", "goal"),
+                "human",
+                cancellationToken: Token
+            )
             .Blueprint.Id.Should()
             .Be("M1");
         s.Store.Blueprints(Token)
@@ -518,7 +582,7 @@ public sealed class TaskStoreTests
         }
 
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
-        database.SchemaVersion().Should().Be(23);
+        database.SchemaVersion().Should().Be(24);
         var store = new TaskStore(database);
         var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
         blueprint.Id.Should().Be("M1");

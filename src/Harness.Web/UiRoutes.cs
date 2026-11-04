@@ -27,6 +27,7 @@ public static class UiRoutes
         "/api/projects/{id}/blueprints",
         "/api/projects/{id}/blueprints/{bid}/edit",
         "/api/projects/{id}/blueprints/{bid}/remove",
+        "/api/projects/{id}/blueprints-order",
         "/api/projects/{id}/task-proposals/{pid}/approve",
         "/api/projects/{id}/task-proposals/{pid}/reject",
         "/api/projects/{id}/blueprint-proposals/{pid}/approve",

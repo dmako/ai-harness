@@ -1800,3 +1800,14 @@ table.dups { min-width: 45rem; }
 @media (max-width: 56.25em) {
   .trow { grid-template-columns: 1rem 1rem minmax(0, 1fr) auto auto auto; }
 }
+/* reordering blueprints in Work › Tasks (TASK-0078): the header with move
+   up / move down beside it, dragged by the header, a bar where it lands */
+.mheadrow { display: flex; align-items: center; gap: 0.25rem; padding-right: 0.5rem; background: var(--surface); }
+.mheadrow:hover { background: var(--surface-2); }
+.mheadrow .mhead { flex: 1 1 auto; min-width: 0; width: auto; background: transparent; }
+.mheadrow .mhead[draggable=true] { cursor: grab; }
+.mheadrow .bpmove { flex: none; }
+.mheadrow .bpmove:disabled { opacity: 0.35; cursor: default; }
+.mstone.bpdrop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.mstone.bpdrop-after { box-shadow: 0 3px 0 0 var(--accent); }
+.bpdragging .mstone { transition: box-shadow 80ms ease-out; }

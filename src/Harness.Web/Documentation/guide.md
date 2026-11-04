@@ -142,6 +142,15 @@ that is also in the backlog file is restated from the file again at its
 next import. Drag a task onto another blueprint's group to move it there;
 the move is in its audit trail.
 
+To put the blueprints in the order you work through them, show all of them
+in Work › Tasks and drag a blueprint by its header above or below another
+(a bar shows where it lands), or use the up and down arrows beside its
+header. The order is saved with the project, so every listing of the
+blueprints (the Tasks and Blueprints views, `harness tasks blueprints`,
+the agents' `task_blueprints`) follows it, in any browser and after a
+restart; importing the backlog does not change it. A blueprint you have not
+placed yet, such as a new one, comes after the ordered ones.
+
 To delete a task, use the bin at the end of its row: a dialog says what
 goes (the task, its criteria, its dependencies and its audit trail) before
 anything does. Deleting is refused while an agent holds the task or while

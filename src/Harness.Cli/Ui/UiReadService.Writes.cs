@@ -131,6 +131,14 @@ internal sealed partial class UiReadService : IUiWriteApi
             "blueprints" => SaveBlueprint(database, null, request.Body, token),
             "blueprints/{bid}/edit" => SaveBlueprint(database, route.Value("bid"), request.Body, token),
             "blueprints/{bid}/remove" => RemoveBlueprint(database, request, token),
+            "blueprints-order" => UiJson.Node(
+                new JsonObjectMap
+                {
+                    ["blueprints"] = new TaskStore(database)
+                        .ReorderBlueprints(new UiWriteBody(request.Body, "order").List("order"), token)
+                        .Select(TaskViews.Blueprint),
+                }
+            ),
             "blueprint-proposals/{pid}/approve" => ApproveBlueprint(database, request, token),
             "blueprint-proposals/{pid}/reject" => UiJson.Node(
                 new JsonObjectMap

@@ -351,6 +351,168 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task BlueprintsAreReorderedByDragOrArrowsAndKeepTheirOrderEverywhere()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            var origin = new TaskOrigin("test", "test", "fixture");
+            tasks.ImportBlueprints(
+                [new("M1", "One"), new("M2", "Two"), new("M3", "Three")],
+                "test",
+                cancellationToken: Token
+            );
+            foreach (
+                var (id, blueprint) in new[]
+                {
+                    ("UI-0001", "M1"),
+                    ("UI-0002", "M2"),
+                    ("UI-0003", "M3"),
+                    ("UI-0004", "M4"),
+                    ("UI-0005", "M5"),
+                }
+            )
+            {
+                tasks.Create(
+                    new TaskDefinition
+                    {
+                        Id = id,
+                        Title = "Task of " + blueprint,
+                        Blueprint = blueprint,
+                    },
+                    "",
+                    origin,
+                    Token
+                );
+            }
+
+            // M4 and M5 hold only deferred tasks: they come after the others, in their own order
+            var human = new TaskActor("human:fixture", Privileged: true);
+            tasks.Defer("UI-0004", human, "later", Token);
+            tasks.Defer("UI-0005", human, "later", Token);
+        }
+
+        const string Shown = "[...document.querySelectorAll('#main .mstone')].map(s => s.dataset.blueprint).join()";
+        const string Drag = """
+            window.drag = (from, to, after, type) => {
+              const dt = new DataTransfer();
+              from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+              if (type && !dt.types.includes(type)) return 'no ' + type;
+              const box = to.getBoundingClientRect();
+              const at = { bubbles: true, cancelable: true, dataTransfer: dt, clientY: after ? box.bottom - 2 : box.top + 2 };
+              to.dispatchEvent(new DragEvent('dragover', at));
+              const marked = [...to.classList].filter(c => c.startsWith('bpdrop')).join();
+              to.dispatchEvent(new DragEvent('drop', at));
+              from.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+              return marked;
+            };
+            """;
+        string Section(string m) => $"document.querySelector('#main .mstone[data-blueprint={m}]')";
+        await BrowsePagesAsync(
+            executable,
+            fixture,
+            2,
+            async (pages, server) =>
+            {
+                var page = pages[0];
+                var id = UiWriteTests.ProjectId(fixture);
+                var tasksView = server.Client.BaseAddress + "#/p/" + id + "/work/tasks";
+                await page.CommandAsync("Page.navigate", new { url = tasksView });
+                await page.WaitAsync(Shown + " === 'M1,M2,M3,M4,M5'");
+                await page.EvaluateAsync(Drag);
+
+                // dragged by its header above M1: the bar shows where it lands, the order is saved, no task moves
+                (
+                    await ValueAsync(
+                        page,
+                        $"drag({Section("M3")}.querySelector('.mhead'), {Section("M1")}, false, 'text/x-blueprint')"
+                    )
+                )
+                    .Should()
+                    .Be("bpdrop-before");
+                await page.WaitAsync(Shown + " === 'M3,M1,M2,M4,M5'");
+                using (var database = fixture.Database())
+                {
+                    new TaskStore(database).Get("UI-0003", Token).Definition.Blueprint.Should().Be("M3");
+                    new TaskStore(database)
+                        .Blueprints(Token)
+                        .Select(b => $"{b.Definition.Id}@{b.Order}")
+                        .Should()
+                        .Equal("M3@0", "M1@1", "M2@2", "M4@3", "M5@4");
+                }
+
+                // the keyboard way: the arrows beside the header, the focus staying on the arrow
+                (await ValueAsync(page, $"{Section("M3")}.querySelector('.bpmove-up').disabled"))
+                    .Should()
+                    .Be("True");
+                await page.EvaluateAsync($"{Section("M3")}.querySelector('.bpmove-down').click()");
+                await page.WaitAsync(Shown + " === 'M1,M3,M2,M4,M5'");
+                await page.WaitAsync(
+                    "document.activeElement && document.activeElement.getAttribute('aria-label') === 'Move down M3'"
+                );
+                // a deferred-only blueprint moved up stays among those, now first of them
+                await page.EvaluateAsync($"{Section("M5")}.querySelector('.bpmove-up').click()");
+                await page.WaitAsync(Shown + " === 'M1,M3,M2,M5,M4'");
+
+                // a task dropped on a blueprint still moves there, and is no blueprint drag
+                (
+                    await ValueAsync(
+                        page,
+                        $"drag(document.querySelector('#task-UI-0001 .trow'), {Section("M2")}, true, 'text/x-task')"
+                    )
+                )
+                    .Should()
+                    .BeEmpty("a task drag shows no blueprint drop bar");
+                await ProviderFixture.EventuallyAsync(() =>
+                {
+                    using var database = fixture.Database();
+                    return new TaskStore(database).Get("UI-0001", Token).Definition.Blueprint is "M2";
+                });
+                await page.WaitAsync(Shown + " === 'M3,M2,M5,M4'");
+
+                (
+                    await ValueAsync(
+                        page,
+                        "fetch(location.pathname.replace(/\\/$/, '') + '/api/projects/"
+                            + id
+                            + "/blueprints').then(r => r.json())"
+                            + ".then(j => j.blueprints.map(b => b.id + '@' + b.order).join())"
+                    )
+                )
+                    .Should()
+                    .Be("M1@0,M3@1,M2@2,M5@3,M4@4", "the blueprints API returns each one's order");
+
+                // with one blueprint picked there is nothing to order
+                await page.EvaluateAsync(
+                    "(() => { const s = document.querySelector('select[aria-label=Blueprint]'); s.value = 'M2'; s.dispatchEvent(new Event('change')); })()"
+                );
+                await page.WaitAsync(Shown + " === 'M2'");
+                (
+                    await ValueAsync(
+                        page,
+                        "document.querySelectorAll('#main .bpmove, #main .mhead[draggable=true]').length"
+                    )
+                )
+                    .Should()
+                    .Be("0");
+
+                // the same order after a reload, in another browser context and from a freshly started harness ui
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync(Shown + " === 'M3,M2,M5,M4'");
+                await using var restarted = await UiFixture.StartAsync(fixture);
+                await pages[1]
+                    .CommandAsync(
+                        "Page.navigate",
+                        new { url = restarted.Client.BaseAddress + "#/p/" + id + "/work/tasks" }
+                    );
+                await pages[1].WaitAsync(Shown + " === 'M3,M2,M5,M4'");
+            }
+        );
+    }
+
+    [Fact]
     public async Task BlueprintsAreCreatedEditedAndRemovedOnceConfirmedAskingAboutTheirTasks()
     {
         var executable = Browser();

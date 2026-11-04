@@ -48,6 +48,10 @@
             },
             "notes": {
               "type": "string"
+            },
+            "order": {
+              "type": "integer",
+              "description": "the position the author gave it in harness ui (0 first); absent when not ordered, listed after the ordered ones"
             }
           },
           "required": [

@@ -130,10 +130,12 @@ public sealed record TaskImportResult(
 
 public sealed record TaskExportResult(string Path, IReadOnlyList<string> Added, bool Created);
 
+/// <param name="Order">The position the author gave it in harness ui (0 first), or null when not ordered.</param>
 public sealed record BlueprintProgress(
     BlueprintDefinition Definition,
     bool Defined,
-    IReadOnlyDictionary<string, int> Tasks
+    IReadOnlyDictionary<string, int> Tasks,
+    int? Order = null
 )
 {
     public int Total => Tasks.Values.Sum();

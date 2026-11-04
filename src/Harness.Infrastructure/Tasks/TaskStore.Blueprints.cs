@@ -159,10 +159,78 @@ public sealed partial class TaskStore
                     }
                 }
 
-                return (IReadOnlyList<BlueprintProgress>)order.Select(id => byId[id]).ToArray();
+                // the author's order first; the rest after, in the order above (OrderBy is stable)
+                var positions = BlueprintPositions(c, t);
+                return (IReadOnlyList<BlueprintProgress>)
+                    order
+                        .Select(id => byId[id] with { Order = positions.TryGetValue(id, out var p) ? p : null })
+                        .OrderBy(m => m.Order ?? int.MaxValue)
+                        .ToArray();
             },
             cancellationToken
         );
+
+    /// <summary>
+    /// Sets the order the author gave the blueprints (harness ui): each listed blueprint takes its place in the
+    /// list, and one not listed loses its place, so it comes after the ordered ones. Every id must be a blueprint,
+    /// described or named by a task, and listed once.
+    /// </summary>
+    public IReadOnlyList<BlueprintProgress> ReorderBlueprints(
+        IReadOnlyList<string> ids,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var order = ids.Select(id => id.Trim()).ToArray();
+        database.WithTransaction(
+            (c, t) =>
+            {
+                var known = BlueprintIds(c, t);
+                HashSet<string> seen = new(StringComparer.Ordinal);
+                foreach (var id in order)
+                {
+                    if (!known.Contains(id))
+                    {
+                        throw new ArgumentException($"unknown blueprint {TaskWorkflow.Quote(id)}");
+                    }
+
+                    if (!seen.Add(id))
+                    {
+                        throw new ArgumentException($"blueprint {id} is listed twice");
+                    }
+                }
+
+                Execute(c, t, "DELETE FROM blueprint_order");
+                for (var position = 0; position < order.Length; position++)
+                {
+                    Execute(
+                        c,
+                        t,
+                        "INSERT INTO blueprint_order(id,position) VALUES($id,$position)",
+                        ("$id", order[position]),
+                        ("$position", position)
+                    );
+                }
+
+                return order.Length;
+            },
+            cancellationToken
+        );
+        return Blueprints(cancellationToken);
+    }
+
+    private static Dictionary<string, int> BlueprintPositions(SqliteConnection c, SqliteTransaction t)
+    {
+        Dictionary<string, int> positions = new(StringComparer.Ordinal);
+        using var command = Command(c, t, "SELECT id,position FROM blueprint_order");
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            positions[reader.GetString(0)] = reader.GetInt32(1);
+        }
+
+        return positions;
+    }
 
     /// <summary>
     /// The next free blueprint id: the number after the highest one of the last numbered blueprint's prefix
@@ -443,6 +511,7 @@ public sealed partial class TaskStore
                 }
 
                 Execute(c, t, "DELETE FROM blueprints WHERE id=$id", ("$id", id));
+                Execute(c, t, "DELETE FROM blueprint_order WHERE id=$id", ("$id", id));
                 RecomputeReadiness(c, t);
                 return new BlueprintRemoval(id, moved, deleted, unlinked);
             },
