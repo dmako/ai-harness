@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using AwesomeAssertions;
 using Harness.Core.Memory;
@@ -10,12 +12,13 @@ using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Tasks;
 using Harness.Integration.Providers;
 using Harness.Integration.Sync;
+using Microsoft.Win32.SafeHandles;
 using Xunit;
 
 namespace Harness.Integration.Web;
 
 [Collection("Provider processes")]
-public sealed class UiBrowserTests
+public sealed class UiBrowserTests(SharedBrowser browser)
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -752,7 +755,7 @@ public sealed class UiBrowserTests
     {
         var executable = Browser();
         using var fixture = await SyncFixture.CreateAsync();
-        var profile = Path.Combine(Path.GetTempPath(), ProfilePrefix + Guid.NewGuid().ToString("N"));
+        var profile = SharedBrowser.Edge.NewProfile();
         var running = 0;
 
         await FluentActions
@@ -770,10 +773,61 @@ public sealed class UiBrowserTests
                 )
             )
             .Should()
-            .ThrowAsync<InvalidOperationException>();
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("a check failed mid-page");
 
         running.Should().BeGreaterThan(1, "the browser runs with its helper processes");
         (await BrowserProcessesAsync(profile)).Should().BeEmpty("ending the test ends the browser and every helper");
+    }
+
+    [Fact]
+    public async Task SharedBrowserPagesShareNoStorageAndACrashedBrowserIsReplaced()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        await BrowsePagesAsync(
+            executable,
+            fixture,
+            2,
+            async (pages, server) =>
+            {
+                foreach (var page in pages)
+                {
+                    await page.CommandAsync("Page.navigate", new { url = server.Client.BaseAddress + "#/" });
+                    await page.WaitAsync("document.readyState === 'complete'");
+                }
+
+                await pages[0]
+                    .EvaluateAsync(
+                        "localStorage.setItem('leak', 'yes'); sessionStorage.setItem('leak', 'yes'); "
+                            + "document.cookie = 'leak=yes; path=/'"
+                    );
+                (await ValueAsync(pages[0], "localStorage.getItem('leak') + document.cookie"))
+                    .Should()
+                    .Be("yesleak=yes");
+                (await ValueAsync(pages[1], "String(localStorage.getItem('leak')) + '|' + document.cookie"))
+                    .Should()
+                    .Be("null|", "a page in another browser context sees none of the first one's storage");
+            }
+        );
+
+        var before = browser.ProcessId;
+        before.Should().NotBeNull("the shared browser is still running after a test");
+        await browser.CrashAsync();
+        await BrowsePagesAsync(
+            executable,
+            fixture,
+            1,
+            async (pages, server) =>
+            {
+                await pages[0].CommandAsync("Page.navigate", new { url = server.Client.BaseAddress + "#/" });
+                await pages[0].WaitAsync("document.readyState === 'complete'");
+                (await ValueAsync(pages[0], "String(localStorage.getItem('leak'))"))
+                    .Should()
+                    .Be("null", "the next test starts clean in a fresh browser");
+            }
+        );
+        browser.ProcessId.Should().NotBe(before, "a crashed shared browser is replaced for the next test");
     }
 
     [Fact]
@@ -989,24 +1043,33 @@ public sealed class UiBrowserTests
             checks = await reader.ReadToEndAsync(Token);
         }
 
-        await BrowseAsync(
+        // each theme and width is a pass of its own, on its own page in its own browser context, run side by side:
+        // a full page load holds the splash for over a second, and 104 of them one after another took minutes
+        (string Theme, int Width)[] passes = [("dark", 1400), ("dark", 390), ("light", 1400), ("light", 390)];
+        await BrowsePagesAsync(
             executable,
             fixture,
-            async (page, server) =>
+            passes.Length,
+            async (tabs, server) =>
             {
                 var id = UiWriteTests.ProjectId(fixture);
-                await page.CommandAsync("Page.enable", new { });
-                await page.CommandAsync(
-                    "Page.addScriptToEvaluateOnNewDocument",
-                    new
-                    {
-                        source = """
-                        window.__errors = [];
-                        addEventListener('error', (e) => window.__errors.push(String(e.message || e.error)));
-                        addEventListener('unhandledrejection', (e) => window.__errors.push('rejected: ' + String(e.reason && (e.reason.stack || e.reason))));
-                        """,
-                    }
-                );
+                foreach (var tab in tabs)
+                {
+                    await tab.CommandAsync("Page.enable", new { });
+                    await tab.CommandAsync(
+                        "Page.addScriptToEvaluateOnNewDocument",
+                        new
+                        {
+                            source = """
+                            window.__errors = [];
+                            addEventListener('error', (e) => window.__errors.push(String(e.message || e.error)));
+                            addEventListener('unhandledrejection', (e) => window.__errors.push('rejected: ' + String(e.reason && (e.reason.stack || e.reason))));
+                            """,
+                        }
+                    );
+                }
+
+                var page = tabs[0];
                 var root = server.Client.BaseAddress!.ToString().TrimEnd('/');
                 await page.CommandAsync("Page.navigate", new { url = root + "/#/" });
                 await page.WaitAsync("!!document.querySelector('#main h2, #main .card')");
@@ -1049,54 +1112,58 @@ public sealed class UiBrowserTests
                         "members",
                     }.Select(view => "w/pages/" + view)
                 );
-                List<string> faults = [];
-                foreach (var theme in new[] { "dark", "light" })
+                async Task<List<string>> PassAsync(BrowserPage tab, string theme, int width)
                 {
-                    foreach (var width in new[] { 1400, 390 })
-                    {
-                        await page.CommandAsync(
-                            "Emulation.setDeviceMetricsOverride",
-                            new
-                            {
-                                width,
-                                height = 900,
-                                deviceScaleFactor = 1,
-                                mobile = width < 600,
-                            }
-                        );
-                        await page.CommandAsync(
-                            "Emulation.setEmulatedMedia",
-                            new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
-                        );
-                        foreach (var path in pages)
+                    List<string> found = [];
+                    await tab.CommandAsync(
+                        "Emulation.setDeviceMetricsOverride",
+                        new
                         {
-                            var at = $"{path} {width} {theme}";
-                            await page.CommandAsync("Page.navigate", new { url = "about:blank" });
-                            await page.CommandAsync("Page.navigate", new { url = root + "/#/" + path });
-                            if (!await SettleAsync(page))
-                            {
-                                faults.Add(at + ": still loading after 20 s");
-                            }
-                            var closed = await ChecksAsync(page, checks);
-                            await page.EvaluateAsync(
-                                "document.querySelectorAll('details').forEach((d) => { d.open = true; })"
-                            );
-                            await SettleAsync(page);
-                            var open = await ChecksAsync(page, checks);
-                            faults.AddRange(
-                                closed
-                                    .Concat(open.Except(closed).Select(f => f + " (with every fold open)"))
-                                    .Select(f => $"{at}: {f}")
-                            );
-                            var errors = await ValueAsync(page, "(window.__errors || ['no error log']).join(' | ')");
-                            if (errors.Length > 0)
-                            {
-                                faults.Add($"{at}: script error {errors}");
-                            }
+                            width,
+                            height = 900,
+                            deviceScaleFactor = 1,
+                            mobile = width < 600,
+                        }
+                    );
+                    await tab.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    foreach (var path in pages)
+                    {
+                        var at = $"{path} {width} {theme}";
+                        await tab.CommandAsync("Page.navigate", new { url = "about:blank" });
+                        await tab.CommandAsync("Page.navigate", new { url = root + "/#/" + path });
+                        if (!await SettleAsync(tab))
+                        {
+                            found.Add(at + ": still loading after 20 s");
+                        }
+                        var closed = await ChecksAsync(tab, checks);
+                        await tab.EvaluateAsync(
+                            "document.querySelectorAll('details').forEach((d) => { d.open = true; })"
+                        );
+                        await SettleAsync(tab);
+                        var open = await ChecksAsync(tab, checks);
+                        found.AddRange(
+                            closed
+                                .Concat(open.Except(closed).Select(f => f + " (with every fold open)"))
+                                .Select(f => $"{at}: {f}")
+                        );
+                        var errors = await ValueAsync(tab, "(window.__errors || ['no error log']).join(' | ')");
+                        if (errors.Length > 0)
+                        {
+                            found.Add($"{at}: script error {errors}");
                         }
                     }
+
+                    return found;
                 }
 
+                var faults = (
+                    await Task.WhenAll(passes.Select((pass, index) => PassAsync(tabs[index], pass.Theme, pass.Width)))
+                )
+                    .SelectMany(found => found)
+                    .ToList();
                 faults.Should().BeEmpty(string.Join("\n", faults.Take(60)));
 
                 // the checks do report: a control too small to hit
@@ -1342,276 +1409,168 @@ public sealed class UiBrowserTests
     }
 
     /// <summary>
-    /// Serves the fixture's UI, opens it in a headless browser and runs the checks on its page. The browser runs in
-    /// a kill-on-close job (a process group elsewhere): when the test ends, however it ends, so do the browser and
-    /// every helper process it started.
+    /// Serves the fixture's UI and runs the checks on a page of the shared browser, in a browser context of its own
+    /// that is disposed when the checks end. A test that names a profile gets a browser of its own instead, started
+    /// on that profile in a kill-on-close job (a process group elsewhere) and ended with the test, with every helper
+    /// process it started.
     /// </summary>
-    private static async Task BrowseAsync(
+    private async Task BrowseAsync(
         string executable,
         SyncFixture fixture,
         Func<BrowserPage, UiFixture, Task> checks,
         string? profile = null
     )
     {
-        await using var server = await UiFixture.StartAsync(fixture);
-        // The profile lives apart from the fixture, so a slow helper exit cannot fail the fixture's cleanup.
-        SweepProfiles();
-        profile ??= Path.Combine(Path.GetTempPath(), ProfilePrefix + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(profile);
-        var browser = new ProviderProcessFactory().Start(
-            new(
-                executable,
-                [
-                    "--headless=new",
-                    "--disable-gpu",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-background-networking",
-                    "--remote-debugging-port=0",
-                    "--user-data-dir=" + profile,
-                    "about:blank",
-                ]
-            )
-        );
-        // the browser's own output is not read, only drained so it never blocks on a full pipe
-        var drained = Task.WhenAll(
-            browser.Output.CopyToAsync(Stream.Null, CancellationToken.None),
-            browser.Error.CopyToAsync(Stream.Null, CancellationToken.None)
-        );
-        using var handler = new SocketsHttpHandler { UseProxy = false };
-        using var client = new HttpClient(handler, disposeHandler: false);
-        var port = "";
-        try
+        if (profile is null)
         {
-            var portFile = Path.Combine(profile, "DevToolsActivePort");
-            await ProviderFixture.EventuallyAsync(() => File.Exists(portFile));
-            port = (await File.ReadAllLinesAsync(portFile, Token))[0];
-            using var targets = JsonDocument.Parse(
-                await client.GetStringAsync("http://127.0.0.1:" + port + "/json/list", Token)
-            );
-            var target = targets.RootElement.EnumerateArray().First(t => t.GetProperty("type").GetString() is "page");
-            using var socket = new ClientWebSocket();
-            await socket.ConnectAsync(new(target.GetProperty("webSocketDebuggerUrl").GetString()!), Token);
-            await checks(new BrowserPage(socket), server);
-        }
-        finally
-        {
-            await CloseAsync(browser, client, port);
-            // ending the job ends the browser and every helper still running
-            await browser.DisposeAsync();
-            try
-            {
-                await drained;
-            }
-            catch (Exception error) when (error is IOException or ObjectDisposedException)
-            {
-                // The pipes closed with the processes.
-            }
-
-            await DeleteProfileAsync(profile);
-        }
-    }
-
-    private const string ProfilePrefix = "harness-edge-";
-
-    /// <summary>
-    /// Deletes a browser profile (some 200 MB) once its killed processes let go of its files, a moment after the
-    /// job ends; one still held is left for a later test's sweep.
-    /// </summary>
-    private static async Task DeleteProfileAsync(string profile)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (true)
-        {
-            try
-            {
-                Directory.Delete(profile, recursive: true);
-                return;
-            }
-            catch (DirectoryNotFoundException)
-            {
-                return;
-            }
-            catch (Exception error)
-                when (error is IOException or UnauthorizedAccessException && DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(200, CancellationToken.None);
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-            {
-                return;
-            }
-        }
-    }
-
-    /// <summary>Removes the profiles earlier browser tests could not delete, so they never pile up.</summary>
-    private static void SweepProfiles()
-    {
-        var before = DateTime.UtcNow.AddMinutes(-15);
-        foreach (
-            var directory in new DirectoryInfo(Path.GetTempPath())
-                .EnumerateDirectories(ProfilePrefix + "*")
-                .Where(directory => directory.LastWriteTimeUtc < before)
-        )
-        {
-            try
-            {
-                directory.Delete(recursive: true);
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-            {
-                // Still in use: the next sweep takes it.
-            }
-        }
-    }
-
-    /// <summary>Asks the browser to close as a user would; whatever of it is left ends with its job.</summary>
-    private static async Task CloseAsync(IProviderProcess browser, HttpClient client, string port)
-    {
-        if (port.Length is 0 || browser.Completion.IsCompleted)
-        {
+            await BrowsePagesAsync(executable, fixture, 1, (pages, server) => checks(pages[0], server));
             return;
         }
 
+        await using var server = await UiFixture.StartAsync(fixture);
+        using var handler = new SocketsHttpHandler { UseProxy = false };
+        using var client = new HttpClient(handler, disposeHandler: false);
+        await using var edge = await SharedBrowser.Edge.StartAsync(executable, profile, client, Token);
+        using var socket = await edge.FirstPageAsync(client, Token);
+        await checks(new BrowserPage(socket), server);
+    }
+
+    /// <summary>
+    /// Serves the fixture's UI and runs the checks on several pages of the shared browser at once, each in a browser
+    /// context of its own, so they share nothing but the server.
+    /// </summary>
+    private async Task BrowsePagesAsync(
+        string executable,
+        SyncFixture fixture,
+        int count,
+        Func<IReadOnlyList<BrowserPage>, UiFixture, Task> checks
+    )
+    {
+        await using var server = await UiFixture.StartAsync(fixture);
+        List<SharedBrowser.IsolatedPage> pages = [];
         try
         {
-            using var version = JsonDocument.Parse(
-                await client.GetStringAsync("http://127.0.0.1:" + port + "/json/version", CancellationToken.None)
-            );
-            using var socket = new ClientWebSocket();
-            await socket.ConnectAsync(
-                new(version.RootElement.GetProperty("webSocketDebuggerUrl").GetString()!),
-                CancellationToken.None
-            );
-            await new BrowserPage(socket).SendAsync("Browser.close");
-            await browser.Completion.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+            for (var index = 0; index < count; index++)
+            {
+                pages.Add(await browser.OpenAsync(executable, Token));
+            }
+
+            await checks(pages.Select(page => page.Page).ToArray(), server);
         }
-        catch (Exception error)
-            when (error is HttpRequestException or WebSocketException or TimeoutException or OperationCanceledException)
+        finally
         {
-            // It did not close by itself: its job ends it.
+            foreach (var page in pages)
+            {
+                await page.DisposeAsync();
+            }
         }
     }
 
     /// <summary>The ids of the browser processes (the browser and its helpers) that use this profile directory.</summary>
     private static async Task<IReadOnlyList<int>> BrowserProcessesAsync(string profile)
     {
-        var (command, arguments) = OperatingSystem.IsWindows()
-            ? (
-                "powershell",
-                new[]
-                {
-                    "-NoProfile",
-                    "-Command",
-                    "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('"
-                        + profile.Replace("'", "''", StringComparison.Ordinal)
-                        + "') -and $_.Name -ne 'powershell.exe' } | ForEach-Object { $_.ProcessId }",
-                }
-            )
-            : ("ps", new[] { "-eo", "pid=,args=" });
-        using var process = new Process
+        if (OperatingSystem.IsWindows())
         {
-            StartInfo = new(command)
+            // read each process's command line directly: a WMI query (Get-CimInstance) takes some 10 s
+            List<int> ids = [];
+            foreach (var process in Process.GetProcesses())
+            {
+                using (process)
+                {
+                    if (
+                        process.Id != Environment.ProcessId
+                        && CommandLines.Of(process.Id)?.Contains(profile, StringComparison.Ordinal) is true
+                    )
+                    {
+                        ids.Add(process.Id);
+                    }
+                }
+            }
+
+            return ids;
+        }
+
+        using var ps = new Process
+        {
+            StartInfo = new("ps")
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 CreateNoWindow = true,
+                ArgumentList = { "-eo", "pid=,args=" },
             },
         };
-        foreach (var argument in arguments)
-        {
-            process.StartInfo.ArgumentList.Add(argument);
-        }
-
-        process.Start();
-        var output = await process.StandardOutput.ReadToEndAsync(Token);
-        await process.WaitForExitAsync(Token);
+        ps.Start();
+        var output = await ps.StandardOutput.ReadToEndAsync(Token);
+        await ps.WaitForExitAsync(Token);
         return output
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(line => OperatingSystem.IsWindows() || line.Contains(profile, StringComparison.Ordinal))
+            .Where(line => line.Contains(profile, StringComparison.Ordinal))
             .Select(line => int.Parse(line.Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture))
             .Where(id => id != Environment.ProcessId)
             .ToArray();
     }
 
-    private sealed class BrowserPage(ClientWebSocket socket)
+    /// <summary>A Windows process's command line, read with NtQueryInformationProcess (Windows 8.1 and later).</summary>
+    [SuppressMessage(
+        "Interoperability",
+        "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute to generate P/Invoke marshalling code at compile time",
+        Justification = "The repository disallows unsafe code; these bounded Windows ABI declarations use runtime marshalling."
+    )]
+    private static class CommandLines
     {
-        private int _id;
+        private const int QueryLimitedInformation = 0x1000;
+        private const int ProcessCommandLineInformation = 60;
 
-        /// <summary>Sends a command without waiting for its answer (a closing browser may give none).</summary>
-        internal Task SendAsync(string method) =>
-            socket.SendAsync(
-                JsonSerializer.SerializeToUtf8Bytes(new { id = ++_id, method }),
-                WebSocketMessageType.Text,
-                true,
-                CancellationToken.None
-            );
-
-        internal async Task<JsonElement> CommandAsync(string method, object parameters)
+        /// <summary>The command line, or null for a process that is gone or may not be queried.</summary>
+        internal static string? Of(int id)
         {
-            var id = ++_id;
-            await socket.SendAsync(
-                JsonSerializer.SerializeToUtf8Bytes(
-                    new
-                    {
-                        id,
-                        method,
-                        @params = parameters,
-                    }
-                ),
-                WebSocketMessageType.Text,
-                true,
-                Token
-            );
+            using var handle = OpenProcess(QueryLimitedInformation, false, id);
+            if (handle.IsInvalid)
+            {
+                return null;
+            }
+
             var buffer = new byte[8192];
-            while (true)
+            for (var attempt = 0; attempt < 2; attempt++)
             {
-                using var message = new MemoryStream();
-                ValueWebSocketReceiveResult read;
-                do
+                var status = NtQueryInformationProcess(
+                    handle,
+                    ProcessCommandLineInformation,
+                    buffer,
+                    buffer.Length,
+                    out var needed
+                );
+                if (status is 0)
                 {
-                    read = await socket.ReceiveAsync(buffer.AsMemory(), Token);
-                    await message.WriteAsync(buffer.AsMemory(0, read.Count), Token);
-                } while (!read.EndOfMessage);
-                using var response = JsonDocument.Parse(message.ToArray());
-                if (response.RootElement.TryGetProperty("id", out var returned) && returned.GetInt32() == id)
-                {
-                    response.RootElement.TryGetProperty("error", out var error).Should().BeFalse(error.ToString());
-                    return response.RootElement.GetProperty("result").Clone();
+                    // a UNICODE_STRING (length, maximum, pointer) whose characters follow it in the buffer
+                    var length = BitConverter.ToUInt16(buffer, 0);
+                    return System.Text.Encoding.Unicode.GetString(buffer, 2 * IntPtr.Size, length);
                 }
+
+                if (needed <= buffer.Length)
+                {
+                    return null;
+                }
+
+                buffer = new byte[needed];
             }
+
+            return null;
         }
 
-        internal async Task<JsonElement> EvaluateAsync(string expression) =>
-            await CommandAsync(
-                "Runtime.evaluate",
-                new
-                {
-                    expression,
-                    returnByValue = true,
-                    awaitPromise = true,
-                }
-            );
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern SafeProcessHandle OpenProcess(int access, bool inherit, int id);
 
-        internal async Task WaitAsync(string expression)
-        {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Token);
-            timeout.CancelAfter(TimeSpan.FromSeconds(25));
-            while (
-                !(await EvaluateAsync(expression)).GetProperty("result").TryGetProperty("value", out var value)
-                || value.ValueKind is not JsonValueKind.True
-            )
-            {
-                try
-                {
-                    await Task.Delay(100, timeout.Token);
-                }
-                catch (OperationCanceledException) when (!Token.IsCancellationRequested)
-                {
-                    // name what the page never showed: a bare cancellation does not say which wait it was
-                    throw new TimeoutException("the page did not reach " + expression + " in 25 s");
-                }
-            }
-        }
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(
+            SafeProcessHandle process,
+            int informationClass,
+            byte[] information,
+            int length,
+            out int returned
+        );
     }
 }

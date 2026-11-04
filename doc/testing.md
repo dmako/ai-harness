@@ -43,6 +43,14 @@ Optional installed tools remain explicit: set `HARNESS_UI_BROWSER` for Chrome,
 server. Missing optional tools, Unix-only link/mode scenarios on Windows, and an
 occupied default UI port produce explained skips rather than false passes.
 
+The browser tests (`UiBrowserTests`, with `HARNESS_UI_BROWSER` set to a 64-bit
+Chrome or Edge) share one headless browser per run, the `SharedBrowser` assembly
+fixture. Each page a test opens gets a CDP browser context of its own, disposed
+when the test ends, so storage, cookies and cache never pass between tests; a
+browser that died or stopped answering is replaced before the next test. A test
+that passes `BrowseAsync` a profile gets a browser of its own on that profile.
+The whole-UI check runs its theme/width passes on parallel pages.
+
 `.github/workflows/tests.yml` runs standalone tests on Windows, Linux and macOS.
 The release workflow adds native publish, repeat hashes and archive probes for
 all four supported RIDs. Local execution does not imply those CI jobs ran.
