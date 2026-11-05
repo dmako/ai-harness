@@ -5213,12 +5213,11 @@ async function viewTasks(p, opts, sec) {
             onclick: () => blueprintDialog(p, m) }, icon("edit")),
           m.id !== "—" && h("button", { class: "iconbtn mcdel", type: "button", title: `Remove blueprint ${m.id}`, "aria-label": `Remove blueprint ${m.id}`,
             onclick: () => removeBlueprintDialog(p, m, others) }, icon("trash"))),
-          m.goal && h("p", { class: "mcgoal" }, m.goal),
+          m.goal && clampText(m, "goal", "mcgoal", m.goal),
           m.total > 0 && h("div", { class: "mcprog" }, meter(n("done"), m.total, `${n("done")} of ${m.total} tasks done`),
             h("span", { class: "counts" }, ["ready", "in_progress", "review", "blocked", "backlog", "deferred"].filter((s) => n(s)).map((s) => [statusPill(s), " ", n(s), " "]))),
-          (m.exit || []).length > 0 && h("div", { class: "mcexit" }, h("h4", {}, "Done when"),
-            h("ul", {}, m.exit.map((e) => h("li", {}, e)))),
-          m.notes && h("p", { class: "mcnote" }, m.notes),
+          (m.exit || []).length > 0 && clampList(m, "exit", "mcexit", "Done when", m.exit),
+          m.notes && (noteItems(m.notes) ? clampList(m, "notes", "mcexit mcnotes", "Notes", noteItems(m.notes)) : clampText(m, "notes", "mcnote", m.notes)),
           m.total > 0 && h("button", {
             class: "mclink", onclick: () => {
               t.milestone = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
@@ -5231,6 +5230,61 @@ async function viewTasks(p, opts, sec) {
     fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
       shown.length ? grid : h("p", { class: "empty" }, "No blueprints match."));
     bpRefocus(grid, ".bpmove:not(:disabled)");
+    // a clamped text's toggle shows only while the text runs past its two lines
+    const measure = () => grid.querySelectorAll(".mcpart").forEach((part) => {
+      const [text, more] = part.children;
+      const open = text.classList.contains("open");
+      text.classList.remove("open");
+      const over = text.scrollHeight > text.clientHeight + 1;
+      text.classList.toggle("open", open);
+      more.hidden = !over;
+    });
+    // measured again when the cards' width changes, a frame later (not inside the observer)
+    let width = -1;
+    new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (w !== width) { width = w; requestAnimationFrame(measure); }
+    }).observe(grid);
+  }
+
+  // A card shows a summary: the goal and notes cut to two lines, the first
+  // three Done when criteria under their count; each part opens and closes on
+  // its own, and what is open stays open across redraws (live refresh,
+  // reordering) until the page is loaded again (from the C# rewrite)
+  t.mexpand = t.mexpand || new Set();
+  function partOf(m, part) {
+    return { key: `${p.id}|${m.id}|${part}`, id: `mc-${String(m.id).replace(/[^A-Za-z0-9_-]/g, "_")}-${part}` };
+  }
+  function partToggle(m, part, target, labels) {
+    const { key, id } = partOf(m, part);
+    const b = h("button", { class: "linkbtn mcmore", type: "button", "aria-controls": id });
+    const show = () => {
+      const open = t.mexpand.has(key);
+      b.setAttribute("aria-expanded", String(open));
+      b.textContent = labels[open ? 1 : 0];
+      target.classList.toggle("open", open);
+    };
+    b.addEventListener("click", () => { t.mexpand.has(key) ? t.mexpand.delete(key) : t.mexpand.add(key); show(); });
+    show();
+    return b;
+  }
+  function clampText(m, part, cls, text) {
+    const el = h("p", { class: `${cls} mcclamp`, id: partOf(m, part).id }, text);
+    const more = partToggle(m, part, el, ["more", "less"]);
+    more.hidden = true;
+    return h("div", { class: "mcpart" }, el, more);
+  }
+  function clampList(m, part, cls, title, items) {
+    const ul = h("ul", { class: "mclist", id: partOf(m, part).id }, items.map((e, i) => h("li", { class: i >= 3 ? "mcextra" : null }, e)));
+    return h("div", { class: cls },
+      h("h4", {}, title, h("span", { class: "mcbadge", title: plural(items.length, "entry", "entries") }, items.length)),
+      ul,
+      items.length > 3 && partToggle(m, part, ul, [`Show all ${items.length}`, "Show less"]));
+  }
+  // notes written as a list (every line a "- " or "* " entry) are counted like Done when
+  function noteItems(notes) {
+    const lines = String(notes).split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.length > 1 && lines.every((l) => /^[-*•]\s+/.test(l)) ? lines.map((l) => l.replace(/^[-*•]\s+/, "")) : null;
   }
 
   const chips = TASK_STATUSES.map((s) => h("button", {

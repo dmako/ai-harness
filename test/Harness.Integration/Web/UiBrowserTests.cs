@@ -552,6 +552,205 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task BlueprintCardsShowASummaryWhosePartsOpenOnTheirOwnAndStayOpenAcrossRedraws()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var origin = new TaskOrigin("test", "test", "fixture");
+        var words = string.Join(" ", Enumerable.Repeat("a goal that keeps going well past two lines", 12));
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            tasks.ImportBlueprints(
+                [
+                    new("M1", "Long", words, ["one", "two", "three", "four", "five"], "Notes " + words),
+                    new("M2", "Short", "Brief.", ["only", "two"], "- first\n- second\n- third\n- fourth"),
+                ],
+                "test",
+                cancellationToken: Token
+            );
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0001",
+                    Title = "In M1",
+                    Blueprint = "M1",
+                },
+                "",
+                origin,
+                Token
+            );
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0002",
+                    Title = "In M2",
+                    Blueprint = "M2",
+                },
+                "",
+                origin,
+                Token
+            );
+        }
+
+        string Card(string m) => $"document.querySelector('#main .mcard[data-blueprint=\"{m}\"]')";
+        // per part: visible lines (text) or entries (list), the badge, the toggle's text and aria-expanded
+        string State(string m) =>
+            $$"""
+                (() => {
+                  const c = {{Card(m)}};
+                  const lines = (e) => { const cs = getComputedStyle(e); return Math.round((e.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / parseFloat(cs.lineHeight)); };
+                  const more = (part) => { const b = part.querySelector('.mcmore'); return !b || b.hidden ? '-' : b.textContent + '/' + b.getAttribute('aria-expanded'); };
+                  const text = (part) => part ? lines(part.querySelector('p')) + 'l ' + more(part) : 'none';
+                  const list = (part) => part ? part.querySelector('.mcbadge').textContent + ' ' + [...part.querySelectorAll('li')].filter(l => l.offsetParent).length + 'v ' + more(part) : 'none';
+                  const goal = c.querySelector('.mcgoal')?.closest('.mcpart');
+                  const note = c.querySelector('.mcnote')?.closest('.mcpart') ;
+                  return ['goal ' + text(goal), 'exit ' + list(c.querySelector('.mcexit:not(.mcnotes)')),
+                    'notes ' + (note ? text(note) : list(c.querySelector('.mcnotes')))].join(' | ');
+                })()
+                """;
+        string Toggle(string m, string selector) =>
+            $"{Card(m)}.querySelector('{selector}').closest('.mcpart, .mcexit').querySelector('.mcmore')";
+        const string M1Collapsed = "goal 2l more/false | exit 5 3v Show all 5/false | notes 2l more/false";
+        const string M2Collapsed = "goal 1l - | exit 2 2v - | notes 4 3v Show all 4/false";
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/blueprints" }
+                );
+                await page.WaitAsync(
+                    $"!!{Card("M2")} && {Card("M1")}.querySelector('.mcgoal + .mcmore:not([hidden])') !== null"
+                );
+                // the summary: two lines of goal and notes, three entries under their count; no toggle when it all fits
+                (await ValueAsync(page, State("M1")))
+                    .Should()
+                    .Be(M1Collapsed);
+                (await ValueAsync(page, State("M2"))).Should().Be(M2Collapsed);
+                (
+                    await ValueAsync(
+                        page,
+                        $$"""
+                        (() => {
+                          const b = {{Toggle("M1", ".mcgoal")}}, p = {{Card("M1")}}.querySelector('.mcgoal');
+                          return [b.tagName, b.type, b.tabIndex, b.getAttribute('aria-controls') === p.id, getComputedStyle(p).webkitLineClamp].join();
+                        })()
+                        """
+                    )
+                ).Should().Be("BUTTON,button,0,true,2");
+
+                // each part opens on its own
+                await page.EvaluateAsync($"{Toggle("M1", ".mcgoal")}.click()");
+                (await ValueAsync(page, State("M1")))
+                    .Should()
+                    .MatchRegex(@"^goal ([3-9]|\d\d)l less/true \| exit 5 3v Show all 5/false \| notes 2l more/false$");
+                await page.EvaluateAsync($"{Toggle("M1", "li")}.click()");
+                await page.EvaluateAsync($"{Toggle("M2", ".mcnotes li")}.click()");
+                (await ValueAsync(page, State("M2")))
+                    .Should()
+                    .Be("goal 1l - | exit 2 2v - | notes 4 4v Show less/true");
+                var opened = await ValueAsync(page, State("M1"));
+                opened.Should().Contain("exit 5 5v Show less/true").And.Contain("notes 2l more/false");
+
+                // the toggle's focus ring, and its text readable in light and dark
+                await ForcePseudoStateAsync(page, "#main .mcmore:not([hidden])", ["focus-visible"]);
+                (
+                    await ValueAsync(
+                        page,
+                        "getComputedStyle(document.querySelector('#main .mcmore:not([hidden])')).outlineStyle"
+                    )
+                )
+                    .Should()
+                    .Be("solid");
+                await ForcePseudoStateAsync(page, "#main .mcmore:not([hidden])", []);
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    (await ValueAsync(page, ButtonContrast("#main .mcmore:not([hidden])"))).Should().Be("ok", theme);
+                }
+
+                await page.CommandAsync("Emulation.setEmulatedMedia", new { features = Array.Empty<object>() });
+
+                // a live refresh and a reorder redraw the cards: what was open stays open
+                using (var database = fixture.Database())
+                {
+                    new TaskStore(database).Create(
+                        new TaskDefinition
+                        {
+                            Id = "UI-0003",
+                            Title = "Also in M1",
+                            Blueprint = "M1",
+                        },
+                        "",
+                        origin,
+                        Token
+                    );
+                }
+
+                await page.WaitAsync($"{Card("M1")}.querySelector('.mclink').textContent.includes('2 tasks')");
+                (await ValueAsync(page, State("M1"))).Should().Be(opened);
+                await page.EvaluateAsync($"{Card("M2")}.querySelector('.bpmove-up').click()");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('#main .mcard')].map(c => c.dataset.blueprint).join().startsWith('M2,M1')"
+                );
+                (await ValueAsync(page, State("M1"))).Should().Be(opened);
+                (await ValueAsync(page, State("M2")))
+                    .Should()
+                    .Be("goal 1l - | exit 2 2v - | notes 4 4v Show less/true");
+
+                // closed again, it is the summary again
+                await page.EvaluateAsync($"{Toggle("M1", ".mcgoal")}.click()");
+                await page.EvaluateAsync($"{Toggle("M1", "li")}.click()");
+                (await ValueAsync(page, State("M1"))).Should().Be(M1Collapsed);
+
+                // on a phone the card holds its badges and toggles, and nothing scrolls sideways
+                await page.CommandAsync(
+                    "Emulation.setDeviceMetricsOverride",
+                    new
+                    {
+                        width = 390,
+                        height = 900,
+                        deviceScaleFactor = 1,
+                        mobile = true,
+                    }
+                );
+                await page.WaitAsync("innerWidth <= 400");
+                (
+                    await ValueAsync(
+                        page,
+                        """
+                        (() => {
+                          const inside = [...document.querySelectorAll('#main .mcard')].every((c) => {
+                            const r = c.getBoundingClientRect();
+                            return [...c.querySelectorAll('.mcbadge, .mcmore:not([hidden])')].every((e) => { const b = e.getBoundingClientRect(); return b.left >= r.left - 1 && b.right <= r.right + 1; });
+                          });
+                          return [inside, document.documentElement.scrollWidth <= innerWidth].join();
+                        })()
+                        """
+                    )
+                ).Should().Be("true,true");
+                await page.CommandAsync("Emulation.clearDeviceMetricsOverride", new { });
+
+                // a fresh page load starts with the summary
+                await page.EvaluateAsync($"{Toggle("M2", ".mcnotes li")}.click()");
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync(
+                    $"!!{Card("M2")} && {Card("M1")}.querySelector('.mcgoal + .mcmore:not([hidden])') !== null"
+                );
+                (await ValueAsync(page, State("M2"))).Should().Be(M2Collapsed);
+            }
+        );
+    }
+
+    [Fact]
     public async Task BlueprintCardsAreReorderedAsTheTasksSectionsAreAndShareTheirOrder()
     {
         var executable = Browser();
