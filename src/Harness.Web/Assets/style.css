@@ -1899,4 +1899,8 @@ table.dups { min-width: 45rem; }
 .mcmore:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mcpart .mcnote + .mcmore { margin-left: 0.625rem; }
 .mcexit li { overflow-wrap: anywhere; }
+/* Work › Tasks: a section's goal cut the same way (TASK-0089); the space below
+   moves from the text to its wrapper so the clamp hides the third line whole */
+.mstone > .mcpart { padding: 0 0.875rem 0.625rem 2.5rem; }
+.mstone > .mcpart > .mgoal { padding: 0; }
 

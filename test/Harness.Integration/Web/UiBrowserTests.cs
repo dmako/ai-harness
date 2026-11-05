@@ -751,6 +751,202 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task TaskSectionGoalsAreCutToTwoLinesAndOpenOnTheirOwn()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var origin = new TaskOrigin("test", "test", "fixture");
+        var words = string.Join(" ", Enumerable.Repeat("a goal that keeps going well past two lines", 12));
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            tasks.ImportBlueprints(
+                [new("M1", "Long", words), new("M2", "Short", "Brief.")],
+                "test",
+                cancellationToken: Token
+            );
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0001",
+                    Title = "In M1",
+                    Blueprint = "M1",
+                },
+                "",
+                origin,
+                Token
+            );
+            tasks.Create(
+                new TaskDefinition
+                {
+                    Id = "UI-0002",
+                    Title = "In M2",
+                    Blueprint = "M2",
+                },
+                "",
+                origin,
+                Token
+            );
+        }
+
+        string Section(string m) => $"document.querySelector('#main .mstone[data-blueprint=\"{m}\"]')";
+        // the goal's visible lines, its toggle's text and aria-expanded, whether the section is open
+        string State(string m) =>
+            $$"""
+                (() => {
+                  const s = {{Section(m)}}, g = s.querySelector('.mgoal');
+                  if (!g) return 'folded';
+                  const b = g.parentElement.querySelector('.mcmore');
+                  const lines = Math.round(g.clientHeight / parseFloat(getComputedStyle(g).lineHeight));
+                  return lines + 'l ' + (b.hidden ? '-' : b.textContent + '/' + b.getAttribute('aria-expanded'));
+                })()
+                """;
+        string Toggle(string m) => $"{Section(m)}.querySelector('.mgoal').parentElement.querySelector('.mcmore')";
+        string Ready() => $"!!{Section("M2")} && !!{Section("M1")}?.querySelector('.mgoal + .mcmore:not([hidden])')";
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var work = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/";
+                await page.CommandAsync("Page.navigate", new { url = work + "tasks" });
+                await page.WaitAsync(Ready());
+                (await ValueAsync(page, State("M1"))).Should().Be("2l more/false");
+                (await ValueAsync(page, State("M2"))).Should().Be("1l -");
+                (
+                    await ValueAsync(
+                        page,
+                        $$"""
+                        (() => {
+                          const b = {{Toggle("M1")}}, g = {{Section("M1")}}.querySelector('.mgoal');
+                          return [b.tagName, b.type, b.tabIndex, b.getAttribute('aria-controls') === g.id, getComputedStyle(g).webkitLineClamp].join();
+                        })()
+                        """
+                    )
+                ).Should().Be("BUTTON,button,0,true,2");
+
+                // opening it neither folds the section nor touches the other one
+                await page.EvaluateAsync($"{Toggle("M1")}.click()");
+                var opened = await ValueAsync(page, State("M1"));
+                opened.Should().MatchRegex(@"^([3-9]|\d\d)l less/true$");
+                (await ValueAsync(page, $"{Section("M1")}.querySelector('.mhead').getAttribute('aria-expanded')"))
+                    .Should()
+                    .Be("true");
+                (await ValueAsync(page, State("M2"))).Should().Be("1l -");
+
+                // focus ring and contrast in both themes
+                await ForcePseudoStateAsync(page, "#main .mstone .mcmore:not([hidden])", ["focus-visible"]);
+                (
+                    await ValueAsync(
+                        page,
+                        "getComputedStyle(document.querySelector('#main .mstone .mcmore:not([hidden])')).outlineStyle"
+                    )
+                )
+                    .Should()
+                    .Be("solid");
+                await ForcePseudoStateAsync(page, "#main .mstone .mcmore:not([hidden])", []);
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    (await ValueAsync(page, ButtonContrast("#main .mstone .mcmore:not([hidden])")))
+                        .Should()
+                        .Be("ok", theme);
+                }
+
+                await page.CommandAsync("Emulation.setEmulatedMedia", new { features = Array.Empty<object>() });
+
+                // kept across a live refresh, a reorder, a filter change and folding the section
+                using (var database = fixture.Database())
+                {
+                    new TaskStore(database).Create(
+                        new TaskDefinition
+                        {
+                            Id = "UI-0003",
+                            Title = "Also in M1",
+                            Blueprint = "M1",
+                        },
+                        "",
+                        origin,
+                        Token
+                    );
+                }
+
+                await page.WaitAsync(
+                    $"{Section("M1")}.textContent.includes('UI-0003')"
+                );
+                (await ValueAsync(page, State("M1"))).Should().Be(opened);
+                await page.EvaluateAsync($"{Section("M2")}.querySelector('.bpmove-up').click()");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('#main .mstone')].map(s => s.dataset.blueprint).join().startsWith('M2,M1')"
+                );
+                (await ValueAsync(page, State("M1"))).Should().Be(opened);
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('#main .chip')].find(c => c.textContent.includes('done')).click()"
+                );
+                (await ValueAsync(page, State("M1"))).Should().Be(opened);
+                await page.EvaluateAsync($"{Section("M1")}.querySelector('.mhead').click()");
+                (await ValueAsync(page, State("M1"))).Should().Be("folded");
+                await page.EvaluateAsync($"{Section("M1")}.querySelector('.mhead').click()");
+                await page.WaitAsync($"{Toggle("M1")}.getAttribute('aria-expanded') === 'true'");
+                (await ValueAsync(page, State("M1"))).Should().Be(opened);
+
+                // on a phone the goal and its toggle stay inside the section, nothing scrolls sideways
+                await page.CommandAsync(
+                    "Emulation.setDeviceMetricsOverride",
+                    new
+                    {
+                        width = 390,
+                        height = 900,
+                        deviceScaleFactor = 1,
+                        mobile = true,
+                    }
+                );
+                await page.WaitAsync("innerWidth <= 400");
+                (
+                    await ValueAsync(
+                        page,
+                        $$"""
+                        (() => {
+                          const s = {{Section("M1")}}.getBoundingClientRect();
+                          const inside = [...{{Section(
+                            "M1"
+                        )}}.querySelectorAll('.mgoal, .mcmore')].every((e) => { const b = e.getBoundingClientRect(); return b.left >= s.left - 1 && b.right <= s.right + 1; });
+                          return [inside, document.documentElement.scrollWidth <= innerWidth].join();
+                        })()
+                        """
+                    )
+                ).Should().Be("true,true");
+                await page.CommandAsync("Emulation.clearDeviceMetricsOverride", new { });
+
+                // the Blueprints card keeps its own state: still the summary there
+                await page.CommandAsync("Page.navigate", new { url = work + "blueprints" });
+                await page.WaitAsync(
+                    "!!document.querySelector('#main .mcard[data-blueprint=\"M1\"] .mcgoal + .mcmore:not([hidden])')"
+                );
+                (
+                    await ValueAsync(
+                        page,
+                        "document.querySelector('#main .mcard[data-blueprint=\"M1\"] .mcgoal + .mcmore').getAttribute('aria-expanded')"
+                    )
+                )
+                    .Should()
+                    .Be("false");
+
+                // a fresh page load starts collapsed
+                await page.CommandAsync("Page.navigate", new { url = work + "tasks" });
+                await page.WaitAsync("location.hash.endsWith('/work/tasks') && !!document.querySelector('#main .mstone')");
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync(Ready());
+                (await ValueAsync(page, State("M1"))).Should().Be("2l more/false");
+            }
+        );
+    }
+
+    [Fact]
     public async Task BlueprintCardsAreReorderedAsTheTasksSectionsAreAndShareTheirOrder()
     {
         var executable = Browser();

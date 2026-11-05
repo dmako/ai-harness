@@ -5125,7 +5125,8 @@ async function viewTasks(p, opts, sec) {
       const at = movable.indexOf(m);
       const section = h("section", { class: "mstone", "data-blueprint": m },
         at >= 0 ? h("div", { class: "mheadrow" }, head, bpArrows(p, milestones, movable, m)) : head,
-        open && mi && mi.goal && h("p", { class: "mgoal" }, mi.goal),
+        // a long goal cut to two lines, as on the Blueprints cards; its own open state (from the C# rewrite)
+        open && mi && mi.goal && clampText({ id: m }, "tasks-goal", "mgoal", mi.goal),
         open && rows.length > 0 && h("div", { class: "tlist" }, rows.map((x) => draggableTask(taskRow(x, drawTasks), x))),
         open && h("button", { class: "taddrow", type: "button", onclick: () => newTaskDialog(p, mres.blueprints || [], m === "—" ? "" : m) }, icon("plus"), "Add task"),
         open && [...reasons].map(([reason, xs]) => h("div", { class: "deferredline" },
@@ -5140,6 +5141,7 @@ async function viewTasks(p, opts, sec) {
       [...milestones.filter((m) => !order.includes(m)), ...(milestones.includes("—") ? [] : ["—"])].map((m) => dropZone(h("span", { class: "dropchip" }, m === "—" ? "no blueprint" : info[m] && info[m].title ? `${m} · ${info[m].title}` : m), m))));
     // a blueprint moved with the keyboard keeps the focus on its arrow
     bpRefocus(list, ".mhead");
+    watchClamps(list);
   }
   // dragging a task onto a blueprint moves it there
   function draggableTask(row, x) {
@@ -5230,21 +5232,7 @@ async function viewTasks(p, opts, sec) {
     fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
       shown.length ? grid : h("p", { class: "empty" }, "No blueprints match."));
     bpRefocus(grid, ".bpmove:not(:disabled)");
-    // a clamped text's toggle shows only while the text runs past its two lines
-    const measure = () => grid.querySelectorAll(".mcpart").forEach((part) => {
-      const [text, more] = part.children;
-      const open = text.classList.contains("open");
-      text.classList.remove("open");
-      const over = text.scrollHeight > text.clientHeight + 1;
-      text.classList.toggle("open", open);
-      more.hidden = !over;
-    });
-    // measured again when the cards' width changes, a frame later (not inside the observer)
-    let width = -1;
-    new ResizeObserver(([entry]) => {
-      const w = Math.round(entry.contentRect.width);
-      if (w !== width) { width = w; requestAnimationFrame(measure); }
-    }).observe(grid);
+    watchClamps(grid);
   }
 
   // A card shows a summary: the goal and notes cut to two lines, the first
@@ -5252,6 +5240,41 @@ async function viewTasks(p, opts, sec) {
   // its own, and what is open stays open across redraws (live refresh,
   // reordering) until the page is loaded again (from the C# rewrite)
   t.mexpand = t.mexpand || new Set();
+  // whether each part ran past its lines when last measured, so a redraw starts from that
+  t.mover = t.mover || new Map();
+  // a clamped text's toggle shows only while the text runs past its two lines;
+  // measured after each draw and again when the container's width changes, a
+  // frame later (not inside the observer). Work › Tasks' section goals use it too
+  function watchClamps(container) {
+    // a part not laid out yet (no width: off the page, or its view still hidden)
+    // is measured again a little later, a few times at most
+    const measure = (tries = 0) => {
+      let pending = false;
+      container.querySelectorAll(".mcpart").forEach((part) => {
+        const [text, more] = part.children;
+        if (!text.clientWidth) { pending = true; return; }
+        const open = text.classList.contains("open");
+        text.classList.remove("open");
+        // hidden text counts once it is more than half a line, not a rounding difference
+        const over = text.scrollHeight - text.clientHeight > parseFloat(getComputedStyle(text).lineHeight) / 2;
+        text.classList.toggle("open", open);
+        more.hidden = !over;
+        t.mover.set(part.dataset.part, over);
+      });
+      // a timer, not an animation frame: a page in the background runs none
+      if (pending && tries < 40) setTimeout(() => measure(tries + 1), 50);
+    };
+    measure();
+    // and again once the web fonts are in: they set how far the text runs
+    if (document.fonts && document.fonts.status !== "loaded") document.fonts.ready.then(() => measure());
+    if (container.clampWatch) return;
+    let width = -1;
+    container.clampWatch = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (w !== width) { width = w; requestAnimationFrame(() => measure()); }
+    });
+    container.clampWatch.observe(container);
+  }
   function partOf(m, part) {
     return { key: `${p.id}|${m.id}|${part}`, id: `mc-${String(m.id).replace(/[^A-Za-z0-9_-]/g, "_")}-${part}` };
   }
@@ -5271,8 +5294,10 @@ async function viewTasks(p, opts, sec) {
   function clampText(m, part, cls, text) {
     const el = h("p", { class: `${cls} mcclamp`, id: partOf(m, part).id }, text);
     const more = partToggle(m, part, el, ["more", "less"]);
-    more.hidden = true;
-    return h("div", { class: "mcpart" }, el, more);
+    // until measured, as it was last time (an open part needed its toggle), so a redraw does not flicker
+    const { key } = partOf(m, part);
+    more.hidden = !(t.mexpand.has(key) || t.mover.get(key));
+    return h("div", { class: "mcpart", "data-part": key }, el, more);
   }
   function clampList(m, part, cls, title, items) {
     const ul = h("ul", { class: "mclist", id: partOf(m, part).id }, items.map((e, i) => h("li", { class: i >= 3 ? "mcextra" : null }, e)));
