@@ -552,6 +552,95 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task AWriteRedrawsWithoutWaitingForTheStacksWhichFillTheirBadgesInPlaceWhenTheyArrive()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using (var database = fixture.Database())
+        {
+            var tasks = new TaskStore(database);
+            tasks.ImportBlueprints([new("M1", "One"), new("M2", "Two")], "test", cancellationToken: Token);
+            foreach (var (id, blueprint) in new[] { ("UI-0001", "M1"), ("UI-0002", "M2") })
+            {
+                tasks.Create(
+                    new TaskDefinition
+                    {
+                        Id = id,
+                        Title = "Task of " + blueprint,
+                        Blueprint = blueprint,
+                    },
+                    "",
+                    new TaskOrigin("test", "test", "fixture"),
+                    Token
+                );
+            }
+        }
+
+        const string Shown = "[...document.querySelectorAll('#main .mstone')].map(s => s.dataset.blueprint).join()";
+        // every /api/stacks from now on is held until release() answers it with one stack for the project
+        const string Hold = """
+            window.heldStacks = [];
+            window.realFetch = window.realFetch || window.fetch;
+            window.fetch = (url, ...rest) => String(url).includes('/api/stacks')
+              ? new Promise((resolve) => window.heldStacks.push(resolve))
+              : window.realFetch(url, ...rest);
+            window.release = (id) => {
+              const body = JSON.stringify({ [id]: { language: 'C#', runtime: { name: '.NET', version: '10.0', major: '10' }, frameworks: [], badge: 'C# · .NET 10' } });
+              window.heldStacks.splice(0).forEach((r) => r(new Response(body, { headers: { 'Content-Type': 'application/json' } })));
+            };
+            'held';
+            """;
+        await BrowsePagesAsync(
+            executable,
+            fixture,
+            1,
+            async (pages, server) =>
+            {
+                var page = pages[0];
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/work/tasks" }
+                );
+                await page.WaitAsync(Shown + " === 'M1,M2'");
+                await page.EvaluateAsync(Hold);
+
+                // the write's redraw does not wait for the held stacks, and asks for them again
+                await page.EvaluateAsync(
+                    "document.querySelector('#main .mstone[data-blueprint=M1] .bpmove-down').click()"
+                );
+                await page.WaitAsync(Shown + " === 'M2,M1'");
+                (await ValueAsync(page, "window.heldStacks.length > 0")).Should().Be("True");
+
+                // when they arrive the badge is drawn in place: the sections are not drawn again
+                await page.EvaluateAsync("window.section = document.querySelector('#main .mstone[data-blueprint=M2]')");
+                await page.EvaluateAsync($"window.release('{id}')");
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('.metaline .stackbadge')].map(b => b.getAttribute('aria-label')).join() === 'C# · .NET 10'"
+                );
+                (await ValueAsync(page, "window.section.isConnected")).Should().Be("True");
+
+                // a failing /api/stacks breaks nothing and keeps the badge already drawn
+                await page.EvaluateAsync(
+                    "window.fetch = (url, ...rest) => String(url).includes('/api/stacks') ? Promise.reject(new Error('down')) : window.realFetch(url, ...rest)"
+                );
+                await page.EvaluateAsync(
+                    "document.querySelector('#main .mstone[data-blueprint=M2] .bpmove-down').click()"
+                );
+                await page.WaitAsync(Shown + " === 'M1,M2'");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.metaline .stackbadge')].map(b => b.getAttribute('aria-label')).join()"
+                    )
+                )
+                    .Should()
+                    .Be("C# · .NET 10");
+            }
+        );
+    }
+
+    [Fact]
     public async Task BlueprintCardsShowASummaryWhosePartsOpenOnTheirOwnAndStayOpenAcrossRedraws()
     {
         var executable = Browser();

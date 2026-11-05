@@ -890,7 +890,7 @@ async function atAGlance(w) {
     api(`/api/workspaces/${enc(w.name)}/issues`).catch(() => null)]);
   const name = (id) => { const p = state.projects.find((x) => x.id === id); return p ? pname(p) : id; };
   const lines = [];
-  const line = (icon, text, href, more) => lines.push(h("li", {}, h("span", { class: "gicon", "aria-hidden": "true" }, icon), h("span", {}, text, more && h("span", { class: "muted" }, " " + more)),
+  const line = (icon, text, href, more) => lines.push(h("li", {}, h("span", { class: "gicon", "aria-hidden": "true" }, icon), h("span", {}, text, more && (more instanceof Node ? more : h("span", { class: "muted" }, " " + more))),
     href && h("a", { class: "glink", href }, "details →")));
   const arch = workspaceHref(w.name, "architecture");
   // what is open, first: findings and design issues together (HAR-0117)
@@ -909,10 +909,13 @@ async function atAGlance(w) {
     const libs = sys.nodes.filter((n) => n.kind === "library");
     const outside = sys.nodes.filter((n) => n.kind === "external" || n.kind === "broker");
     const parts = [`${services.length} service${services.length === 1 ? "" : "s"}`, libs.length && `${libs.length} librar${libs.length === 1 ? "y" : "ies"}`, outside.length && `${outside.length} outside system${outside.length === 1 ? "" : "s"}`].filter(Boolean);
-    const badges = {};
-    for (const n of [...services, ...libs]) { const st = (state.stacks || {})[n.member_id]; if (st) (badges[st.badge] = badges[st.badge] || []).push(n.name); }
-    const bs = Object.entries(badges);
-    line("▦", `Made of ${parts.join(", ")}`, null, bs.length === 1 ? `· all ${bs[0][0]}` : bs.length ? `· ${bs.map(([b, ns]) => `${b} (${ns.length})`).join(", ")}` : "");
+    line("▦", `Made of ${parts.join(", ")}`, null, stackSlot(() => {
+      const badges = {};
+      for (const n of [...services, ...libs]) { const st = (state.stacks || {})[n.member_id]; if (st) (badges[st.badge] = badges[st.badge] || []).push(n.name); }
+      const bs = Object.entries(badges);
+      const more = bs.length === 1 ? `· all ${bs[0][0]}` : bs.length ? `· ${bs.map(([b, ns]) => `${b} (${ns.length})`).join(", ")}` : "";
+      return more && h("span", { class: "muted" }, " " + more);
+    }));
     // who everyone needs at run time
     const calls = sys.links.filter((l) => l.style === "grpc" || l.style === "http");
     for (const n of services) {
@@ -1775,7 +1778,7 @@ function memberTile(p) {
   const parts = [knowledgeWaiting(l) && `${knowledgeWaiting(l)} knowledge`, workProposals(l) && `${workProposals(l)} tasks`, l.checks_failed && `${l.checks_failed} failing`].filter(Boolean);
   return h("a", { class: `mtile k-${stateKind(l)}`, href: projectHref(p.id) },
     h("div", { class: "mt-top" }, projectMark(p), h("b", { class: "mt-name" }, pname(p)), stateGlyph(l),
-      (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id]))),
+      stackSlot(() => (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id])))),
     h("div", { class: "mt-wait" }, n ? [h("span", { class: "badge" }, n), h("span", { class: "muted small" }, ` ${parts.join(" · ") || "waiting"}`)] : h("span", { class: "okay small" }, "✓ nothing waiting")),
     l.context_answers_30d > 0 ? h("div", { class: "mt-meter", title: "get_context hits per answer, 30 days" }, miniRing(l.context_hit_rate_30d, "r-context"),
       h("span", {}, h("b", {}, pct(l.context_hit_rate_30d)), h("span", { class: "muted small" }, " context hits")))
@@ -1847,7 +1850,7 @@ function workspaceSummary(w) {
       h("button", { class: "small", type: "button", onclick: () => addProjectsWizard(w, state.projects) }, icon("plus"), "Add projects")),
     h("div", { class: "wsrows" }, members.slice(0, SHOW).map((p) => h("a", { class: "wsrow", href: projectHref(p.id), onclick: () => { state.lastWs = w.name; } },
       projectMark(p), h("span", { class: "nname" }, pname(p)), stateGlyph(p.live),
-      (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id])),
+      stackSlot(() => (state.stacks || {})[p.id] && h("span", { class: "chipmark" }, langMark(state.stacks[p.id]))),
       h("span", { class: "nslot" }, waitingIn(p) > 0 && h("span", { class: "badge" }, waitingIn(p)))))),
     members.length > SHOW && h("a", { class: "small", href: workspaceHref(w.name, "members") }, `+${members.length - SHOW} more →`),
     members.length > 0 && wsFooter(members));
@@ -2737,6 +2740,9 @@ function langMark(st) {
 // 10", "[TS] React 18 · Node 22"); markOnly keeps just the mark, the rest
 // on hover (where it would repeat on every card).
 function stackBadge(id, cls, markOnly) {
+  return stackSlot(() => stackBadgeNow(id, cls, markOnly));
+}
+function stackBadgeNow(id, cls, markOnly) {
   const st = (state.stacks || {})[id];
   if (!st) return null;
   const rest = st.badge.split(" · ").slice(1).join(" · ") || (st.language === "Go" ? st.badge.replace(/^Go /, "") : "");
@@ -5511,15 +5517,44 @@ function taskDetail(x, passed) {
 // --- boot ---
 async function loadProjects() {
   try {
-    const [res, ws, st] = await Promise.all([api("/api/projects"), api("/api/workspaces").catch(() => ({ workspaces: [] })), api("/api/stacks").catch(() => ({}))]);
+    const [res, ws] = await Promise.all([api("/api/projects"), api("/api/workspaces").catch(() => ({ workspaces: [] }))]);
     state.projects = res.projects || [];
     state.workspaces = ws.workspaces || [];
-    state.stacks = st || {};
   } catch (e) {
     fill(document.getElementById("main"), h("p", { class: "error" }, `Could not read the machine registry: ${e.message}`));
     return false;
   }
+  loadStacks();
   return true;
+}
+// loadStacks reads the projects' stacks (their language badges) on their
+// own: reading them can take seconds, so nothing waits for them (TASK-0091).
+// The badges already drawn stay until an answer that differs arrives; then
+// only the stack slots are drawn again, in place. A load asked for while one
+// runs runs once more after it; a failed one leaves the badges as they are.
+const stacksLoad = { running: false, again: false };
+async function loadStacks() {
+  if (stacksLoad.running) { stacksLoad.again = true; return; }
+  stacksLoad.running = true;
+  try {
+    do {
+      stacksLoad.again = false;
+      try {
+        const next = (await api("/api/stacks")) || {};
+        if (JSON.stringify(next) !== JSON.stringify(state.stacks || {})) { state.stacks = next; drawStackSlots(); }
+      } catch { /* badges stay missing or as they were until a later load */ }
+    } while (stacksLoad.again);
+  } finally { stacksLoad.running = false; }
+}
+// stackSlot holds what depends on the stacks, drawn by draw now and again
+// whenever the stacks change.
+function stackSlot(draw) {
+  const el = h("span", { class: "stackslot" }, draw());
+  el.drawStacks = draw;
+  return el;
+}
+function drawStackSlots() {
+  for (const el of document.querySelectorAll(".stackslot")) if (el.drawStacks) fill(el, el.drawStacks());
 }
 
 // --- loading screen ---
