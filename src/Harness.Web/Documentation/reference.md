@@ -152,7 +152,7 @@ args = ["--graphify", "~/.dotnet/tools/graphify-csharp.exe"]
 
 [providers.nuget]                  # package_api for C# packages
 command = "dnx"
-args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes"]
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
 ```
 
 Install each tool as its own documentation says (graphify-csharp and

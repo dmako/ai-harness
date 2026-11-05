@@ -73,7 +73,7 @@ public static partial class ConfigurationExample
         new(
             "providers.nuget",
             "package_api for C# packages",
-            [new("command", "\"dnx\""), new("args", "[\"DimonSmart.NugetMcpServer@1.1.10\", \"--yes\"]")]
+            [new("command", "\"dnx\""), new("args", "[\"DimonSmart.NugetMcpServer@1.1.10\", \"--yes\", \"--source\", \"https://api.nuget.org/v3/index.json\"]")]
         ),
         new(
             "providers.<name>",

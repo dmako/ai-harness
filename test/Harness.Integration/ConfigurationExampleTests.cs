@@ -91,6 +91,8 @@ public sealed class ConfigurationExampleTests
             args = [
               "DimonSmart.NugetMcpServer@1.1.10",
               "--yes",
+              "--source",
+              "https://api.nuget.org/v3/index.json",
             ]
             stale = [
               1,
