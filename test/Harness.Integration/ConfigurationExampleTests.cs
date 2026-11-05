@@ -118,7 +118,10 @@ public sealed class ConfigurationExampleTests
         var text = update.Text;
         text.Should().StartWith("# my own notes stay\n[storage]\nbusy_timeout_ms = 10000   # mine, kept\n");
         text.Should().Contain("busy_timeout_ms = 10000   # mine, kept\n# db_path = \".harness/harness.db\"");
-        text.Should().Contain("args = [\n  \"DimonSmart.NugetMcpServer@1.1.10\",\n  \"--yes\",\n]\n");
+        text.Should()
+            .Contain(
+                "args = [\n  \"DimonSmart.NugetMcpServer@1.1.10\",\n  \"--yes\",\n  \"--source\",\n  \"https://api.nuget.org/v3/index.json\",\n]\n"
+            );
         text.Should().NotContain("retired_option").And.NotContain("old_example").And.NotContain("stale");
         text.Should().NotContain("obsolete").And.NotContain("x = 1").And.NotContain("# y = 2");
         ConfigurationExample.Update(text).Changed.Should().BeFalse("an updated file is up to date");
