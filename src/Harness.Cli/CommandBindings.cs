@@ -154,6 +154,41 @@ internal static class CommandBindings
         };
     }
 
+    internal static Func<ParseResult, Harness.Cli.Migrate.MigrateSettings> BindMigrateSettings(Command command)
+    {
+        var dryRunOption = new Option<bool>("--dry-run")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "Show what would be migrated, refreshed and synced without changing anything",
+        };
+        command.Options.Add(dryRunOption);
+        var jsonOption = new Option<bool>("--json")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "Machine-readable output",
+        };
+        command.Options.Add(jsonOption);
+        var fullOption = new Option<bool>("--full")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "Sync every worktree with a full rescan",
+        };
+        command.Options.Add(fullOption);
+        var jobsOption = new Option<int>("--jobs")
+        {
+            DefaultValueFactory = _ => 0,
+            Description = "Projects migrated at once (default: processor count, at most 4)",
+        };
+        command.Options.Add(jobsOption);
+        return result => new Harness.Cli.Migrate.MigrateSettings
+        {
+            DryRun = result.GetValue(dryRunOption),
+            Json = result.GetValue(jsonOption),
+            Full = result.GetValue(fullOption),
+            Jobs = result.GetValue(jobsOption),
+        };
+    }
+
     internal static Func<ParseResult, Harness.Cli.Setup.InstallSettings> BindInstallSettings(Command command)
     {
         var projectOption = new Option<string>("--project") { DefaultValueFactory = _ => ".", Description = null };

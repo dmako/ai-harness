@@ -28,35 +28,47 @@ internal sealed class SyncCommand(
             await error.Writer.WriteLineAsync("harness sync: --full and --since are mutually exclusive");
             return 2;
         }
-        var location = await lifecycle.LocateAsync(settings.Project, cancellationToken: cancellationToken);
-        // A live graphify watch maintains itself; sync must never start it just to ask whether it refreshes.
-        var configured = location
-            .Configuration.Value.Providers.Where(pair => pair.Value.Pack is not "graphify-csharp")
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        await using var registry = ConfiguredProviders.Build(configured, location.Root, new ProviderProcessFactory());
         var mode = (settings.Full, settings.Since.Length > 0) switch
         {
             (true, _) => "full",
             (_, true) => "since",
             _ => "incremental",
         };
+        var result = await RunAsync(lifecycle, settings.Project, mode, settings.Since, cancellationToken);
+        await PrintAsync(result);
+        export.SendLater();
+        return 0;
+    }
+
+    /// <summary>One sync of the worktree holding <paramref name="directory"/>, with the project's providers.</summary>
+    internal static async Task<ProjectSyncResult> RunAsync(
+        ProjectLifecycle lifecycle,
+        string directory,
+        string mode,
+        string since,
+        CancellationToken cancellationToken
+    )
+    {
+        var location = await lifecycle.LocateAsync(directory, cancellationToken: cancellationToken);
+        // A live graphify watch maintains itself; sync must never start it just to ask whether it refreshes.
+        var configured = location
+            .Configuration.Value.Providers.Where(pair => pair.Value.Pack is not "graphify-csharp")
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        await using var registry = ConfiguredProviders.Build(configured, location.Root, new ProviderProcessFactory());
         // The exact-complexity worker is this executable, started detached by 'harness complexity measure'.
         var launcher = Environment.ProcessPath is { Length: > 0 } self
             ? new Harness.Infrastructure.Architecture.Metrics.ProcessMetricsLauncher(self)
             : null;
-        var result = await new ProjectSynchronizer(lifecycle, providers: registry, metricsLauncher: launcher).RunAsync(
-            settings.Project,
+        return await new ProjectSynchronizer(lifecycle, providers: registry, metricsLauncher: launcher).RunAsync(
+            directory,
             new SyncOptions
             {
                 Mode = mode,
-                Since = settings.Since,
+                Since = since,
                 Refreshers = registry.Providers().OfType<Core.Providers.IProviderRefresher>().ToArray(),
             },
             cancellationToken
         );
-        await PrintAsync(result);
-        export.SendLater();
-        return 0;
     }
 
     private async Task PrintAsync(ProjectSyncResult result)

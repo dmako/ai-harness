@@ -38,6 +38,36 @@ public static class ProjectInstructions
         return [Ensure(agents, dryRun), EnsureImport(claude, dryRun)];
     }
 
+    /// <summary>
+    /// The harness blocks already in the project's AGENTS.md and CLAUDE.md restated as this harness writes them
+    /// (the guidance section, or CLAUDE.md's import of AGENTS.md); a file without one is left alone, none is added.
+    /// </summary>
+    public static IReadOnlyList<FileChange> Refresh(string root, bool dryRun = false)
+    {
+        List<FileChange> changes = [];
+        foreach (var name in new[] { AgentGuidance.FileName, AgentGuidance.ClaudeFileName })
+        {
+            var path = Path.Combine(root, name);
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
+            var source = FileEditor.Read(path);
+            var (start, end) = AgentGuidance.Block.Find(source);
+            if (start < 0)
+            {
+                continue;
+            }
+
+            var imports = source[start..end].Split('\n').Any(line => line.Trim() is "@AGENTS.md" or "@./AGENTS.md");
+            var block = imports ? AgentGuidance.ImportBlock : AgentGuidance.Section;
+            changes.Add(FileEditor.Apply(path, (text, _) => AgentGuidance.Block.Put(text, block), dryRun));
+        }
+
+        return changes;
+    }
+
     public static IReadOnlyList<FileChange> RemoveProject(string root, bool dryRun = false)
     {
         var paths = new[]

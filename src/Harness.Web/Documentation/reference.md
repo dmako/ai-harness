@@ -25,10 +25,13 @@ Harness needs Git and nothing else: no Node, no Python, no network access.
    `harness instructions` and `harness hooks install --kind git`.
 3. Restart Claude Code / Codex so they pick up the harness MCP server.
 
-**Upgrade:** replace the binaries. Before a project database is migrated,
-harness copies it to `.harness/backups/` (the last 5 are kept). Rerun
-`harness hooks install` after an upgrade if hooks were installed, so their
-commands match the new binary.
+**Upgrade:** replace the binaries, then run `harness migrate`. It migrates
+the global config, the knowledge databases and every registered project
+(config, database, the guidance, hooks and MCP entries already installed),
+then syncs each project's worktrees. Before a database is migrated, harness
+copies it to `.harness/backups/` (the last 5 are kept). An MCP entry or hook
+whose executable no longer exists is pointed at the binary running `migrate`;
+one whose executable still exists keeps it.
 
 **Uninstall:** `harness uninstall --all --project <repository>` removes
 everything harness added (MCP entries in every scope, Git and client hooks,
@@ -42,6 +45,7 @@ uninstall` alone lets you pick what to remove.
 | Command | What it does |
 |---|---|
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
+| `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
 | `harness doctor` | Checks the installation, database, clients, hooks and providers, with a fix for each problem (`--all`: every project on the machine). |
 | `harness status` | The project, its Git state, database and clients. |

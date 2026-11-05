@@ -240,6 +240,22 @@ telemetry if you turn it on.
   (`harness workspace`): workspace-level knowledge applies to all members,
   and searches can span them.
 
+## Updating harness
+
+After replacing the binaries, run `harness migrate` once, from anywhere. It
+brings the machine up to date first: the global `config.toml`, the user and
+workspace knowledge databases, and the MCP entries and client hooks harness
+installed for you. Then it brings every registered project up to date
+(`harness projects list`), several at a time (`--jobs`). Each project gets
+what `harness init` would do: its config and its database, migrated after a
+backup. The harness section in AGENTS.md / CLAUDE.md, the Git and client hooks
+and the MCP entries it already has are restated as this version writes them.
+Finally every worktree that still exists is synced. Nothing is installed that
+was not there. A project whose folder is gone is skipped, never forgotten, and
+the summary says how to restore or forget it. `--dry-run` shows what would
+change, and `--json` gives the result per project. You no longer need to run
+`harness init` and `harness sync` in every project by hand.
+
 ## When something seems off
 
 - `harness doctor` checks the installation, the database, the clients'

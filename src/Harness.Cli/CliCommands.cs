@@ -70,6 +70,16 @@ internal static class CliCommands
         );
         Add(
             root,
+            "migrate",
+            "After updating harness: migrate every database, refresh installed hooks, guidance and MCP entries, sync every project",
+            CommandBindings.BindMigrateSettings,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Migrate.MigrateCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            root,
             "install",
             null,
             CommandBindings.BindInstallSettings,

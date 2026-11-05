@@ -98,6 +98,63 @@ public sealed class GitHooks(string directory)
             : change;
     }
 
+    /// <summary>
+    /// The harness hook blocks already installed, restated as this harness writes them with the executable each one
+    /// runs; a hook without a block is left alone, none is added.
+    /// </summary>
+    public IReadOnlyList<FileChange> Refresh(bool dryRun = false)
+    {
+        List<FileChange> changes = [];
+        foreach (var name in Names)
+        {
+            var path = Path.Combine(directory, name);
+            var source = File.Exists(path) ? FileEditor.Read(path) : "";
+            var (start, end) = Section.Find(source);
+            if (start >= 0)
+            {
+                changes.Add(Set(name, true, InstalledCommand(source[start..end]), dryRun));
+            }
+        }
+
+        return changes;
+    }
+
+    /// <summary>The executable a harness hook block runs ('harness' when it cannot be read back).</summary>
+    public static string InstalledCommand(string block)
+    {
+        ArgumentNullException.ThrowIfNull(block);
+        const string Probe = "if command -v '";
+        var start = block.IndexOf(Probe, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return "harness";
+        }
+
+        // single-quoted shell word: a quote inside is written '"'"'
+        var text = block[(start + Probe.Length)..];
+        var command = new System.Text.StringBuilder();
+        var i = 0;
+        while (i < text.Length)
+        {
+            if (text.AsSpan(i).StartsWith("'\"'\"'", StringComparison.Ordinal))
+            {
+                command.Append('\'');
+                i += 5;
+            }
+            else if (text[i] is '\'')
+            {
+                return command.Length is 0 ? "harness" : command.ToString();
+            }
+            else
+            {
+                command.Append(text[i]);
+                i++;
+            }
+        }
+
+        return "harness";
+    }
+
     public static string Block(string command)
     {
         var quoted = "'" + command.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";

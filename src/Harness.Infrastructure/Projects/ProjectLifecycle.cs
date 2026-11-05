@@ -208,6 +208,42 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
     }
 
     /// <summary>
+    /// The global config.toml brought up to date as init does it, under the same lock and against the file on disk,
+    /// without touching any project: <c>Failed</c> when the file cannot be updated (its problem is in the note).
+    /// </summary>
+    public async Task<(InitAction Action, bool Failed)> UpdateGlobalConfigurationAsync(
+        bool dryRun,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var path = GlobalConfigurationPath;
+        var (action, content) = ConfigurationFile(path, ConfigurationExample.GlobalHeader, "global config");
+        var failed =
+            action.Verb is "exists" && content is null && action.Note.Contains("not updated", StringComparison.Ordinal);
+        if (dryRun || content is null)
+        {
+            return (action, failed);
+        }
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        StorageFiles.CreateDirectory(directory);
+        await using var lease = await Harness
+            .Infrastructure.Workspaces.AtomicMachineFile.LockAsync(
+                Path.Combine(directory, "config.toml.lock"),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        // recomputed under the lock: another harness may have changed it since
+        (action, content) = ConfigurationFile(path, ConfigurationExample.GlobalHeader, "global config");
+        if (content is not null)
+        {
+            await WriteConfigurationAsync(path, content, cancellationToken).ConfigureAwait(false);
+        }
+
+        return (action, false);
+    }
+
+    /// <summary>
     /// A config.toml as init leaves it: a new one with every option commented out, an existing one brought up to
     /// date (options new to this harness added as comments, ones it dropped removed), or left as it is.
     /// </summary>
