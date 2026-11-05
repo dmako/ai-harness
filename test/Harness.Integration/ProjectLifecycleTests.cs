@@ -606,8 +606,10 @@ public sealed class ProjectLifecycleTests
         var token = TestContext.Current.CancellationToken;
         var root = await fixture.CreateRepositoryAsync(name);
         var repository = await GitRepository.DiscoverAsync(root, token);
+        // where harness looks for it: under Git's resolved path (macOS's temp folder is behind the /var symlink,
+        // and a database registered under the other spelling would be taken for a copy)
         using var database = HarnessDatabase.Open(
-            Path.Combine(root, ".harness", "harness.db"),
+            Path.Combine(repository.StateRoot, ".harness", "harness.db"),
             new StorageOptions(),
             MigrationCatalog.All.Take(23).ToArray(),
             token
