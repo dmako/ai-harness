@@ -134,6 +134,14 @@ Work can also start without the backlog file:
   named as its proposer; reject it and nothing changes. A proposal may name
   its blueprint by id or by title; it keeps that blueprint when approved,
   even one not described yet.
+- **Approved outside harness:** when the work was already approved
+  elsewhere (a change board, a ticket, you in the conversation), the agent
+  names that approver in `task_propose`'s or `task_blueprint_propose`'s
+  `approved_by`. The proposal is then approved at once in their name, as an
+  Inbox approval would do it, and never waits in the Inbox. The task's
+  history and `harness tasks proposals --status approved` show it as
+  "approved externally by …". Agents still propose by default and use
+  `approved_by` only for an approval that really happened.
 
 Until an agent claims a task, you can restate it in harness ui: Work ›
 Tasks, the pencil in the task's row (disabled once an agent claims it)

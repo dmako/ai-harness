@@ -210,6 +210,12 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
     }
 
+    /// <summary>Who decided a proposal; an approval made outside harness (approved_by) is told apart.</summary>
+    internal static string DecidedLine(string status, string decidedBy) =>
+        TaskStore.ApprovedExternally(decidedBy)
+            ? "approved externally by " + decidedBy["external: ".Length..]
+            : status + " by " + decidedBy;
+
     private async Task ListProposalsAsync(
         TaskProposalListSettings settings,
         TaskStore store,
@@ -265,6 +271,11 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                 if (proposal.Result.Length is not 0)
                 {
                     await output.WriteLineAsync("    became " + proposal.Result);
+                }
+
+                if (proposal.DecidedBy.Length is not 0)
+                {
+                    await output.WriteLineAsync("    " + DecidedLine(proposal.Status, proposal.DecidedBy));
                 }
             }
 

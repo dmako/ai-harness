@@ -168,6 +168,11 @@ internal sealed partial class TaskCommandRunner
             {
                 await output.WriteLineAsync("    became " + proposal.Result);
             }
+
+            if (proposal.DecidedBy.Length is not 0)
+            {
+                await output.WriteLineAsync("    " + DecidedLine(proposal.Status, proposal.DecidedBy));
+            }
         }
     }
 

@@ -306,7 +306,19 @@ internal static class TaskTools
             Scope = Strings(values, "scope"),
             DependsOn = Strings(values, "depends_on").Select(TaskWorkflow.NormalizeDependency).ToArray(),
         };
-        var proposal = await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, token);
+        var approver = Text(values, "approved_by").Trim();
+        var proposal = await session.ProposeTaskAsync(definition, Text(values, "reason"), caller, approver, token);
+        if (approver.Length is not 0)
+        {
+            return new JsonObjectMap
+            {
+                ["proposal"] = TaskViews.Proposal(proposal),
+                ["task_id"] = proposal.Result,
+                ["note"] =
+                    $"Approved externally by {approver}: task {proposal.Result} is created and can be taken (task_next or task_claim).",
+            };
+        }
+
         var blueprint = proposal.Task.Blueprint;
         var unknown =
             blueprint.Length is not 0 && !(await session.BlueprintsAsync(token)).Any(b => b.Definition.Id == blueprint);
@@ -351,14 +363,29 @@ internal static class TaskTools
             values.TryGetProperty("exit", out _) ? Strings(values, "exit") : current.Exit,
             Given("notes", current.Notes)
         );
-        return new JsonObjectMap
-        {
-            ["proposal"] = TaskViews.BlueprintProposal(
-                await session.ProposeBlueprintAsync(target, definition, Text(values, "reason"), caller, token)
-            ),
-            ["note"] =
-                "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not use it until it is approved.",
-        };
+        var approver = Text(values, "approved_by").Trim();
+        var proposal = await session.ProposeBlueprintAsync(
+            target,
+            definition,
+            Text(values, "reason"),
+            caller,
+            approver,
+            approver.Length is 0 ? "" : Text(values, "same_name").Trim(),
+            token
+        );
+        return approver.Length is 0
+            ? new JsonObjectMap
+            {
+                ["proposal"] = TaskViews.BlueprintProposal(proposal),
+                ["note"] =
+                    "Waiting for the user: tell them it is in harness ui, Work › Inbox (or 'harness tasks proposals'). Do not use it until it is approved.",
+            }
+            : new JsonObjectMap
+            {
+                ["proposal"] = TaskViews.BlueprintProposal(proposal),
+                ["blueprint_id"] = proposal.Result,
+                ["note"] = $"Approved externally by {approver}: blueprint {proposal.Result} is saved as proposed.",
+            };
     }
 
     private static JsonObjectMap Empty() =>

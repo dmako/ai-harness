@@ -8,10 +8,23 @@ namespace Harness.Infrastructure.Tasks;
 
 public sealed partial class TaskStore
 {
+    /// <summary>
+    /// Proposes a task; it waits for the author unless <c>approvedBy</c> names whoever already approved
+    /// it outside harness: then it is approved at once, as an Inbox approval does it, in the same transaction (a
+    /// refusal leaves nothing behind) and recorded as decided by <see cref="ExternalApprover"/>.
+    /// </summary>
     public TaskProposal Propose(
         TaskDefinition definition,
         string reason,
         string by,
+        CancellationToken cancellationToken = default
+    ) => Propose(definition, reason, by, "", cancellationToken);
+
+    public TaskProposal Propose(
+        TaskDefinition definition,
+        string reason,
+        string by,
+        string approvedBy,
         CancellationToken cancellationToken = default
     )
     {
@@ -73,11 +86,26 @@ public sealed partial class TaskStore
                     ("$by", by),
                     ("$at", proposal.ProposedAt)
                 );
-                return proposal;
+                return string.IsNullOrWhiteSpace(approvedBy)
+                    ? proposal
+                    : ApproveIn(c, t, proposal, null, "", ExternalApprover(approvedBy)).Proposal;
             },
             cancellationToken
         );
     }
+
+    /// <summary>How an approval made outside harness is recorded as the decider: "external: &lt;actor&gt;".</summary>
+    public static string ExternalApprover(string actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        return ExternalPrefix + actor.Trim();
+    }
+
+    /// <summary>The decider was an approval made outside harness (task_propose's approved_by).</summary>
+    public static bool ApprovedExternally(string decidedBy) =>
+        decidedBy.StartsWith(ExternalPrefix, StringComparison.Ordinal);
+
+    private const string ExternalPrefix = "external: ";
 
     public IReadOnlyList<TaskProposal> Proposals(string status = "", CancellationToken cancellationToken = default) =>
         database.ReadTransaction(
@@ -200,22 +228,34 @@ public sealed partial class TaskStore
                     throw new InvalidOperationException($"{id} was already {proposal.Status}");
                 }
 
-                var definition = edit ?? proposal.Task;
-                var source = "proposal:" + id;
-                var task = Create(
-                    c,
-                    t,
-                    definition with
-                    {
-                        Blueprint = BlueprintFor(c, t, definition.Blueprint, source),
-                    },
-                    prefix,
-                    new(by, source, $"proposed by {proposal.ProposedBy} ({id}), approved by {by}")
-                );
-                return new TaskApproval(Decide(c, t, proposal, "approved", by, "", task.Id, Stamp()), task);
+                return ApproveIn(c, t, proposal, edit, prefix, by);
             },
             cancellationToken
         );
+
+    private TaskApproval ApproveIn(
+        SqliteConnection c,
+        SqliteTransaction t,
+        TaskProposal proposal,
+        TaskDefinition? edit,
+        string prefix,
+        string by
+    )
+    {
+        var definition = edit ?? proposal.Task;
+        var source = "proposal:" + proposal.Id;
+        var task = Create(
+            c,
+            t,
+            definition with
+            {
+                Blueprint = BlueprintFor(c, t, definition.Blueprint, source),
+            },
+            prefix,
+            new(by, source, $"proposed by {proposal.ProposedBy} ({proposal.Id}), approved by {by}")
+        );
+        return new TaskApproval(Decide(c, t, proposal, "approved", by, "", task.Id, Stamp()), task);
+    }
 
     public TaskProposal Reject(string id, string note, string by, CancellationToken cancellationToken = default) =>
         database.WithTransaction(

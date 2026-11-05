@@ -34,7 +34,7 @@ public static class AgentGuidance
           Other workspace repositories: `scope` workspace; keep `depth` light unless the user asks for compiler-exact cross-project answers.
         - Before planning read `goals_current` and `constraints_current`; before changing an area, `decisions_for` it.
           An `open_question` is the user's to settle: ask.
-        - Architecture findings (`architecture_findings`, `get_context`): explain and suggest; act only once it is a task. Propose, never create, tasks (`architecture_propose`, else `task_propose`) and blueprints (`task_blueprint_propose`).
+        - Architecture findings (`architecture_findings`, `get_context`): explain and suggest; act only once it is a task. Propose, never create, tasks (`architecture_propose`, else `task_propose`) and blueprints (`task_blueprint_propose`); set their `approved_by` only when the user or a recorded process already approved that work outside harness.
         - For planned work, take one task with `task_next` (claim=true) and keep its `claim_token`; it stays `claimed` while
           you analyse and clarify. `task_update` it to `in_progress` when you start changing code, and to `review` while you
           check the acceptance criteria, constraints and validation (back to `in_progress` if something fails). Finish with
