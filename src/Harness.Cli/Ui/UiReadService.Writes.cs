@@ -28,6 +28,10 @@ internal sealed partial class UiReadService : IUiWriteApi
             {
                 return WriteKnowledge(request, token);
             }
+            if (endpoint is "/api/board-defaults")
+            {
+                return await SetBoardDefaultsAsync(request.Body, token);
+            }
             if (endpoint is "/api/telemetry")
             {
                 return await SetTelemetryAsync(request.Body, token);
@@ -89,6 +93,10 @@ internal sealed partial class UiReadService : IUiWriteApi
             );
         }
         var project = await catalog.FindAsync(route.Value("id"), token);
+        if (endpoint is "board")
+        {
+            return await SetBoardAsync(route.Value("id"), request.Body, token);
+        }
         if (endpoint is "fix")
         {
             return await FixAsync(project, request.Body, token);
@@ -131,6 +139,14 @@ internal sealed partial class UiReadService : IUiWriteApi
             "blueprints" => SaveBlueprint(database, null, request.Body, token),
             "blueprints/{bid}/edit" => SaveBlueprint(database, route.Value("bid"), request.Body, token),
             "blueprints/{bid}/remove" => RemoveBlueprint(database, request, token),
+            "blueprints-order" => UiJson.Node(
+                new JsonObjectMap
+                {
+                    ["blueprints"] = new TaskStore(database)
+                        .ReorderBlueprints(new UiWriteBody(request.Body, "order").List("order"), token)
+                        .Select(TaskViews.Blueprint),
+                }
+            ),
             "blueprint-proposals/{pid}/approve" => ApproveBlueprint(database, request, token),
             "blueprint-proposals/{pid}/reject" => UiJson.Node(
                 new JsonObjectMap
@@ -401,14 +417,15 @@ internal sealed partial class UiReadService : IUiWriteApi
     )
     {
         var fields = id is null
-            ? new UiWriteBody(body, "id", "title", "goal", "exit", "notes")
-            : new UiWriteBody(body, "title", "goal", "exit", "notes");
+            ? new UiWriteBody(body, "id", "title", "goal", "exit", "notes", "color")
+            : new UiWriteBody(body, "title", "goal", "exit", "notes", "color");
         BlueprintDefinition definition = new(
             id ?? fields.Text("id"),
             fields.Text("title"),
             fields.Text("goal"),
             Clean(fields.List("exit")),
-            fields.Text("notes")
+            fields.Text("notes"),
+            fields.Text("color")
         );
         var store = new TaskStore(database);
         var saved = id is null
@@ -426,13 +443,14 @@ internal sealed partial class UiReadService : IUiWriteApi
         BlueprintDefinition? definition = null;
         if (edit is not null)
         {
-            var fields = new UiWriteBody(edit, "id", "title", "goal", "exit", "notes");
+            var fields = new UiWriteBody(edit, "id", "title", "goal", "exit", "notes", "color");
             definition = new(
                 fields.Text("id"),
                 fields.Text("title"),
                 fields.Text("goal"),
                 Clean(fields.List("exit")),
-                fields.Text("notes")
+                fields.Text("notes"),
+                fields.Text("color")
             );
         }
 

@@ -85,18 +85,28 @@ public interface ITaskSession
         TaskCompletion input,
         CancellationToken cancellationToken
     );
+
+    /// <summary>A proposal, approved at once when <paramref name="approvedBy"/> names an external approver.</summary>
     Task<TaskProposal> ProposeTaskAsync(
         TaskDefinition definition,
         string reason,
         string by,
+        string approvedBy,
         CancellationToken cancellationToken
     );
     Task<IReadOnlyList<BlueprintProgress>> BlueprintsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A blueprint proposal, approved at once when <paramref name="approvedBy"/> names an external approver
+    /// (<paramref name="sameName"/>: merge or new when a blueprint of its title exists).
+    /// </summary>
     Task<BlueprintProposal> ProposeBlueprintAsync(
         string blueprint,
         BlueprintDefinition definition,
         string reason,
         string by,
+        string approvedBy,
+        string sameName,
         CancellationToken cancellationToken
     );
 }

@@ -25,10 +25,13 @@ Harness needs Git and nothing else: no Node, no Python, no network access.
    `harness instructions` and `harness hooks install --kind git`.
 3. Restart Claude Code / Codex so they pick up the harness MCP server.
 
-**Upgrade:** replace the binaries. Before a project database is migrated,
-harness copies it to `.harness/backups/` (the last 5 are kept). Rerun
-`harness hooks install` after an upgrade if hooks were installed, so their
-commands match the new binary.
+**Upgrade:** replace the binaries, then run `harness migrate`. It migrates
+the global config, the knowledge databases and every registered project
+(config, database, the guidance, hooks and MCP entries already installed),
+then syncs each project's worktrees. Before a database is migrated, harness
+copies it to `.harness/backups/` (the last 5 are kept). An MCP entry or hook
+whose executable no longer exists is pointed at the binary running `migrate`;
+one whose executable still exists keeps it.
 
 **Uninstall:** `harness uninstall --all --project <repository>` removes
 everything harness added (MCP entries in every scope, Git and client hooks,
@@ -42,6 +45,7 @@ uninstall` alone lets you pick what to remove.
 | Command | What it does |
 |---|---|
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
+| `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
 | `harness doctor` | Checks the installation, database, clients, hooks and providers, with a fix for each problem (`--all`: every project on the machine). |
 | `harness status` | The project, its Git state, database and clients. |
@@ -148,7 +152,7 @@ args = ["--graphify", "~/.dotnet/tools/graphify-csharp.exe"]
 
 [providers.nuget]                  # package_api for C# packages
 command = "dnx"
-args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes"]
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
 ```
 
 Install each tool as its own documentation says (graphify-csharp and
@@ -334,12 +338,12 @@ list` or in harness ui (Work).
 | Command | What it does |
 |---|---|
 | `harness tasks add --title … [--goal --accept … --depends … --blueprint --type --priority --scope --prefix --id]` | Adds a task by hand with the next free id of the prefix (default: the prefix of the backlog's newest task). `--depends` takes this project's task ids, or `<project>:<task id>` for another registered project's task (its short name, folder name, parent/folder or id, any case; a name two projects share is refused): the task stays in the backlog until that one is done, and goes back if it reopens (its status is read again after 30 s). Backlog files and `task_propose` take the same form. harness ui: Work › Tasks › New task, whose dependency search offers the workspace's other projects' open tasks. |
-| `harness tasks blueprints` | The blueprints (formerly milestones): what each group of tasks is for, its exit criteria and progress. `harness tasks list --blueprint M5` and the agents' `task_next` take one blueprint's tasks. The former names (`tasks milestones`, `--milestone`, the backlog keys `milestones:` and `milestone:`) are still accepted. harness ui: Work › Blueprints, where blueprints are also created, edited and removed (with their tasks moved or deleted). Agents list them with `task_blueprints`. |
-| `harness tasks blueprints add [--id --title --goal --exit … --notes]` | Adds a blueprint: the next free id (M17 after M16, or BP-001) and the name "New blueprint" unless given. |
-| `harness tasks blueprints edit <id> [--title --goal --exit … --notes]` | Restates a blueprint; what is not given stays, `--exit ""` clears its exit criteria. Its id stays. |
+| `harness tasks blueprints` | The blueprints (formerly milestones): what each group of tasks is for, its exit criteria and progress. `harness tasks list --blueprint M5` and the agents' `task_next` take one blueprint's tasks. The former names (`tasks milestones`, `--milestone`, the backlog keys `milestones:` and `milestone:`) are still accepted. harness ui: Work › Blueprints, where blueprints are also created, edited and removed (with their tasks moved or deleted). Listed in the order the author gave them in harness ui (drag a blueprint, or use its up and down arrows: its header in Work › Tasks while all blueprints are shown, or its card in Work › Blueprints), then the ones not yet placed in the backlog's order; each placed one has `order` in `--json` and in `task_blueprints`, which agents list them with. |
+| `harness tasks blueprints add [--id --title --goal --exit … --notes --color]` | Adds a blueprint: the next free id (M17 after M16, or BP-001) and the name "New blueprint" unless given, and the first of the 16 colours no other blueprint uses unless `--color` names one (teal, orange, blue, rose, green, violet, amber, cyan, pink, lime, indigo, red, fuchsia, yellow, slate, purple). |
+| `harness tasks blueprints edit <id> [--title --goal --exit … --notes --color]` | Restates a blueprint; what is not given stays, `--exit ""` clears its exit criteria. Its id stays. `--color` sets its colour on harness ui's Board and in Work › Tasks; an unknown colour is refused. |
 | `harness tasks blueprints remove <id> [--tasks move/delete --to <blueprint>]` | Removes a blueprint. One with tasks needs `--tasks move` (to `--to`, or to no blueprint without it; `--to` alone moves too) or `--tasks delete`, which is refused while an agent holds one of them; tasks elsewhere lose their dependencies on deleted ones. |
 | `harness tasks export [file]` | Writes the tasks the backlog file lacks (added by hand, approved proposals, tasks made from findings) at the end of its `tasks:` list; the rest of the file is kept as it is. A missing file is written whole. |
-| `harness tasks proposals [--status]` | The tasks and blueprints agents proposed (`task_propose`, `task_blueprint_propose`). `harness tasks approve <id>` makes the task, or makes or restates the blueprint (a new one gets the next free id); `harness tasks reject <id> --note …` closes the proposal. harness ui: Work › Inbox, where a proposal can be restated before it is approved. A proposed task's blueprint is matched by id or title when the task is approved, so tasks proposed with a new blueprint (named by its title) join it whichever is approved first; with no match, the blueprint is created with the next free id. A new blueprint whose title a blueprint has already asks whether to merge into that one (it is restated, its id and tasks stay) or create a separate one: `--same-name merge` or `--same-name new`, without which it is refused. |
+| `harness tasks proposals [--status]` | The tasks and blueprints agents proposed (`task_propose`, `task_blueprint_propose`). `harness tasks approve <id>` makes the task, or makes or restates the blueprint (a new one gets the next free id); `harness tasks reject <id> --note …` closes the proposal. harness ui: Work › Inbox, where a proposal can be restated before it is approved. A proposed task's blueprint is matched by id or title when the task is approved, so tasks proposed with a new blueprint (named by its title) join it whichever is approved first; with no match, the blueprint is created with the next free id. A new blueprint whose title a blueprint has already asks whether to merge into that one (it is restated, its id and tasks stay) or create a separate one: `--same-name merge` or `--same-name new`, without which it is refused. An agent whose work was already approved outside harness passes `approved_by` (the approver) to `task_propose` or `task_blueprint_propose` (with `same_name` for a blueprint titled like an existing one): the proposal is approved at once, recorded as decided by `external: <approver>`, and shown as "approved externally by …"; anything an Inbox approval would refuse is refused and nothing is created. |
 
 Each task's audit trail (`harness tasks show <id> --events`) says how it
 was made: imported, added with `harness tasks add`, added in harness ui, or

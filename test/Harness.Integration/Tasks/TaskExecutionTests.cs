@@ -212,6 +212,100 @@ public sealed class TaskExecutionTests
     }
 
     [Fact]
+    public async Task McpProposalsApprovedOutsideHarnessAreApprovedAtOnceAndRefusalsLeaveNothing()
+    {
+        using var state = new State();
+        state.Store.ImportBlueprints([new("M1", "Existing", "Its goal")], "fixture", cancellationToken: Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<CallToolResult> CallAsync(string tool, Dictionary<string, object?> arguments) =>
+            await client.CallToolAsync(tool, arguments, cancellationToken: Token);
+        Dictionary<string, object?> Task(string title, string? approvedBy, params string[] dependsOn)
+        {
+            var arguments = new Dictionary<string, object?>
+            {
+                ["title"] = title,
+                ["goal"] = "the outcome",
+                ["acceptance"] = new[] { "checked" },
+                ["depends_on"] = dependsOn,
+            };
+            if (approvedBy is not null)
+            {
+                arguments["approved_by"] = approvedBy;
+            }
+
+            return arguments;
+        }
+
+        // approved outside harness: the task exists at once, recorded as approved externally
+        var approved = await CallAsync("task_propose", Task("Approved by the board", " change board "));
+        approved.IsError.Should().NotBe(true);
+        var answer = approved.StructuredContent!.Value;
+        var id = answer.GetProperty("task_id").GetString()!;
+        answer.GetProperty("note").GetString().Should().StartWith("Approved externally by change board: task " + id);
+        answer.GetProperty("note").GetString().Should().NotContain("Waiting for the user");
+        var proposal = state.Store.GetProposal(answer.GetProperty("proposal").GetProperty("id").GetString()!, Token);
+        (proposal.Status, proposal.DecidedBy, proposal.Result).Should().Be(("approved", "external: change board", id));
+        proposal.DecidedAt.Should().NotBeEmpty();
+        state.Store.Get(id, Token).Definition.Title.Should().Be("Approved by the board");
+        state.Store.Events(id, Token)[0].Detail.Should().Contain("approved by external: change board");
+        state.Store.PendingProposals(Token).Should().Be(0);
+
+        // blank or left out: it waits, as before
+        foreach (var blank in new[] { "  ", null })
+        {
+            var waiting = await CallAsync("task_propose", Task("Waits", blank));
+            waiting.StructuredContent!.Value.GetProperty("note").GetString().Should().Contain("Waiting for the user");
+            waiting.StructuredContent.Value.TryGetProperty("task_id", out _).Should().BeFalse();
+        }
+
+        state.Store.PendingProposals(Token).Should().Be(2);
+
+        // refused as an approval would be: nothing is proposed or created
+        var tasks = state.Store.List(cancellationToken: Token).Count;
+        var proposals = state.Store.Proposals("", Token).Count;
+        (await CallAsync("task_propose", Task("Unknown dependency", "change board", "T-404")))
+            .IsError.Should()
+            .BeTrue();
+        state.Store.List(cancellationToken: Token).Count.Should().Be(tasks);
+        state.Store.Proposals("", Token).Count.Should().Be(proposals);
+
+        // blueprints: a new one made at once; one titled like an existing one needs merge or new
+        var made = await CallAsync(
+            "task_blueprint_propose",
+            new()
+            {
+                ["title"] = "Planned",
+                ["goal"] = "planned elsewhere",
+                ["approved_by"] = "planning meeting",
+            }
+        );
+        made.IsError.Should().NotBe(true);
+        var blueprint = made.StructuredContent!.Value.GetProperty("blueprint_id").GetString()!;
+        state
+            .Store.Blueprints(Token)
+            .Should()
+            .Contain(b => b.Definition.Id == blueprint && b.Definition.Title == "Planned");
+        made.StructuredContent.Value.GetProperty("note")
+            .GetString()
+            .Should()
+            .StartWith("Approved externally by planning meeting");
+        var same = new Dictionary<string, object?>
+        {
+            ["title"] = "Existing",
+            ["goal"] = "restated",
+            ["approved_by"] = "planning meeting",
+        };
+        var before = state.Store.BlueprintProposals("", Token).Count;
+        (await CallAsync("task_blueprint_propose", same)).IsError.Should().BeTrue();
+        state.Store.BlueprintProposals("", Token).Count.Should().Be(before);
+        same["same_name"] = "merge";
+        var merged = await CallAsync("task_blueprint_propose", same);
+        merged.StructuredContent!.Value.GetProperty("blueprint_id").GetString().Should().Be("M1");
+        state.Store.Blueprints(Token).Single(b => b.Definition.Id == "M1").Definition.Goal.Should().Be("restated");
+        state.Store.BlueprintProposals("pending", Token).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task McpListsBlueprintsAndOnlyProposesNewOrChangedOnes()
     {
         using var state = new State();

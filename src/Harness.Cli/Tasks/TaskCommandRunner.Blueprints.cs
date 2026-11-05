@@ -27,7 +27,14 @@ internal sealed partial class TaskCommandRunner
         {
             var id = settings.Id.Trim().Length is 0 ? store.NextBlueprintId(cancellationToken) : settings.Id;
             saved = store.CreateBlueprint(
-                new(id, settings.Title ?? NewBlueprintTitle, settings.Goal ?? "", settings.Exit, settings.Notes ?? ""),
+                new(
+                    id,
+                    settings.Title ?? NewBlueprintTitle,
+                    settings.Goal ?? "",
+                    settings.Exit,
+                    settings.Notes ?? "",
+                    settings.Color ?? ""
+                ),
                 "cli",
                 cancellationToken
             );
@@ -45,7 +52,8 @@ internal sealed partial class TaskCommandRunner
                     settings.Title ?? d.Title,
                     settings.Goal ?? d.Goal,
                     settings.Exit ?? d.Exit,
-                    settings.Notes ?? d.Notes
+                    settings.Notes ?? d.Notes,
+                    settings.Color ?? d.Color
                 ),
                 "cli",
                 cancellationToken
@@ -54,7 +62,13 @@ internal sealed partial class TaskCommandRunner
 
         if (settings.Json)
         {
-            await JsonAsync(new JsonObjectMap { ["blueprint"] = TaskViews.BlueprintDefinition(saved) });
+            // with the colour it has, the one given out when none was asked for
+            var view = TaskViews.BlueprintDefinition(saved);
+            view["color"] = store
+                .Blueprints(cancellationToken)
+                .First(b => b.Definition.Id == saved.Id)
+                .Definition.Color;
+            await JsonAsync(new JsonObjectMap { ["blueprint"] = view });
         }
         else
         {
@@ -153,6 +167,11 @@ internal sealed partial class TaskCommandRunner
             if (proposal.Result.Length is not 0)
             {
                 await output.WriteLineAsync("    became " + proposal.Result);
+            }
+
+            if (proposal.DecidedBy.Length is not 0)
+            {
+                await output.WriteLineAsync("    " + DecidedLine(proposal.Status, proposal.DecidedBy));
             }
         }
     }

@@ -13,13 +13,25 @@ public sealed partial class TaskStore
 
     /// <summary>
     /// Proposes a new blueprint (<paramref name="blueprint"/> empty) or a restated one; nothing changes until the
-    /// author approves it.
+    /// author approves it, unless <c>approvedBy</c> names whoever already approved it outside harness:
+    /// then it is approved at once in the same transaction, as an Inbox approval does it (<c>sameName</c>
+    /// is its merge-or-new choice), and recorded as decided by <see cref="ExternalApprover"/>.
     /// </summary>
     public BlueprintProposal ProposeBlueprint(
         string blueprint,
         BlueprintDefinition definition,
         string reason,
         string by,
+        CancellationToken cancellationToken = default
+    ) => ProposeBlueprint(blueprint, definition, reason, by, "", "", cancellationToken);
+
+    public BlueprintProposal ProposeBlueprint(
+        string blueprint,
+        BlueprintDefinition definition,
+        string reason,
+        string by,
+        string approvedBy,
+        string sameName,
         CancellationToken cancellationToken = default
     )
     {
@@ -74,7 +86,9 @@ public sealed partial class TaskStore
                     ("$by", by),
                     ("$at", proposal.ProposedAt)
                 );
-                return proposal;
+                return string.IsNullOrWhiteSpace(approvedBy)
+                    ? proposal
+                    : ApproveBlueprintIn(c, t, proposal, null, ExternalApprover(approvedBy), sameName).Proposal;
             },
             cancellationToken
         );
@@ -164,7 +178,7 @@ public sealed partial class TaskStore
     /// <summary>
     /// Creates or restates the proposed blueprint, as proposed or as the author restated it. A new one without an
     /// id gets the next free one. When a blueprint with the new one's title exists already (a task approved first
-    /// made it), the author says what to do: <paramref name="sameName"/> "merge" restates that one, keeping its id
+    /// made it), the author says what to do: <c>sameName</c> "merge" restates that one, keeping its id
     /// and tasks, "new" creates a separate blueprint; without either it is refused.
     /// </summary>
     public BlueprintApproval ApproveBlueprint(
@@ -182,38 +196,51 @@ public sealed partial class TaskStore
                     throw new ArgumentException("same-name must be merge or new");
                 }
 
-                var proposal = PendingBlueprintProposal(c, t, id);
-                var source = "proposal:" + id;
-                var d = edit ?? proposal.Definition;
-                var target = proposal.Blueprint;
-                if (target.Length is 0 && TitledBlueprint(c, t, d.Title) is { Length: > 0 } existing)
-                {
-                    target = sameName switch
-                    {
-                        "merge" => existing,
-                        "new" => "",
-                        _ => throw new InvalidOperationException(
-                            $"a blueprint titled \"{d.Title.Trim()}\" exists already ({existing}): merge into it "
-                                + "(same-name merge: its id and tasks stay) or create a separate one (same-name new)"
-                        ),
-                    };
-                }
-
-                if (target.Length is 0 && d.Id.Trim().Length is 0)
-                {
-                    d = d with { Id = NextBlueprintId(BlueprintIds(c, t)) };
-                }
-
-                var saved = target.Length is 0
-                    ? CreateBlueprint(c, t, d, source)
-                    : EditBlueprint(c, t, target, d with { Id = target }, source);
-                return new BlueprintApproval(
-                    DecideBlueprint(c, t, proposal, "approved", by, "", saved.Id, Stamp()),
-                    saved
-                );
+                return ApproveBlueprintIn(c, t, PendingBlueprintProposal(c, t, id), edit, by, sameName);
             },
             cancellationToken
         );
+
+    private BlueprintApproval ApproveBlueprintIn(
+        SqliteConnection c,
+        SqliteTransaction t,
+        BlueprintProposal proposal,
+        BlueprintDefinition? edit,
+        string by,
+        string sameName
+    )
+    {
+        if (sameName is not ("" or "merge" or "new"))
+        {
+            throw new ArgumentException("same-name must be merge or new");
+        }
+
+        var source = "proposal:" + proposal.Id;
+        var d = edit ?? proposal.Definition;
+        var target = proposal.Blueprint;
+        if (target.Length is 0 && TitledBlueprint(c, t, d.Title) is { Length: > 0 } existing)
+        {
+            target = sameName switch
+            {
+                "merge" => existing,
+                "new" => "",
+                _ => throw new InvalidOperationException(
+                    $"a blueprint titled \"{d.Title.Trim()}\" exists already ({existing}): merge into it "
+                        + "(same-name merge: its id and tasks stay) or create a separate one (same-name new)"
+                ),
+            };
+        }
+
+        if (target.Length is 0 && d.Id.Trim().Length is 0)
+        {
+            d = d with { Id = NextBlueprintId(BlueprintIds(c, t)) };
+        }
+
+        var saved = target.Length is 0
+            ? CreateBlueprint(c, t, d, source)
+            : EditBlueprint(c, t, target, d with { Id = target }, source);
+        return new BlueprintApproval(DecideBlueprint(c, t, proposal, "approved", by, "", saved.Id, Stamp()), saved);
+    }
 
     public BlueprintProposal RejectBlueprint(
         string id,

@@ -353,6 +353,47 @@ public sealed class UiWriteTests
     }
 
     [Fact]
+    public async Task ProposalsApprovedOutsideHarnessShowTheirApproverInTheCliAndUi()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using (var database = fixture.Database())
+        {
+            var store = new TaskStore(database);
+            store.Propose(
+                new TaskDefinition
+                {
+                    Title = "Board approved",
+                    Goal = "approved elsewhere",
+                    Acceptance = ["checked"],
+                },
+                "why",
+                "agent",
+                "change board",
+                Token
+            );
+            store.ProposeBlueprint("", new("", "Planned", "goal"), "why", "agent", "planning meeting", "", Token);
+        }
+
+        var cli = await fixture.ProcessAsync(
+            "dotnet",
+            [UiFixture.CliPath, "tasks", "proposals", "--status", "approved", "--project", fixture.Root]
+        );
+        cli.Code.Should().Be(0, cli.Error);
+        cli.Output.Should()
+            .Contain("approved externally by change board")
+            .And.Contain("approved externally by planning meeting");
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+        var approved = await UiTests.ReadAsync(server.Client, root + "/task-proposals?status=approved");
+        approved["proposals"]![0]!["decided_by"]!.GetValue<string>().Should().Be("external: change board");
+        var pending = await UiTests.ReadAsync(server.Client, root + "/task-proposals?status=pending");
+        pending["proposals"]!.AsArray().Should().BeEmpty();
+        var live = (await UiTests.ReadAsync(server.Client, "/api/projects"))["projects"]![0]!["live"]!;
+        live["pending_task_proposals"]!.GetValue<int>().Should().Be(0);
+        live["pending_blueprint_proposals"]!.GetValue<int>().Should().Be(0);
+    }
+
+    [Fact]
     public async Task BlueprintProposalsAreListedApprovedAsRestatedAndRejected()
     {
         using var fixture = await SyncFixture.CreateAsync();

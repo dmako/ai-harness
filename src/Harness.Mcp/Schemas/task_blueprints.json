@@ -48,6 +48,14 @@
             },
             "notes": {
               "type": "string"
+            },
+            "color": {
+              "type": "string",
+              "description": "its colour in harness ui (one of 16 names, e.g. teal); absent for a blueprint only tasks name"
+            },
+            "order": {
+              "type": "integer",
+              "description": "the position the author gave it in harness ui (0 first); absent when not ordered, listed after the ordered ones"
             }
           },
           "required": [

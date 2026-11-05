@@ -79,7 +79,7 @@ internal static class AtomicMachineFile
         }
     }
 
-    private static async Task<FileStream> LockAsync(string path, CancellationToken token)
+    internal static async Task<FileStream> LockAsync(string path, CancellationToken token)
     {
         var timer = Stopwatch.StartNew();
         while (true)

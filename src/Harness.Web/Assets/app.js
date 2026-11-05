@@ -251,7 +251,7 @@ const chevron = (open) => h("span", { class: "chev" + (open ? " open" : ""), "ar
 //   #/search?q=…                    search
 // Links of the earlier layout (#/<project>/<tab>, #/workspaces/<name>)
 // redirect to their new places.
-const PROJECT_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["work", "Work"], ["agents", "Agents"], ["health", "Health"]];
+const PROJECT_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["work", "Work"], ["board", "Board"], ["agents", "Agents"], ["health", "Health"]];
 // A workspace's views mirror a project's: Architecture second, Issues where
 // a project has Health; each groups its parts as sub-views.
 const WORKSPACE_VIEWS = [["overview", "Overview"], ["architecture", "Architecture"], ["knowledge", "Knowledge"], ["issues", "Issues"], ["members", "Members"]];
@@ -689,7 +689,7 @@ function projectHead(p) {
 // runs doctor's checks when opened or refreshed).
 const VIEW_KINDS = {
   overview: ["summary", "tasks", "knowledge", "proposals", "findings", "sync"], architecture: ["findings", "sync"],
-  "work/inbox": ["proposals"], work: ["tasks", "proposals"], health: [], "knowledge/inbox": ["proposals"], knowledge: ["knowledge", "levels"],
+  "work/inbox": ["proposals"], work: ["tasks", "proposals"], board: ["tasks"], health: [], "knowledge/inbox": ["proposals"], knowledge: ["knowledge", "levels"],
   "agents/tools": ["activity", "sync"], agents: ["activity", "knowledge", "proposals"],
 };
 
@@ -728,6 +728,7 @@ async function projectView(p, view, item, opts) {
       const nav = subnav(base, [["blueprints", "Blueprints"], ["tasks", "Tasks"], ["inbox", "Inbox", workProposals(p.live)]], sec);
       return h("div", {}, nav, sec === "inbox" ? await viewArchProposals(p) : await viewTasks(p, opts, sec));
     }
+    case "board": return viewBoard(p);
     case "health": return viewHealth(p);
     case "knowledge": {
       const inbox = item === "inbox";
@@ -1165,6 +1166,9 @@ const ICONS = {
   spike: ["M13 2 5 13.5h6L10 22l8-11.5h-6z"],
   test: ["M9 3h6", "M10 3v6l-5 9.5A2 2 0 0 0 6.8 21h10.4a2 2 0 0 0 1.8-2.5L14 9V3", "M7.5 15h9"],
   process: ["M20 11a8 8 0 0 0-14.3-4.9", "M4 4v4h4", "M4 13a8 8 0 0 0 14.3 4.9", "M20 20v-4h-4"],
+  "type-other": ["M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8z"],
+  up: ["M12 19V5", "m6 11 6-6 6 6"],
+  down: ["M12 5v14", "m6 13 6 6 6-6"],
   // priorities
   "p-low": ["M12 5v14", "m6 13 6 6 6-6"],
   "p-medium": ["M5 9h14", "M5 15h14"],
@@ -2134,6 +2138,7 @@ async function renderMachine(main) {
         seg("Theme", THEMES.map((t) => [t, t === "system" ? "System" : t[0].toUpperCase() + t.slice(1)]), store.get("theme", "system"), (v) => { store.set("theme", v); applyTheme(); })),
       h("div", { class: "setrow" }, h("div", {}, h("b", {}, "Open projects on"), h("p", { class: "muted small" }, "The view a project opens on from the sidebar.")),
         seg("Default project view", PROJECT_VIEWS, defaultView(), (v) => store.set("projectView", v))))),
+    section("Board", "Kept on this machine: how a project's Board starts until it is set there.", boardDefaults()),
     section("Developer telemetry", "Anonymous, aggregated numbers for the harness developer: how well harness serves agents. Never code, paths, queries or names.", tel),
     section("C# sessions (graphify-csharp)", "Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone.",
       graphifySessions(null)),
@@ -2144,6 +2149,23 @@ async function renderMachine(main) {
         [k, v && h("code", { title: v }, paths.global && v.startsWith(paths.global + "/") ? v.slice(paths.global.length + 1) : v)]),
     ]))),
     h("p", { class: "muted small buildline" }, `harness ${b.version || "?"}`, b.commit && ` · ${b.commit.slice(0, 12)}`, b.date && ` · built ${b.date.slice(0, 10)}`, b.platform && ` · ${b.platform}`, b.runtime && ` · ${b.runtime}`));
+}
+
+// boardDefaults sets the Board's sort and done-age for projects without
+// their own (from the C# rewrite: TASK-0081).
+function boardDefaults() {
+  const box = h("div", { class: "card pad settings" }, h("p", { class: "empty" }, "Loading…"));
+  const draw = (d) => {
+    const choice = (label, hint, opts, cur, key, conv) => h("div", { class: "setrow" }, h("div", {}, h("b", {}, label), h("p", { class: "muted small" }, hint)),
+      h("select", { "aria-label": label, onchange: async (ev) => {
+        try { draw((await post("/api/board-defaults", { [key]: conv ? conv(ev.target.value) : ev.target.value })).defaults); toast("Board default saved"); } catch (e) { toast(e.message, true); }
+      } }, opts.map(([v, text]) => h("option", { value: String(v), selected: String(v) === String(cur) }, text))));
+    fill(box,
+      choice("Sort cards by", "Within every column.", Object.entries(BOARD_SORTS), d.sort, "sort"),
+      choice("Hide done tasks older than", "By when each was done.", [1, 3, 7, 14].map((n) => [n, plural(n, "day")]), d.hide_done_days, "hide_done_days", Number));
+  };
+  api("/api/board-defaults").then((r) => draw(r.defaults || {})).catch((e) => fill(box, h("p", { class: "error" }, e.message)));
+  return box;
 }
 
 // telemetryCard is the opt-in as a switch: on asks for the collector's
@@ -4692,10 +4714,13 @@ function blueprintFields(p, init, isNew) {
   const goal = h("textarea", { rows: 3, placeholder: "What it is for: the outcome, and why now", "aria-label": "Goal" }, init.goal || "");
   const exit = listBuilder(init.exit || [], "A criterion that says it is done", "round");
   const notes = h("textarea", { rows: 2, "aria-label": "Notes" }, init.notes || "");
+  // its colour on the Board and in Work › Tasks (from the C# rewrite)
+  const color = colorPicker(init.color, isNew || !init.color);
   return {
     nodes: [isNew ? h("div", { class: "frow2 bphead" }, field("Id", id, "Suggested: the next one."), field("Title", title)) : field("Title", title),
-      field("Goal", goal), h("fieldset", { class: "fgroup" }, h("legend", {}, "Done when"), exit.el), field("Notes", notes)],
-    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value.trim(), goal: goal.value.trim(), exit: exit.value(), notes: notes.value.trim() }),
+      field("Goal", goal), h("fieldset", { class: "fgroup" }, h("legend", {}, "Done when"), exit.el), field("Notes", notes),
+      h("fieldset", { class: "fgroup" }, h("legend", {}, "Colour"), color.el)],
+    value: () => ({ ...(isNew ? { id: id.value.trim() } : {}), title: title.value.trim(), goal: goal.value.trim(), exit: exit.value(), notes: notes.value.trim(), ...(color.value() ? { color: color.value() } : {}) }),
   };
 }
 
@@ -4891,6 +4916,159 @@ function archProposalCard(p, x) {
     panel);
 }
 
+// --- blueprint colours and the Board (from the C# rewrite: TASK-0081) ---
+// BP_COLORS are the 16 a blueprint can have (BlueprintColors.Names, in the
+// order they are given out); style.css draws each as --bp-<name>, a light
+// and a dark variant readable on a card, set on an element by bpc-<name>
+// (a class: the page's policy allows no inline styles).
+const BP_COLORS = ["teal", "orange", "blue", "rose", "green", "violet", "amber", "cyan", "pink", "lime", "indigo", "red", "fuchsia", "yellow", "slate", "purple"];
+const bpClass = (color) => (BP_COLORS.includes(color) ? ` bpc-${color}` : "");
+// bpFrame is a blueprint's id and title in an outlined frame of its colour
+// (neutral for one without, as a blueprint only tasks name); titleOnly
+// leaves the id out of view (the frame still names both).
+function bpFrame(id, title, color, titleOnly) {
+  const name = title ? `${id} · ${title}` : id;
+  const only = titleOnly && title;
+  return h("span", { class: "bpframe" + bpClass(color) + (only ? " bponly" : ""), title: color ? `${name} (${color})` : name, "aria-label": only ? `Blueprint ${name}` : null },
+    !only && h("span", { class: "bpid mono" }, id), title && h("span", { class: "bptitle" }, title));
+}
+// colorPicker chooses a blueprint's colour from swatches; a new blueprint
+// may leave it to harness (the first colour no other uses).
+function colorPicker(cur, allowAuto) {
+  let v = cur || "";
+  const box = h("div", { class: "bpswatches", role: "radiogroup", "aria-label": "Colour" });
+  const draw = () => fill(box, [...(allowAuto ? [""] : []), ...BP_COLORS].map((c) => h("button", {
+    type: "button", role: "radio", class: "bpswatch" + (c ? bpClass(c) : " auto"), "aria-checked": String(c === v),
+    title: c || "The first colour no other blueprint uses", "aria-label": c || "next free colour",
+    onclick: () => { v = c; draw(); },
+  }, c ? h("span", { class: "dot", "aria-hidden": "true" }) : "auto")));
+  draw();
+  return { el: box, value: () => v };
+}
+
+const BOARD_SORTS = { priority: "Priority", id: "Id", name: "Name", created: "Created", changed: "Last changed" };
+// viewBoard is a project's tasks as a read-only board: a column per status,
+// a card per task; its sort, done-age and blueprint filter are kept on
+// this machine for the project (sort and done-age default to Machine › Board).
+async function viewBoard(p) {
+  const res = await api(projectAPI(p, "board"));
+  const s = res.settings || {};
+  const info = Object.fromEntries((res.blueprints || []).map((b) => [b.id, b]));
+  const save = async (change) => {
+    try { await post(projectAPI(p, "board"), change); await renderMain(); } catch (e) { toast(e.message, true); }
+  };
+  const choice = (label, opts, cur, pick) => h("label", { class: "bsel" }, h("span", {}, label),
+    h("select", { "aria-label": label, onchange: (ev) => pick(ev.target.value) },
+      opts.map(([v, text]) => h("option", { value: String(v), selected: String(v) === String(cur) }, text))));
+  const bar = h("div", { class: "filters boardbar" },
+    choice("Sort by:", (res.sorts || []).map((x) => [x, BOARD_SORTS[x] || x]), s.sort, (v) => save({ sort: v })),
+    choice("Hide done tasks older than:", (res.hide_done_days_options || []).map((d) => [d, plural(d, "day")]), s.hide_done_days, (v) => save({ hide_done_days: Number(v) })),
+    choice("Blueprint:", [["", "all blueprints"], ...(res.blueprints || []).map((b) => [b.id, b.title ? `${b.id} · ${b.title}` : b.id]), ["—", "no blueprint"]], s.blueprint || "", (v) => save({ blueprint: v })));
+  const columns = (res.columns || []).map((col) => h("section", { class: "bcol", "data-status": col.status, "aria-label": `${col.status.replace("_", " ")}: ${col.tasks.length}` },
+    h("h3", { class: "bhead" }, statusPill(col.status), h("span", { class: "count" }, col.tasks.length)),
+    h("div", { class: "bcards" }, col.tasks.length ? col.tasks.map((x) => boardCard(p, x, info)) : h("p", { class: "empty small" }, "None"))));
+  return h("div", {}, bar, h("div", { class: "board", role: "region", "aria-label": "Board", tabindex: "0" }, columns));
+}
+function boardCard(p, x, info) {
+  const b = x.blueprint && info[x.blueprint];
+  // the type and id on the left, the priority on the right; the title below,
+  // wrapping; the blueprint's title on one line under it
+  return h("article", { class: "bcard", "data-task": x.id },
+    h("div", { class: "bctop" },
+      typeMark(x.type),
+      h("button", { class: "linkbtn tid mono", type: "button", title: `Open ${x.id}`, onclick: () => taskDialog(p, x) }, x.id),
+      h("span", { class: `prio p-${x.priority}`, title: `${x.priority} priority` }, icon("p-" + x.priority), x.priority)),
+    h("p", { class: "bctitle" }, x.title),
+    x.blueprint && h("div", { class: "bcbp" }, bpFrame(x.blueprint, b && b.title, b && b.color, true)));
+}
+// taskDialog is a task as Work › Tasks shows it opened: its definition,
+// criteria and audit trail, with Edit and Delete where Work allows them.
+function taskDialog(p, x) {
+  const acc = x.acceptance || [];
+  const passed = acc.filter((c) => c.result === "pass" || c.result === "n/a").length;
+  const dlg = dialog({ title: `${x.id} · ${x.title}`, sub: x.blueprint ? `In blueprint ${x.blueprint}` : "Without a blueprint", wide: true });
+  dlg.set(null, [h("div", { class: "taskdlg" }, taskDetail(x, passed))], [
+    h("button", { class: "ghost danger", type: "button", onclick: () => { dlg.close(); deleteTaskDialog(x); } }, icon("trash"), "Delete…"),
+    h("button", { class: "ghost", type: "button", disabled: !taskEditable(x), title: taskEditable(x) ? "" : "Only a ready or backlog task can be edited: once claimed, its definition is fixed",
+      onclick: () => { dlg.close(); editTaskDialog({ id: p.id }, x); } }, icon("edit"), "Edit…"),
+    h("button", { class: "primary", type: "button", onclick: () => dlg.close() }, "Close")]);
+  setTimeout(() => dlg.el.querySelector(".dlg-foot .primary")?.focus(), 0);
+}
+
+// --- blueprint order (from the C# rewrite: TASK-0078, TASK-0083) ---
+// The author orders the blueprints in Work › Tasks and Work › Blueprints
+// alike: Move up / Move down beside a blueprint, or dragging it before or
+// after another (a bar shows where it lands). A move among the blueprints
+// shown keeps the hidden ones' places in the whole order; "—" (no
+// blueprint) is never ordered. The order is saved for every listing.
+
+// bpPlace is the whole order with m moved before or after target.
+function bpPlace(all, m, target, where) {
+  const rest = all.filter((x) => x !== "—" && x !== m);
+  rest.splice(rest.indexOf(target) + (where === "after" ? 1 : 0), 0, m);
+  return rest;
+}
+async function bpSaveOrder(p, ids) {
+  try {
+    await post(projectAPI(p, "blueprints-order"), { order: ids });
+    toast("Blueprint order saved");
+    await afterWrite();
+  } catch (e) { state.tasks.refocus = null; toast(e.message, true); }
+}
+// bpArrows are m's Move up / Move down among the shown blueprints.
+function bpArrows(p, all, shown, m) {
+  const at = shown.indexOf(m);
+  const move = (dir, label) => h("button", {
+    class: `iconbtn bpmove bpmove-${dir}`, type: "button", title: `${label} ${m}`, "aria-label": `${label} ${m}`,
+    disabled: dir === "up" ? at === 0 : at === shown.length - 1,
+    onclick: () => { state.tasks.refocus = { m, dir }; bpSaveOrder(p, bpPlace(all, m, shown[at + (dir === "up" ? -1 : 1)], dir === "up" ? "before" : "after")); },
+  }, icon(dir));
+  return [move("up", "Move up"), move("down", "Move down")];
+}
+// bpDraggable lets handle drag m and target take another blueprint dropped
+// on it. Sections stack, so the bar is above or below; cards in a grid of
+// several columns take it on their left or right side.
+function bpDraggable(p, all, container, handle, target, m) {
+  const marks = ["bpdrop-before", "bpdrop-after", "bpside"];
+  const unmark = () => container.querySelectorAll(".bpdrop-before, .bpdrop-after").forEach((s) => s.classList.remove(...marks));
+  const isBlueprint = (ev) => Array.from(ev.dataTransfer.types || []).includes("text/x-blueprint");
+  handle.draggable = true;
+  handle.addEventListener("dragstart", (ev) => { ev.dataTransfer.setData("text/x-blueprint", m); ev.dataTransfer.effectAllowed = "move"; container.classList.add("bpdragging"); });
+  handle.addEventListener("dragend", () => { container.classList.remove("bpdragging"); unmark(); });
+  target.addEventListener("dragover", (ev) => {
+    if (!isBlueprint(ev)) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "move";
+    const box = target.getBoundingClientRect();
+    const side = getComputedStyle(target.parentElement).gridTemplateColumns.split(" ").filter(Boolean).length > 1;
+    const after = side ? ev.clientX > box.left + box.width / 2 : ev.clientY > box.top + box.height / 2;
+    const mark = after ? "bpdrop-after" : "bpdrop-before";
+    if (!target.classList.contains(mark) || target.classList.contains("bpside") !== side) { unmark(); target.classList.add(mark); if (side) target.classList.add("bpside"); }
+  });
+  target.addEventListener("dragleave", (ev) => { if (!target.contains(ev.relatedTarget)) target.classList.remove(...marks); });
+  target.addEventListener("drop", (ev) => {
+    const dragged = ev.dataTransfer.getData("text/x-blueprint");
+    if (!dragged) return; // a task: its own drop zone moves it
+    ev.preventDefault();
+    const after = target.classList.contains("bpdrop-after");
+    unmark();
+    container.classList.remove("bpdragging");
+    if (dragged !== m) bpSaveOrder(p, bpPlace(all, dragged, m, after ? "after" : "before"));
+  });
+}
+// bpRefocus puts the focus back on the arrow a move was made with, once
+// the redrawn view is in the page (a detached button takes no focus).
+function bpRefocus(container, fallback) {
+  if (!state.tasks.refocus) return;
+  const { m, dir } = state.tasks.refocus;
+  state.tasks.refocus = null;
+  const target = [...container.querySelectorAll("[data-blueprint]")].find((s) => s.dataset.blueprint === m);
+  const btn = target && target.querySelector(`.bpmove-${dir}`);
+  const el = btn && !btn.disabled ? btn : target && target.querySelector(fallback);
+  const focus = (tries) => { if (el && el.isConnected) el.focus(); else if (el && tries > 0) requestAnimationFrame(() => focus(tries - 1)); };
+  focus(60);
+}
+
 // --- tasks: grouped by blueprint, with progress ---
 async function viewTasks(p, opts, sec) {
   const t = state.tasks;
@@ -4925,6 +5103,8 @@ async function viewTasks(p, opts, sec) {
     // Blueprints with something to work on first; those holding only
     // deferred tasks after them.
     const order = [...milestones.filter((m) => shown.some(inM(m))), ...milestones.filter((m) => !shown.some(inM(m)) && deferred.some(inM(m)))];
+    // the author orders the blueprints while all of them are shown (from the C# rewrite)
+    const movable = t.milestone ? [] : order.filter((m) => m !== "—");
     fill(list, ...order.map((m) => {
       const mine = all.filter(inM(m));
       const rows = shown.filter(inM(m));
@@ -4933,26 +5113,35 @@ async function viewTasks(p, opts, sec) {
       const done = mine.filter((x) => x.status === "done").length;
       const open = !t.collapsed.has(m);
       const mi = info[m];
-      return dropZone(h("section", { class: "mstone" },
-        h("button", {
-          class: "mhead", "aria-expanded": String(open),
-          onclick: () => { open ? t.collapsed.add(m) : t.collapsed.delete(m); drawTasks(); },
-        },
-          chevron(open),
-          h("span", { class: "mname" }, m, mi && mi.title && h("span", { class: "mtitle" }, mi.title)),
-          h("span", { class: "mcount" }, `${rows.length} shown` + (reasons.size ? `, ${[...reasons.values()].reduce((n, xs) => n + xs.length, 0)} deferred` : "")),
-          h("span", { class: "mprog" }, meter(done, mine.length, `${done} of ${mine.length} tasks done`))),
-        open && mi && mi.goal && h("p", { class: "mgoal" }, mi.goal),
+      const head = h("button", {
+        class: "mhead", "aria-expanded": String(open),
+        onclick: () => { open ? t.collapsed.add(m) : t.collapsed.delete(m); drawTasks(); },
+      },
+        chevron(open),
+        // the blueprint in its colour's frame, as on the Board (from the C# rewrite)
+        h("span", { class: "mname" }, m === "—" ? m : bpFrame(m, mi && mi.title, mi && mi.color)),
+        h("span", { class: "mcount" }, `${rows.length} shown` + (reasons.size ? `, ${[...reasons.values()].reduce((n, xs) => n + xs.length, 0)} deferred` : "")),
+        h("span", { class: "mprog" }, meter(done, mine.length, `${done} of ${mine.length} tasks done`)));
+      const at = movable.indexOf(m);
+      const section = h("section", { class: "mstone", "data-blueprint": m },
+        at >= 0 ? h("div", { class: "mheadrow" }, head, bpArrows(p, milestones, movable, m)) : head,
+        // a long goal cut to two lines, as on the Blueprints cards; its own open state (from the C# rewrite)
+        open && mi && mi.goal && clampText({ id: m }, "tasks-goal", "mgoal", mi.goal),
         open && rows.length > 0 && h("div", { class: "tlist" }, rows.map((x) => draggableTask(taskRow(x, drawTasks), x))),
         open && h("button", { class: "taddrow", type: "button", onclick: () => newTaskDialog(p, mres.blueprints || [], m === "—" ? "" : m) }, icon("plus"), "Add task"),
         open && [...reasons].map(([reason, xs]) => h("div", { class: "deferredline" },
           statusPill("deferred"), h("span", { class: "dcount" }, plural(xs.length, "task")),
           h("span", { class: "dreason" }, reason || "no reason given"),
-          h("button", { class: "linkbtn", onclick: () => { t.statuses.add("deferred"); renderMain(); } }, "show")))), m);
+          h("button", { class: "linkbtn", onclick: () => { t.statuses.add("deferred"); renderMain(); } }, "show"))));
+      if (at >= 0) bpDraggable(p, milestones, list, head, section, m);
+      return dropZone(section, m);
     }),
     // while a task is dragged: the blueprints with nothing shown, as targets
     h("div", { class: "dropstrip" }, h("span", { class: "muted small" }, "Move to:"),
       [...milestones.filter((m) => !order.includes(m)), ...(milestones.includes("—") ? [] : ["—"])].map((m) => dropZone(h("span", { class: "dropchip" }, m === "—" ? "no blueprint" : info[m] && info[m].title ? `${m} · ${info[m].title}` : m), m))));
+    // a blueprint moved with the keyboard keeps the focus on its arrow
+    bpRefocus(list, ".mhead");
+    watchClamps(list);
   }
   // dragging a task onto a blueprint moves it there
   function draggableTask(row, x) {
@@ -5007,32 +5196,120 @@ async function viewTasks(p, opts, sec) {
     const chips = [["open", "Open"], ["done", "Done"], ["deferred", "Deferred"], ["all", "All"]].map(([k, label]) => h("button", {
       class: "chip", "aria-pressed": String(filt === k), onclick: () => { t.mfilter = k; drawMilestones(); },
     }, label, h("span", { class: "count" }, k === "all" ? ms.length : ms.filter((m) => kind(m) === k).length)));
-    fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
-      shown.length ? h("div", { class: "mcards" }, shown.map((m) => {
+    // the author orders the shown cards as the Tasks view orders sections (from the C# rewrite)
+    const movable = shown.map((m) => m.id).filter((id) => id !== "—");
+    const grid = h("div", { class: "mcards" });
+    fill(grid, shown.map((m) => {
         const [cls, ico, label] = stateOf(m);
         const n = (s) => (m.tasks || {})[s] || 0;
         const others = ms.filter((o) => o.id !== m.id && o.id !== "—");
-        return h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
+        const card = h("article", { class: `mcard ms-${cls}`, "data-blueprint": m.id },
           h("div", { class: "mctop" },
-            m.id !== "—" && h("span", { class: "mid" }, m.id),
+            // the id framed in the blueprint's colour, as everywhere, on its own: Go's .mid
+            // chip around it outlined it twice (from the C# rewrite)
+            m.id !== "—" && bpFrame(m.id, "", m.color),
             h("h3", {}, m.title || h("span", { class: "muted" }, m.id === "—" ? "Without a blueprint" : "Not described in the backlog")),
             h("span", { class: `pill ms-${cls}` }, h("span", { class: "ico", "aria-hidden": "true" }, ico), label),
+          m.id !== "—" && bpArrows(p, milestones, movable, m.id),
           m.id !== "—" && h("button", { class: "iconbtn mcedit", type: "button", title: m.title ? `Edit blueprint ${m.id}` : `Describe blueprint ${m.id}`, "aria-label": `Edit blueprint ${m.id}`,
             onclick: () => blueprintDialog(p, m) }, icon("edit")),
           m.id !== "—" && h("button", { class: "iconbtn mcdel", type: "button", title: `Remove blueprint ${m.id}`, "aria-label": `Remove blueprint ${m.id}`,
             onclick: () => removeBlueprintDialog(p, m, others) }, icon("trash"))),
-          m.goal && h("p", { class: "mcgoal" }, m.goal),
+          m.goal && clampText(m, "goal", "mcgoal", m.goal),
           m.total > 0 && h("div", { class: "mcprog" }, meter(n("done"), m.total, `${n("done")} of ${m.total} tasks done`),
             h("span", { class: "counts" }, ["ready", "in_progress", "review", "blocked", "backlog", "deferred"].filter((s) => n(s)).map((s) => [statusPill(s), " ", n(s), " "]))),
-          (m.exit || []).length > 0 && h("div", { class: "mcexit" }, h("h4", {}, "Done when"),
-            h("ul", {}, m.exit.map((e) => h("li", {}, e)))),
-          m.notes && h("p", { class: "mcnote" }, m.notes),
+          (m.exit || []).length > 0 && clampList(m, "exit", "mcexit", "Done when", m.exit),
+          m.notes && (noteItems(m.notes) ? clampList(m, "notes", "mcexit mcnotes", "Notes", noteItems(m.notes)) : clampText(m, "notes", "mcnote", m.notes)),
           m.total > 0 && h("button", {
             class: "mclink", onclick: () => {
               t.milestone = m.id; t.statuses = new Set(TASK_STATUSES); t.collapsed.delete(m.id); location.hash = projectHref(p.id, "work", "tasks");
             },
           }, `Show its ${plural(m.total, "task")} →`));
-      })) : h("p", { class: "empty" }, "No blueprints match."));
+        // the card is dragged as a whole; its buttons still take clicks
+        if (m.id !== "—") bpDraggable(p, milestones, grid, card, card, m.id);
+        return card;
+      }));
+    fill(body, h("div", { class: "filters" }, chips, h("button", { class: "primary newtask", onclick: () => newBlueprintDialog(p) }, "New blueprint…")),
+      shown.length ? grid : h("p", { class: "empty" }, "No blueprints match."));
+    bpRefocus(grid, ".bpmove:not(:disabled)");
+    watchClamps(grid);
+  }
+
+  // A card shows a summary: the goal and notes cut to two lines, the first
+  // three Done when criteria under their count; each part opens and closes on
+  // its own, and what is open stays open across redraws (live refresh,
+  // reordering) until the page is loaded again (from the C# rewrite)
+  t.mexpand = t.mexpand || new Set();
+  // whether each part ran past its lines when last measured, so a redraw starts from that
+  t.mover = t.mover || new Map();
+  // a clamped text's toggle shows only while the text runs past its two lines;
+  // measured after each draw and again when the container's width changes, a
+  // frame later (not inside the observer). Work › Tasks' section goals use it too
+  function watchClamps(container) {
+    // a part not laid out yet (no width: off the page, or its view still hidden)
+    // is measured again a little later, a few times at most
+    const measure = (tries = 0) => {
+      let pending = false;
+      container.querySelectorAll(".mcpart").forEach((part) => {
+        const [text, more] = part.children;
+        if (!text.clientWidth) { pending = true; return; }
+        const open = text.classList.contains("open");
+        text.classList.remove("open");
+        // hidden text counts once it is more than half a line, not a rounding difference
+        const over = text.scrollHeight - text.clientHeight > parseFloat(getComputedStyle(text).lineHeight) / 2;
+        text.classList.toggle("open", open);
+        more.hidden = !over;
+        t.mover.set(part.dataset.part, over);
+      });
+      // a timer, not an animation frame: a page in the background runs none
+      if (pending && tries < 40) setTimeout(() => measure(tries + 1), 50);
+    };
+    measure();
+    // and again once the web fonts are in: they set how far the text runs
+    if (document.fonts && document.fonts.status !== "loaded") document.fonts.ready.then(() => measure());
+    if (container.clampWatch) return;
+    let width = -1;
+    container.clampWatch = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (w !== width) { width = w; requestAnimationFrame(() => measure()); }
+    });
+    container.clampWatch.observe(container);
+  }
+  function partOf(m, part) {
+    return { key: `${p.id}|${m.id}|${part}`, id: `mc-${String(m.id).replace(/[^A-Za-z0-9_-]/g, "_")}-${part}` };
+  }
+  function partToggle(m, part, target, labels) {
+    const { key, id } = partOf(m, part);
+    const b = h("button", { class: "linkbtn mcmore", type: "button", "aria-controls": id });
+    const show = () => {
+      const open = t.mexpand.has(key);
+      b.setAttribute("aria-expanded", String(open));
+      b.textContent = labels[open ? 1 : 0];
+      target.classList.toggle("open", open);
+    };
+    b.addEventListener("click", () => { t.mexpand.has(key) ? t.mexpand.delete(key) : t.mexpand.add(key); show(); });
+    show();
+    return b;
+  }
+  function clampText(m, part, cls, text) {
+    const el = h("p", { class: `${cls} mcclamp`, id: partOf(m, part).id }, text);
+    const more = partToggle(m, part, el, ["more", "less"]);
+    // until measured, as it was last time (an open part needed its toggle), so a redraw does not flicker
+    const { key } = partOf(m, part);
+    more.hidden = !(t.mexpand.has(key) || t.mover.get(key));
+    return h("div", { class: "mcpart", "data-part": key }, el, more);
+  }
+  function clampList(m, part, cls, title, items) {
+    const ul = h("ul", { class: "mclist", id: partOf(m, part).id }, items.map((e, i) => h("li", { class: i >= 3 ? "mcextra" : null }, e)));
+    return h("div", { class: cls },
+      h("h4", {}, title, h("span", { class: "mcbadge", title: plural(items.length, "entry", "entries") }, items.length)),
+      ul,
+      items.length > 3 && partToggle(m, part, ul, [`Show all ${items.length}`, "Show less"]));
+  }
+  // notes written as a list (every line a "- " or "* " entry) are counted like Done when
+  function noteItems(notes) {
+    const lines = String(notes).split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.length > 1 && lines.every((l) => /^[-*•]\s+/.test(l)) ? lines.map((l) => l.replace(/^[-*•]\s+/, "")) : null;
   }
 
   const chips = TASK_STATUSES.map((s) => h("button", {
@@ -5050,7 +5327,7 @@ async function viewTasks(p, opts, sec) {
     const panel = h("div", { class: "mpanel" });
     const add = h("button", { class: "primary newtask", onclick: () => newTaskDialog(p, mres.blueprints || []) }, "New task…");
     fill(body, h("div", { class: "filters" }, chips, msSel, add), panel,
-      h("p", { class: "muted small draghint" }, "Drag a task onto another blueprint to move it; 'harness tasks export' writes the moves into the backlog file."), list);
+      h("p", { class: "muted small draghint" }, "Drag a task onto another blueprint to move it; 'harness tasks export' writes the moves into the backlog file. Drag a blueprint by its header, or use its arrows, to reorder the blueprints."), list);
     drawTasks();
   } else {
     drawMilestones();
@@ -5109,6 +5386,16 @@ function lease(claim) {
   return [text, left < 60 ? "warn" : ""];
 }
 
+// typeMark (from the C# rewrite) is a task's type as the Type picker's icon,
+// named by the type; no type is the default feature, an unknown one a
+// neutral dot.
+function typeMark(type) {
+  const t = type || "feature";
+  const known = TASK_TYPES.includes(t);
+  // opt-<type> is the Type picker's class: it gives the icon the picker's colour (--oc)
+  return h("span", { class: `ttype ty-${known ? `${t} opt-${t}` : "other"}`, role: "img", title: t, "aria-label": t }, icon(known ? t : "type-other"));
+}
+
 function taskRow(x, redraw) {
   const t = state.tasks;
   const open = t.open.has(x.id);
@@ -5121,6 +5408,7 @@ function taskRow(x, redraw) {
   },
     chevron(open),
     h("a", { class: "tid mono", href: projectHref(route().id, "work", x.id), onclick: (ev) => ev.stopPropagation(), title: "Link to this task" }, x.id),
+    typeMark(x.type),
     h("span", { class: "ttitle" }, x.title, x.claim && (() => {
       const [left, cls] = lease(x.claim);
       return h("span", { class: `claimtag ${cls}`, title: `claimed ${x.claim.claimed_at || ""}` }, `${x.claim.claimant}${left ? " · " + left : ""}`);

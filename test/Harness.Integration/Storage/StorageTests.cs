@@ -45,7 +45,7 @@ public sealed class StorageTests
         using var directory = new TestDirectory();
         using (var database = Open(directory.DatabasePath))
         {
-            database.SchemaVersion().Should().Be(23);
+            database.SchemaVersion().Should().Be(25);
             DatabaseBackups.List(directory.DatabasePath).Should().BeEmpty();
             using var connection = database.OpenConnection();
             Scalar(connection, "PRAGMA journal_mode").Should().Be("wal");
@@ -79,20 +79,22 @@ public sealed class StorageTests
     [InlineData(21)]
     [InlineData(22)]
     [InlineData(23)]
+    [InlineData(24)]
+    [InlineData(25)]
     public void HistoricalDatabasesUpgradeWithoutChangingDiagnosticsAndBackupsRestore(int version)
     {
         using var directory = new TestDirectory();
         CreateHistoricalDatabase(directory.DatabasePath, version);
         using (var database = Open(directory.DatabasePath))
         {
-            database.SchemaVersion().Should().Be(23);
+            database.SchemaVersion().Should().Be(25);
             database.GetDiagnostic("fixture").Should().Be("žluťoučký 🧪");
             using var connection = database.OpenConnection();
             Scalar(connection, "PRAGMA integrity_check").Should().Be("ok");
         }
 
         var backups = DatabaseBackups.List(directory.DatabasePath);
-        if (version == 23)
+        if (version == 25)
         {
             backups.Should().BeEmpty();
             return;
@@ -108,7 +110,7 @@ public sealed class StorageTests
         var restoredPath = Path.Combine(directory.Path, "restored.db");
         File.Copy(backup, restoredPath);
         using var restored = Open(restoredPath);
-        restored.SchemaVersion().Should().Be(23);
+        restored.SchemaVersion().Should().Be(25);
         restored.GetDiagnostic("fixture").Should().Be("žluťoučký 🧪");
     }
 
@@ -228,7 +230,7 @@ public sealed class StorageTests
     }
 
     [Theory]
-    [InlineData("INSERT INTO schema_migrations VALUES (24, '0024_future', 'now')", true)]
+    [InlineData("INSERT INTO schema_migrations VALUES (26, '0026_future', 'now')", true)]
     [InlineData("UPDATE schema_migrations SET name = '0001_wrong' WHERE version = 1", false)]
     [InlineData("INSERT INTO schema_migrations VALUES (0, '0000_invalid', 'now')", false)]
     public void InvalidOrNewerHistoryIsRejectedWithoutChangingTheDatabase(string mutation, bool newer)
@@ -489,7 +491,7 @@ public sealed class StorageTests
 
         using var database = HarnessDatabase.OpenReadOnly(directory.DatabasePath);
         using var connection = database.OpenConnection();
-        Scalar(connection, "SELECT COUNT(*) FROM schema_migrations").Should().Be(23L);
+        Scalar(connection, "SELECT COUNT(*) FROM schema_migrations").Should().Be(25L);
         Scalar(connection, "SELECT COUNT(*) FROM diagnostics").Should().Be(4L);
         Scalar(connection, "PRAGMA integrity_check").Should().Be("ok");
     }
@@ -500,7 +502,7 @@ public sealed class StorageTests
         using var directory = new TestDirectory();
         using (var created = Open(directory.DatabasePath))
         {
-            created.SchemaVersion().Should().Be(23);
+            created.SchemaVersion().Should().Be(25);
         }
 
         using var child = StartWorker("hold", directory.DatabasePath);
@@ -527,7 +529,7 @@ public sealed class StorageTests
                         )
                 )
                 .Should()
-                .Be(23);
+                .Be(25);
             var timer = Stopwatch.StartNew();
             var locked = FluentActions
                 .Invoking(() => WriteTransaction(current, (connection, transaction) => 0))
@@ -573,6 +575,39 @@ public sealed class StorageTests
         {
             Stop(child);
         }
+    }
+
+    [Fact]
+    public void ExistingBlueprintsGetColoursInTheBacklogsOrderWhenMigrated()
+    {
+        using var directory = new TestDirectory();
+        using (var old = Open(directory.DatabasePath, new StorageOptions(), MigrationCatalog.All.Take(24).ToArray()))
+        {
+            WriteTransaction(
+                old,
+                (connection, transaction) =>
+                {
+                    Execute(
+                        connection,
+                        """
+                        INSERT INTO blueprints(id,title,ordinal,updated_at) VALUES
+                          ('M2','Two',1,'2026-01-01T00:00:00Z'),('M1','One',0,'2026-01-01T00:00:00Z'),('M3','Three',2,'2026-01-01T00:00:00Z')
+                        """,
+                        transaction
+                    );
+                    return 0;
+                }
+            );
+        }
+
+        using var database = Open(directory.DatabasePath);
+        using var connection = database.OpenConnection();
+        Scalar(
+                connection,
+                "SELECT group_concat(id || '=' || color, ' ') FROM (SELECT id,color FROM blueprints ORDER BY ordinal)"
+            )
+            .Should()
+            .Be("M1=teal M2=orange M3=blue", "as given out one by one, the first colour no other uses");
     }
 
     private static void CreateHistoricalDatabase(string path, int version)

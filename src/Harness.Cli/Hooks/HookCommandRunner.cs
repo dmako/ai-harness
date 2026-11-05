@@ -133,7 +133,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
     }
 
     /// <summary>The hook command line for the client, run by the harness executable itself.</summary>
-    private static string HookCommand(string explicitPath, string client)
+    internal static string HookCommand(string explicitPath, string client)
     {
         var spec = SetupCommandRunner.Executable(explicitPath);
         // Client hooks accept one executable. The apphost is available beside framework builds.

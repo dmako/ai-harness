@@ -84,8 +84,9 @@ public sealed partial class HarnessStateSession
         TaskDefinition definition,
         string reason,
         string by,
+        string approvedBy,
         CancellationToken cancellationToken
-    ) => TaskOperationAsync(s => s.Propose(definition, reason, by, cancellationToken), cancellationToken);
+    ) => TaskOperationAsync(s => s.Propose(definition, reason, by, approvedBy, cancellationToken), cancellationToken);
 
     public Task<IReadOnlyList<BlueprintProgress>> BlueprintsAsync(CancellationToken cancellationToken) =>
         TaskOperationAsync(s => s.Blueprints(cancellationToken), cancellationToken);
@@ -95,10 +96,12 @@ public sealed partial class HarnessStateSession
         BlueprintDefinition definition,
         string reason,
         string by,
+        string approvedBy,
+        string sameName,
         CancellationToken cancellationToken
     ) =>
         TaskOperationAsync(
-            s => s.ProposeBlueprint(blueprint, definition, reason, by, cancellationToken),
+            s => s.ProposeBlueprint(blueprint, definition, reason, by, approvedBy, sameName, cancellationToken),
             cancellationToken
         );
 }

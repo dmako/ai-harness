@@ -1792,3 +1792,115 @@ table.dups { min-width: 45rem; }
 .choice { display: flex; align-items: center; justify-content: flex-start; gap: 0.5rem; flex-wrap: wrap; font-size: var(--text-md); }
 .choice input[type=radio] { width: auto; margin: 0; flex: none; }
 .choice select { width: auto; min-width: 12em; }
+/* a task row's type icon between its id and title (TASK-0080), the Type
+   picker's icon in the picker's colour (TASK-0082: --oc from .opt-<type>);
+   a column of its own so rows line up. Spike's gold (--warning) is 2:1 on a
+   light surface, so spike takes the palette's gold ink, in the picker too */
+.opt-spike { --oc: var(--gold-ink); }
+.trow { grid-template-columns: 1rem 5.75rem 1rem minmax(0, 1fr) 2.75rem 4.25rem 6.875rem 1.75rem 1.75rem; }
+.ttype { display: inline-flex; align-items: center; justify-content: center; width: 1rem; color: var(--oc, var(--ink-2)); }
+.ttype .icon { width: 1rem; height: 1rem; }
+@media (max-width: 56.25em) {
+  .trow { grid-template-columns: 1rem 1rem minmax(0, 1fr) auto auto auto; }
+}
+/* reordering blueprints in Work › Tasks (TASK-0078): the header with move
+   up / move down beside it, dragged by the header, a bar where it lands */
+.mheadrow { display: flex; align-items: center; gap: 0.25rem; padding-right: 0.5rem; background: var(--surface); }
+.mheadrow:hover { background: var(--surface-2); }
+.mheadrow .mhead { flex: 1 1 auto; min-width: 0; width: auto; background: transparent; }
+.mheadrow .mhead[draggable=true] { cursor: grab; }
+.mheadrow .bpmove { flex: none; }
+.mheadrow .bpmove:disabled { opacity: 0.35; cursor: default; }
+.mstone.bpdrop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.mstone.bpdrop-after { box-shadow: 0 3px 0 0 var(--accent); }
+.bpdragging .mstone { transition: box-shadow 80ms ease-out; }
+/* the merge-or-new choice in the Inbox's approve form (TASK-0077): it sits in
+   an .aform, whose labels are grids and inputs full width, so .choice is
+   restated there; a long label wraps beside its radio, not below it */
+.aform label.choice, .aprop .aform label.choice { display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap; font-size: var(--text-md); }
+.aform .choice input[type=radio] { width: auto; padding: 0; border: none; margin: 0; flex: none; }
+.choice > span:last-child { flex: 1 1 auto; min-width: 0; }
+/* reordering blueprint cards in Work › Blueprints (TASK-0083): the Tasks
+   view's arrows in the card's top row, the card dragged as a whole, a bar
+   where it lands: above or below, or on its side in a grid of columns */
+.mctop .bpmove { flex: none; }
+.mctop .bpmove:disabled { opacity: 0.35; cursor: default; }
+.mcard[draggable=true] { cursor: grab; }
+.mcard[draggable=true] :is(button, a) { cursor: pointer; }
+/* the bar alone (TASK-0084): --card-shadow is 'none' in dark themes, and a
+   list holding 'none' is invalid, which dropped the bar there */
+.mcard.bpdrop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.mcard.bpdrop-after { box-shadow: 0 3px 0 0 var(--accent); }
+.mcard.bpdrop-before.bpside { box-shadow: -3px 0 0 0 var(--accent); }
+.mcard.bpdrop-after.bpside { box-shadow: 3px 0 0 0 var(--accent); }
+/* blueprint colours and the Board (TASK-0081): 16 colours (--bp-<name> in the
+   palette, brand.css), each a light and a dark variant at WCAG AA (4.5:1) on a
+   card; a blueprint's id and title in an outlined frame of its colour, on
+   Board cards and in Work › Tasks */
+/* a blueprint's colour on an element, as a class: the page allows no inline styles */
+.bpc-teal { --bpc: var(--bp-teal); } .bpc-orange { --bpc: var(--bp-orange); } .bpc-blue { --bpc: var(--bp-blue); } .bpc-rose { --bpc: var(--bp-rose); } .bpc-green { --bpc: var(--bp-green); } .bpc-violet { --bpc: var(--bp-violet); } .bpc-amber { --bpc: var(--bp-amber); } .bpc-cyan { --bpc: var(--bp-cyan); } .bpc-pink { --bpc: var(--bp-pink); } .bpc-lime { --bpc: var(--bp-lime); } .bpc-indigo { --bpc: var(--bp-indigo); } .bpc-red { --bpc: var(--bp-red); } .bpc-fuchsia { --bpc: var(--bp-fuchsia); } .bpc-yellow { --bpc: var(--bp-yellow); } .bpc-slate { --bpc: var(--bp-slate); } .bpc-purple { --bpc: var(--bp-purple); }
+.bpframe {
+  display: inline-flex; align-items: baseline; gap: 0.375rem; max-width: 100%; min-width: 0;
+  padding: 0.0625rem 0.4375rem; border: 1px solid var(--bpc, var(--border)); border-radius: var(--radius-sm);
+  color: var(--bpc, var(--ink-2)); font-size: var(--text-sm); line-height: 1.4;
+}
+.bpframe .bpid { font-weight: 600; white-space: nowrap; }
+.bpframe .bptitle { overflow-wrap: anywhere; min-width: 0; }
+.mname .bpframe { font-size: var(--text-md); }
+.bpswatches { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.bpswatch {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.75rem; height: 1.75rem; padding: 0 0.375rem;
+  border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--surface); color: var(--ink-2); font-size: var(--text-xs);
+}
+.bpswatch .dot { width: 1rem; height: 1rem; border-radius: var(--radius-pill); background: var(--bpc); }
+.bpswatch[aria-checked="true"] { border-color: var(--bpc, var(--accent)); box-shadow: 0 0 0 2px var(--bpc, var(--accent)); color: var(--ink); }
+.boardbar { align-items: center; }
+.boardbar .bsel { display: inline-flex; align-items: center; gap: 0.375rem; font-size: var(--text-sm); color: var(--ink-2); }
+.boardbar select { width: auto; }
+/* one column per status side by side; on a narrow screen the board scrolls
+   sideways inside itself, never the page; each column scrolls on its own */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(13.5rem, 1fr); gap: 0.75rem; overflow-x: auto; padding-bottom: 0.5rem; margin-top: 0.75rem; max-width: 100%; }
+.bcol { display: flex; flex-direction: column; min-width: 0; max-height: 75vh; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.bhead { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0; padding: 0.625rem 0.75rem; font-size: var(--text-sm); }
+.bcards { display: grid; align-content: start; gap: 0.5rem; padding: 0 0.5rem 0.5rem; overflow-y: auto; min-height: 0; }
+.bcard { display: grid; gap: 0.375rem; padding: 0.5rem 0.625rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--card-shadow); min-width: 0; }
+/* a card (TASK-0084): type and id left, priority right, centred on one line;
+   the title below, wrapping; the blueprint's title on one line, cut with an
+   ellipsis when it does not fit */
+.bctop { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.bctop .tid { padding: 0; min-height: 1.5rem; font-size: var(--text-xs); }
+.bctop .prio { margin-left: auto; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem; }
+.bctitle { margin: 0; overflow-wrap: anywhere; font-size: var(--text-sm); min-width: 0; }
+.bcbp { min-width: 0; display: flex; }
+.bcbp .bpframe { min-width: 0; max-width: 100%; }
+.bcbp .bptitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+/* the task dialog: wider, its detail block inset on every side and rounded */
+.dlg.wide:has(.taskdlg) { width: min(880px, calc(100vw - 32px)); }
+.taskdlg .tdetail { padding: 1rem; border: 1px solid var(--grid); border-radius: var(--radius-lg); }
+/* a ghost button that deletes: the danger colour as its text, filled once
+   highlighted (.ghost.danger kept .danger's white text on no fill) */
+.ghost.danger { background: transparent; color: color-mix(in srgb, var(--critical) 80%, var(--ink)); border-color: color-mix(in srgb, var(--critical) 45%, var(--border)); }
+.ghost.danger:hover, .ghost.danger:focus-visible { background: var(--critical); border-color: var(--critical); color: var(--on-fill); filter: none; }
+/* dark themes fill with a light red, so the highlighted text is the palette's near black */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ghost.danger:hover, :root:not([data-theme="light"]) .ghost.danger:focus-visible { color: var(--on-gold); }
+}
+:root[data-theme="dark"] .ghost.danger:hover, :root[data-theme="dark"] .ghost.danger:focus-visible { color: var(--on-gold); }
+@media (max-width: 47.5em) { .board { grid-auto-columns: minmax(15rem, 85vw); } }
+/* Work › Blueprints cards as a summary (TASK-0087): the goal and notes cut to
+   two lines, Done when to its first three entries under their count, each
+   opened by its own toggle */
+.mcclamp:not(.open) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.mcclamp { overflow-wrap: anywhere; }
+.mclist:not(.open) > .mcextra { display: none; }
+.mcexit h4 { display: flex; align-items: center; gap: 0.375rem; }
+.mcbadge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.125rem; padding: 0 0.375rem; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border); font-size: var(--text-xs); font-weight: 600; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.mcmore { margin-top: 0.125rem; font-size: var(--text-sm); border-radius: var(--radius-sm); display: inline-flex; align-items: center; min-height: 1.5rem; min-width: 1.5rem; }
+.mcmore:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mcpart .mcnote + .mcmore { margin-left: 0.625rem; }
+.mcexit li { overflow-wrap: anywhere; }
+/* Work › Tasks: a section's goal cut the same way (TASK-0089); the space below
+   moves from the text to its wrapper so the clamp hides the third line whole */
+.mstone > .mcpart { padding: 0 0.875rem 0.625rem 2.5rem; }
+.mstone > .mcpart > .mgoal { padding: 0; }
+

@@ -3,6 +3,7 @@ using System.Text.Json;
 using AwesomeAssertions;
 using Harness.Core.Memory;
 using Harness.Core.Tasks;
+using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Tasks;
 using Xunit;
@@ -348,6 +349,148 @@ public sealed class TaskStoreTests
     }
 
     [Fact]
+    public void BlueprintsGetTheFirstFreeColourKeepItAndTakeTheOneTheAuthorPicks()
+    {
+        using var s = new State();
+        string Colors() =>
+            string.Join(" ", s.Store.Blueprints(Token).Select(b => b.Definition.Id + "=" + b.Definition.Color));
+        // imported, created and described blueprints each take the first colour no other uses
+        s.Store.ImportBlueprints(
+            [new("M1", "One"), new("M2", "Two", Color: "rose")],
+            "fixture",
+            cancellationToken: Token
+        );
+        s.Store.CreateBlueprint(new("M3", "Three"), "ui", Token);
+        s.Store.Import([Definition("T-1") with { Blueprint = "M9" }], "fixture", cancellationToken: Token);
+        Colors().Should().Be("M1=teal M2=rose M3=orange M9=", "a blueprint only tasks name has no colour yet");
+        s.Store.EditBlueprint("M9", new("", "Nine"), "ui", Token);
+        Colors().Should().Be("M1=teal M2=rose M3=orange M9=blue");
+
+        // an edit without a colour keeps it; one with a colour sets it; an unknown one is refused
+        s.Store.EditBlueprint("M1", new("", "One again"), "ui", Token);
+        s.Store.EditBlueprint("M3", new("", "Three", Color: "Violet"), "ui", Token);
+        Colors().Should().Be("M1=teal M2=rose M3=violet M9=blue");
+        FluentActions
+            .Invoking(() => s.Store.EditBlueprint("M3", new("", "Three", Color: "mauve"), "ui", Token))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*mauve*");
+        FluentActions
+            .Invoking(() =>
+                s.Store.ImportBlueprints([new("M5", "Five", Color: "mauve")], "fixture", cancellationToken: Token)
+            )
+            .Should()
+            .Throw<ArgumentException>();
+
+        // the backlog file carries the colour; one re-imported without colours keeps the blueprints' own
+        var path = Path.Combine(s.Directory, "backlog.yaml");
+        s.Store.Export(path, cancellationToken: Token);
+        BacklogCodec.Read(path).Blueprints.Select(b => b.Id + "=" + b.Color).Should().Contain(["M3=violet", "M2=rose"]);
+        s.Store.ImportBlueprints([new("M1", "One again"), new("M2", "Two")], "fixture", cancellationToken: Token);
+        Colors().Should().StartWith("M1=teal M2=rose");
+
+        // all 16 used: the set starts again from the first
+        s.Store.ImportBlueprints(
+            [.. Enumerable.Range(10, 12).Select(i => new BlueprintDefinition("B" + i, "Filler " + i))],
+            "fixture",
+            cancellationToken: Token
+        );
+        s.Store.Blueprints(Token).Select(b => b.Definition.Color).Distinct().Should().HaveCount(16);
+        s.Store.CreateBlueprint(new("M40", "Seventeenth"), "ui", Token).Id.Should().Be("M40");
+        s.Store.Blueprints(Token).Single(b => b.Definition.Id == "M40").Definition.Color.Should().Be("teal");
+        TaskViews.Blueprint(s.Store.Blueprints(Token)[0]).Should().ContainKey("color");
+    }
+
+    [Fact]
+    public async Task BoardChoicesAreKeptOnTheMachinePerProjectWithMachineDefaults()
+    {
+        using var s = new State();
+        var settings = new UiPreferences(s.Directory);
+        settings
+            .Board("prj_a")
+            .Should()
+            .Be(new BoardSettings("priority", 7, ""), "nothing chosen: the Board's defaults");
+        await settings.SetBoardDefaultsAsync("changed", 3, Token);
+        await settings.SetBoardAsync("prj_a", "name", null, "M2", Token);
+        // a new instance reads the file again, as another browser or a restarted harness ui does
+        var again = new UiPreferences(s.Directory);
+        again
+            .Board("prj_a")
+            .Should()
+            .Be(new BoardSettings("name", 3, "M2"), "its own sort and filter, the default done-age");
+        again.Board("prj_b").Should().Be(new BoardSettings("changed", 3, ""));
+        again.BoardDefaults().Should().Be(new BoardSettings("changed", 3, ""));
+        await FluentActions
+            .Awaiting(() => again.SetBoardAsync("prj_a", "random", null, null, Token))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+        await FluentActions
+            .Awaiting(() => again.SetBoardDefaultsAsync(null, 5, Token))
+            .Should()
+            .ThrowAsync<ArgumentException>();
+        File.Exists(Path.Combine(s.Directory, "ui.json")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void BlueprintsKeepTheOrderTheAuthorGaveThemAndUnorderedOnesFollow()
+    {
+        using var s = new State();
+        s.Store.ImportBlueprints(
+            [new("M1", "One"), new("M2", "Two"), new("M3", "Three")],
+            "fixture",
+            cancellationToken: Token
+        );
+        // M7 is only named by a task: it can be ordered too
+        s.Store.Import([Definition("T-1") with { Blueprint = "M7" }], "fixture", cancellationToken: Token);
+        string Listed() =>
+            string.Join(
+                " ",
+                s.Store.Blueprints(Token).Select(b => b.Definition.Id + (b.Order is { } o ? "@" + o : ""))
+            );
+        Listed().Should().Be("M1 M2 M3 M7", "nothing is ordered yet: the backlog's order");
+
+        s.Store.ReorderBlueprints(["M7", "M3"], Token)
+            .Select(b => b.Definition.Id)
+            .Should()
+            .Equal("M7", "M3", "M1", "M2");
+        Listed().Should().Be("M7@0 M3@1 M1 M2", "unordered blueprints follow, in their usual order");
+
+        // a new blueprint has no place yet; re-importing the backlog keeps the author's order
+        s.Store.CreateBlueprint(new("M4", "Four"), "ui", Token);
+        s.Store.ImportBlueprints(
+            [new("M1", "One"), new("M2", "Two"), new("M3", "Three edited")],
+            "fixture",
+            cancellationToken: Token
+        );
+        Listed().Should().Be("M7@0 M3@1 M1 M2 M4");
+
+        // a new order replaces the old one whole; removing a blueprint takes its place with it
+        s.Store.ReorderBlueprints(["M2", "M4", "M1", "M3", "M7"], Token);
+        s.Store.RemoveBlueprint("M4", BlueprintTasks.Keep, "", "human", Token);
+        s.Store.CreateBlueprint(new("M4", "Four again"), "ui", Token);
+        Listed().Should().Be("M2@0 M1@2 M3@3 M7@4 M4", "the recreated M4 starts unordered");
+        new TaskStore(s.Database)
+            .Blueprints(Token)
+            .Select(b => b.Definition.Id)
+            .Should()
+            .Equal(["M2", "M1", "M3", "M7", "M4"], "the order is stored, not held by one store");
+
+        FluentActions
+            .Invoking(() => s.Store.ReorderBlueprints(["M1", "M404"], Token))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*M404*");
+        FluentActions
+            .Invoking(() => s.Store.ReorderBlueprints(["M1", "M1"], Token))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*twice*");
+        Listed().Should().Be("M2@0 M1@2 M3@3 M7@4 M4", "a refused order changes nothing");
+        TaskViews.Blueprint(s.Store.Blueprints(Token)[0]).Should().ContainKey("order").WhoseValue.Should().Be(0);
+        TaskViews.Blueprint(s.Store.Blueprints(Token)[^1]).Should().NotContainKey("order");
+    }
+
+    [Fact]
     public void BlueprintsAreCreatedEditedAndRemovedWithTheirTasksMovedOrDeleted()
     {
         using var s = new State();
@@ -461,7 +604,12 @@ public sealed class TaskStoreTests
         var approved = s.Store.ApproveBlueprint(created.Id, null, "human", cancellationToken: Token);
         approved.Blueprint.Id.Should().Be("M2", "a new one gets the next free id");
         approved.Proposal.Result.Should().Be("M2");
-        s.Store.ApproveBlueprint(changed.Id, new("", "Restated by the author", "goal"), "human", cancellationToken: Token)
+        s.Store.ApproveBlueprint(
+                changed.Id,
+                new("", "Restated by the author", "goal"),
+                "human",
+                cancellationToken: Token
+            )
             .Blueprint.Id.Should()
             .Be("M1");
         s.Store.Blueprints(Token)
@@ -518,7 +666,7 @@ public sealed class TaskStoreTests
         }
 
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
-        database.SchemaVersion().Should().Be(23);
+        database.SchemaVersion().Should().Be(25);
         var store = new TaskStore(database);
         var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
         blueprint.Id.Should().Be("M1");

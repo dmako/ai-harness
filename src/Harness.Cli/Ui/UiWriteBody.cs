@@ -33,11 +33,12 @@ internal sealed class UiWriteBody
             name.ToUpperInvariant() switch
             {
                 "TASK" or "EDIT" => value is JsonObject,
-                "PROJECT_IDS" or "DEPENDS_ON" or "ACCEPTANCE" or "SUPERSEDES" or "EXIT" => Strings(value),
+                "PROJECT_IDS" or "DEPENDS_ON" or "ACCEPTANCE" or "SUPERSEDES" or "EXIT" or "ORDER" => Strings(value),
                 // a task's paths, or a memory's one scope
                 "SCOPE" => Strings(value) || value is JsonValue one && one.TryGetValue<string>(out _),
                 "KEEP_BOTH" or "DRY_RUN" or "FORCE" or "ENABLED" or "SYNC" => value is JsonValue flag
                     && flag.TryGetValue<bool>(out _),
+                "HIDE_DONE_DAYS" => value is JsonValue number && number.TryGetValue<int>(out _),
                 _ => value is JsonValue text && text.TryGetValue<string>(out _),
             }
         );
@@ -51,6 +52,8 @@ internal sealed class UiWriteBody
     internal string? Optional(string name) => _values.GetValueOrDefault(name)?.GetValue<string>();
 
     internal bool Flag(string name) => _values.GetValueOrDefault(name)?.GetValue<bool>() ?? false;
+
+    internal int? Number(string name) => _values.GetValueOrDefault(name)?.GetValue<int>();
 
     internal string[] List(string name) =>
         _values.GetValueOrDefault(name) switch

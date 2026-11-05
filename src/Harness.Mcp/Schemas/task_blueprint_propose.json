@@ -1,5 +1,5 @@
 {
-  "description": "Propose a new blueprint (a group of tasks: title, goal, exit criteria, notes), or a change to one (name it in blueprint; fields you leave out keep their current value). Agents propose blueprints, never create or change them: it waits for the user in harness ui, Work › Inbox, who approves it (the blueprint is made or restated) or rejects it. Tasks you propose for a new one name it by its title (task_propose blueprint): whichever is approved first, they end up in it.",
+  "description": "Propose a new blueprint (a group of tasks: title, goal, exit criteria, notes), or a change to one (name it in blueprint; fields you leave out keep their current value). Agents propose blueprints, never create or change them: it waits for the user in harness ui, Work › Inbox, who approves it (the blueprint is made or restated) or rejects it. Tasks you propose for a new one name it by its title (task_propose blueprint): whichever is approved first, they end up in it. Only when it was already approved outside harness, name that approver in approved_by: the blueprint is then made or restated at once, recorded as approved by them.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -31,6 +31,14 @@
       "reason": {
         "type": "string",
         "description": "why you propose it: what you saw, where"
+      },
+      "approved_by": {
+        "type": "string",
+        "description": "only when the work was already approved outside harness (a change board, a ticket, the user in this conversation): who approved it. It is then approved at once in their name, without the Inbox; leave out otherwise, the default"
+      },
+      "same_name": {
+        "type": "string",
+        "description": "with approved_by, when a blueprint of the new one's title exists: merge (restate that one) or new (a separate blueprint); without it such an approval is refused"
       }
     },
     "additionalProperties": false
@@ -114,6 +122,10 @@
       },
       "note": {
         "type": "string"
+      },
+      "blueprint_id": {
+        "type": "string",
+        "description": "the blueprint made or restated when approved_by was given"
       }
     },
     "required": [

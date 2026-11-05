@@ -117,7 +117,11 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
             : throw new InvalidDataException("HEAD is neither a branch nor a commit.");
     }
 
-    internal static bool PathEquals(string first, string second) =>
+    /// <summary>Compares paths as the file system does: ignoring case on Windows.</summary>
+    public static StringComparer PathComparer { get; } =
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    public static bool PathEquals(string first, string second) =>
         string.Equals(
             Path.GetFullPath(first),
             Path.GetFullPath(second),

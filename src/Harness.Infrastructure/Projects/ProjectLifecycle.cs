@@ -101,15 +101,16 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         var actions = steps
             .Select(step => new InitAction(Path.Exists(step.Path) ? "exists" : "create", step.Path, step.Note))
             .ToList();
-        var configurations = new[]
+        var files = new[]
         {
-            ConfigurationFile(
-                ConfigurationPaths.ProjectPath(repository.Root),
-                ConfigurationExample.ProjectHeader,
-                "project config"
+            (
+                Path: ConfigurationPaths.ProjectPath(repository.Root),
+                Header: ConfigurationExample.ProjectHeader,
+                Note: "project config"
             ),
-            ConfigurationFile(GlobalConfigurationPath, ConfigurationExample.GlobalHeader, "global config"),
+            (Path: GlobalConfigurationPath, Header: ConfigurationExample.GlobalHeader, Note: "global config"),
         };
+        var configurations = files.Select(file => ConfigurationFile(file.Path, file.Header, file.Note)).ToArray();
         actions.AddRange(configurations.Select(configuration => configuration.Action));
         // the configuration is read as init will leave it, so an invalid one stops init before anything is written
         var location = await LocateAsync(
@@ -137,10 +138,25 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
                 }
             }
 
-            foreach (var (action, content) in configurations.Where(configuration => configuration.Content is not null))
+            if (configurations.Any(configuration => configuration.Content is not null))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                WriteConfiguration(action.Path, content!);
+                // concurrent inits share the global config: one writes at a time, each against the file it finds
+                var globalDirectory = Path.GetDirectoryName(Path.GetFullPath(GlobalConfigurationPath))!;
+                StorageFiles.CreateDirectory(globalDirectory);
+                await using var lease = await Harness
+                    .Infrastructure.Workspaces.AtomicMachineFile.LockAsync(
+                        Path.Combine(globalDirectory, "config.toml.lock"),
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+                foreach (var file in files)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (ConfigurationFile(file.Path, file.Header, file.Note).Content is { } content)
+                    {
+                        await WriteConfigurationAsync(file.Path, content, cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
         }
 
@@ -192,6 +208,42 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
     }
 
     /// <summary>
+    /// The global config.toml brought up to date as init does it, under the same lock and against the file on disk,
+    /// without touching any project: <c>Failed</c> when the file cannot be updated (its problem is in the note).
+    /// </summary>
+    public async Task<(InitAction Action, bool Failed)> UpdateGlobalConfigurationAsync(
+        bool dryRun,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var path = GlobalConfigurationPath;
+        var (action, content) = ConfigurationFile(path, ConfigurationExample.GlobalHeader, "global config");
+        var failed =
+            action.Verb is "exists" && content is null && action.Note.Contains("not updated", StringComparison.Ordinal);
+        if (dryRun || content is null)
+        {
+            return (action, failed);
+        }
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        StorageFiles.CreateDirectory(directory);
+        await using var lease = await Harness
+            .Infrastructure.Workspaces.AtomicMachineFile.LockAsync(
+                Path.Combine(directory, "config.toml.lock"),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        // recomputed under the lock: another harness may have changed it since
+        (action, content) = ConfigurationFile(path, ConfigurationExample.GlobalHeader, "global config");
+        if (content is not null)
+        {
+            await WriteConfigurationAsync(path, content, cancellationToken).ConfigureAwait(false);
+        }
+
+        return (action, false);
+    }
+
+    /// <summary>
     /// A config.toml as init leaves it: a new one with every option commented out, an existing one brought up to
     /// date (options new to this harness added as comments, ones it dropped removed), or left as it is.
     /// </summary>
@@ -238,14 +290,39 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             ? string.Join(", ", options)
             : string.Join(", ", options.Take(3)) + " and " + (options.Count - 3) + " more";
 
-    private static void WriteConfiguration(string path, string content)
+    private static async Task WriteConfigurationAsync(string path, string content, CancellationToken token)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(temporary, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.Move(temporary, path, overwrite: true);
+            await File.WriteAllTextAsync(
+                    temporary,
+                    content,
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                    token
+                )
+                .ConfigureAwait(false);
+            // Windows refuses to replace a file another process has open (a harness reading its config); that
+            // reader lets go within moments
+            var attempt = 0;
+            var moved = false;
+            while (!moved)
+            {
+                try
+                {
+                    File.Move(temporary, path, overwrite: true);
+                    moved = true;
+                }
+                catch (Exception error)
+                    when (OperatingSystem.IsWindows()
+                        && ++attempt < 40
+                        && error is IOException or UnauthorizedAccessException
+                    )
+                {
+                    await Task.Delay(25, token).ConfigureAwait(false);
+                }
+            }
         }
         finally
         {

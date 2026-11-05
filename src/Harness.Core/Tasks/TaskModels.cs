@@ -72,12 +72,15 @@ public sealed record TaskDefinition
     }
 }
 
+/// <param name="Color">One of <see cref="BlueprintColors.Names"/>; "" asks for one to be given out (or, when
+/// editing, keeps the current one).</param>
 public sealed record BlueprintDefinition(
     string Id,
     string Title,
     string Goal = "",
     IReadOnlyList<string>? Exit = null,
-    string Notes = ""
+    string Notes = "",
+    string Color = ""
 );
 
 /// <summary>What removing a blueprint did to its tasks: moved to another (or none), or deleted, and the outside tasks
@@ -130,10 +133,12 @@ public sealed record TaskImportResult(
 
 public sealed record TaskExportResult(string Path, IReadOnlyList<string> Added, bool Created);
 
+/// <param name="Order">The position the author gave it in harness ui (0 first), or null when not ordered.</param>
 public sealed record BlueprintProgress(
     BlueprintDefinition Definition,
     bool Defined,
-    IReadOnlyDictionary<string, int> Tasks
+    IReadOnlyDictionary<string, int> Tasks,
+    int? Order = null
 )
 {
     public int Total => Tasks.Values.Sum();

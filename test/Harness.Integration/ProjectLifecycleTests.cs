@@ -3,8 +3,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text.Json;
 using AwesomeAssertions;
+using Harness.Core.Instructions;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Git;
+using Harness.Infrastructure.Hooks;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -128,7 +130,7 @@ public sealed class ProjectLifecycleTests
         inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         _ = inspection.Checks("test");
         inspection.Project!.Id.Should().Be(initialized.Registration.Project.Id);
-        inspection.SchemaVersion.Should().Be(23);
+        inspection.SchemaVersion.Should().Be(25);
         fixture.Snapshot().Should().Equal(before);
 
         var config = Path.Combine(root, ".harness", "config.toml");
@@ -377,7 +379,7 @@ public sealed class ProjectLifecycleTests
         var before = (wal.Length, wal.LastWriteTimeUtc);
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         inspection.Project!.Id.Should().Be(initialized.Registration!.Project.Id);
-        inspection.SchemaVersion.Should().Be(23);
+        inspection.SchemaVersion.Should().Be(25);
         wal.Refresh();
         ((wal.Length, wal.LastWriteTimeUtc)).Should().Be(before);
         using var readOnly = HarnessDatabase.OpenReadOnly(initialized.Location.DatabasePath);
@@ -446,6 +448,182 @@ public sealed class ProjectLifecycleTests
         }
     }
 
+    [Fact]
+    public async Task MigrateBringsEveryProjectUpToDateRefreshesOnlyWhatIsInstalledAndSyncsInParallel()
+    {
+        using var fixture = new ProjectFixture { IsolatedHome = true };
+        var token = TestContext.Current.CancellationToken;
+        var installed = await OldProjectAsync(fixture, "installed");
+        var bare = await OldProjectAsync(fixture, "bare");
+        var broken = await OldProjectAsync(fixture, "broken");
+        var gone = await OldProjectAsync(fixture, "gone");
+        Directory.Move(gone, gone + "-moved");
+        // an outdated guidance block and an outdated Git hook in one project, nothing in the other
+        await File.WriteAllTextAsync(
+            Path.Combine(installed, "AGENTS.md"),
+            "# Notes\n\n" + AgentGuidance.BeginMarker + "\nold guidance\n" + AgentGuidance.EndMarker + "\n",
+            token
+        );
+        var hook = Path.Combine(installed, ".git", "hooks", "post-commit");
+        await File.WriteAllTextAsync(
+            hook,
+            "#!/bin/sh\n" + GitHooks.Section.Begin + "\nold\n" + GitHooks.Section.End + "\n",
+            token
+        );
+        // a project whose config cannot be read fails on its own
+        await File.WriteAllTextAsync(Path.Combine(broken, ".harness", "config.toml"), "[[[ not toml", token);
+        // the user's knowledge database, and a user-scope MCP entry whose executable is gone
+        var knowledge = Path.Combine(fixture.GlobalDirectory, "knowledge", "user.db");
+        HarnessDatabase.Open(knowledge, new StorageOptions(), MigrationCatalog.All.Take(23).ToArray(), token).Dispose();
+        Directory.CreateDirectory(fixture.ClaudeDirectory);
+        var claude = Path.Combine(fixture.ClaudeDirectory, ".claude.json");
+        await File.WriteAllTextAsync(
+            claude,
+            """{"mcpServers":{"harness":{"type":"stdio","command":"/gone/harness","args":["mcp"]}}}""",
+            token
+        );
+
+        var run = await fixture.CliAsync("migrate", "--json", "--jobs", "2");
+        run.Code.Should().Be(1, run.Error);
+        using var json = JsonDocument.Parse(run.Output);
+        var result = json.RootElement;
+        result.GetProperty("peak_jobs").GetInt32().Should().BeInRange(1, 2);
+        var projects = result
+            .GetProperty("projects")
+            .EnumerateArray()
+            .ToDictionary(p => p.GetProperty("root").GetString()!, p => p, GitRepository.PathComparer);
+        projects[installed].GetProperty("status").GetString().Should().Be("ok");
+        projects[bare].GetProperty("status").GetString().Should().Be("ok");
+        projects[broken].GetProperty("status").GetString().Should().Be("failed");
+        projects[gone].GetProperty("status").GetString().Should().Be("skipped");
+        projects[installed].GetProperty("schema_from").GetInt32().Should().Be(23);
+        projects[installed].GetProperty("schema_to").GetInt32().Should().Be(HarnessDatabase.LatestSchemaVersion);
+        States(projects[installed])
+            .Should()
+            .Contain(["database:migrated", "guidance:refreshed", "hook:refreshed", "sync:synced"]);
+        States(projects[bare])
+            .Should()
+            .Contain(["database:migrated", "sync:synced"])
+            .And.NotContain(state =>
+                state.StartsWith("guidance", StringComparison.Ordinal)
+                || state.StartsWith("hook", StringComparison.Ordinal)
+                || state.StartsWith("mcp", StringComparison.Ordinal)
+            );
+        States(result.GetProperty("machine")).Should().Contain(["knowledge:migrated", "mcp:refreshed"]);
+
+        foreach (var root in new[] { installed, bare })
+        {
+            var database = Path.Combine(root, ".harness", "harness.db");
+            using (var opened = HarnessDatabase.OpenReadOnly(database))
+            {
+                opened.SchemaVersion().Should().Be(HarnessDatabase.LatestSchemaVersion);
+            }
+
+            DatabaseBackups.List(database).Should().ContainSingle();
+        }
+
+        using (var opened = HarnessDatabase.OpenReadOnly(knowledge))
+        {
+            opened.SchemaVersion().Should().Be(HarnessDatabase.LatestSchemaVersion);
+        }
+
+        (await File.ReadAllTextAsync(Path.Combine(installed, "AGENTS.md"), token))
+            .Should()
+            .StartWith("# Notes")
+            .And.NotContain("old guidance")
+            .And.Contain("## Harness");
+        (await File.ReadAllTextAsync(hook, token)).Should().Contain(" sync >/dev/null");
+        File.Exists(Path.Combine(bare, "AGENTS.md")).Should().BeFalse();
+        File.Exists(Path.Combine(bare, ".git", "hooks", "post-commit")).Should().BeFalse();
+        File.Exists(Path.Combine(bare, ".mcp.json")).Should().BeFalse();
+        File.Exists(Path.Combine(fixture.ClaudeDirectory, "settings.json")).Should().BeFalse();
+        (await File.ReadAllTextAsync(claude, token)).Should().NotContain("/gone/harness");
+        // the missing project stays registered
+        fixture.Lifecycle.Registry.Load()["projects"]!
+            .AsArray()
+            .Count.Should()
+            .Be(4);
+
+        // again: nothing left to change apart from the syncs it runs (the databases, the registry's sync note)
+        var before = fixture.Snapshot().Where(Unsynced).ToArray();
+        var again = await fixture.CliAsync("migrate", "--json");
+        again.Code.Should().Be(1, again.Error);
+        using var second = JsonDocument.Parse(again.Output);
+        foreach (var project in second.RootElement.GetProperty("projects").EnumerateArray())
+        {
+            var root = project.GetProperty("root").GetString()!;
+            if (GitRepository.PathEquals(root, installed) || GitRepository.PathEquals(root, bare))
+            {
+                States(project)
+                    .Should()
+                    .OnlyContain(state =>
+                        state.EndsWith(":up_to_date", StringComparison.Ordinal) || state == "sync:synced"
+                    );
+            }
+        }
+
+        States(second.RootElement.GetProperty("machine"))
+            .Should()
+            .OnlyContain(state => state.EndsWith(":up_to_date", StringComparison.Ordinal));
+        fixture.Snapshot().Where(Unsynced).Should().Equal(before);
+        var text = await fixture.CliAsync("migrate");
+        text.Output.Should().Contain("skipped").And.Contain("harness projects forget");
+
+        static bool Unsynced(string entry) =>
+            !entry.Contains(".db|", StringComparison.Ordinal)
+            && !entry.Contains("projects.json|", StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MigrateDryRunWritesNothingAndRefusesNoJobs()
+    {
+        using var fixture = new ProjectFixture { IsolatedHome = true };
+        var root = await OldProjectAsync(fixture, "dry");
+        var before = fixture.Snapshot();
+        var run = await fixture.CliAsync("migrate", "--dry-run");
+        run.Code.Should().Be(0, run.Output + run.Error);
+        run.Output.Should()
+            .Contain("would migrate")
+            .And.Contain("schema 23 to ")
+            .And.Contain("would sync")
+            .And.Contain("Dry run: nothing was changed.");
+        fixture.Snapshot().Should().Equal(before);
+        DatabaseBackups.List(Path.Combine(root, ".harness", "harness.db")).Should().BeEmpty();
+        (await fixture.CliAsync("migrate", "--jobs", "-1")).Code.Should().Be(2);
+        (await fixture.CliAsync("--help")).Output.Should().Contain("migrate");
+        (await fixture.CliAsync("__complete", "bash", "mi")).Output.Should().Contain("migrate");
+    }
+
+    private static IEnumerable<string> States(JsonElement group) =>
+        group
+            .GetProperty("items")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("kind").GetString() + ":" + item.GetProperty("state").GetString());
+
+    /// <summary>A registered project whose database an older harness (schema 23) wrote, without init's files.</summary>
+    private static async Task<string> OldProjectAsync(ProjectFixture fixture, string name)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var root = await fixture.CreateRepositoryAsync(name);
+        var repository = await GitRepository.DiscoverAsync(root, token);
+        // where harness looks for it: under Git's resolved path (macOS's temp folder is behind the /var symlink,
+        // and a database registered under the other spelling would be taken for a copy)
+        using var database = HarnessDatabase.Open(
+            Path.Combine(repository.StateRoot, ".harness", "harness.db"),
+            new StorageOptions(),
+            MigrationCatalog.All.Take(23).ToArray(),
+            token
+        );
+        var registration = ProjectStore.Register(database, repository, await repository.ReadHeadAsync(token), token);
+        await fixture.Lifecycle.Registry.NoteInitAsync(
+            registration.Project,
+            ProjectStore.Worktrees(database),
+            "test",
+            token
+        );
+        return repository.Root;
+    }
+
     private sealed class ProjectFixture : IDisposable
     {
         internal string Root { get; } =
@@ -453,6 +631,11 @@ public sealed class ProjectLifecycleTests
         internal string GlobalDirectory => Path.Combine(Root, "global");
         internal string GlobalConfig => Path.Combine(GlobalDirectory, "config.toml");
         internal ProjectLifecycle Lifecycle => new(GlobalConfig, "test");
+
+        /// <summary>Client configuration (Claude Code, Codex) is read from a home inside the fixture.</summary>
+        internal bool IsolatedHome { get; init; }
+        internal string Home => Path.Combine(Root, "home");
+        internal string ClaudeDirectory => Path.Combine(Home, ".claude");
 
         internal ProjectFixture() => Directory.CreateDirectory(Root);
 
@@ -512,6 +695,12 @@ public sealed class ProjectLifecycleTests
                 WorkingDirectory = Root,
             };
             start.Environment["HARNESS_CONFIG_DIR"] = GlobalDirectory;
+            if (IsolatedHome)
+            {
+                start.Environment[OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME"] = Home;
+                start.Environment["CLAUDE_CONFIG_DIR"] = ClaudeDirectory;
+                start.Environment["CODEX_HOME"] = Path.Combine(Home, ".codex");
+            }
             if (executable == "dotnet")
             {
                 start.Environment["GIT_DIR"] = Path.Combine(Root, "unrelated-git-dir");

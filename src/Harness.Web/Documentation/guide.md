@@ -134,6 +134,14 @@ Work can also start without the backlog file:
   named as its proposer; reject it and nothing changes. A proposal may name
   its blueprint by id or by title; it keeps that blueprint when approved,
   even one not described yet.
+- **Approved outside harness:** when the work was already approved
+  elsewhere (a change board, a ticket, you in the conversation), the agent
+  names that approver in `task_propose`'s or `task_blueprint_propose`'s
+  `approved_by`. The proposal is then approved at once in their name, as an
+  Inbox approval would do it, and never waits in the Inbox. The task's
+  history and `harness tasks proposals --status approved` show it as
+  "approved externally by …". Agents still propose by default and use
+  `approved_by` only for an approval that really happened.
 
 Until an agent claims a task, you can restate it in harness ui: Work ›
 Tasks, the pencil in the task's row (disabled once an agent claims it)
@@ -141,6 +149,17 @@ opens the same form as New task; the id, validation and notes stay. A task
 that is also in the backlog file is restated from the file again at its
 next import. Drag a task onto another blueprint's group to move it there;
 the move is in its audit trail.
+
+To put the blueprints in the order you work through them, drag a blueprint
+before or after another (a bar shows where it lands), or use the up and
+down arrows beside it: by its header in Work › Tasks while all blueprints
+are shown, or as a whole card in Work › Blueprints under any filter (a move
+among the cards shown keeps the hidden ones in their places). The order is
+saved with the project, so every listing of the blueprints (both views,
+`harness tasks blueprints`, the agents' `task_blueprints`) follows it, in
+any browser and after a restart; importing the backlog does not change it.
+A blueprint you have not placed yet, such as a new one, comes after the
+ordered ones.
 
 To delete a task, use the bin at the end of its row: a dialog says what
 goes (the task, its criteria, its dependencies and its audit trail) before
@@ -150,8 +169,8 @@ command or agent tool does.
 
 Blueprints are kept in harness ui too: Work › Blueprints › New blueprint
 starts with the next free id (M17 after M16, or BP-001); the pencil on a
-blueprint's card changes its name, goal, exit criteria and notes, not its
-id. The bin removes it after you confirm; for a blueprint with tasks it
+blueprint's card changes its name, goal, exit criteria, notes and colour,
+not its id. The bin removes it after you confirm; for a blueprint with tasks it
 also asks what happens to them: moved to another blueprint (or to none), or
 deleted with their audit trail. Deleting is refused while an agent holds
 one of the tasks, and a task elsewhere that depended on a deleted one loses
@@ -189,13 +208,30 @@ flight or next; and what needs a person, most urgent first. Then:
   removed from project knowledge.
 - **Work:** Blueprints, Tasks and the Inbox of proposed tasks, blueprints
   and architecture work.
+- **Board:** the tasks as a read-only board, a card per task in a column
+  per status: backlog, ready, claimed, in progress, review, done and blocked.
+  Deferred tasks are not on the Board: only `harness tasks defer` sets a task
+  aside, and Work › Tasks lists them. A card shows the task's type, id and
+  priority, its title, and its blueprint's title in the blueprint's colour.
+  The task's id opens it as Work › Tasks does (with Edit and Delete where
+  Work allows them).
+  Sort the cards by priority, id, name, created or last changed, hide done
+  tasks finished more than 1, 3, 7 or 14 days ago, and show one blueprint's
+  tasks; the choices are kept for the project on this machine.
 - **Agents:** how harness serves your agents and what you can change so it
   serves them better.
 - **Health:** the checks `harness doctor` runs; a check harness can fix
   itself has Fix it, and a stale index has Sync now.
 
+Each blueprint has a colour, one of 16: its id and title are framed in it on
+the Board and in Work › Tasks. A new blueprint gets the first colour no other
+uses (once all 16 are, they start again from the first); pick another in its
+edit dialog, with `harness tasks blueprints edit <id> --color <name>`, or as
+`color:` in the backlog file.
+
 A workspace has the same views over its members. Machine holds this page's
-settings, the C# sessions, and the switch for the opt-in developer
+settings, the Board's defaults (the sort and done-age of a project that has
+not chosen its own), the C# sessions, and the switch for the opt-in developer
 telemetry. How harness itself performs (relevance per provider, latency)
 is for the harness developer: it is not shown here, only sent in that
 telemetry if you turn it on.
@@ -211,6 +247,22 @@ telemetry if you turn it on.
   repositories (a service and its library), put them in a workspace
   (`harness workspace`): workspace-level knowledge applies to all members,
   and searches can span them.
+
+## Updating harness
+
+After replacing the binaries, run `harness migrate` once, from anywhere. It
+brings the machine up to date first: the global `config.toml`, the user and
+workspace knowledge databases, and the MCP entries and client hooks harness
+installed for you. Then it brings every registered project up to date
+(`harness projects list`), several at a time (`--jobs`). Each project gets
+what `harness init` would do: its config and its database, migrated after a
+backup. The harness section in AGENTS.md / CLAUDE.md, the Git and client hooks
+and the MCP entries it already has are restated as this version writes them.
+Finally every worktree that still exists is synced. Nothing is installed that
+was not there. A project whose folder is gone is skipped, never forgotten, and
+the summary says how to restore or forget it. `--dry-run` shows what would
+change, and `--json` gives the result per project. You no longer need to run
+`harness init` and `harness sync` in every project by hand.
 
 ## When something seems off
 
