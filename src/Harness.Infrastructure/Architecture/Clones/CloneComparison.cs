@@ -33,20 +33,21 @@ public static class CloneComparison
                 first[index] = true;
             }
         }
-        foreach (
-            var (left, right) in Candidates(
-                input,
-                index => first[index] && input[index].Tokens >= options.MinNear,
-                function => function.Canonical,
-                4,
-                100
-            )
-        )
+        var pairs = Candidates(
+            input,
+            index => first[index] && input[index].Tokens >= options.MinNear,
+            function => function.Canonical,
+            4,
+            100
+        );
+        // The checks are independent and run side by side; groups are joined in the pairs' order (TASK-0107).
+        var checks = new (double Similarity, bool Copied)[pairs.Length];
+        Parallel.For(0, pairs.Length, at => checks[at] = Check(input[pairs[at].Left], input[pairs[at].Right], options));
+        for (var at = 0; at < pairs.Length; at++)
         {
-            var (similarity, copied) = Check(input[left], input[right], options);
-            if (copied)
+            if (checks[at].Copied)
             {
-                groups.Join(left, right, similarity);
+                groups.Join(pairs[at].Left, pairs[at].Right, checks[at].Similarity);
             }
         }
         return groups
@@ -82,29 +83,26 @@ public static class CloneComparison
         options ??= new();
         var input = functions.Where(function => function.Tokens >= options.MinNear).ToArray();
         var groups = new CloneGroups(input.Length);
-        foreach (
-            var (left, right) in Candidates(
-                input,
-                _ => true,
-                function => function.Shape,
-                6,
-                Math.Max(100, input.Length / 4)
-            )
-        )
-        {
-            if (
-                Nested(input[left], input[right])
-                || Overrides(input[left], input[right])
-                || Check(input[left], input[right], options).Copied
-            )
+        var pairs = Candidates(input, _ => true, function => function.Shape, 6, Math.Max(100, input.Length / 4));
+        // Checked side by side, joined in the pairs' order (TASK-0107); a copy is no template.
+        var similarities = new double[pairs.Length];
+        Parallel.For(
+            0,
+            pairs.Length,
+            at =>
             {
-                continue;
+                var (left, right) = (input[pairs[at].Left], input[pairs[at].Right]);
+                similarities[at] =
+                    Nested(left, right) || Overrides(left, right) || Check(left, right, options).Copied
+                        ? -1
+                        : Alike(left.Shape, right.Shape);
             }
-
-            var similarity = Alike(input[left].Shape, input[right].Shape);
-            if (similarity >= options.Shape)
+        );
+        for (var at = 0; at < pairs.Length; at++)
+        {
+            if (similarities[at] >= options.Shape)
             {
-                groups.Join(left, right, similarity);
+                groups.Join(pairs[at].Left, pairs[at].Right, similarities[at]);
             }
         }
         List<CloneTemplate> output = [];
@@ -197,6 +195,12 @@ public static class CloneComparison
 
     internal sealed record Gap(int LeftStart, int LeftEnd, int RightStart, int RightEnd);
 
+    /// <summary>A thread's LCS table, kept up to <see cref="KeptTable"/> ints (4 MiB); larger ones are not kept.</summary>
+    [ThreadStatic]
+    private static int[]? s_lengths;
+
+    private const int KeptTable = 1 << 20;
+
     internal static IReadOnlyList<Gap> Gaps(IReadOnlyList<string> left, IReadOnlyList<string> right)
     {
         if (left.SequenceEqual(right, StringComparer.Ordinal))
@@ -204,15 +208,34 @@ public static class CloneComparison
             return [];
         }
 
-        var lengths = Enumerable.Range(0, left.Count + 1).Select(_ => new int[right.Count + 1]).ToArray();
-        for (var i = left.Count - 1; i >= 0; i--)
+        // One flat table per thread, grown as needed and reused by every pair it checks (TASK-0107).
+        var width = right.Count + 1;
+        var size = (left.Count + 1) * width;
+        var lengths = s_lengths;
+        if (lengths is null || lengths.Length < size)
         {
-            for (var j = right.Count - 1; j >= 0; j--)
+            lengths = new int[size > KeptTable ? size : Math.Min(KeptTable, Math.Max(size, (lengths?.Length ?? 0) * 2))];
+            if (lengths.Length <= KeptTable)
             {
-                lengths[i][j] =
-                    left[i] == right[j] ? lengths[i + 1][j + 1] + 1 : Math.Max(lengths[i + 1][j], lengths[i][j + 1]);
+                s_lengths = lengths;
             }
         }
+
+        Array.Clear(lengths, left.Count * width, width);
+        for (var i = left.Count - 1; i >= 0; i--)
+        {
+            var row = i * width;
+            var below = row + width;
+            lengths[row + right.Count] = 0;
+            for (var j = right.Count - 1; j >= 0; j--)
+            {
+                lengths[row + j] =
+                    left[i] == right[j]
+                        ? lengths[below + j + 1] + 1
+                        : Math.Max(lengths[below + j], lengths[row + j + 1]);
+            }
+        }
+        int Length(int i, int j) => lengths[i * width + j];
 
         List<Gap> gaps = [];
         var a = 0;
@@ -236,7 +259,7 @@ public static class CloneComparison
                 startA = a;
                 startB = b;
             }
-            else if (lengths[a + 1][b] >= lengths[a][b + 1])
+            else if (Length(a + 1, b) >= Length(a, b + 1))
             {
                 a++;
             }
