@@ -278,8 +278,24 @@ public sealed class ViewCache(ProjectLifecycle lifecycle) : IDisposable
 
         public TreeWatch(string root)
         {
-            _root = Path.GetFullPath(root);
+            _root = Physical(Path.GetFullPath(root));
             _watcher = Watch();
+        }
+
+        /// <summary>
+        /// The directory without symbolic links: macOS reports a change by its physical path (/private/var for
+        /// /var), and a path relative to another root would escape it and pass every filter (.git, .harness).
+        /// </summary>
+        private static string Physical(string root)
+        {
+            try
+            {
+                return GitRepository.PhysicalDirectory(root);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return root;
+            }
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage(

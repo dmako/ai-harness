@@ -239,11 +239,15 @@ public sealed class ViewCacheTests
         // an edited manifest reads that project again, and only that one
         first.Write("App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
         var deadline = DateTime.UtcNow.AddSeconds(10);
-        while ((await GetAsync("first", first))!["n"]!.GetValue<int>() != 2)
+        while ((await GetAsync("first", first))!["n"]!.GetValue<int>() < 2)
         {
             DateTime.UtcNow.Should().BeBefore(deadline, "the edited manifest reaches the stack");
             await Task.Delay(100, Token);
         }
+
+        // One write is several file-system events (the folder, the file, its content), and some arrive after the
+        // first of them already read the project again: count those reads as the write's, once the events settle.
+        var settled = await SettledAsync(() => GetAsync("first", first));
         (await GetAsync("second", second))!["n"]!.GetValue<int>().Should().Be(1, "the other project is unchanged");
 
         second.Write("notes.md", "moved");
@@ -254,7 +258,27 @@ public sealed class ViewCacheTests
             DateTime.UtcNow.Should().BeBefore(deadline, "a commit moves HEAD");
             await Task.Delay(100, Token);
         }
-        (await GetAsync("first", first))!["n"]!.GetValue<int>().Should().Be(2);
+        (await GetAsync("first", first))!["n"]!.GetValue<int>().Should().Be(settled, "another project's commit");
+    }
+
+    /// <summary>The view's count once it has stayed the same for a second: a write's late events are through.</summary>
+    private static async Task<int> SettledAsync(Func<Task<JsonNode?>> get)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        var last = (await get())!["n"]!.GetValue<int>();
+        var stable = DateTime.UtcNow;
+        while (DateTime.UtcNow - stable < TimeSpan.FromSeconds(1))
+        {
+            DateTime.UtcNow.Should().BeBefore(deadline, "a write's file-system events end");
+            await Task.Delay(100, Token);
+            var now = (await get())!["n"]!.GetValue<int>();
+            if (now != last)
+            {
+                (last, stable) = (now, DateTime.UtcNow);
+            }
+        }
+
+        return last;
     }
 
     [Fact]
