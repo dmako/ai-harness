@@ -1,0 +1,5 @@
+PASS  Insert via generated mapper: 10 inserted
+PASS  FindById (generated Deserialize): key:3 2026-11-06T13:00:00.0000000+01:00 (Local)
+PASS  Find string predicate: 3 found
+PASS  Transaction rollback: rolled back
+0 failure(s); Native AOT

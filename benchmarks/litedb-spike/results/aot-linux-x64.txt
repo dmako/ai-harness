@@ -1,0 +1,23 @@
+PASS  manual BsonDocument insert + Query.EQ/GT + index: 3 documents
+PASS  manual BsonExpression string predicate with parameter: 3 documents
+PASS  partial update: UpdateMany(transform, predicate): 5 updated
+PASS  aggregate: SQL SELECT COUNT/MAX GROUP BY: {"kind":"complexity","n":5,"top":9} {"kind":"cycle","n":5,"top":8}
+FAIL  typed GetCollection<FindingDoc>().Insert (BsonMapper reflection): InvalidOperationException: Operation is not valid due to the current state of the object.
+FAIL  typed FindById (BsonMapper deserialize): InvalidOperationException: read null
+FAIL  typed LINQ predicate Find(x => x.Kind == "cycle" && x.Measure > 3): LiteException: Failed to create instance for type 'LiteDbSpike.FindingDoc' from assembly 'LiteDbSpike.FindingDoc, LiteDbSpike, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null'. Checks if the class has a public constructor with no parameters. <- ArgumentException: Type 'LiteDbSpike.FindingDoc' does not have a default constructor (Parameter 'type')
+PASS  typed EnsureIndex(x => x.Kind): created
+PASS  ORDER BY a 100-character string (finding keys reach 1.3 KB): sorted
+PASS  ORDER BY a 250-character string (finding keys reach 1.3 KB): sorted
+FAIL  ORDER BY a 400-character string (finding keys reach 1.3 KB): NotImplementedException: The method or operation is not implemented.
+FAIL  ORDER BY a 900-character string (finding keys reach 1.3 KB): NotImplementedException: The method or operation is not implemented.
+FAIL  ORDER BY a 1100-character string (finding keys reach 1.3 KB): ArgumentOutOfRangeException: Specified argument was out of the range of valid values. (Parameter 'length')
+PASS  transaction BeginTrans/Rollback: rolled back
+PASS  engine mapper (LiteEngine direct): EnsureIndex + Upsert: 10 inserted
+PASS  engine mapper (LiteEngine direct): FindById round trip (records, lists, UTC time, null): FindingRecord { Key = key:3, Kind = complexity, Level = warn, Measure = 3, Units = <>z__ReadOnlyList`1[System.String], LastSeen = 11/06/2026 12:03:00 +00:00, MarkState = by_design }
+PASS  engine mapper (LiteEngine direct): string predicate with parameters + ORDER BY: key:4,key:6,key:8
+PASS  engine mapper (LiteEngine direct): UpdateMany + transaction rollback: 5 updated, rolled back
+PASS  engine mapper (SharedEngine): EnsureIndex + Upsert: 10 inserted
+PASS  engine mapper (SharedEngine): FindById round trip (records, lists, UTC time, null): FindingRecord { Key = key:3, Kind = complexity, Level = warn, Measure = 3, Units = <>z__ReadOnlyList`1[System.String], LastSeen = 11/06/2026 12:03:00 +00:00, MarkState = by_design }
+PASS  engine mapper (SharedEngine): string predicate with parameters + ORDER BY: key:4,key:6,key:8
+PASS  engine mapper (SharedEngine): UpdateMany + transaction rollback: 5 updated, rolled back
+6 failure(s); LiteDB 5.0.21.0; Native AOT

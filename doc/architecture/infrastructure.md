@@ -31,6 +31,10 @@ strict tables and bounded busy waits are established on connections.
 retry loop does not override the millisecond `PRAGMA busy_timeout` budget.
 Cross-process contention tests protect this behavior on dependency upgrades.
 
+LiteDB was evaluated as a replacement and rejected (TASK-0110): its locking
+between processes fails under Native AOT on Linux, it is slower, and it lacks
+full-text search. See [litedb-spike.md](litedb-spike.md).
+
 Memory stores implement history, supersession, retirement and proposals.
 Knowledge levels combine project, branch, workspace and wider stores while
 preserving provenance. Failed or missing wider stores remain unknown/missing

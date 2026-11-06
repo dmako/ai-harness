@@ -1,0 +1,10 @@
+== sqlite
+holder: transaction open (holds its write transaction 8 s)
+read  during the hold: 1 after 0.00 s
+write during the hold: SqliteException: SQLite Error 5: 'database is locked'. after 5.02 s
+holder: committed
+== shared
+holder: transaction open (holds its write transaction 8 s)
+read  during the hold: 1 after 0.00 s
+write during the hold: written after 0.00 s
+holder: committed
