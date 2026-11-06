@@ -1,5 +1,7 @@
 # Spike: replace git processes with LibGit2Sharp? (TASK-0097)
 
+GitReader, a fully managed alternative, was evaluated the same way in TASK-0098, with the same answer: [GITREADER.md](GITREADER.md).
+
 **Recommendation: no.** Keep the external git. Cut the number of git starts instead (see [Follow-ups](#follow-ups)).
 
 LibGit2Sharp 0.32.0 (libgit2 `5853918`, from LibGit2Sharp.NativeBinaries 2.0.324) has three problems:

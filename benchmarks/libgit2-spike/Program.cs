@@ -11,8 +11,30 @@ return args switch
 {
     ["bench", var root, ..] => Bench.Run(Path.GetFullPath(root), args.Length > 2 ? int.Parse(args[2]) : 7),
     ["formats", var scratch] => Formats.Run(Path.GetFullPath(scratch)),
+    ["exit", var root, var what] => ExitProbe(Path.GetFullPath(root), what),
     _ => Usage(),
 };
+
+// TASK-0098: one GitReader read on a fresh repository, disposed, then the process's handles and memory before it
+// returns (a large repository's benchmark run took over 12 minutes to exit)
+static int ExitProbe(string root, string what)
+{
+    var watch = Stopwatch.StartNew();
+    using (var repo = Gr.Open(root))
+    {
+        var count = what switch
+        {
+            "churn" => Gr.Churn(repo, DateTimeOffset.UtcNow.AddDays(-180)).Count(),
+            "status" => Gr.Dirty(repo).Count(),
+            _ => Gr.RecentCommits(repo, [".gitignore"], 5).Count(),
+        };
+        Console.WriteLine($"{what}: {count} entries in {watch.Elapsed.TotalMilliseconds:F0} ms");
+    }
+
+    using var self = Process.GetCurrentProcess();
+    Console.WriteLine($"disposed; handles {self.HandleCount}, working set {self.WorkingSet64 / 1048576} MB, private {self.PrivateMemorySize64 / 1048576} MB; returning at {DateTime.Now:HH:mm:ss.fff}");
+    return 0;
+}
 
 static int Usage()
 {
@@ -268,14 +290,33 @@ static class Bench
                 repo => [repo.Ignore.IsPathIgnored(".harness/knowledge.toml") ? "ignored" : "not ignored"]),
         ];
 
+        // TASK-0098: the same commands through GitReader; a command missing here has no GitReader equivalent
+        var gr = new Dictionary<string, Func<GitReader.Primitive.PrimitiveRepository, IReadOnlyList<string>>>(StringComparer.Ordinal)
+        {
+            [commands[0].Name] = repo => Sorted(Gr.FileList(repo)),
+            [commands[1].Name] = repo => Sorted(Gr.Dirty(repo)),
+            [commands[2].Name] = repo => [Gr.Commit(repo, GitReader.Hash.Parse(baseRev)) is null ? "no" : "yes"],
+            [commands[3].Name] = repo => Sorted(Gr.ChangesSince(repo, GitReader.Hash.Parse(baseRev))),
+            [commands[4].Name] = repo => [.. Gr.Churn(repo, since).Order(StringComparer.Ordinal)],
+            [commands[5].Name] = repo => [.. Gr.RecentCommits(repo, paths, 5)],
+            [commands[6].Name] = repo => Sorted(Gr.ChangedBetween(repo, GitReader.Hash.Parse(from), GitReader.Hash.Parse(head))),
+            [commands[8].Name] = repo => [Gr.FileAt(repo, GitReader.Hash.Parse(from), file)],
+        };
+
         var load = Stopwatch.StartNew();
         using var shared = new Repository(root);
         Console.WriteLine($"libgit2: native load + first open {load.Elapsed.TotalMilliseconds:F1} ms");
         var reopen = Median(runs, () => { using var r = new Repository(root); _ = r.Head.Tip; });
         Console.WriteLine($"libgit2: open + HEAD on a fresh Repository, median {reopen:F1} ms");
+        load.Restart();
+        using var reader = Gr.Open(root);
+        _ = Gr.Head(reader);
+        Console.WriteLine($"GitReader: first open + HEAD {load.Elapsed.TotalMilliseconds:F1} ms");
+        var reopenReader = Median(runs, () => { using var r = Gr.Open(root); _ = Gr.Head(r); });
+        Console.WriteLine($"GitReader: open + HEAD on a fresh repository, median {reopenReader:F1} ms");
         Console.WriteLine();
-        Console.WriteLine("| command | used by | git first | git median | libgit2 first | libgit2 median | libgit2 fresh repo | same answer |");
-        Console.WriteLine("|---|---|---:|---:|---:|---:|---:|---|");
+        Console.WriteLine("| command | used by | git first | git median | libgit2 first | libgit2 median | libgit2 fresh repo | libgit2 same | GitReader first | GitReader median | GitReader fresh repo | GitReader same |");
+        Console.WriteLine("|---|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---|");
         foreach (var command in commands)
         {
             var (gitFirst, gitAnswer) = Timed(() => command.ByGit(root));
@@ -283,10 +324,33 @@ static class Bench
             var (libFirst, libAnswer) = Timed(() => command.ByLibGit2(shared));
             var libMedian = Median(runs, () => command.ByLibGit2(shared));
             var fresh = Median(Math.Min(runs, 3), () => { using var r = new Repository(root); command.ByLibGit2(r); });
-            Console.WriteLine($"| `{command.Name}` | {command.Use} | {gitFirst:F1} | {gitMedian:F1} | {libFirst:F1} | {libMedian:F1} | {fresh:F1} | {Same(gitAnswer, libAnswer)} |");
+            var readerCells = "— | — | — | no equivalent";
+            if (gr.TryGetValue(command.Name, out var byReader))
+            {
+                var (grFirst, grAnswer) = Timed(() => byReader(reader));
+                var grMedian = Median(runs, () => byReader(reader));
+                var grFresh = Median(Math.Min(runs, 3), () => { using var r = Gr.Open(root); byReader(r); });
+                readerCells = $"{grFirst:F1} | {grMedian:F1} | {grFresh:F1} | {Same(gitAnswer, grAnswer)}";
+                Dump(command, "gitreader", grAnswer);
+            }
+
+            Dump(command, "libgit2", libAnswer);
+
+            Console.WriteLine($"| `{command.Name}` | {command.Use} | {gitFirst:F1} | {gitMedian:F1} | {libFirst:F1} | {libMedian:F1} | {fresh:F1} | {Same(gitAnswer, libAnswer)} | {readerCells} |");
         }
 
         return 0;
+    }
+
+    /// <summary>With LG2SPIKE_DUMP set to a folder, writes each library's full answer there (to compare AOT with JIT).</summary>
+    private static void Dump(Command command, string library, IReadOnlyList<string> answer)
+    {
+        if (Environment.GetEnvironmentVariable("LG2SPIKE_DUMP") is { Length: > 0 } folder)
+        {
+            Directory.CreateDirectory(folder);
+            var name = new string([.. command.Name.Select(c => char.IsLetterOrDigit(c) ? c : '-')]).Trim('-');
+            File.WriteAllLines(Path.Combine(folder, $"{library}-{name}.txt"), answer.Order(StringComparer.Ordinal));
+        }
     }
 
     private static (double Ms, IReadOnlyList<string> Answer) Timed(Func<IReadOnlyList<string>> call)
@@ -334,7 +398,7 @@ static class Bench
 
         var onlyGit = git.Except(lib, StringComparer.Ordinal).Take(2).Select(Short);
         var onlyLib = lib.Except(git, StringComparer.Ordinal).Take(2).Select(Short);
-        return $"**no** git {git.Count} / libgit2 {lib.Count}; git only: {string.Join("; ", onlyGit)}; libgit2 only: {string.Join("; ", onlyLib)}";
+        return $"**no** git {git.Count} / library {lib.Count}; git only: {string.Join("; ", onlyGit)}; library only: {string.Join("; ", onlyLib)}";
     }
 
     private static string Short(string text)
@@ -423,8 +487,8 @@ static class Formats
             ("commit-graph + multi-pack-index", () => { var r = Seed(scratch, "graph"); Sh(r, "repack", "-adq", "--write-midx"); Sh(r, "commit-graph", "write", "--reachable"); return r; }),
         };
 
-        Console.WriteLine("| repository | libgit2 opens | HEAD | file list (ls-files) | dirty paths (status) | old file (show HEAD~1:src/a.cs) |");
-        Console.WriteLine("|---|---|---|---|---|---|");
+        Console.WriteLine("| repository | library | opens | HEAD | file list (ls-files) | dirty paths (status) | old file (HEAD~1:src/a.cs) |");
+        Console.WriteLine("|---|---|---|---|---|---|---|");
         foreach (var (name, make) in cases)
         {
             string root;
@@ -434,17 +498,77 @@ static class Formats
             }
             catch (Exception error)
             {
-                Console.WriteLine($"| {name} | (git could not create it: {error.Message}) | | | | |");
+                Console.WriteLine($"| {name} | | (git could not create it: {error.Message}) | | | | |");
                 continue;
             }
 
-            Console.WriteLine($"| {name} | {Check(root)} |");
+            // both libraries read before git touches the repository again (git fetches a partial clone's blobs on demand)
+            var libgit2 = CheckLibGit2(root);
+            var reader = CheckGitReader(root);
+            Console.WriteLine($"| {name} | libgit2 | {Finish(root, libgit2)} |");
+            Console.WriteLine($"| | GitReader | {Finish(root, reader)} |");
         }
 
         return 0;
     }
 
-    private static string Check(string root)
+    /// <summary>What a library answered: whether it opened, HEAD, file list, dirty paths and the old file.</summary>
+    private sealed record Answers(string? Failure, Func<string>? Head, Func<IEnumerable<string>>? Files, Func<IEnumerable<string>>? Dirty, string Old);
+
+    /// <summary>The old file's text, or '!' and why it could not be read.</summary>
+    private static string Read(Func<string> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch (Exception error)
+        {
+            return $"!**fails**: {error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")}";
+        }
+    }
+
+    private static string Try(Func<string> check)
+    {
+        try
+        {
+            return check();
+        }
+        catch (Exception error)
+        {
+            return $"**fails**: {error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")}";
+        }
+    }
+
+    private static string Compare(IEnumerable<string> git, IEnumerable<string> lib)
+    {
+        var g = git.Select(p => p.Replace('\\', '/')).Distinct().Order(StringComparer.Ordinal).ToArray();
+        var l = lib.Select(p => p.Replace('\\', '/')).Distinct().Order(StringComparer.Ordinal).ToArray();
+        return g.SequenceEqual(l) ? $"same ({g.Length})" : $"**differs**: git [{string.Join(", ", g)}] library [{string.Join(", ", l)}]";
+    }
+
+    private static string Finish(string root, Answers answers)
+    {
+        if (answers.Failure is { } failure)
+        {
+            return $"**no**: {failure} | | | |";
+        }
+
+        var head = Try(() => Git.Read(root, "rev-parse", "HEAD").Trim() is var sha && sha == answers.Head!() ? "same" : $"**differs** ({answers.Head!()})");
+        var files = Try(() => Compare(Git.Nul(Git.Read(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")), answers.Files!()));
+        var dirty = Try(() =>
+        {
+            var fields = Git.Nul(Git.Read(root, "status", "--porcelain=v1", "-z", "--untracked-files=all"));
+            return Compare(fields.Where(f => f.Length > 3 && f[2] == ' ').Select(f => f[3..]), answers.Dirty!());
+        });
+        // the library read the old file first; git now (it may fetch a partial clone's blob on demand)
+        var old = answers.Old.StartsWith('!')
+            ? answers.Old[1..]
+            : Try(() => answers.Old == Git.Read(root, "show", "HEAD~1:src/a.cs") ? "same" : "**differs**");
+        return $"yes | {head} | {files} | {dirty} | {old}";
+    }
+
+    private static Answers CheckLibGit2(string root)
     {
         Repository repo;
         try
@@ -453,54 +577,34 @@ static class Formats
         }
         catch (Exception error)
         {
-            return $"**no**: {error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")} | | | |";
+            return new($"{error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")}", null, null, null, "");
         }
 
-        using (repo)
+        var old = Read(() => repo.Head.Tip!.Parents.FirstOrDefault() is { } parent
+            ? ((Blob)parent["src/a.cs"].Target).GetContentText()
+            : "!no HEAD~1 (shallow)");
+        var options = new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true, IncludeIgnored = false };
+        return new(null, () => repo.Head.Tip?.Sha ?? "",
+            () => repo.Index.Select(e => e.Path).Concat(repo.RetrieveStatus(options).Untracked.Select(e => e.FilePath)),
+            () => repo.RetrieveStatus(options).Where(e => e.State is not FileStatus.Unaltered and not FileStatus.Ignored).Select(e => e.FilePath),
+            old);
+    }
+
+    private static Answers CheckGitReader(string root)
+    {
+        GitReader.Primitive.PrimitiveRepository repo;
+        try
         {
-            string Try(Func<string> check)
-            {
-                try
-                {
-                    return check();
-                }
-                catch (Exception error)
-                {
-                    return $"**fails**: {error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")}";
-                }
-            }
-
-            static string Compare(IEnumerable<string> git, IEnumerable<string> lib)
-            {
-                var g = git.Select(p => p.Replace('\\', '/')).Distinct().Order(StringComparer.Ordinal).ToArray();
-                var l = lib.Select(p => p.Replace('\\', '/')).Distinct().Order(StringComparer.Ordinal).ToArray();
-                return g.SequenceEqual(l) ? $"same ({g.Length})" : $"**differs**: git [{string.Join(", ", g)}] libgit2 [{string.Join(", ", l)}]";
-            }
-
-            var head = Try(() => Git.Read(root, "rev-parse", "HEAD").Trim() == repo.Head.Tip?.Sha ? "same" : $"**differs** ({repo.Head.Tip?.Sha})");
-            var files = Try(() => Compare(
-                Git.Nul(Git.Read(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")),
-                repo.Index.Select(e => e.Path).Concat(repo.RetrieveStatus(new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true, IncludeIgnored = false }).Untracked.Select(e => e.FilePath))));
-            var dirty = Try(() =>
-            {
-                var fields = Git.Nul(Git.Read(root, "status", "--porcelain=v1", "-z", "--untracked-files=all"));
-                return Compare(fields.Where(f => f.Length > 3 && f[2] == ' ').Select(f => f[3..]),
-                    repo.RetrieveStatus(new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true, IncludeIgnored = false })
-                        .Where(e => e.State is not FileStatus.Unaltered and not FileStatus.Ignored).Select(e => e.FilePath));
-            });
-            var old = Try(() =>
-            {
-                // libgit2 first: git fetches a missing blob of a partial clone on demand, which would hide the gap
-                var parent = repo.Head.Tip!.Parents.FirstOrDefault();
-                if (parent is null)
-                {
-                    return "no HEAD~1 in either (shallow)";
-                }
-
-                var lib = ((Blob)parent["src/a.cs"].Target).GetContentText();
-                return lib == Git.Read(root, "show", "HEAD~1:src/a.cs") ? "same" : "**differs**";
-            });
-            return $"yes | {head} | {files} | {dirty} | {old}";
+            repo = Gr.Open(root);
         }
+        catch (Exception error)
+        {
+            return new($"{error.GetType().Name}: {error.Message.ReplaceLineEndings(" ")}", null, null, null, "");
+        }
+
+        var old = Read(() => Gr.Commit(repo, Gr.Head(repo)) is { } tip && tip.Parents.Count > 0
+            ? Gr.FileAt(repo, tip.Parents[0], "src/a.cs")
+            : "!no HEAD~1 (shallow)");
+        return new(null, () => Gr.Head(repo).ToString(), () => Gr.FileList(repo), () => Gr.Dirty(repo), old);
     }
 }
