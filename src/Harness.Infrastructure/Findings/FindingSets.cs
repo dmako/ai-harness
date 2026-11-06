@@ -97,25 +97,33 @@ public sealed class FindingSets(
         CancellationToken token
     )
     {
+        // The providers (mostly their start) answer while harness detects its own repeated code (TASK-0102).
+        var asked = Task.Run(() => ProviderFindingsAsync(stored, providers, token), token);
         List<ArchitectureFinding> found = [];
-        var repo = await reader.RepositoryAsync(Current, token).ConfigureAwait(false);
-        if (own is not null)
+        try
         {
-            found.AddRange(
-                KnowledgeDrift.Read(
-                    repo,
-                    own.Search(new() { Types = ["constraint", "decision", "convention"], Limit = 2000 }, token),
-                    token
-                )
-            );
+            var repo = await reader.RepositoryAsync(Current, token).ConfigureAwait(false);
+            if (own is not null)
+            {
+                found.AddRange(
+                    KnowledgeDrift.Read(
+                        repo,
+                        own.Search(new() { Types = ["constraint", "decision", "convention"], Limit = 2000 }, token),
+                        token
+                    )
+                );
+            }
+
+            await reader.PrepareRepeatedAsync(Current, token).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The registry outlives no call: wait for the providers, the first error is the one reported.
+            await ((Task)asked).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            throw;
         }
 
-        if (providers is not null)
-        {
-            await providers.DiscoverAsync(token).ConfigureAwait(false);
-        }
-
-        var fresh = await ProviderFindingsAsync(stored, providers, token).ConfigureAwait(false);
+        var fresh = await asked.ConfigureAwait(false);
         found.AddRange(await reader.RepeatedAsync(Current, fresh, token).ConfigureAwait(false));
         var complexity = Complexity();
         var exact = await ExactAsync(complexity, token).ConfigureAwait(false);
@@ -132,6 +140,11 @@ public sealed class FindingSets(
         CancellationToken token
     )
     {
+        if (providers is not null)
+        {
+            await providers.DiscoverAsync(token).ConfigureAwait(false);
+        }
+
         var cycles = await ArchitectureProviders.CyclesAsync(providers, token).ConfigureAwait(false);
         var duplicates = await RepeatedCodeReader.ProviderDuplicatesAsync(providers, token).ConfigureAwait(false);
         var fresh = cycles.Findings.Concat(duplicates.Findings).ToList();

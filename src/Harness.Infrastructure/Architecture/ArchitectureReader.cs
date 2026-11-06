@@ -24,6 +24,10 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members, W
         CancellationToken token
     ) => (await RepeatedReaderAsync(member, token).ConfigureAwait(false)).Read(provided);
 
+    /// <summary>Harness's own repeated-code detection, which <see cref="RepeatedAsync"/> then merges with a provider's.</summary>
+    public async Task PrepareRepeatedAsync(WorkspaceMember member, CancellationToken token) =>
+        (await RepeatedReaderAsync(member, token).ConfigureAwait(false)).Prepare();
+
     /// <summary>Complexity findings from the functions the repeated-code reader already extracted.</summary>
     public async Task<IReadOnlyList<ArchitectureFinding>> ComplexityAsync(
         WorkspaceMember member,

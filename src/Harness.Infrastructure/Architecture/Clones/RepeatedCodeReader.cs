@@ -9,38 +9,67 @@ namespace Harness.Infrastructure.Architecture.Clones;
 public sealed class RepeatedCodeReader(AnalysisRepository repository)
 {
     private readonly CloneExtractor _extractor = new(repository);
+    private OwnClones? _own;
     public CloneExtractor Extractor => _extractor;
+
+    /// <summary>
+    /// Harness's own extraction and comparison, which needs no provider's findings: done once, so a sync can run it
+    /// while the providers answer and merge their duplicates afterwards (<see cref="Read"/>).
+    /// </summary>
+    public void Prepare() => Own();
 
     public IReadOnlyList<ArchitectureFinding> Read(IReadOnlyList<ArchitectureFinding>? provided = null)
     {
-        var functions = _extractor.Extract();
-        var copies = CloneComparison.Find(functions);
-        var own = copies.Select(CopyFinding).ToList();
-        var groups = own.SelectMany(
-                (finding, index) => finding.Evidence!.Select(evidence => (Id: PlaceId(evidence), Group: index + 1))
-            )
-            .GroupBy(pair => pair.Id, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Last().Group, StringComparer.Ordinal);
-        foreach (var finding in Checked(functions, provided ?? []))
+        var own = Own();
+        var found = own.Copies.ToList();
+        foreach (var finding in Checked(own.Functions, provided ?? []))
         {
             if (
                 finding.Kind is "duplicate"
                 && finding.Evidence is { Count: 2 } evidence
-                && groups.TryGetValue(PlaceId(evidence[0]), out var left)
-                && groups.GetValueOrDefault(PlaceId(evidence[1])) == left
+                && own.Groups.TryGetValue(PlaceId(evidence[0]), out var left)
+                && own.Groups.GetValueOrDefault(PlaceId(evidence[1])) == left
             )
             {
                 continue;
             }
 
-            own.Add(finding);
+            found.Add(finding);
         }
-        var templates = CloneComparison.Templates(functions);
-        own.AddRange(templates.Select(TemplateFinding));
-        own.AddRange(CloneSequences.Find(functions, copies, templates).Select(SequenceFinding));
-        own.AddRange(CloneContracts.Find(functions, _extractor.Branches()).Select(ContractFinding));
-        return own;
+        found.AddRange(own.Rest);
+        return found;
     }
+
+    private OwnClones Own()
+    {
+        if (_own is not null)
+        {
+            return _own;
+        }
+
+        var functions = _extractor.Extract();
+        var copies = CloneComparison.Find(functions);
+        var copied = copies.Select(CopyFinding).ToArray();
+        var groups = copied
+            .SelectMany(
+                (finding, index) => finding.Evidence!.Select(evidence => (Id: PlaceId(evidence), Group: index + 1))
+            )
+            .GroupBy(pair => pair.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last().Group, StringComparer.Ordinal);
+        var templates = CloneComparison.Templates(functions);
+        List<ArchitectureFinding> rest = [.. templates.Select(TemplateFinding)];
+        rest.AddRange(CloneSequences.Find(functions, copies, templates).Select(SequenceFinding));
+        rest.AddRange(CloneContracts.Find(functions, _extractor.Branches()).Select(ContractFinding));
+        return _own = new(functions, copied, groups, rest);
+    }
+
+    /// <summary>Harness's own findings: copies (which provider duplicates are checked against), then the rest.</summary>
+    private sealed record OwnClones(
+        IReadOnlyList<CloneFunction> Functions,
+        IReadOnlyList<ArchitectureFinding> Copies,
+        IReadOnlyDictionary<string, int> Groups,
+        IReadOnlyList<ArchitectureFinding> Rest
+    );
 
     private static ArchitectureFinding CopyFinding(CloneCopy copy)
     {
