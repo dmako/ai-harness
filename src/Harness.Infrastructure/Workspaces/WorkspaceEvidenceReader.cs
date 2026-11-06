@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Harness.Core.Architecture;
 using Harness.Core.Workspaces;
@@ -14,10 +15,13 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
         ),
         StringComparer.Ordinal
     );
-    private readonly Dictionary<string, (AnalysisRepository Repository, EcosystemReader Ecosystem)> _repositories = new(
+    private readonly ConcurrentDictionary<
+        string,
+        (AnalysisRepository Repository, EcosystemReader Ecosystem)
+    > _repositories = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, IReadOnlyList<DeclaredType>> _declarations = new(
         StringComparer.Ordinal
     );
-    private readonly Dictionary<string, IReadOnlyList<DeclaredType>> _declarations = new(StringComparer.Ordinal);
 
     public async Task<(AnalysisRepository Repository, EcosystemReader Ecosystem)> RepositoryAsync(
         WorkspaceMember member,
@@ -29,10 +33,9 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
             return cached;
         }
 
-        var repository = await AnalysisRepository.OpenAsync(member.Root, token).ConfigureAwait(false);
-        var result = (repository, new EcosystemReader(repository));
-        _repositories.Add(member.Id, result);
-        return result;
+        var repository = await AnalysisRepository.OpenAsync(member.Root, Shared, token).ConfigureAwait(false);
+        Counts.List();
+        return _repositories.GetOrAdd(member.Id, (repository, new EcosystemReader(repository)));
     }
 
     public async Task<LibraryAdoption> AdoptionAsync(string library, CancellationToken token)
@@ -109,7 +112,7 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
         );
     }
 
-    public async Task<WorkspaceDependencyGraph> DependenciesAsync(CancellationToken token)
+    private async Task<WorkspaceDependencyGraph> ReadDependenciesAsync(CancellationToken token)
     {
         List<WorkspaceDependencyNode> nodes = [];
         List<WorkspaceDependencyEdge> edges = [];
@@ -163,12 +166,11 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
         return new(nodes, edges);
     }
 
-    private IReadOnlyList<DeclaredType> Declarations(WorkspaceMember member, AnalysisRepository repository)
+    internal IReadOnlyList<DeclaredType> Declarations(WorkspaceMember member, AnalysisRepository repository)
     {
         if (!_declarations.TryGetValue(member.Id, out var declarations))
         {
-            declarations = DeclarationReader.Read(repository);
-            _declarations.Add(member.Id, declarations);
+            declarations = _declarations.GetOrAdd(member.Id, DeclarationReader.Read(repository));
         }
         return declarations;
     }

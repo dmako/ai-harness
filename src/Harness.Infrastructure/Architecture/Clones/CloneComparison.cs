@@ -33,20 +33,21 @@ public static class CloneComparison
                 first[index] = true;
             }
         }
-        foreach (
-            var (left, right) in Candidates(
-                input,
-                index => first[index] && input[index].Tokens >= options.MinNear,
-                function => function.Canonical,
-                4,
-                100
-            )
-        )
+        var pairs = Candidates(
+            input,
+            index => first[index] && input[index].Tokens >= options.MinNear,
+            function => function.Canonical,
+            4,
+            100
+        );
+        // The checks are independent and run side by side; groups are joined in the pairs' order (TASK-0107).
+        var checks = new (double Similarity, bool Copied)[pairs.Length];
+        Parallel.For(0, pairs.Length, at => checks[at] = Check(input[pairs[at].Left], input[pairs[at].Right], options));
+        for (var at = 0; at < pairs.Length; at++)
         {
-            var (similarity, copied) = Check(input[left], input[right], options);
-            if (copied)
+            if (checks[at].Copied)
             {
-                groups.Join(left, right, similarity);
+                groups.Join(pairs[at].Left, pairs[at].Right, checks[at].Similarity);
             }
         }
         return groups
@@ -82,29 +83,26 @@ public static class CloneComparison
         options ??= new();
         var input = functions.Where(function => function.Tokens >= options.MinNear).ToArray();
         var groups = new CloneGroups(input.Length);
-        foreach (
-            var (left, right) in Candidates(
-                input,
-                _ => true,
-                function => function.Shape,
-                6,
-                Math.Max(100, input.Length / 4)
-            )
-        )
-        {
-            if (
-                Nested(input[left], input[right])
-                || Overrides(input[left], input[right])
-                || Check(input[left], input[right], options).Copied
-            )
+        var pairs = Candidates(input, _ => true, function => function.Shape, 6, Math.Max(100, input.Length / 4));
+        // Checked side by side, joined in the pairs' order (TASK-0107); a copy is no template.
+        var similarities = new double[pairs.Length];
+        Parallel.For(
+            0,
+            pairs.Length,
+            at =>
             {
-                continue;
+                var (left, right) = (input[pairs[at].Left], input[pairs[at].Right]);
+                similarities[at] =
+                    Nested(left, right) || Overrides(left, right) || Check(left, right, options).Copied
+                        ? -1
+                        : Alike(left.Shape, right.Shape);
             }
-
-            var similarity = Alike(input[left].Shape, input[right].Shape);
-            if (similarity >= options.Shape)
+        );
+        for (var at = 0; at < pairs.Length; at++)
+        {
+            if (similarities[at] >= options.Shape)
             {
-                groups.Join(left, right, similarity);
+                groups.Join(pairs[at].Left, pairs[at].Right, similarities[at]);
             }
         }
         List<CloneTemplate> output = [];
@@ -197,6 +195,12 @@ public static class CloneComparison
 
     internal sealed record Gap(int LeftStart, int LeftEnd, int RightStart, int RightEnd);
 
+    /// <summary>A thread's LCS table, kept up to <see cref="KeptTable"/> ints (4 MiB); larger ones are not kept.</summary>
+    [ThreadStatic]
+    private static int[]? s_lengths;
+
+    private const int KeptTable = 1 << 20;
+
     internal static IReadOnlyList<Gap> Gaps(IReadOnlyList<string> left, IReadOnlyList<string> right)
     {
         if (left.SequenceEqual(right, StringComparer.Ordinal))
@@ -204,15 +208,34 @@ public static class CloneComparison
             return [];
         }
 
-        var lengths = Enumerable.Range(0, left.Count + 1).Select(_ => new int[right.Count + 1]).ToArray();
-        for (var i = left.Count - 1; i >= 0; i--)
+        // One flat table per thread, grown as needed and reused by every pair it checks (TASK-0107).
+        var width = right.Count + 1;
+        var size = (left.Count + 1) * width;
+        var lengths = s_lengths;
+        if (lengths is null || lengths.Length < size)
         {
-            for (var j = right.Count - 1; j >= 0; j--)
+            lengths = new int[size > KeptTable ? size : Math.Min(KeptTable, Math.Max(size, (lengths?.Length ?? 0) * 2))];
+            if (lengths.Length <= KeptTable)
             {
-                lengths[i][j] =
-                    left[i] == right[j] ? lengths[i + 1][j + 1] + 1 : Math.Max(lengths[i + 1][j], lengths[i][j + 1]);
+                s_lengths = lengths;
             }
         }
+
+        Array.Clear(lengths, left.Count * width, width);
+        for (var i = left.Count - 1; i >= 0; i--)
+        {
+            var row = i * width;
+            var below = row + width;
+            lengths[row + right.Count] = 0;
+            for (var j = right.Count - 1; j >= 0; j--)
+            {
+                lengths[row + j] =
+                    left[i] == right[j]
+                        ? lengths[below + j + 1] + 1
+                        : Math.Max(lengths[below + j], lengths[row + j + 1]);
+            }
+        }
+        int Length(int i, int j) => lengths[i * width + j];
 
         List<Gap> gaps = [];
         var a = 0;
@@ -236,7 +259,7 @@ public static class CloneComparison
                 startA = a;
                 startB = b;
             }
-            else if (lengths[a + 1][b] >= lengths[a][b + 1])
+            else if (Length(a + 1, b) >= Length(a, b + 1))
             {
                 a++;
             }
@@ -327,7 +350,13 @@ public static class CloneComparison
         return 2.0 * previous[right.Count] / (left.Count + right.Count);
     }
 
-    private static (int Left, int Right)[] Candidates(
+    /// <summary>
+    /// Pairs of functions (left &lt; right) whose forms share enough windows of <paramref name="size"/> tokens: at
+    /// least 40% of their distinct windows, with lengths within 4:5. Windows shared by more than
+    /// <paramref name="common"/> functions say nothing and are skipped. Each distinct token is hashed once and the
+    /// window hashes are rolled from the token hashes (TASK-0106); counting runs over sorted arrays.
+    /// </summary>
+    internal static (int Left, int Right)[] Candidates(
         CloneFunction[] input,
         Func<int, bool> use,
         Func<CloneFunction, IReadOnlyList<string>> form,
@@ -335,43 +364,37 @@ public static class CloneComparison
         int common
     )
     {
-        var sets = new HashSet<ulong>?[input.Length];
-        Dictionary<ulong, List<int>> index = [];
+        var sets = new ulong[]?[input.Length];
+        var lengths = new int[input.Length];
+        Dictionary<ulong, List<int>> places = [];
+        Dictionary<string, ulong> tokens = new(StringComparer.Ordinal);
         for (var number = 0; number < input.Length; number++)
         {
+            var words = form(input[number]);
+            lengths[number] = words.Count;
             if (!use(number))
             {
                 continue;
             }
 
-            var tokens = form(input[number]);
-            HashSet<ulong> hashes = [];
-            for (var start = 0; start + size <= tokens.Count; start++)
+            var windows = Windows(words, size, tokens);
+            sets[number] = windows;
+            foreach (var hash in windows)
             {
-                var hash = 14695981039346656037UL;
-                for (var offset = 0; offset < size; offset++)
+                if (!places.TryGetValue(hash, out var list))
                 {
-                    foreach (var value in Encoding.UTF8.GetBytes(tokens[start + offset]))
-                    {
-                        hash = unchecked((hash ^ value) * 1099511628211UL);
-                    }
-
-                    hash = unchecked(hash * 1099511628211UL);
+                    list = [];
+                    places.Add(hash, list);
                 }
-                hashes.Add(hash);
-            }
-            sets[number] = hashes;
-            foreach (var hash in hashes)
-            {
-                if (!index.TryGetValue(hash, out var places))
-                {
-                    places = [];
-                    index.Add(hash, places);
-                }
-                places.Add(number);
+                list.Add(number);
             }
         }
+
+        // Each list holds its functions in increasing order, as they were added.
+        var index = places.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray());
         List<(int Left, int Right)> pairs = [];
+        var shared = new int[input.Length];
+        List<int> touched = [];
         for (var left = 0; left < input.Length; left++)
         {
             if (sets[left] is not { } hashes)
@@ -379,29 +402,114 @@ public static class CloneComparison
                 continue;
             }
 
-            Dictionary<int, int> shared = [];
-            foreach (var hash in hashes.Where(hash => index[hash].Count <= common))
+            foreach (var hash in hashes)
             {
-                foreach (var right in index[hash].Where(right => right > left))
+                var list = index[hash];
+                if (list.Length > common)
                 {
-                    shared[right] = shared.GetValueOrDefault(right) + 1;
+                    continue;
+                }
+
+                var from = Array.BinarySearch(list, left + 1);
+                for (var at = from < 0 ? ~from : from; at < list.Length; at++)
+                {
+                    if (shared[list[at]]++ is 0)
+                    {
+                        touched.Add(list[at]);
+                    }
                 }
             }
 
-            foreach (var (right, count) in shared)
+            foreach (var right in touched)
             {
-                var a = form(input[left]).Count;
-                var b = form(input[right]).Count;
+                var count = shared[right];
+                shared[right] = 0;
+                var a = lengths[left];
+                var b = lengths[right];
                 if (
                     5L * Math.Min(a, b) >= 4L * Math.Max(a, b)
-                    && count >= 0.4 * (hashes.Count + sets[right]!.Count - count)
+                    && count >= 0.4 * (hashes.Length + sets[right]!.Length - count)
                 )
                 {
                     pairs.Add((left, right));
                 }
             }
+            touched.Clear();
         }
         return pairs.OrderBy(pair => pair.Left).ThenBy(pair => pair.Right).ToArray();
+    }
+
+    /// <summary>The distinct hashes of every run of <paramref name="size"/> tokens, rolled from the tokens' hashes.</summary>
+    private static ulong[] Windows(IReadOnlyList<string> words, int size, Dictionary<string, ulong> tokens)
+    {
+        if (words.Count < size)
+        {
+            return [];
+        }
+
+        const ulong Base = 1099511628211UL;
+        var hashes = new ulong[words.Count];
+        for (var at = 0; at < hashes.Length; at++)
+        {
+            if (!tokens.TryGetValue(words[at], out var hash))
+            {
+                hash = TokenHash(words[at]);
+                tokens.Add(words[at], hash);
+            }
+            hashes[at] = hash;
+        }
+
+        var top = 1UL;
+        for (var step = 1; step < size; step++)
+        {
+            top = unchecked(top * Base);
+        }
+
+        HashSet<ulong> windows = new(words.Count - size + 1);
+        var rolling = 0UL;
+        for (var at = 0; at < hashes.Length; at++)
+        {
+            rolling = unchecked(rolling * Base + hashes[at]);
+            if (at >= size)
+            {
+                rolling = unchecked(rolling - hashes[at - size] * top * Base);
+            }
+
+            if (at >= size - 1)
+            {
+                windows.Add(Mix(rolling));
+            }
+        }
+        return [.. windows];
+    }
+
+    /// <summary>FNV-1a of the token's UTF-8 bytes; ASCII without encoding.</summary>
+    private static ulong TokenHash(string token)
+    {
+        var hash = 14695981039346656037UL;
+        foreach (var character in token)
+        {
+            if (character >= 0x80)
+            {
+                hash = 14695981039346656037UL;
+                foreach (var value in Encoding.UTF8.GetBytes(token))
+                {
+                    hash = unchecked((hash ^ value) * 1099511628211UL);
+                }
+                return hash;
+            }
+
+            hash = unchecked((hash ^ character) * 1099511628211UL);
+        }
+        return hash;
+    }
+
+    /// <summary>SplitMix64's finalizer: spreads a rolled hash over all bits (one to one, so no new collision).</summary>
+    private static ulong Mix(ulong value)
+    {
+        value = unchecked((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL);
+        value = unchecked((value ^ (value >> 27)) * 0x94D049BB133111EBUL);
+        return value ^ (value >> 31);
     }
 
     internal static CloneFunction[] Sorted(IEnumerable<CloneFunction> functions) =>

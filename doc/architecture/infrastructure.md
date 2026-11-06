@@ -31,6 +31,10 @@ strict tables and bounded busy waits are established on connections.
 retry loop does not override the millisecond `PRAGMA busy_timeout` budget.
 Cross-process contention tests protect this behavior on dependency upgrades.
 
+LiteDB was evaluated as a replacement and rejected (TASK-0110): its locking
+between processes fails under Native AOT on Linux, it is slower, and it lacks
+full-text search. See [litedb-spike.md](litedb-spike.md).
+
 Memory stores implement history, supersession, retirement and proposals.
 Knowledge levels combine project, branch, workspace and wider stores while
 preserving provenance. Failed or missing wider stores remain unknown/missing
@@ -67,6 +71,42 @@ sequences, filters generated/test/vendor sources and reports qualified evidence.
 Change coupling combines history and provider evidence to suggest missing usual
 partners. Layering, service and database guesses remain labeled heuristics.
 Coverage gaps do not become negative findings.
+
+A sync extracts functions only from files that changed (TASK-0105). `CloneCache`
+keeps, per repository, one compressed file beside the global configuration
+(`cache/clones/<root hash>.bin`) holding each file's extracted functions,
+complexity members and branches with the content hash they were read from: the
+SHA-256 of the file's bytes, the same hash sync records in its `files` table. A
+sync hands the cache those recorded hashes, so an unchanged file is neither read
+nor lexed; files sync does not record are read and hashed. A Go file's key also
+holds its package's files, since its functions depend on them. The extractor
+version and harness's build stamp the file: a new build starts it over, as does
+an unreadable file. Findings are the same as from a full extraction; on NM-2
+(3,540 files) extraction takes 0.3 s instead of 2-3 s, with a 5.7 MiB cache.
+
+A sync's workspace findings start from what its project read already read of
+every member (`WorkspaceEvidenceReader.For`: file lists, texts, builds,
+declarations; member-set results such as duplicates are read anew), so each
+member is listed and built once per sync. Before computing a workspace, the sync
+fingerprints its inputs (`WorkspaceInputs`: harness's build, the global and each
+member's configuration, each member's root, HEAD and `git status` paths with
+their size and modification time, `.harness/` left out, and the workspace's
+decisions and conventions). When the fingerprint equals the one stored beside the
+workspace's knowledge (`<knowledge db>.inputs`) with its last findings, they are
+kept and the sync says so; any change in any member, synced there or not,
+computes them again (TASK-0108).
+
+The project's own findings are kept the same way (TASK-0109): `FindingSets`
+fingerprints what they depend on (harness's build, the global and project
+configuration, this repository's and its workspace members' HEAD and changed
+paths with size and modification time, the file hashes sync recorded, the
+constraints, decisions and conventions of the project, its workspaces and the
+user, the exact .NET metrics run for HEAD, and the configured providers'
+executables) and keeps the stored findings when the fingerprint in
+`<project db>.findings-inputs` matches and is less than a day old. Providers are
+not asked to find out: their answers change only with their index, and a sync
+that refreshes a provider (or `harness sync --full`) always computes the
+findings. A sync with nothing changed takes about 1 s on ai-harness-cs and NM-2.
 
 The complexity reader counts each function's cyclomatic complexity from the
 tokens the clone extractor already holds. It reads no file a second time and

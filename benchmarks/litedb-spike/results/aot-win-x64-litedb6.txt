@@ -1,0 +1,2 @@
+FAIL  open: InvalidOperationException: This is a prerelease development build of LiteDB. Broken databases and data loss are expected, and you are on your own if it breaks; support may not be available. DO NOT RUN IN PRODUCTION! To acknowledge this risk, call LiteDBPragmas.I_AM_AWARE_MY_DATABASE_BREAKS_WHEN_I_USE_THIS() before constructing LiteDatabase.
+1 failure(s); LiteDB 6.0.0.0; Native AOT

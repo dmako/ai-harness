@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Harness.Core.Sync;
 
@@ -11,13 +12,65 @@ public sealed partial record GitRepository
         return (await RunAsync(Root, ["cat-file", "-e", commit + "^{commit}"], token).ConfigureAwait(false)).Code is 0;
     }
 
-    public async Task<IReadOnlyList<string>> ListFilesAsync(CancellationToken token = default) =>
-        SplitNul(
+    /// <summary>The file lists already read in this flow, by repository root (see <see cref="ShareFileLists"/>).</summary>
+    private static readonly AsyncLocal<ConcurrentDictionary<string, IReadOnlyList<string>>?> SharedFileLists = new();
+
+    /// <summary>
+    /// Until disposed, each repository's file list is read once in this flow (and the calls it awaits) and reused
+    /// (TASK-0101): a sync lists its files while finding what changed, and its findings and metrics read the same
+    /// list instead of starting git again. Only for work that reads a stable tree, as a sync under its lease does.
+    /// </summary>
+    public static IDisposable ShareFileLists()
+    {
+        var previous = SharedFileLists.Value;
+        SharedFileLists.Value = new(PathComparer);
+        return new Restore(() => SharedFileLists.Value = previous);
+    }
+
+    private sealed class Restore(Action restore) : IDisposable
+    {
+        public void Dispose() => restore();
+    }
+
+    public async Task<IReadOnlyList<string>> ListFilesAsync(CancellationToken token = default)
+    {
+        if (SharedFileLists.Value is { } shared && shared.TryGetValue(Root, out var known))
+        {
+            return known;
+        }
+
+        var files = SplitNul(
                 await ReadGitAsync(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], token)
                     .ConfigureAwait(false)
             )
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        SharedFileLists.Value?.TryAdd(Root, files);
+        return files;
+    }
+
+    /// <summary>
+    /// The untracked files (what <c>ls-files --others --exclude-standard</c> lists). Inside
+    /// <see cref="ShareFileLists"/>, read with the tracked ones in one <c>ls-files -t</c> whose full list is kept
+    /// for <see cref="ListFilesAsync"/>.
+    /// </summary>
+    private async Task<string[]> UntrackedAsync(CancellationToken token)
+    {
+        if (SharedFileLists.Value is not { } shared)
+        {
+            return SplitNul(
+                await ReadGitAsync(["ls-files", "-z", "--others", "--exclude-standard"], token).ConfigureAwait(false)
+            );
+        }
+
+        // each entry is "<tag> <path>": '?' marks an untracked file, the other tags tracked ones
+        var entries = SplitNul(
+            await ReadGitAsync(["ls-files", "-z", "-t", "--cached", "--others", "--exclude-standard"], token)
+                .ConfigureAwait(false)
+        );
+        shared.TryAdd(Root, entries.Select(entry => entry[2..]).Distinct(StringComparer.Ordinal).ToArray());
+        return [.. entries.Where(entry => entry[0] is '?').Select(entry => entry[2..])];
+    }
 
     public async Task<IReadOnlyList<string>> DirtyPathsAsync(CancellationToken token = default)
     {
@@ -43,9 +96,24 @@ public sealed partial record GitRepository
         return paths;
     }
 
-    public async Task<IReadOnlyList<GitChange>> ChangesSinceAsync(string commit, CancellationToken token = default)
+    public Task<IReadOnlyList<GitChange>> ChangesSinceAsync(string commit, CancellationToken token = default) =>
+        ChangesSinceAsync(commit, verified: false, token);
+
+    /// <summary>
+    /// What changed in the work tree since <paramref name="commit"/>; <paramref name="verified"/> when the caller
+    /// has just checked that the commit exists (a sync's mode selection does), so it is not checked again.
+    /// </summary>
+    public async Task<IReadOnlyList<GitChange>> ChangesSinceAsync(
+        string commit,
+        bool verified,
+        CancellationToken token = default
+    )
     {
-        if (!await HasCommitAsync(commit, token).ConfigureAwait(false))
+        if (verified)
+        {
+            ValidateRevision(commit);
+        }
+        else if (!await HasCommitAsync(commit, token).ConfigureAwait(false))
         {
             throw new InvalidDataException(commit + ": commit not found in repository");
         }
@@ -82,11 +150,7 @@ public sealed partial record GitRepository
             .Where(pair => pair.change.Kind is "deleted")
             .ToDictionary(pair => pair.change.Path, pair => pair.index, StringComparer.Ordinal);
         List<string> added = [];
-        foreach (
-            var path in SplitNul(
-                await ReadGitAsync(["ls-files", "-z", "--others", "--exclude-standard"], token).ConfigureAwait(false)
-            )
-        )
+        foreach (var path in await UntrackedAsync(token).ConfigureAwait(false))
         {
             if (deleted.Remove(path, out var index))
             {

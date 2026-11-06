@@ -1,0 +1,24 @@
+== sqlite
+  child exit 0: p0 applied 0 migration(s), 100 writes ok, 0 errors, write p50 2.5 ms, max 26.4 ms
+  child exit 0: p1 applied 0 migration(s), 100 writes ok, 0 errors, write p50 2.4 ms, max 17.0 ms
+  child exit 0: p2 applied 0 migration(s), 100 writes ok, 0 errors, write p50 2.2 ms, max 5.4 ms
+  child exit 0: p3 applied 0 migration(s), 100 writes ok, 0 errors, write p50 2.4 ms, max 45.5 ms
+  child exit 0: p4 applied 5 migration(s), 100 writes ok, 0 errors, write p50 2.6 ms, max 27.0 ms
+  child exit 0: p5 applied 0 migration(s), 100 writes ok, 0 errors, write p50 2.3 ms, max 63.6 ms
+sqlite: 6 processes x 100 writes in 2.53 s; ledger 5/5, migration rows 1000/1000, rows 600/600, counter 600/600, failed processes 0 => PASS
+== shared
+  child exit 0: p0 applied 5 migration(s), 100 writes ok, 0 errors, write p50 129.3 ms, max 556.5 ms
+  child exit 0: p1 applied 0 migration(s), 100 writes ok, 0 errors, write p50 129.5 ms, max 480.8 ms
+  child exit 0: p2 applied 0 migration(s), 100 writes ok, 0 errors, write p50 129.5 ms, max 480.5 ms
+  child exit 0: p3 applied 0 migration(s), 100 writes ok, 0 errors, write p50 129.5 ms, max 480.5 ms
+  child exit 0: p4 applied 0 migration(s), 100 writes ok, 0 errors, write p50 129.6 ms, max 480.5 ms
+  child exit 0: p5 applied 0 migration(s), 100 writes ok, 0 errors, write p50 127.7 ms, max 492.4 ms
+shared: 6 processes x 100 writes in 14.34 s; ledger 5/5, migration rows 1000/1000, rows 600/600, counter 600/600, failed processes 0 => PASS
+== direct
+  child exit 0: p0 applied 5 migration(s), 100 writes ok, 0 errors, write p50 0.1 ms, max 1.0 ms
+  child exit 1: p1 FAILED: IOException: The process cannot access the file 'C:\Users\david\AppData\Local\Temp\litedb-spike-contend-445524\c.litedb' because it is being used by another process.
+  child exit 1: p2 FAILED: IOException: The process cannot access the file 'C:\Users\david\AppData\Local\Temp\litedb-spike-contend-445524\c.litedb' because it is being used by another process.
+  child exit 1: p3 FAILED: IOException: The process cannot access the file 'C:\Users\david\AppData\Local\Temp\litedb-spike-contend-445524\c.litedb' because it is being used by another process.
+  child exit 1: p4 FAILED: IOException: The process cannot access the file 'C:\Users\david\AppData\Local\Temp\litedb-spike-contend-445524\c.litedb' because it is being used by another process.
+  child exit 1: p5 FAILED: IOException: The process cannot access the file 'C:\Users\david\AppData\Local\Temp\litedb-spike-contend-445524\c.litedb' because it is being used by another process.
+direct: 6 processes x 100 writes in 0.11 s; ledger 5/5, migration rows 1000/1000, rows 100/600, counter 100/600, failed processes 5 => FAIL

@@ -18,6 +18,43 @@ internal sealed partial class UiReadService
 {
     private readonly Dictionary<string, AnalysisRepository> _repositories = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The evidence reader for these members: harness ui's shared one while their working trees are unchanged
+    /// (TASK-0093), so the workspace views and the members' structure and stack read each file and project once.
+    /// </summary>
+    private async Task<WorkspaceEvidenceReader> EvidenceAsync(
+        IReadOnlyList<WorkspaceMember> members,
+        CancellationToken token
+    ) =>
+        views is null
+            ? new WorkspaceEvidenceReader(members)
+            : await views.AnalysisAsync(
+                members.Select(member => new ViewMember(member.Id, member.Root, member.DatabasePath)).ToArray(),
+                () => new WorkspaceEvidenceReader(members, shared: true),
+                token
+            );
+
+    /// <summary>
+    /// Runs a view's reads alone on the evidence reader, after its members were read side by side (what
+    /// <paramref name="reads"/> names; with <paramref name="focus"/>, the others only their builds): requests
+    /// arriving together compute each piece once.
+    /// </summary>
+    private static Task<T> AnalyzeAsync<T>(
+        WorkspaceEvidenceReader evidence,
+        MemberReads reads,
+        Func<Task<T>> read,
+        CancellationToken token,
+        string? focus = null
+    ) =>
+        evidence.ExclusiveAsync(
+            async () =>
+            {
+                await evidence.WarmAsync(reads, token, focus);
+                return await read();
+            },
+            token
+        );
+
     private async Task<AnalysisRepository> RepositoryAsync(string root, CancellationToken token)
     {
         if (!_repositories.TryGetValue(root, out var repository))
@@ -60,12 +97,25 @@ internal sealed partial class UiReadService
         var id = UiProjectCatalog.Text(project, "id");
         var root = UiProjectCatalog.Text(project, "root");
         var (members, current) = StructureMembers(project, id, root);
-        var reader = new ArchitectureReader(members);
+        var evidence = await EvidenceAsync(members, token);
+        var reader = new ArchitectureReader(members, evidence);
         using var state = Live(project) ? Open(project) : null;
         var rules = ArchitectureReader.RulesFor(state is null ? null : new MemoryStore(state), Levels, id, token);
         var workspaceCount = Workspaces.Load().Count(w => w.Members.Contains(id, StringComparer.Ordinal));
-        var read = await reader.ProjectAsync(current, rules, true, token, workspaceKnown: workspaceCount > 0);
-        var repository = await reader.RepositoryAsync(current, token);
+        var (read, repository, packageUsers) = await AnalyzeAsync(
+            evidence,
+            MemberReads.Builds,
+            async () =>
+            {
+                var read = await reader.ProjectAsync(current, rules, true, token, workspaceKnown: workspaceCount > 0);
+                var repository = await reader.RepositoryAsync(current, token);
+                var users = read.Architecture is { } known
+                    ? await PackageUsersAsync(reader, members, id, known, token)
+                    : null;
+                return (read, repository, users);
+            },
+            token
+        );
         JsonObject result = new()
         {
             ["known"] = read.Architecture is not null,
@@ -84,7 +134,7 @@ internal sealed partial class UiReadService
             result["workspaces"] = workspaceCount;
         }
         result["architecture"] = UiJson.Node(architecture);
-        result["package_users"] = await PackageUsersAsync(reader, members, id, architecture, token);
+        result["package_users"] = packageUsers;
         if (Live(project))
         {
             await AddFindingsAsync(result, project, root, id, read, token);
@@ -209,7 +259,6 @@ internal sealed partial class UiReadService
             throw new UiRequestException(400, exception.Message);
         }
         var members = Workspaces.Resolve(workspace.Members);
-        var evidence = new WorkspaceEvidenceReader(members);
         var endpoint = request.Endpoint.Split('/')[^1];
         // a workspace view, from harness ui's view cache while its members are unchanged
         Task<JsonNode?> View(Func<Task<JsonNode?>> compute) =>
@@ -221,15 +270,32 @@ internal sealed partial class UiReadService
                     compute,
                     token
                 );
+        // the members' shared analysis, alone on it, after reading them side by side
+        async Task<T> Analyze<T>(MemberReads reads, Func<WorkspaceEvidenceReader, Task<T>> read)
+        {
+            var evidence = await EvidenceAsync(members, token);
+            return await AnalyzeAsync(evidence, reads, () => read(evidence), token);
+        }
+        const MemberReads Everything = MemberReads.Stacks | MemberReads.Sources;
         return endpoint switch
         {
             "snippet" => await WorkspaceSnippetAsync(members, request, token),
-            "dependencies" => await View(async () => UiJson.Node(await evidence.DependencySummaryAsync(token))),
-            "adoption" => UiJson.Node(await evidence.AdoptionAsync(request.Parameter("library"), token)),
-            "issues" => await View(() => IssuesAsync(members, evidence, token)),
-            "stack" => await View(async () => UiJson.Node(await evidence.WorkspaceStackAsync(token))),
-            "duplicates" => await View(() => DuplicatesAsync(workspace.Name, members, evidence, token)),
-            "system" => await View(() => SystemAsync(workspace.Name, members, token)),
+            "dependencies" => await View(() =>
+                Analyze(MemberReads.Stacks, async evidence => UiJson.Node(await evidence.DependencySummaryAsync(token)))
+            ),
+            "adoption" => UiJson.Node(
+                await Analyze(MemberReads.Sources, evidence => evidence.AdoptionAsync(request.Parameter("library"), token))
+            ),
+            "issues" => await View(() => Analyze(Everything, evidence => IssuesAsync(members, evidence, token))),
+            "stack" => await View(() =>
+                Analyze(MemberReads.Stacks, async evidence => UiJson.Node(await evidence.WorkspaceStackAsync(token)))
+            ),
+            "duplicates" => await View(() =>
+                Analyze(Everything, evidence => DuplicatesAsync(workspace.Name, members, evidence, token))
+            ),
+            "system" => await View(() =>
+                Analyze(Everything, evidence => SystemAsync(workspace.Name, members, evidence, token))
+            ),
             "findings" => WorkspaceFindings(workspace.Name, members, token),
             _ => throw new UiRequestException(404, "unknown endpoint"),
         };
@@ -266,31 +332,59 @@ internal sealed partial class UiReadService
         {
             members = members.Append(new WorkspaceMember("", id, UiProjectCatalog.Text(project, "root"))).ToArray();
         }
-        return UiJson.Node(await new WorkspaceEvidenceReader(members).ProjectStackAsync(id, token));
+        var evidence = await EvidenceAsync(members, token);
+        return UiJson.Node(
+            await AnalyzeAsync(evidence, MemberReads.Stacks, () => evidence.ProjectStackAsync(id, token), token, id)
+        );
     }
 
+    /// <summary>
+    /// Every registered project's stack badge, each kept while its HEAD and working tree are unchanged
+    /// (TASK-0092); the projects not kept yet are read side by side, at most four at once.
+    /// </summary>
     private async Task<JsonNode?> StacksAsync(CancellationToken token)
     {
+        var projects = (await catalog.ListAsync(token))
+            .Where(project => project["live"]?["state"]?.GetValue<string>() is not "missing")
+            .ToArray();
+        var badges = new JsonNode?[projects.Length];
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, projects.Length),
+            new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = token },
+            async (index, cancel) => badges[index] = await StackBadgeAsync(projects[index], cancel)
+        );
         JsonObject result = [];
-        foreach (var project in await catalog.ListAsync(token))
+        for (var index = 0; index < projects.Length; index++)
         {
-            if (project["live"]?["state"]?.GetValue<string>() is "missing")
+            if (badges[index]?["stack"] is { } stack)
             {
-                continue;
-            }
-            try
-            {
-                var repo = await RepositoryAsync(UiProjectCatalog.Text(project, "root"), token);
-                if (new StackReader(repo, new EcosystemReader(repo)).Read() is { } stack)
-                {
-                    result[UiProjectCatalog.Text(project, "id")] = UiJson.Node(stack);
-                }
-            }
-            catch (Exception exception) when (ReadError(exception))
-            { /* Other badges remain available. */
+                result[UiProjectCatalog.Text(projects[index], "id")] = stack.DeepClone();
             }
         }
         return result;
+    }
+
+    /// <summary>A project's stack ({"stack": null} when it has none); null, and not kept, when it cannot be read.</summary>
+    private async Task<JsonNode?> StackBadgeAsync(JsonObject project, CancellationToken token)
+    {
+        var id = UiProjectCatalog.Text(project, "id");
+        var root = UiProjectCatalog.Text(project, "root");
+        async Task<JsonNode?> ReadAsync()
+        {
+            try
+            {
+                var repository = await AnalysisRepository.OpenAsync(root, token);
+                var stack = new StackReader(repository, new EcosystemReader(repository)).Read();
+                return new JsonObject { ["stack"] = stack is null ? null : UiJson.Node(stack) };
+            }
+            catch (Exception exception) when (ReadError(exception))
+            {
+                return null; // other badges remain available; this one is read again next time
+            }
+        }
+        return views is null
+            ? await ReadAsync()
+            : await views.TreeViewAsync("stack:" + id, [new ViewMember(id, root, "")], ReadAsync, token);
     }
 
     private async Task<JsonNode?> DuplicatesAsync(
@@ -322,10 +416,11 @@ internal sealed partial class UiReadService
     private async Task<JsonNode?> SystemAsync(
         string name,
         IReadOnlyList<WorkspaceMember> members,
+        WorkspaceEvidenceReader evidence,
         CancellationToken token
     )
     {
-        var system = await new ArchitectureReader(members).SystemAsync(token, name, Levels);
+        var system = await new ArchitectureReader(members, evidence).SystemAsync(token, name, Levels);
         using var database = OpenLevel(MemoryScope.Parse("workspace:" + name));
         var annotated = database is null
             ? (Array.Empty<Finding>(), (FindingSnapshot?)null)

@@ -1,0 +1,3 @@
+named mutex held here; another process took it at once: it does NOT cross processes (Native AOT, Ubuntu 26.10)
+named mutex held here; another process could not take it: it crosses processes (JIT, Ubuntu 26.10)
+6 failure(s); LiteDB 5.0.21.0; Native AOT

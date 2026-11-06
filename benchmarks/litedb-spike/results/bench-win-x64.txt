@@ -1,0 +1,19 @@
+import into LiteDB: 0.16 s
+data: 602 files in worktree wt_8a70e29f039d4c34493ef4b51536116c, 241 memories, 367 findings
+search "sqlite busy timeout": sqlite 14 hits, litedb 14 hits, 14 in both; top 5 equal: False
+search "commit message format": sqlite 17 hits, litedb 8 hits, 8 in both; top 5 equal: False
+search "native aot trimming release": sqlite 20 hits, litedb 20 hits, 18 in both; top 5 equal: False
+
+median ms over 15 runs (first run discarded as warm-up)
+operation                               sqlite   litedb shared   litedb direct
+open + first read                        13.31            0.67           25.72
+file hashes read (all)                    0.51            1.59            1.00
+file hashes write 50                      9.07           19.09            1.21
+file hashes write all 602                 6.35           51.27           15.90
+memory search x3                          1.49           13.77            1.63
+findings take (snapshot)                 17.81           43.62            5.96
+findings read current                     1.02           11.79            1.49
+
+bench.sqlite                   4780 KiB
+direct.litedb                  2664 KiB
+shared.litedb                  2664 KiB

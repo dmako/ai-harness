@@ -1,0 +1,4 @@
+holder: transaction open (holds its write transaction 75 s)
+read  during the hold: 2 after 75.03 s
+write during the hold: written after 0.01 s
+holder: committed

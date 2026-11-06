@@ -16,6 +16,8 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
     private readonly bool _linked;
     private readonly McpSupervisor _supervisor;
     private readonly Dictionary<string, Plan> _plans;
+    private readonly IReadOnlyDictionary<string, string?> _environment;
+    private readonly NotIndexedMemo? _notIndexed;
     private string _project = "";
 
     public GenericMcpProvider(
@@ -26,11 +28,14 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         IReadOnlyDictionary<string, string?>? environment = null,
         McpRestartPolicy? policy = null,
         TimeProvider? timeProvider = null,
-        bool? linkedWorktree = null
+        bool? linkedWorktree = null,
+        NotIndexedMemo? notIndexed = null
     )
     {
         Name = name;
         _configuration = configuration;
+        _environment = environment ?? new Dictionary<string, string?>();
+        _notIndexed = notIndexed;
         _root = Path.GetFullPath(root);
         _canonicalRoot = Canonical(_root);
         _linked = linkedWorktree ?? IsLinked(_root);
@@ -82,7 +87,8 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         IReadOnlyDictionary<string, string?>? environment = null,
         McpRestartPolicy? policy = null,
         TimeProvider? timeProvider = null,
-        bool? linkedWorktree = null
+        bool? linkedWorktree = null,
+        NotIndexedMemo? notIndexed = null
     ) =>
         configuration.Refresh is null
             ? new GenericMcpProvider(
@@ -93,9 +99,20 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
                 environment,
                 policy,
                 timeProvider,
-                linkedWorktree
+                linkedWorktree,
+                notIndexed
             )
-            : new Refreshing(name, configuration, root, factory, environment, policy, timeProvider, linkedWorktree);
+            : new Refreshing(
+                name,
+                configuration,
+                root,
+                factory,
+                environment,
+                policy,
+                timeProvider,
+                linkedWorktree,
+                notIndexed
+            );
 
     public IReadOnlyList<CapabilityInfo> Capabilities() =>
         _plans
@@ -509,6 +526,16 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         }
 
         var mapping = _configuration.Resolve!;
+        // A remembered 'not known' spares starting the provider only to hear it again (TASK-0103).
+        var fingerprint = _notIndexed is null ? "" : NotIndexedMemo.Fingerprint(Identity(), IndexDirectory());
+        if (_notIndexed?.Recall(Name, _canonicalRoot, fingerprint) is { } remembered)
+        {
+            var since = remembered.At.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
+            var note =
+                $"{remembered.Message} (answered {since}; asked again once its index or configuration changes, or after a day)";
+            throw new ProviderNotIndexedException(note, Failure("", note, remembered.Fix));
+        }
+
         var result = await _supervisor
             .CallToolAsync(
                 mapping.Tool,
@@ -529,6 +556,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             if (root.Length > 0 && value.Length > 0 && Canonical(root) == _canonicalRoot)
             {
                 Volatile.Write(ref _project, value);
+                _notIndexed?.Forget(Name, _canonicalRoot);
                 return value;
             }
         }
@@ -539,8 +567,75 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
             ? "run 'harness sync' here to index it"
             : $"to index worktrees too, set providers.{Name}.index_worktrees = true and run 'harness sync' here";
         var fix = _linked ? worktreeFix : mapping.Fix.Replace("{root}", _root, StringComparison.Ordinal);
+        _notIndexed?.Remember(Name, _canonicalRoot, fingerprint, message, fix);
         throw new ProviderNotIndexedException(message, Failure("", message, fix));
     }
+
+    /// <summary>What decides whether the provider can know this repository: how it starts and how it is asked.</summary>
+    private string Identity()
+    {
+        var text = new StringBuilder()
+            .Append(_configuration.Command)
+            .Append('\n')
+            .AppendJoin('\u001f', _configuration.Args)
+            .Append('\n')
+            .Append(_configuration.Dir)
+            .Append('\n')
+            .Append(_configuration.IndexWorktrees)
+            .Append('\n');
+        if (_configuration.Resolve is { } resolve)
+        {
+            text.Append(resolve.Tool).Append('\n').Append(resolve.Items).Append('\n').Append(resolve.Match);
+            text.Append('\n').Append(resolve.Value).Append('\n').AppendJoin('\u001f', resolve.Index).Append('\n');
+            Arguments(text, resolve.Args);
+        }
+
+        if (_configuration.Refresh is { } refresh)
+        {
+            text.Append(refresh.Tool).Append('\n').Append(refresh.Skip).Append('\n');
+            Arguments(text, refresh.Args);
+        }
+
+        return text.ToString();
+
+        static void Arguments(StringBuilder text, Dictionary<string, JsonElement> args)
+        {
+            foreach (var pair in args.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                text.Append(pair.Key).Append('=').Append(pair.Value.GetRawText()).Append('\n');
+            }
+        }
+    }
+
+    /// <summary>The first configured index directory that is set (<c>$NAME</c> an environment variable, <c>~</c> home).</summary>
+    private string? IndexDirectory()
+    {
+        foreach (var entry in _configuration.Resolve?.Index ?? [])
+        {
+            var value = entry.StartsWith('$') ? Variable(entry[1..]) : entry;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (value == "~" || value.StartsWith("~/", StringComparison.Ordinal))
+            {
+                var home = Variable("HOME") is { Length: > 0 } set
+                    ? set
+                    : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                value = Path.Combine(home, value.Length > 2 ? value[2..] : "");
+            }
+
+            return Path.GetFullPath(value);
+        }
+
+        return null;
+    }
+
+    private string? Variable(string name) =>
+        _environment.TryGetValue(name, out var value) && value is not null
+            ? value
+            : Environment.GetEnvironmentVariable(name);
 
     protected async Task<RefreshResult> RefreshCoreAsync(RefreshRequest request, CancellationToken cancellationToken)
     {
@@ -656,9 +751,20 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         IReadOnlyDictionary<string, string?>? environment,
         McpRestartPolicy? policy,
         TimeProvider? timeProvider,
-        bool? linkedWorktree
+        bool? linkedWorktree,
+        NotIndexedMemo? notIndexed
     )
-        : GenericMcpProvider(name, configuration, root, factory, environment, policy, timeProvider, linkedWorktree),
+        : GenericMcpProvider(
+            name,
+            configuration,
+            root,
+            factory,
+            environment,
+            policy,
+            timeProvider,
+            linkedWorktree,
+            notIndexed
+        ),
             IProviderRefresher
     {
         public Task<RefreshResult> RefreshAsync(

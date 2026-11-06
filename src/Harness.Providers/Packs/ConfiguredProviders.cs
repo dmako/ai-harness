@@ -14,7 +14,8 @@ public static class ConfiguredProviders
         IProviderProcessFactory factory,
         bool light = false,
         IReadOnlyDictionary<string, string?>? environment = null,
-        IReadOnlyList<string>? detectedLanguages = null
+        IReadOnlyList<string>? detectedLanguages = null,
+        NotIndexedMemo? notIndexed = null
     ) =>
         ProviderRouting.Build(
             providers.Select(pair => new ProviderRegistration(
@@ -31,7 +32,14 @@ public static class ConfiguredProviders
                             environment,
                             allowDetachedChildren: pair.Value.Pack is "graphify-csharp"
                         ),
-                        "mcp" => GenericMcpProvider.Build(pair.Key, pair.Value, root, factory, environment),
+                        "mcp" => GenericMcpProvider.Build(
+                            pair.Key,
+                            pair.Value,
+                            root,
+                            factory,
+                            environment,
+                            notIndexed: notIndexed
+                        ),
                         _ => throw new ArgumentException("unknown provider type " + pair.Value.Type),
                     },
                 pair.Value.IsEnabled(),

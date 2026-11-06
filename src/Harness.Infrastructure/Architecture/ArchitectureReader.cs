@@ -9,11 +9,17 @@ namespace Harness.Infrastructure.Architecture;
 
 public sealed record ArchitectureRead(ProjectArchitecture? Architecture, IReadOnlyList<string> Notes);
 
-/// <summary>One request caches each member's files/build. Quick reads omit workspace and stale-knowledge scans.</summary>
-public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
+/// <summary>
+/// One request caches each member's files/build, or reads them from a shared evidence reader (TASK-0093). Quick
+/// reads omit workspace and stale-knowledge scans.
+/// </summary>
+public sealed class ArchitectureReader(
+    IReadOnlyList<WorkspaceMember> members,
+    WorkspaceEvidenceReader? evidence = null,
+    Clones.CloneCache? clones = null
+)
 {
-    private readonly WorkspaceEvidenceReader _evidence = new(members);
-    private readonly Dictionary<string, ProjectBuild?> _builds = new(StringComparer.Ordinal);
+    private readonly WorkspaceEvidenceReader _evidence = evidence ?? new(members);
     private readonly Dictionary<string, Clones.RepeatedCodeReader> _repeated = new(StringComparer.Ordinal);
 
     public async Task<IReadOnlyList<ArchitectureFinding>> RepeatedAsync(
@@ -21,6 +27,10 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         IReadOnlyList<ArchitectureFinding>? provided,
         CancellationToken token
     ) => (await RepeatedReaderAsync(member, token).ConfigureAwait(false)).Read(provided);
+
+    /// <summary>Harness's own repeated-code detection, which <see cref="RepeatedAsync"/> then merges with a provider's.</summary>
+    public async Task PrepareRepeatedAsync(WorkspaceMember member, CancellationToken token) =>
+        (await RepeatedReaderAsync(member, token).ConfigureAwait(false)).Prepare();
 
     /// <summary>Complexity findings from the functions the repeated-code reader already extracted.</summary>
     public async Task<IReadOnlyList<ArchitectureFinding>> ComplexityAsync(
@@ -52,7 +62,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
         if (!_repeated.TryGetValue(member.Id, out var reader))
         {
             var (repository, _) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
-            reader = new(repository);
+            reader = new(repository, clones);
             _repeated.Add(member.Id, reader);
         }
         return reader;
@@ -160,19 +170,8 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members)
     public async Task<AnalysisRepository> RepositoryAsync(WorkspaceMember member, CancellationToken token) =>
         (await _evidence.RepositoryAsync(member, token).ConfigureAwait(false)).Repository;
 
-    private async Task<ProjectBuild?> BuildAsync(WorkspaceMember member, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        if (_builds.TryGetValue(member.Id, out var build))
-        {
-            return build;
-        }
-
-        var (repository, ecosystem) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
-        build = new BuildReader(repository, ecosystem).Read();
-        _builds.Add(member.Id, build);
-        return build;
-    }
+    private Task<ProjectBuild?> BuildAsync(WorkspaceMember member, CancellationToken token) =>
+        _evidence.BuildAsync(member, token);
 
     /// <summary>Own groups precede workspace/user groups; every applicable rule is checked.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

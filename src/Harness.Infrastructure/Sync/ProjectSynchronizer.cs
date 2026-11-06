@@ -1,5 +1,6 @@
 using Harness.Core.Projects;
 using Harness.Core.Sync;
+using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 
@@ -48,6 +49,8 @@ public sealed class ProjectSynchronizer(
         var time = clock ?? TimeProvider.System;
         var started = time.GetUtcNow();
         await using var lease = await WorktreeSyncLock.AcquireAsync(repository.GitDir, token).ConfigureAwait(false);
+        // the files listed while finding what changed serve the findings and metrics of this run (TASK-0101)
+        using var files = GitRepository.ShareFileLists();
         using var database = HarnessDatabase.Open(
             location.DatabasePath,
             new() { BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs) },
@@ -61,6 +64,27 @@ public sealed class ProjectSynchronizer(
             ? SyncStore.SyncedSince(database, worktree, started, head.Commit)
             : 0;
         SyncRun? run = null;
+        WorktreeIdentity[] removed = [];
+        Harness.Core.Memory.SharedKnowledgeMerge? knowledge = null;
+        IReadOnlyList<Harness.Infrastructure.Findings.FindingSync> findings = [];
+        // Harness's own work runs while the providers refresh; only its provider questions wait (TASK-0104).
+        async Task AlongsideAsync(Task<IReadOnlyList<Harness.Core.Sync.ProviderOutcome>> refreshed)
+        {
+            removed = RemoveGoneWorktrees(database, worktree, token);
+            knowledge = SharedKnowledge(database, location.Root, token);
+            await NoteSyncAsync(registration, database, token).ConfigureAwait(false);
+            await ResolveTelemetryAsync(database, repository, worktree, head.Commit, token).ConfigureAwait(false);
+            findings = await new Harness.Infrastructure.Findings.FindingSets(
+                location.Root,
+                registration.Project.Id,
+                database,
+                lifecycle.GlobalConfigurationPath,
+                lifecycle.Registry
+            )
+                .SyncAsync(head.Commit, providers, refreshed, MayKeep(options, refreshed), token)
+                .ConfigureAwait(false);
+        }
+
         if (covered is 0)
         {
             run = await GitSynchronizer
@@ -73,8 +97,14 @@ public sealed class ProjectSynchronizer(
                         Ignore = location.Configuration.Value.Sync.Ignore.Concat(options.Ignore).ToArray(),
                     },
                     time,
+                    AlongsideAsync,
                     token
                 )
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            await AlongsideAsync(Task.FromResult<IReadOnlyList<Harness.Core.Sync.ProviderOutcome>>([]))
                 .ConfigureAwait(false);
         }
 
@@ -82,54 +112,6 @@ public sealed class ProjectSynchronizer(
             run?.State
             ?? SyncStore.LoadState(database, worktree)
             ?? throw new InvalidDataException("load sync state: no recorded state");
-        var removed = RemoveGoneWorktrees(database, worktree, token);
-        Harness.Core.Memory.SharedKnowledgeMerge? knowledge = null;
-        try
-        {
-            knowledge = Memory.SharedKnowledgeSync.Refresh(database, location.Root, token);
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        { /* An unreadable file is read again on the next sync or knowledge read. */
-        }
-        try
-        {
-            await lifecycle
-                .Registry.NoteSyncAsync(
-                    registration.Project,
-                    ProjectStore.Worktrees(database),
-                    lifecycle.Version,
-                    token
-                )
-                .ConfigureAwait(false);
-        }
-        catch (Exception error)
-            when (error
-                    is IOException
-                        or UnauthorizedAccessException
-                        or System.Text.Json.JsonException
-                        or InvalidOperationException
-            )
-        { /* Machine observations are best effort, as for MCP startup. */
-        }
-        try
-        {
-            await new Harness.Infrastructure.Telemetry.TelemetryStore(database, clock)
-                .ResolveAsync(repository, worktree, head.Commit, "sync", token)
-                .ConfigureAwait(false);
-        }
-        catch (Exception error)
-            when (error is IOException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
-        { /* Optional scoring cannot fail sync. */
-        }
-        var findings = await new Harness.Infrastructure.Findings.FindingSets(
-            location.Root,
-            registration.Project.Id,
-            database,
-            lifecycle.GlobalConfigurationPath,
-            lifecycle.Registry
-        )
-            .SyncAsync(head.Commit, providers, token)
-            .ConfigureAwait(false);
         var metrics = "";
         if (metricsLauncher is not null)
         {
@@ -164,6 +146,78 @@ public sealed class ProjectSynchronizer(
             Metrics = metrics,
             Knowledge = knowledge,
         };
+    }
+
+    /// <summary>
+    /// Whether the stored project findings may be kept when nothing they depend on changed (TASK-0109): never for
+    /// 'harness sync --full', nor when a provider refreshes its index in this sync (its answers may change).
+    /// </summary>
+    private static bool MayKeep(
+        SyncOptions options,
+        Task<IReadOnlyList<Harness.Core.Sync.ProviderOutcome>> refreshed
+    ) =>
+        options.Mode is "" or "incremental"
+        && refreshed.IsCompletedSuccessfully
+        && refreshed.Result.All(outcome => outcome.Status is "not_needed");
+
+    private static Harness.Core.Memory.SharedKnowledgeMerge? SharedKnowledge(
+        HarnessDatabase database,
+        string root,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            return Memory.SharedKnowledgeSync.Refresh(database, root, token);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { /* An unreadable file is read again on the next sync or knowledge read. */
+            return null;
+        }
+    }
+
+    private async Task NoteSyncAsync(ProjectRegistration registration, HarnessDatabase database, CancellationToken token)
+    {
+        try
+        {
+            await lifecycle
+                .Registry.NoteSyncAsync(
+                    registration.Project,
+                    ProjectStore.Worktrees(database),
+                    lifecycle.Version,
+                    token
+                )
+                .ConfigureAwait(false);
+        }
+        catch (Exception error)
+            when (error
+                    is IOException
+                        or UnauthorizedAccessException
+                        or System.Text.Json.JsonException
+                        or InvalidOperationException
+            )
+        { /* Machine observations are best effort, as for MCP startup. */
+        }
+    }
+
+    private async Task ResolveTelemetryAsync(
+        HarnessDatabase database,
+        GitRepository repository,
+        string worktree,
+        string commit,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            await new Harness.Infrastructure.Telemetry.TelemetryStore(database, clock)
+                .ResolveAsync(repository, worktree, commit, "sync", token)
+                .ConfigureAwait(false);
+        }
+        catch (Exception error)
+            when (error is IOException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+        { /* Optional scoring cannot fail sync. */
+        }
     }
 
     private static WorktreeIdentity[] RemoveGoneWorktrees(

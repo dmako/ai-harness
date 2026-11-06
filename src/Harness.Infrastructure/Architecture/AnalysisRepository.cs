@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Text;
+using System.Xml.Linq;
 using Harness.Infrastructure.Git;
 
 namespace Harness.Infrastructure.Architecture;
@@ -12,13 +14,40 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
     public IReadOnlyList<string> Files { get; } = files;
     public List<string> Notes { get; } = [];
     public int PhysicalReads { get; private set; }
+
+    // What the analysis learned of the disk, kept while it lasts (TASK-0095): whether a path exists, where each
+    // path segment leads once its links are followed, and each parsed MSBuild file. Project evaluation asks the
+    // same questions thousands of times (every Directory.Build.props search walks up the same folders), and on
+    // Windows each disk check costs about 0.1 ms.
+    private readonly ConcurrentDictionary<string, bool> _exists = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> _segments = new(StringComparer.Ordinal);
+    private int _diskProbes;
+    private int _xmlParses;
+
+    /// <summary>Path segments checked on disk (a directory or link test each); each distinct segment once.</summary>
+    public int DiskProbes => _diskProbes;
+
+    /// <summary>MSBuild files parsed; each file once, whichever reader asks.</summary>
+    public int XmlParses => _xmlParses;
+
+    internal ConcurrentDictionary<string, XElement?> Xml { get; } = new(StringComparer.Ordinal);
+
+    internal void CountXmlParse() => Interlocked.Increment(ref _xmlParses);
     internal Dictionary<string, Harness.Core.Architecture.EvaluatedProject> Evaluations { get; } =
         new(StringComparer.Ordinal);
 
-    public static async Task<AnalysisRepository> OpenAsync(string root, CancellationToken token)
+    public static Task<AnalysisRepository> OpenAsync(string root, CancellationToken token) =>
+        OpenAsync(root, detached: false, token);
+
+    /// <summary>
+    /// Lists the repository's files. A detached analysis outlives the request that opened it (harness ui shares
+    /// it between requests), so its reads never stop on that request's token.
+    /// </summary>
+    public static async Task<AnalysisRepository> OpenAsync(string root, bool detached, CancellationToken token)
     {
         var repository = await GitRepository.DiscoverAsync(root, token).ConfigureAwait(false);
-        return new(repository.Root, await repository.ListFilesAsync(token).ConfigureAwait(false), token);
+        var files = await repository.ListFilesAsync(token).ConfigureAwait(false);
+        return new(repository.Root, files, detached ? CancellationToken.None : token);
     }
 
     public string Read(string relative)
@@ -85,21 +114,23 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
         var actual = Root;
         foreach (var segment in Path.GetRelativePath(Root, full).Split(Path.DirectorySeparatorChar))
         {
-            actual = Path.Combine(actual, segment);
-            FileSystemInfo entry = Directory.Exists(actual) ? new DirectoryInfo(actual) : new FileInfo(actual);
-            if (entry.LinkTarget is not null)
-            {
-                actual =
-                    entry.ResolveLinkTarget(true)?.FullName
-                    ?? throw new IOException("cannot resolve analysis path link");
-            }
-
+            actual = _segments.GetOrAdd(Path.Combine(actual, segment), Follow);
             if (!Within(actual))
             {
                 throw new InvalidDataException("analysis path link leaves the repository");
             }
         }
         return actual;
+    }
+
+    /// <summary>Where a path segment leads: itself, or its link's final target.</summary>
+    private string Follow(string path)
+    {
+        Interlocked.Increment(ref _diskProbes);
+        FileSystemInfo entry = Directory.Exists(path) ? new DirectoryInfo(path) : new FileInfo(path);
+        return entry.LinkTarget is null
+            ? path
+            : entry.ResolveLinkTarget(true)?.FullName ?? throw new IOException("cannot resolve analysis path link");
     }
 
     internal bool Within(string full) =>
@@ -109,18 +140,27 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
         );
 
-    internal bool Exists(string relative)
-    {
-        try
-        {
-            return Path.Exists(Resolve(relative));
-        }
-        catch (Exception error)
-            when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
-        {
-            return false;
-        }
-    }
+    internal bool Exists(string relative) =>
+        _exists.GetOrAdd(
+            relative,
+            path =>
+            {
+                try
+                {
+                    return Path.Exists(Resolve(path));
+                }
+                catch (Exception error)
+                    when (error
+                        is IOException
+                            or InvalidDataException
+                            or UnauthorizedAccessException
+                            or ArgumentException
+                    )
+                {
+                    return false;
+                }
+            }
+        );
 
     internal string Relative(string absolute) => Path.GetRelativePath(Root, absolute).Replace('\\', '/');
 

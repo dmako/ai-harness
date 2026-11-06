@@ -1,0 +1,11 @@
+jit/LiteDbSpike
+== JIT contend shared
+  child exit 0: p3 applied 0 migration(s), 100 writes ok, 0 errors, write p50 7.1 ms, max 52.8 ms
+  child exit 0: p4 applied 0 migration(s), 100 writes ok, 0 errors, write p50 7.3 ms, max 261.5 ms
+  child exit 0: p5 applied 0 migration(s), 100 writes ok, 0 errors, write p50 7.1 ms, max 448.1 ms
+shared: 6 processes x 100 writes in 1.54 s; ledger 5/5, migration rows 1000/1000, rows 600/600, counter 600/600, failed processes 0 => PASS
+== JIT hold shared
+holder: transaction open (holds its write transaction 8 s)
+read  during the hold: 2 after 8.02 s
+write during the hold: written after 0.00 s
+holder: committed

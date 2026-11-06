@@ -133,6 +133,7 @@ public static partial class ConfigurationExample
                 new("match", "\"root_path\""),
                 new("value", "\"name\""),
                 new("fix", "\"\""),
+                new("index", "[\"$INDEX_DIR\", \"~/.cache/indexes\"]", "where its indexes are; a change asks again"),
             ]
         ),
     ];
@@ -185,7 +186,7 @@ public static partial class ConfigurationExample
         ("providers.*.capabilities.*.chain.where", null),
         ("providers.*.refresh", ["tool", "args", "skip"]),
         ("providers.*.refresh.args", null),
-        ("providers.*.resolve", ["tool", "args", "items", "match", "value", "fix"]),
+        ("providers.*.resolve", ["tool", "args", "items", "match", "value", "fix", "index"]),
         ("providers.*.resolve.args", null),
     ];
 

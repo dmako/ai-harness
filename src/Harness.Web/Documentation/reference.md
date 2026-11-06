@@ -162,7 +162,12 @@ NugetMcpServer are .NET tools: `dotnet tool install -g graphify-csharp`,
 says what is missing.
 
 - **codebase-memory** answers from an index: if the repository is not
-  indexed, doctor says so with the command that indexes it.
+  indexed, doctor says so with the command that indexes it. A sync that
+  hears it does not know the repository remembers that and does not start
+  it again for this repository (the sync still says why it is skipped)
+  until a repository is indexed in its index directory (`CBM_CACHE_DIR`, or
+  `~/.cache/codebase-memory-mcp`), its configuration changes, or a day has
+  passed.
 - **graphify-csharp** keeps a C# solution compiled in a warm session.
   Loading a large solution takes a minute or more; harness keeps the
   session warm for the next agent session and stops it after 2 hours

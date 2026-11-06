@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -35,6 +36,10 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
     [GeneratedRegex(@"\bclass\s+\w+", EcosystemReader.RxOptions, 1000)]
     private static partial Regex ClassWord { get; }
+
+    // a class that may be a DbContext: its name ends with Context, on the line that says class (as ClassWord)
+    [GeneratedRegex(@"\bclass\s+\w*Context\b", EcosystemReader.RxOptions, 1000)]
+    private static partial Regex ContextClass { get; }
 
     [GeneratedRegex(@"^\s*service\s+(\w+)\s*\{", EcosystemReader.RxOptions, 1000)]
     private static partial Regex Proto { get; }
@@ -181,6 +186,10 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
     {
         public Dictionary<string, (string Owner, string At)> Declarations { get; } = declarations;
 
+        /// <summary>The contracts' names: a file that contains none of them uses and implements none.</summary>
+        public SearchValues<string> Mentioned { get; } =
+            SearchValues.Create([.. declarations.Keys], StringComparison.Ordinal);
+
         public Regex Word { get; } =
             EcosystemReader.Rx(
                 @"\b("
@@ -230,8 +239,12 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         var usage = new ContractUsage(declarations);
         foreach (var member in members)
         {
+            // most files name no contract and declare no DbContext: a search of the whole text skips them
+            // before the line-by-line scan (TASK-0094)
             foreach (
-                var file in member.Repository.Files.Where(file => !TestPath(file) && Path.GetExtension(file) is ".cs")
+                var file in member.Repository.Files.Where(file =>
+                    !TestPath(file) && Path.GetExtension(file) is ".cs" && Mentions(member.Repository.Read(file), usage)
+                )
             )
             {
                 ReadContractUses(member, file, usage);
@@ -344,7 +357,14 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
                 }
                 if (pending.Length is 0)
                 {
-                    ContractUses(member, file, line, original, usage);
+                    // without a class or a contract's name a line declares, implements and uses nothing
+                    if (
+                        original.Contains("class", StringComparison.Ordinal)
+                        || original.AsSpan().IndexOfAny(usage.Mentioned) >= 0
+                    )
+                    {
+                        ContractUses(member, file, line, original, usage);
+                    }
                     return;
                 }
 
@@ -359,6 +379,10 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
             }
         );
     }
+
+    /// <summary>Whether a file's scan can find anything: a contract's name, or a class that may be a DbContext.</summary>
+    private static bool Mentions(string text, ContractUsage usage) =>
+        text.AsSpan().IndexOfAny(usage.Mentioned) >= 0 || ContextClass.IsMatch(text);
 
     /// <summary>
     /// A class declaration registers its DbContext and the contracts it implements, and only its

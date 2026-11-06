@@ -985,6 +985,8 @@ details.indexed[open] > summary { margin-bottom: var(--space-2); }
 .evlist code.evto { padding-left: 0.875rem; color: var(--ink-2); }
 
 /* stack badge (TASK-0033): a mark drawn here, not a vendor logo */
+/* a stack badge's place: drawn again in place when the stacks arrive, adding no box of its own (TASK-0091) */
+.stackslot { display: contents; }
 .stackbadge { display: inline-flex; align-items: center; gap: 0.375rem; font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; }
 .stackbadge.small { font-size: var(--text-xs); }
 .lmark { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 19px; padding: 0 0.25rem; border-radius: var(--radius-xs);

@@ -57,4 +57,11 @@ public sealed record ResolveMapping
     public string Match { get; set; } = "";
     public string Value { get; set; } = "";
     public string Fix { get; set; } = "";
+
+    /// <summary>
+    /// Where the provider keeps its indexes, first that is set: <c>$NAME</c> reads an environment variable, <c>~</c>
+    /// is the home directory. A file added or removed there means a repository may have been indexed, so a sync
+    /// asks again a provider that answered it does not know the repository.
+    /// </summary>
+    public string[] Index { get; set; } = [];
 }

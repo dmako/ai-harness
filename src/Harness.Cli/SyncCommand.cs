@@ -54,7 +54,20 @@ internal sealed class SyncCommand(
         var configured = location
             .Configuration.Value.Providers.Where(pair => pair.Value.Pack is not "graphify-csharp")
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        await using var registry = ConfiguredProviders.Build(configured, location.Root, new ProviderProcessFactory());
+        // A provider that answered it does not know this repository is not started again for it (TASK-0103).
+        var notIndexed = new Harness.Providers.Mcp.NotIndexedMemo(
+            Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(lifecycle.GlobalConfigurationPath))!,
+                "providers",
+                "not-indexed"
+            )
+        );
+        await using var registry = ConfiguredProviders.Build(
+            configured,
+            location.Root,
+            new ProviderProcessFactory(),
+            notIndexed: notIndexed
+        );
         // The exact-complexity worker is this executable, started detached by 'harness complexity measure'.
         var launcher = Environment.ProcessPath is { Length: > 0 } self
             ? new Harness.Infrastructure.Architecture.Metrics.ProcessMetricsLauncher(self)
@@ -167,6 +180,9 @@ internal sealed class SyncCommand(
         var description = finding switch
         {
             { Error.Length: > 0 } => "not read (" + finding.Error + ")",
+            { Kept: { } kept } => $"{kept}, unchanged ("
+                + (finding.Where is "project" ? "nothing they depend on" : "no member")
+                + " changed since they were taken)",
             { Result: { Found: 0, Snapshot: null or { Gone: 0 } } } => "none",
             { Result: { Snapshot: null } result } => $"{result.Found}, unchanged",
             { Result.Snapshot: { } snapshot } =>

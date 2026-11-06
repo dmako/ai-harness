@@ -405,6 +405,131 @@ public sealed class GenericMcpTests
     }
 
     [Fact]
+    public async Task NotKnownIsRememberedUntilTheIndexTheConfigurationOrADayChangesIt()
+    {
+        using var fixture = new ProviderFixture();
+        fixture.Write("projects.json", """{"projects":[]}""");
+        fixture.Write("symbols.json", "[]");
+        fixture.Write("refresh.json", "indexed");
+        var index = Directory.CreateDirectory(Path.Combine(fixture.Root, "index")).FullName;
+        await File.WriteAllTextAsync(Path.Combine(index, "other.db"), "", Token);
+        var configuration = Configuration(
+            (Capabilities.SymbolSearch, new() { Tool = "symbols", Args = Arguments("""{"project":"{project}"}""") })
+        ) with
+        {
+            Resolve = new()
+            {
+                Tool = "projects",
+                Items = "projects",
+                Match = "root",
+                Value = "name",
+                Fix = "index {root}",
+                Index = ["$HARNESS_TEST_UNSET_INDEX_DIR", index],
+            },
+            Refresh = new() { Tool = "refresh", Args = Arguments("""{"root":"{root}"}""") },
+        };
+        var clock = new Clock();
+        var memo = new NotIndexedMemo(Path.Combine(fixture.Root, "memo"), clock);
+        var asked = Path.Combine(fixture.Root, "projects.args");
+
+        // Each sync builds its providers anew: one 'not known' answer is remembered for the next ones.
+        async Task<RefreshResult> SyncAsync(ProviderConfiguration with)
+        {
+            File.Delete(asked);
+            await using var provider = (IProviderRefresher)
+                GenericMcpProvider.Build(
+                    "fakeidx",
+                    with with
+                    {
+                        Args = [ProviderFixture.Worker, "normal", fixture.Root],
+                    },
+                    fixture.Root,
+                    new ProviderProcessFactory(),
+                    timeProvider: clock,
+                    linkedWorktree: false,
+                    notIndexed: memo
+                );
+            var refreshed = await provider.RefreshAsync(new(), Token);
+            await FluentActions
+                .Awaiting(() => provider.ExecuteAsync(new(Capabilities.SymbolSearch), Token))
+                .Should()
+                .ThrowAsync<ProviderNotIndexedException>();
+            return refreshed;
+        }
+
+        var first = await SyncAsync(configuration);
+        first.Skipped.Should().BeTrue();
+        first.Detail.Should().Contain("not known to fakeidx");
+        File.Exists(asked).Should().BeTrue();
+        var next = await SyncAsync(configuration);
+        next.Skipped.Should().BeTrue();
+        next.Detail.Should().Contain("not known to fakeidx").And.Contain("asked again once its index");
+        File.Exists(asked).Should().BeFalse("the remembered answer spares starting the provider");
+
+        // A provider merely running (SQLite sidecars) changes nothing; a new index file asks again.
+        await File.WriteAllTextAsync(Path.Combine(index, "other.db-wal"), "", Token);
+        await SyncAsync(configuration);
+        File.Exists(asked).Should().BeFalse();
+        await File.WriteAllTextAsync(Path.Combine(index, "this.db"), "", Token);
+        await SyncAsync(configuration);
+        File.Exists(asked).Should().BeTrue("a file added to the index directory asks again");
+        await SyncAsync(configuration);
+        File.Exists(asked).Should().BeFalse();
+
+        // Changed configuration asks again.
+        var changed = configuration with
+        {
+            Refresh = configuration.Refresh with { Args = Arguments("""{"root":"{root}","full":"{full}"}""") },
+        };
+        await SyncAsync(changed);
+        File.Exists(asked).Should().BeTrue("a changed configuration asks again");
+        await SyncAsync(changed);
+        File.Exists(asked).Should().BeFalse();
+
+        // A day later it is asked again.
+        clock.Now += NotIndexedMemo.Lifetime;
+        await SyncAsync(changed);
+        File.Exists(asked).Should().BeTrue("the answer counts for a day at most");
+
+        // A known repository is asked on every sync, and forgets the earlier answer.
+        fixture.Write(
+            "projects.json",
+            JsonSerializer.Serialize(new { projects = new[] { new { root = fixture.Root, name = "known" } } })
+        );
+        clock.Now += NotIndexedMemo.Lifetime;
+        for (var sync = 0; sync < 2; sync++)
+        {
+            File.Delete(asked);
+            await using var known = (IProviderRefresher)
+                GenericMcpProvider.Build(
+                    "fakeidx",
+                    changed with
+                    {
+                        Args = [ProviderFixture.Worker, "normal", fixture.Root],
+                    },
+                    fixture.Root,
+                    new ProviderProcessFactory(),
+                    timeProvider: clock,
+                    linkedWorktree: false,
+                    notIndexed: memo
+                );
+            (await known.RefreshAsync(new(), Token)).Skipped.Should().BeFalse();
+            (await known.ExecuteAsync(new(Capabilities.SymbolSearch), Token)).Error.Should().BeNull();
+            File.Exists(asked).Should().BeTrue();
+        }
+
+        memo.Recall("fakeidx", fixture.Root, "any").Should().BeNull();
+        Directory.EnumerateFiles(Path.Combine(fixture.Root, "memo")).Should().BeEmpty();
+    }
+
+    private sealed class Clock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 11, 6, 12, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    [Fact]
     public async Task ArchitectureRelationsAndPlainStringListsRetainAllFields()
     {
         using var fixture = new ProviderFixture();
