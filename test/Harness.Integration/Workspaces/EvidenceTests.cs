@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using Harness.Core.Providers;
 using Harness.Core.Workspaces;
+using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Workspaces;
 using Harness.Providers.Registry;
 using Xunit;
@@ -61,6 +62,51 @@ public sealed class EvidenceTests
         var empty = await healthy.ConcernAsync("pdf", false, Token);
         empty.Members.Should().OnlyContain(member => member.Code.Count == 0);
         empty.Notes.Should().NotContain(note => note.Contains("no provider offers", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AProjectViewOnASharedAnalysisReadsItsPeersBuildsAndAnUnreadablePeerKeepsUnusedUnproven()
+    {
+        using var fixture = await WorkspaceFixture.CreateAsync();
+        Seed(fixture);
+        // a package the library publishes that no member uses
+        fixture.Repositories[0].Write(
+            "Unused/Unused.csproj",
+            "<Project><PropertyGroup><PackageId>Acme.Unused</PackageId><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
+        async Task<IReadOnlyList<string>> UnusedAsync(IReadOnlyList<WorkspaceMember> members)
+        {
+            var evidence = new WorkspaceEvidenceReader(members, shared: true);
+            var reader = new ArchitectureReader(members, evidence);
+            var read = await evidence.ExclusiveAsync(
+                async () =>
+                {
+                    // a project's own view: its peers read only their builds, side by side
+                    await evidence.WarmAsync(MemberReads.Builds, Token, members[0].Id);
+                    return await reader.ProjectAsync(members[0], null, true, Token, workspaceKnown: true);
+                },
+                Token
+            );
+            return read
+                .Architecture!.Findings.Where(finding => finding.Kind is "unused")
+                .Select(finding => finding.Title)
+                .ToArray();
+        }
+
+        var readable = await UnusedAsync(fixture.Members);
+        readable.Should().ContainSingle().Which.Should().StartWith("Unused is used by nothing");
+
+        var missing = fixture.Members[2] with { Root = Path.Combine(fixture.Members[2].Root, "missing") };
+        (await UnusedAsync([fixture.Members[0], fixture.Members[1], missing]))
+            .Should()
+            .BeEmpty("a peer that cannot be read might use it");
+
+        // the project's stack takes its peers' published packages from their builds
+        var stack = await new WorkspaceEvidenceReader(fixture.Members, shared: true).ProjectStackAsync(
+            fixture.Members[1].Id,
+            Token
+        );
+        stack.Uses.Should().ContainSingle(use => use.Package == "Acme.Core" && use.Declared == "2.0");
     }
 
     [Fact]

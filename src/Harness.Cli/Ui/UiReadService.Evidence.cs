@@ -35,19 +35,21 @@ internal sealed partial class UiReadService
             );
 
     /// <summary>
-    /// Runs a view's reads alone on the evidence reader, after its members were read side by side (with their
-    /// code files when <paramref name="sources"/>): requests arriving together compute each piece once.
+    /// Runs a view's reads alone on the evidence reader, after its members were read side by side (what
+    /// <paramref name="reads"/> names; with <paramref name="focus"/>, the others only their builds): requests
+    /// arriving together compute each piece once.
     /// </summary>
     private static Task<T> AnalyzeAsync<T>(
         WorkspaceEvidenceReader evidence,
-        bool sources,
+        MemberReads reads,
         Func<Task<T>> read,
-        CancellationToken token
+        CancellationToken token,
+        string? focus = null
     ) =>
         evidence.ExclusiveAsync(
             async () =>
             {
-                await evidence.WarmAsync(sources, token);
+                await evidence.WarmAsync(reads, token, focus);
                 return await read();
             },
             token
@@ -102,7 +104,7 @@ internal sealed partial class UiReadService
         var workspaceCount = Workspaces.Load().Count(w => w.Members.Contains(id, StringComparer.Ordinal));
         var (read, repository, packageUsers) = await AnalyzeAsync(
             evidence,
-            false,
+            MemberReads.Builds,
             async () =>
             {
                 var read = await reader.ProjectAsync(current, rules, true, token, workspaceKnown: workspaceCount > 0);
@@ -268,30 +270,31 @@ internal sealed partial class UiReadService
                     compute,
                     token
                 );
-        // the members' shared analysis, alone on it, after reading them side by side (with code when sources)
-        async Task<T> Analyze<T>(bool sources, Func<WorkspaceEvidenceReader, Task<T>> read)
+        // the members' shared analysis, alone on it, after reading them side by side
+        async Task<T> Analyze<T>(MemberReads reads, Func<WorkspaceEvidenceReader, Task<T>> read)
         {
             var evidence = await EvidenceAsync(members, token);
-            return await AnalyzeAsync(evidence, sources, () => read(evidence), token);
+            return await AnalyzeAsync(evidence, reads, () => read(evidence), token);
         }
+        const MemberReads Everything = MemberReads.Stacks | MemberReads.Sources;
         return endpoint switch
         {
             "snippet" => await WorkspaceSnippetAsync(members, request, token),
             "dependencies" => await View(() =>
-                Analyze(false, async evidence => UiJson.Node(await evidence.DependencySummaryAsync(token)))
+                Analyze(MemberReads.Stacks, async evidence => UiJson.Node(await evidence.DependencySummaryAsync(token)))
             ),
             "adoption" => UiJson.Node(
-                await Analyze(true, evidence => evidence.AdoptionAsync(request.Parameter("library"), token))
+                await Analyze(MemberReads.Sources, evidence => evidence.AdoptionAsync(request.Parameter("library"), token))
             ),
-            "issues" => await View(() => Analyze(true, evidence => IssuesAsync(members, evidence, token))),
+            "issues" => await View(() => Analyze(Everything, evidence => IssuesAsync(members, evidence, token))),
             "stack" => await View(() =>
-                Analyze(false, async evidence => UiJson.Node(await evidence.WorkspaceStackAsync(token)))
+                Analyze(MemberReads.Stacks, async evidence => UiJson.Node(await evidence.WorkspaceStackAsync(token)))
             ),
             "duplicates" => await View(() =>
-                Analyze(true, evidence => DuplicatesAsync(workspace.Name, members, evidence, token))
+                Analyze(Everything, evidence => DuplicatesAsync(workspace.Name, members, evidence, token))
             ),
             "system" => await View(() =>
-                Analyze(true, evidence => SystemAsync(workspace.Name, members, evidence, token))
+                Analyze(Everything, evidence => SystemAsync(workspace.Name, members, evidence, token))
             ),
             "findings" => WorkspaceFindings(workspace.Name, members, token),
             _ => throw new UiRequestException(404, "unknown endpoint"),
@@ -330,7 +333,9 @@ internal sealed partial class UiReadService
             members = members.Append(new WorkspaceMember("", id, UiProjectCatalog.Text(project, "root"))).ToArray();
         }
         var evidence = await EvidenceAsync(members, token);
-        return UiJson.Node(await AnalyzeAsync(evidence, false, () => evidence.ProjectStackAsync(id, token), token));
+        return UiJson.Node(
+            await AnalyzeAsync(evidence, MemberReads.Stacks, () => evidence.ProjectStackAsync(id, token), token, id)
+        );
     }
 
     private async Task<JsonNode?> StacksAsync(CancellationToken token)

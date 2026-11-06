@@ -159,7 +159,7 @@ public sealed class ViewCacheTests
                     evidence.ExclusiveAsync(
                         async () =>
                         {
-                            await evidence.WarmAsync(sources: index % 2 is 0, Token);
+                            await evidence.WarmAsync(index % 2 is 0 ? MemberReads.Stacks | MemberReads.Sources : MemberReads.Stacks, Token);
                             return (
                                 Graph: await evidence.DependenciesAsync(Token),
                                 Summary: await evidence.DependencySummaryAsync(Token),
@@ -182,7 +182,7 @@ public sealed class ViewCacheTests
         await evidence.ExclusiveAsync(
             async () =>
             {
-                await evidence.WarmAsync(sources: true, Token);
+                await evidence.WarmAsync(MemberReads.Stacks | MemberReads.Sources, Token);
                 return await new ArchitectureReader(members, evidence).SystemAsync(Token);
             },
             Token

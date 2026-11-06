@@ -5,6 +5,22 @@ using Harness.Infrastructure.Architecture;
 
 namespace Harness.Infrastructure.Workspaces;
 
+/// <summary>What <see cref="WorkspaceEvidenceReader.WarmAsync"/> reads of each member beside its file list.</summary>
+[Flags]
+public enum MemberReads
+{
+    None = 0,
+
+    /// <summary>Its build: projects, references and packages (project evaluation).</summary>
+    Builds = 1,
+
+    /// <summary>Its stack (language, runtime, frameworks) and build.</summary>
+    Stacks = 2,
+
+    /// <summary>Its code files and declared types.</summary>
+    Sources = 4,
+}
+
 /// <summary>
 /// A reader shared by every request that reads the same members (harness ui keeps one per member set while their
 /// HEADs and working trees are unchanged, TASK-0093): what it read once (file lists, text, project evaluations,
@@ -54,22 +70,31 @@ public sealed partial class WorkspaceEvidenceReader
     }
 
     /// <summary>
-    /// Reads every member side by side (at most four at once): its file list, project evaluations and build,
-    /// and with <paramref name="sources"/> its code files and declarations. Each member's reads stay on one
-    /// thread, so its repository is never used by two at once; a member that cannot be read is left for the
-    /// views to report as they do.
+    /// Reads every member side by side (at most four at once): its file list and what <paramref name="reads"/>
+    /// names; with <paramref name="focus"/>, only that member reads all of it and the others their builds (a
+    /// project's own view needs no more of its peers). Each member's reads stay on one thread, so its repository
+    /// is never used by two at once; a member that cannot be read is left for the views to report as they do.
     /// </summary>
-    public Task WarmAsync(bool sources, CancellationToken token) =>
+    public Task WarmAsync(MemberReads reads, CancellationToken token, string? focus = null) =>
         Parallel.ForEachAsync(
             members,
             new ParallelOptions { MaxDegreeOfParallelism = Readers, CancellationToken = token },
             async (member, cancel) =>
             {
+                var mine = focus is null || member.Id == focus ? reads : PeerReads(reads);
                 try
                 {
                     var (repository, _) = await RepositoryAsync(member, cancel).ConfigureAwait(false);
-                    await StackAsync(member, cancel).ConfigureAwait(false);
-                    if (sources)
+                    if (mine.HasFlag(MemberReads.Stacks))
+                    {
+                        await StackAsync(member, cancel).ConfigureAwait(false);
+                    }
+                    else if (mine.HasFlag(MemberReads.Builds))
+                    {
+                        await BuildAsync(member, cancel).ConfigureAwait(false);
+                    }
+
+                    if (mine.HasFlag(MemberReads.Sources))
                     {
                         Declarations(member, repository);
                     }
@@ -79,6 +104,12 @@ public sealed partial class WorkspaceEvidenceReader
                 }
             }
         );
+
+    /// <summary>What a focused view needs of the other members: their builds, when it reads builds or stacks.</summary>
+    private static MemberReads PeerReads(MemberReads reads) =>
+        (reads & (MemberReads.Builds | MemberReads.Stacks)) is MemberReads.None
+            ? MemberReads.None
+            : MemberReads.Builds;
 
     /// <summary>A member's build model, read once.</summary>
     internal async Task<ProjectBuild?> BuildAsync(WorkspaceMember member, CancellationToken token)

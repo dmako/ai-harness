@@ -144,14 +144,24 @@ public sealed partial class WorkspaceEvidenceReader
         List<MemberPackageUse> result = [];
         foreach (var member in others)
         {
-            var peer = await StackAsync(member, token).ConfigureAwait(false);
-            if (peer.Build is null)
+            // a peer's published packages come from its build; its stack is not needed here (TASK-0096)
+            ProjectBuild? peer;
+            try
+            {
+                peer = await BuildAsync(member, token).ConfigureAwait(false);
+            }
+            catch (Exception error) when (ReadError(error))
+            {
+                continue; // a member that cannot be read contributes no invented use
+            }
+
+            if (peer is null)
             {
                 continue;
             }
 
             var published = peer
-                .Build.Projects.Where(unit => !string.IsNullOrEmpty(unit.Package))
+                .Projects.Where(unit => !string.IsNullOrEmpty(unit.Package))
                 .GroupBy(unit => unit.Package!, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.Last().Version, StringComparer.Ordinal);
             foreach (
