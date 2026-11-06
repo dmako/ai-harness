@@ -9,12 +9,18 @@ namespace Harness.Infrastructure.Sync;
 /// <summary>File transactions and provider refresh. Call while holding the worktree's sync lease.</summary>
 public static class GitSynchronizer
 {
+    /// <summary>
+    /// Records the changed files and refreshes the providers. <paramref name="alongside"/>, if given, runs while
+    /// they refresh and gets the refresh to await before asking a provider anything that needs a fresh index
+    /// (TASK-0104); the run's state is saved once both are done.
+    /// </summary>
     public static async Task<SyncRun> RunAsync(
         HarnessDatabase database,
         GitRepository repository,
         string worktree,
         SyncOptions options,
         TimeProvider? clock = null,
+        Func<Task, Task>? alongside = null,
         CancellationToken token = default
     )
     {
@@ -78,7 +84,22 @@ public static class GitSynchronizer
                     Files = SyncFiles.Apply(database, worktree, repository.Root, candidates, deleted, token),
                 };
             }
-            var outcomes = await RefreshAsync(options, run, token).ConfigureAwait(false);
+            var refresh = RefreshAsync(options, run, token);
+            if (alongside is not null)
+            {
+                try
+                {
+                    await alongside(refresh).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // No refresh outlives the sync: wait for it, the first error is the one reported.
+                    await ((Task)refresh).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                    throw;
+                }
+            }
+
+            var outcomes = await refresh.ConfigureAwait(false);
             run = run with { Providers = outcomes };
             var dirty = await repository.DirtyPathsAsync(token).ConfigureAwait(false);
             var state = new SyncState(

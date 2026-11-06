@@ -204,6 +204,99 @@ public sealed class SyncTests
     }
 
     [Fact]
+    public async Task HarnessWorkRunsWhileTheProvidersRefresh()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        await fixture.RunAsync();
+        fixture.Write("a.cs", "edited");
+        var working = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // The refresh can only end once harness's own work has started: run one after the other, they would wait
+        // for each other until the refresh times out.
+        await using var index = new Index { Gate = working.Task };
+        var waited = false;
+        using var db = fixture.Database();
+        var repository = await GitRepository.DiscoverAsync(fixture.Root, Token);
+        var run = await GitSynchronizer.RunAsync(
+            db,
+            repository,
+            fixture.Worktree,
+            new() { Refreshers = [index], RefreshTimeout = TimeSpan.FromSeconds(30) },
+            alongside: async refreshed =>
+            {
+                index.Finished.Should().BeFalse();
+                working.SetResult();
+                await refreshed;
+                waited = index.Finished;
+            },
+            token: Token
+        );
+        waited.Should().BeTrue();
+        run.Providers.Single().Status.Should().Be("refreshed");
+        run.State!.ProvidersStale.Should().BeFalse();
+    }
+
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "Register transfers provider ownership to the await-using registry."
+    )]
+    [Fact]
+    public async Task ProviderQuestionsWaitForTheRefreshAndAFailedRefreshStillMarksProvidersStale()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "App.csproj",
+            "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
+        await fixture.RunAsync();
+        await using var index = new Index { Pause = TimeSpan.FromMilliseconds(300) };
+        List<bool> askedAfterRefresh = [];
+        await using var providers = new ProviderRegistry();
+        providers.Register(
+            new ProviderRegistryTests.Fake(
+                "fixture",
+                [Capabilities.ArchCycles],
+                execute: (_, _) =>
+                {
+                    lock (askedAfterRefresh)
+                    {
+                        askedAfterRefresh.Add(index.Finished);
+                    }
+
+                    return Task.FromResult(
+                        new ProviderResult
+                        {
+                            Items = [new() { Provider = "fixture", Tool = "cycles", Members = ["A", "B"] }],
+                        }
+                    );
+                }
+            )
+        );
+        var sync = new ProjectSynchronizer(fixture.Lifecycle, providers: providers);
+        fixture.Write("a.cs", "edited");
+        var refreshed = await sync.RunAsync(fixture.Root, new() { Refreshers = [index] }, Token);
+        refreshed.Files!.Providers.Single().Status.Should().Be("refreshed");
+        refreshed.State.ProvidersStale.Should().BeFalse();
+        refreshed.Findings.Single().Result.Should().NotBeNull();
+        askedAfterRefresh.Should().NotBeEmpty().And.OnlyContain(after => after);
+        using (var db = fixture.Database())
+        {
+            new Harness.Infrastructure.Findings.FindingStore(db)
+                .Current(Token)
+                .Findings.Should()
+                .Contain(f => f.Source.Provider == "fixture" && f.Kind == "cycle");
+        }
+
+        askedAfterRefresh.Clear();
+        index.Failure = new IOException("index busy");
+        fixture.Write("a.cs", "edited again");
+        var failed = await sync.RunAsync(fixture.Root, new() { Refreshers = [index] }, Token);
+        failed.Files!.Providers.Single().Status.Should().Be("failed");
+        failed.State.ProvidersStale.Should().BeTrue();
+        askedAfterRefresh.Should().NotBeEmpty().And.OnlyContain(after => after);
+    }
+
+    [Fact]
     public async Task BranchDetachRebaseAndMissingBaseRebuildCorrectly()
     {
         using var fixture = await SyncFixture.CreateAsync();
@@ -415,6 +508,13 @@ public sealed class SyncTests
         public bool Delay { get; set; }
         public TaskCompletionSource? Started { get; init; }
 
+        /// <summary>The refresh ends only after this, and after <see cref="Pause"/>.</summary>
+        public Task? Gate { get; init; }
+
+        public TimeSpan Pause { get; set; }
+        public bool Finished => Volatile.Read(ref _finished) is 1;
+        private int _finished;
+
         public IReadOnlyList<CapabilityInfo> Capabilities() =>
             [new(Core.Providers.Capabilities.SymbolSearch, Name, "low", "low", "indexed")];
 
@@ -438,6 +538,17 @@ public sealed class SyncTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             }
 
+            if (Gate is not null)
+            {
+                await Gate.WaitAsync(cancellationToken);
+            }
+
+            if (Pause > TimeSpan.Zero)
+            {
+                await Task.Delay(Pause, cancellationToken);
+            }
+
+            Volatile.Write(ref _finished, 1);
             if (Failure is not null)
             {
                 throw Failure;

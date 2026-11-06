@@ -251,7 +251,7 @@ public sealed class MetricsWorker(ProjectLifecycle lifecycle, IMetricsTool tool,
             token
         );
         await new FindingSets(location.Root, projectId, database, lifecycle.GlobalConfigurationPath, lifecycle.Registry)
-            .SyncAsync(commit, null, token)
+            .SyncAsync(commit, null, null, token)
             .ConfigureAwait(false);
     }
 

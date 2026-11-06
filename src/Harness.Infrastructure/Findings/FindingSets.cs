@@ -38,6 +38,7 @@ public sealed class FindingSets(
     private async Task<(IReadOnlyList<ArchitectureFinding> Found, bool Known)> ProjectAsync(
         bool full,
         IProviderRegistry? providers,
+        Task? refreshed,
         CancellationToken token
     )
     {
@@ -53,7 +54,9 @@ public sealed class FindingSets(
         }
         else if (read.Architecture is not null)
         {
-            found.AddRange(await SyncedAsync(reader, own, stored, providers, token).ConfigureAwait(false));
+            found.AddRange(
+                await SyncedAsync(reader, own, stored, providers, refreshed, token).ConfigureAwait(false)
+            );
         }
         return (FindingStore.Merge(found), read.Architecture is not null);
     }
@@ -94,11 +97,12 @@ public sealed class FindingSets(
         MemoryStore? own,
         IReadOnlyList<Finding> stored,
         IProviderRegistry? providers,
+        Task? refreshed,
         CancellationToken token
     )
     {
         // The providers (mostly their start) answer while harness detects its own repeated code (TASK-0102).
-        var asked = Task.Run(() => ProviderFindingsAsync(stored, providers, token), token);
+        var asked = Task.Run(() => ProviderFindingsAsync(stored, providers, refreshed, token), token);
         List<ArchitectureFinding> found = [];
         try
         {
@@ -133,13 +137,24 @@ public sealed class FindingSets(
         return found;
     }
 
-    /// <summary>Providers' cycles and duplicates; stored ones stay for a kind no provider answered.</summary>
+    /// <summary>
+    /// Providers' cycles and duplicates, asked once their refresh (<paramref name="refreshed"/>, run alongside by the
+    /// sync) is over; stored ones stay for a kind no provider answered.
+    /// </summary>
     private static async Task<List<ArchitectureFinding>> ProviderFindingsAsync(
         IReadOnlyList<Finding> stored,
         IProviderRegistry? providers,
+        Task? refreshed,
         CancellationToken token
     )
     {
+        if (refreshed is not null)
+        {
+            // Refreshed or failed alike: a failed refresh is reported by the sync, the questions go to the old index.
+            await refreshed.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            token.ThrowIfCancellationRequested();
+        }
+
         if (providers is not null)
         {
             await providers.DiscoverAsync(token).ConfigureAwait(false);
@@ -277,7 +292,7 @@ public sealed class FindingSets(
         }
         else
         {
-            var (found, known) = await ProjectAsync(database is null, null, token).ConfigureAwait(false);
+            var (found, known) = await ProjectAsync(database is null, null, null, token).ConfigureAwait(false);
             if (!known)
             {
                 return new([], "no .NET, Go or TypeScript/JavaScript project found here");
@@ -414,6 +429,7 @@ public sealed class FindingSets(
     public async Task<IReadOnlyList<FindingSync>> SyncAsync(
         string commit,
         IProviderRegistry? providers,
+        Task? refreshed,
         CancellationToken token
     )
     {
@@ -425,7 +441,7 @@ public sealed class FindingSets(
         List<FindingSync> results = [];
         try
         {
-            var (found, known) = await ProjectAsync(true, providers, token).ConfigureAwait(false);
+            var (found, known) = await ProjectAsync(true, providers, refreshed, token).ConfigureAwait(false);
             if (known)
             {
                 results.Add(new("project", new FindingStore(database).Take(commit, found, token)));
