@@ -54,7 +54,20 @@ internal sealed class SyncCommand(
         var configured = location
             .Configuration.Value.Providers.Where(pair => pair.Value.Pack is not "graphify-csharp")
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        await using var registry = ConfiguredProviders.Build(configured, location.Root, new ProviderProcessFactory());
+        // A provider that answered it does not know this repository is not started again for it (TASK-0103).
+        var notIndexed = new Harness.Providers.Mcp.NotIndexedMemo(
+            Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(lifecycle.GlobalConfigurationPath))!,
+                "providers",
+                "not-indexed"
+            )
+        );
+        await using var registry = ConfiguredProviders.Build(
+            configured,
+            location.Root,
+            new ProviderProcessFactory(),
+            notIndexed: notIndexed
+        );
         // The exact-complexity worker is this executable, started detached by 'harness complexity measure'.
         var launcher = Environment.ProcessPath is { Length: > 0 } self
             ? new Harness.Infrastructure.Architecture.Metrics.ProcessMetricsLauncher(self)

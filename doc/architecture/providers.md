@@ -27,6 +27,17 @@ empty answers.
   explicit JSON requests and bounded responses.
 - The Graphify adapter exposes compiler-oriented symbol, caller, reference and
   impact capabilities while session discovery/lifetime lives in Infrastructure.
+- A generic MCP provider with a `resolve` mapping finds the repository's project
+  in the provider's index. `harness sync` gives it a `NotIndexedMemo` (one file
+  per provider and repository under `<global config dir>/providers/not-indexed`):
+  a "not known" answer is remembered, and the next syncs' refresh and questions
+  fail fast with the same note instead of starting the provider (TASK-0103). The
+  answer counts while its fingerprint holds (the provider's command, arguments,
+  resolve and refresh mappings, and the names of the files in the directory that
+  `resolve.index` names, SQLite sidecars and temporary files left out: indexing a
+  repository adds a file there) and for a day at most, for indexes made through
+  channels harness cannot see. A successful resolve forgets it. MCP sessions and
+  doctor do not use the memo.
 
 Embedded packs provide defaults for codebase-memory, graphify-csharp, NuGet,
 rg/fd and ripwire. They configure external tools rather than bundling those tools.

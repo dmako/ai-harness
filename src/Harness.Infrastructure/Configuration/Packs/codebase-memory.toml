@@ -20,6 +20,9 @@ items = "projects"
 match = "root_path"
 value = "name"
 fix = "index it with codebase-memory's index_repository tool (repo_path={root})"
+# Its indexes, one file per repository: a sync that heard 'not known' asks
+# again only when a file is added or removed here (or after a day).
+index = ["$CBM_CACHE_DIR", "~/.cache/codebase-memory-mcp"]
 
 [refresh]
 tool = "index_repository"
