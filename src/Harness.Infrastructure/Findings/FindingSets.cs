@@ -16,7 +16,7 @@ using Harness.Infrastructure.Workspaces;
 namespace Harness.Infrastructure.Findings;
 
 /// <summary>Request-scoped project/workspace finding sets, shared by MCP and sync.</summary>
-public sealed class FindingSets(
+public sealed partial class FindingSets(
     string root,
     string projectId,
     HarnessDatabase? database,
@@ -471,10 +471,15 @@ public sealed class FindingSets(
         );
     }
 
+    /// <summary>
+    /// Takes the project's and its workspaces' findings. With <paramref name="keepUnchanged"/> the stored project
+    /// findings are kept when nothing they depend on changed since they were taken (<see cref="ProjectInputsAsync"/>).
+    /// </summary>
     public async Task<IReadOnlyList<FindingSync>> SyncAsync(
         string commit,
         IProviderRegistry? providers,
         Task? refreshed,
+        bool keepUnchanged,
         CancellationToken token
     )
     {
@@ -486,10 +491,20 @@ public sealed class FindingSets(
         List<FindingSync> results = [];
         try
         {
-            var (found, known) = await ProjectAsync(true, providers, refreshed, token).ConfigureAwait(false);
-            if (known)
+            var stamp = database.Path + ".findings-inputs";
+            var inputs = await ProjectInputsAsync(token).ConfigureAwait(false);
+            if (keepUnchanged && inputs is not null && StoredInputs(stamp) == inputs)
             {
-                results.Add(new("project", new FindingStore(database).Take(commit, found, token)));
+                results.Add(new("project", null) { Kept = new FindingStore(database).Current(token).Findings.Count });
+            }
+            else
+            {
+                var (found, known) = await ProjectAsync(true, providers, refreshed, token).ConfigureAwait(false);
+                if (known)
+                {
+                    results.Add(new("project", new FindingStore(database).Take(commit, found, token)));
+                    WorkspaceInputs.Store(stamp, inputs is null ? null : inputs + " " + Now());
+                }
             }
         }
         catch (Exception error) when (ReadError(error))

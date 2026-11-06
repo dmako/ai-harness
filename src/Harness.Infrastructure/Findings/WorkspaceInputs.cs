@@ -20,7 +20,7 @@ namespace Harness.Infrastructure.Findings;
 /// </summary>
 internal static class WorkspaceInputs
 {
-    private static readonly string Build =
+    internal static readonly string Build =
         typeof(WorkspaceInputs).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
         ?? "";
 
@@ -101,7 +101,7 @@ internal static class WorkspaceInputs
         }
     }
 
-    private static async Task<string> MemberAsync(WorkspaceMember member, CancellationToken token)
+    internal static async Task<string> MemberAsync(WorkspaceMember member, CancellationToken token)
     {
         var repository = await GitRepository.DiscoverAsync(member.Root, token).ConfigureAwait(false);
         var head = await repository.ReadHeadAsync(token).ConfigureAwait(false);
@@ -145,7 +145,7 @@ internal static class WorkspaceInputs
         return text.ToString();
     }
 
-    private static string Content(string path)
+    internal static string Content(string path)
     {
         try
         {

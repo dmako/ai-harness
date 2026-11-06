@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Harness.Core.Findings;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
+using Harness.Core.Sync;
 using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Projects;
@@ -23,6 +24,9 @@ namespace Harness.Integration.Findings;
 public sealed class FindingsProcessTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    // These syncs change only what a provider answers: --full computes the findings whatever else is unchanged.
+    private static readonly SyncOptions Full = new() { Mode = "full" };
 
     [Fact]
     public async Task PublicToolsFollowSchemasAndRequireProposalApproval()
@@ -216,10 +220,10 @@ public sealed class FindingsProcessTests
             )
         );
         var sync = new ProjectSynchronizer(fixture.Lifecycle, providers: providers);
-        await sync.RunAsync(fixture.Root, token: Token);
+        await sync.RunAsync(fixture.Root, Full, Token);
         using var db = fixture.Database();
         new FindingStore(db).Current(Token).Findings.Should().Contain(f => f.Source.Provider == "fixture");
-        var project = (await sync.RunAsync(fixture.Root, token: Token)).Registration.Project.Id;
+        var project = (await sync.RunAsync(fixture.Root, Full, Token)).Registration.Project.Id;
         var before = providers.Providers().OfType<ProviderRegistryTests.Fake>().Single().Calls;
         var quick = new FindingSets(
             fixture.Root,
@@ -234,10 +238,10 @@ public sealed class FindingsProcessTests
             .Contain(f => f.Source.Provider == "fixture");
         providers.Providers().OfType<ProviderRegistryTests.Fake>().Single().Calls.Should().Be(before);
         phase = 1;
-        await sync.RunAsync(fixture.Root, token: Token);
+        await sync.RunAsync(fixture.Root, Full, Token);
         new FindingStore(db).Current(Token).Findings.Should().Contain(f => f.Source.Provider == "fixture");
         phase = 2;
-        await sync.RunAsync(fixture.Root, token: Token);
+        await sync.RunAsync(fixture.Root, Full, Token);
         new FindingStore(db).Current(Token).Findings.Should().NotContain(f => f.Source.Provider == "fixture");
     }
 
@@ -305,7 +309,7 @@ public sealed class FindingsProcessTests
             )
         );
         var sync = new ProjectSynchronizer(fixture.Lifecycle, providers: providers);
-        await sync.RunAsync(fixture.Root, token: Token);
+        await sync.RunAsync(fixture.Root, Full, Token);
         using var db = fixture.Database();
         string[] Keys(Func<Finding, bool> where) =>
             new FindingStore(db).Current(Token).Findings.Where(where).Select(f => f.Key).Order().ToArray();
@@ -316,11 +320,11 @@ public sealed class FindingsProcessTests
         var copies = Keys(f => f.Source.Tool == "internal/clones" && f.Kind == "duplicate");
         copies.Should().ContainSingle("harness's own copy of Read replaces the provider's pair of the same places");
         phase = 1;
-        await sync.RunAsync(fixture.Root, token: Token);
+        await sync.RunAsync(fixture.Root, Full, Token);
         Keys(f => f.Source.Provider == "fixture").Should().Equal(provided);
         Keys(f => f.Source.Tool == "internal/clones" && f.Kind == "duplicate").Should().Equal(copies);
         phase = 2;
-        await sync.RunAsync(fixture.Root, token: Token);
+        await sync.RunAsync(fixture.Root, Full, Token);
         Keys(f => f.Source.Provider == "fixture").Should().BeEmpty();
         Keys(f => f.Source.Tool == "internal/clones" && f.Kind == "duplicate").Should().Equal(copies);
     }

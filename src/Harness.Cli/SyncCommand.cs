@@ -180,7 +180,9 @@ internal sealed class SyncCommand(
         var description = finding switch
         {
             { Error.Length: > 0 } => "not read (" + finding.Error + ")",
-            { Kept: { } kept } => $"{kept}, unchanged (no member changed since they were taken)",
+            { Kept: { } kept } => $"{kept}, unchanged ("
+                + (finding.Where is "project" ? "nothing they depend on" : "no member")
+                + " changed since they were taken)",
             { Result: { Found: 0, Snapshot: null or { Gone: 0 } } } => "none",
             { Result: { Snapshot: null } result } => $"{result.Found}, unchanged",
             { Result.Snapshot: { } snapshot } =>

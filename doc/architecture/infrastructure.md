@@ -92,6 +92,18 @@ workspace's knowledge (`<knowledge db>.inputs`) with its last findings, they are
 kept and the sync says so; any change in any member, synced there or not,
 computes them again (TASK-0108).
 
+The project's own findings are kept the same way (TASK-0109): `FindingSets`
+fingerprints what they depend on (harness's build, the global and project
+configuration, this repository's and its workspace members' HEAD and changed
+paths with size and modification time, the file hashes sync recorded, the
+constraints, decisions and conventions of the project, its workspaces and the
+user, the exact .NET metrics run for HEAD, and the configured providers'
+executables) and keeps the stored findings when the fingerprint in
+`<project db>.findings-inputs` matches and is less than a day old. Providers are
+not asked to find out: their answers change only with their index, and a sync
+that refreshes a provider (or `harness sync --full`) always computes the
+findings. A sync with nothing changed takes about 1 s on ai-harness-cs and NM-2.
+
 The complexity reader counts each function's cyclomatic complexity from the
 tokens the clone extractor already holds. It reads no file a second time and
 skips the same test, generated and vendor files. A function nested in another

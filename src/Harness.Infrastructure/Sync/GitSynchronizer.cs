@@ -20,7 +20,7 @@ public static class GitSynchronizer
         string worktree,
         SyncOptions options,
         TimeProvider? clock = null,
-        Func<Task, Task>? alongside = null,
+        Func<Task<IReadOnlyList<ProviderOutcome>>, Task>? alongside = null,
         CancellationToken token = default
     )
     {

@@ -68,7 +68,7 @@ public sealed class ProjectSynchronizer(
         Harness.Core.Memory.SharedKnowledgeMerge? knowledge = null;
         IReadOnlyList<Harness.Infrastructure.Findings.FindingSync> findings = [];
         // Harness's own work runs while the providers refresh; only its provider questions wait (TASK-0104).
-        async Task AlongsideAsync(Task refreshed)
+        async Task AlongsideAsync(Task<IReadOnlyList<Harness.Core.Sync.ProviderOutcome>> refreshed)
         {
             removed = RemoveGoneWorktrees(database, worktree, token);
             knowledge = SharedKnowledge(database, location.Root, token);
@@ -81,7 +81,7 @@ public sealed class ProjectSynchronizer(
                 lifecycle.GlobalConfigurationPath,
                 lifecycle.Registry
             )
-                .SyncAsync(head.Commit, providers, refreshed, token)
+                .SyncAsync(head.Commit, providers, refreshed, MayKeep(options, refreshed), token)
                 .ConfigureAwait(false);
         }
 
@@ -104,7 +104,8 @@ public sealed class ProjectSynchronizer(
         }
         else
         {
-            await AlongsideAsync(Task.CompletedTask).ConfigureAwait(false);
+            await AlongsideAsync(Task.FromResult<IReadOnlyList<Harness.Core.Sync.ProviderOutcome>>([]))
+                .ConfigureAwait(false);
         }
 
         var state =
@@ -146,6 +147,18 @@ public sealed class ProjectSynchronizer(
             Knowledge = knowledge,
         };
     }
+
+    /// <summary>
+    /// Whether the stored project findings may be kept when nothing they depend on changed (TASK-0109): never for
+    /// 'harness sync --full', nor when a provider refreshes its index in this sync (its answers may change).
+    /// </summary>
+    private static bool MayKeep(
+        SyncOptions options,
+        Task<IReadOnlyList<Harness.Core.Sync.ProviderOutcome>> refreshed
+    ) =>
+        options.Mode is "" or "incremental"
+        && refreshed.IsCompletedSuccessfully
+        && refreshed.Result.All(outcome => outcome.Status is "not_needed");
 
     private static Harness.Core.Memory.SharedKnowledgeMerge? SharedKnowledge(
         HarnessDatabase database,

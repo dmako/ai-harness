@@ -42,7 +42,7 @@ public sealed class WorkspaceFindingsSyncTests
                 fixture.Lifecycle.GlobalConfigurationPath,
                 fixture.Lifecycle.Registry
             );
-            var results = await sets.SyncAsync("", null, null, Token);
+            var results = await sets.SyncAsync("", null, null, false, Token);
             results.Should().OnlyContain(result => result.Error.Length == 0);
             return (results.Single(result => result.Where == "workspace suite"), sets);
         }
