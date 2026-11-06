@@ -142,6 +142,52 @@ public sealed class ArchitectureReaderTests
     }
 
     [Fact]
+    public void ContractsAndDbContextsDeclaredAcrossLinesAreFoundWhileFilesNamingNeitherAreSkipped()
+    {
+        using var contracts = new ReaderTree(
+            new()
+            {
+                ["Billing.Contracts/IBillingGrpcService.cs"] =
+                    "[ServiceContract]\npublic interface IBillingGrpcService {}\n",
+            }
+        );
+        using var client = new ReaderTree(
+            new()
+            {
+                // the contract only in a class header spread over lines: implemented here, not used
+                ["Billing.WebApi/BillingGrpcService.cs"] =
+                    "public sealed class BillingGrpcService(\n    ILogger log,\n    IClock clock)\n    : IBillingGrpcService\n{\n}\n",
+                // a DbContext whose header names no contract
+                ["Shop.DAL/ShopDbContext.cs"] =
+                    "public class ShopDbContext(\n    DbContextOptions options)\n    : DbContext\n{\n}\n",
+                // a longer name containing the contract's: no use
+                ["Shop.BL/Factory.cs"] = "class Factory { IBillingGrpcServiceFactory make; }\n",
+                ["Shop.BL/Plain.cs"] = "class Plain { int count; }\n",
+            }
+        );
+        using var caller = new ReaderTree(
+            new()
+            {
+                ["Orders.BL/Charges.cs"] =
+                    "public class Charges(\n    IBillingGrpcService billing)\n{\n    IBillingGrpcService again;\n}\n",
+            }
+        );
+        var actual = new SystemReader(
+            [
+                new("k", "Contracts", "contracts", contracts.Repository(), true),
+                new("s", "Shop", "shop", client.Repository()),
+                new("o", "Orders", "orders", caller.Repository()),
+            ]
+        ).Read();
+
+        var contract = actual.Contracts.Should().ContainSingle(c => c.Name == "IBillingGrpcService").Subject;
+        contract.Servers.Should().Equal("s");
+        contract.Clients.Should().Equal("o");
+        actual.Nodes.Should().Contain(node => node.Id == "db:s:shop");
+        actual.Links.Should().Contain(link => link.From == "o" && link.To == "s" && link.Style == "grpc");
+    }
+
+    [Fact]
     public void SnippetsRejectOutsidePathsBinaryDataAndKeepFocusInView()
     {
         using var tree = new ReaderTree(
