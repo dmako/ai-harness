@@ -137,7 +137,7 @@ Priced from the tables above, as in TASK-0097:
   - shared clones;
   - shallow CI checkouts.
 - **Shutdown and handles on Windows.** Every Windows process that read the large repository with GitReader was slow to exit:
-  - **The benchmark process** printed its whole table, then sat in process teardown. It had used **over 30 minutes of CPU, almost all of it kernel time**, and still had not exited when this was written. It could not be killed ("There is no running instance of the task", yet still listed and holding its executable).
+  - **The benchmark process** printed its whole table, then sat in process teardown. It exited about **38 minutes** after printing the table, having used **over 30 minutes of CPU, almost all of it kernel time**. It could not be killed in the meantime ("There is no running instance of the task", yet still listed and holding its executable).
   - **A probe stopped after it timed out** took about 100 s to die. A second one stalled and could not be killed either.
   - **A single `status` read** returned with **886 handles still open after `Dispose`**, then took **27 s** to exit. That read itself took 64 s, but it ran while the first stuck process was spinning, so its timings are inflated.
 
