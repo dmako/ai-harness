@@ -50,7 +50,28 @@ public sealed class ViewCache(ProjectLifecycle lifecycle) : IDisposable
     {
         ArgumentNullException.ThrowIfNull(compute);
         // the key is taken before computing: a change while it runs makes the next request recompute
-        var key = await KeyAsync(members, token).ConfigureAwait(false);
+        return await GetAsync(name, await KeyAsync(members, token).ConfigureAwait(false), compute)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A view read only from these members' working trees (TASK-0092: a project's stack badge), kept while their
+    /// HEADs and working trees are unchanged; written databases and registry changes do not recompute it.
+    /// </summary>
+    public async Task<JsonNode?> TreeViewAsync(
+        string name,
+        IReadOnlyList<ViewMember> members,
+        Func<Task<JsonNode?>> compute,
+        CancellationToken token
+    )
+    {
+        ArgumentNullException.ThrowIfNull(compute);
+        return await GetAsync("tree:" + name, await TreesKeyAsync(members, token).ConfigureAwait(false), compute)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<JsonNode?> GetAsync(string name, string key, Func<Task<JsonNode?>> compute)
+    {
         if (_entries.TryGetValue(name, out var cached) && cached.Key == key)
         {
             cached.Used = Interlocked.Increment(ref _clock);

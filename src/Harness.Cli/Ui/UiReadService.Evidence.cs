@@ -338,28 +338,53 @@ internal sealed partial class UiReadService
         );
     }
 
+    /// <summary>
+    /// Every registered project's stack badge, each kept while its HEAD and working tree are unchanged
+    /// (TASK-0092); the projects not kept yet are read side by side, at most four at once.
+    /// </summary>
     private async Task<JsonNode?> StacksAsync(CancellationToken token)
     {
+        var projects = (await catalog.ListAsync(token))
+            .Where(project => project["live"]?["state"]?.GetValue<string>() is not "missing")
+            .ToArray();
+        var badges = new JsonNode?[projects.Length];
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, projects.Length),
+            new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = token },
+            async (index, cancel) => badges[index] = await StackBadgeAsync(projects[index], cancel)
+        );
         JsonObject result = [];
-        foreach (var project in await catalog.ListAsync(token))
+        for (var index = 0; index < projects.Length; index++)
         {
-            if (project["live"]?["state"]?.GetValue<string>() is "missing")
+            if (badges[index]?["stack"] is { } stack)
             {
-                continue;
-            }
-            try
-            {
-                var repo = await RepositoryAsync(UiProjectCatalog.Text(project, "root"), token);
-                if (new StackReader(repo, new EcosystemReader(repo)).Read() is { } stack)
-                {
-                    result[UiProjectCatalog.Text(project, "id")] = UiJson.Node(stack);
-                }
-            }
-            catch (Exception exception) when (ReadError(exception))
-            { /* Other badges remain available. */
+                result[UiProjectCatalog.Text(projects[index], "id")] = stack.DeepClone();
             }
         }
         return result;
+    }
+
+    /// <summary>A project's stack ({"stack": null} when it has none); null, and not kept, when it cannot be read.</summary>
+    private async Task<JsonNode?> StackBadgeAsync(JsonObject project, CancellationToken token)
+    {
+        var id = UiProjectCatalog.Text(project, "id");
+        var root = UiProjectCatalog.Text(project, "root");
+        async Task<JsonNode?> ReadAsync()
+        {
+            try
+            {
+                var repository = await AnalysisRepository.OpenAsync(root, token);
+                var stack = new StackReader(repository, new EcosystemReader(repository)).Read();
+                return new JsonObject { ["stack"] = stack is null ? null : UiJson.Node(stack) };
+            }
+            catch (Exception exception) when (ReadError(exception))
+            {
+                return null; // other badges remain available; this one is read again next time
+            }
+        }
+        return views is null
+            ? await ReadAsync()
+            : await views.TreeViewAsync("stack:" + id, [new ViewMember(id, root, "")], ReadAsync, token);
     }
 
     private async Task<JsonNode?> DuplicatesAsync(

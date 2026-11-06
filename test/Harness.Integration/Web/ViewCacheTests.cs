@@ -203,6 +203,89 @@ public sealed class ViewCacheTests
     }
 
     [Fact]
+    public async Task ATreeViewIsKeptPerProjectUntilItsManifestOrHeadChangesWhateverIsWritten()
+    {
+        using var first = await SyncFixture.CreateAsync();
+        using var second = await SyncFixture.CreateAsync();
+        using var views = new ViewCache(first.Lifecycle);
+        Dictionary<string, int> computed = new(StringComparer.Ordinal) { ["first"] = 0, ["second"] = 0 };
+        Task<JsonNode?> GetAsync(string name, SyncFixture fixture) =>
+            views.TreeViewAsync(
+                "stack:" + name,
+                [new(name, fixture.Root, "")],
+                () => Task.FromResult<JsonNode?>(new JsonObject { ["n"] = ++computed[name] }),
+                Token
+            );
+
+        (await GetAsync("first", first))!["n"]!.GetValue<int>().Should().Be(1);
+        (await GetAsync("second", second))!["n"]!.GetValue<int>().Should().Be(1);
+        (await GetAsync("first", first))!["n"]!.GetValue<int>().Should().Be(1, "nothing changed");
+
+        // a database write is no reason to read a stack again
+        using (var database = first.Database())
+        {
+            new MemoryStore(database).Put(
+                new()
+                {
+                    Type = "decision",
+                    Content = "Stacks read only the tree",
+                    Source = new("user", "test", "test"),
+                },
+                Token
+            );
+        }
+        (await GetAsync("first", first))!["n"]!.GetValue<int>().Should().Be(1, "a database write keeps it");
+
+        // an edited manifest reads that project again, and only that one
+        first.Write("App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while ((await GetAsync("first", first))!["n"]!.GetValue<int>() != 2)
+        {
+            DateTime.UtcNow.Should().BeBefore(deadline, "the edited manifest reaches the stack");
+            await Task.Delay(100, Token);
+        }
+        (await GetAsync("second", second))!["n"]!.GetValue<int>().Should().Be(1, "the other project is unchanged");
+
+        second.Write("notes.md", "moved");
+        await second.CommitAsync("move HEAD");
+        deadline = DateTime.UtcNow.AddSeconds(10);
+        while ((await GetAsync("second", second))!["n"]!.GetValue<int>() < 2)
+        {
+            DateTime.UtcNow.Should().BeBefore(deadline, "a commit moves HEAD");
+            await Task.Delay(100, Token);
+        }
+        (await GetAsync("first", first))!["n"]!.GetValue<int>().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task HarnessUiShowsAProjectsStackAndItsChangeWithoutReadingItAgainMeanwhile()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "App/App.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>"
+        );
+        fixture.Write("App/Program.cs", "class Program {}\n");
+        await fixture.CommitAsync("app");
+        await using var server = await UiFixture.StartAsync(fixture);
+        var id = UiWriteTests.ProjectId(fixture);
+        async Task<string> BadgeAsync() =>
+            (await UiTests.ReadAsync(server.Client, "/api/stacks"))[id]?["badge"]?.GetValue<string>() ?? "";
+
+        (await BadgeAsync()).Should().Contain(".NET 8");
+        fixture.Write(
+            "App/App.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+        );
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (!(await BadgeAsync()).Contains(".NET 10", StringComparison.Ordinal))
+        {
+            DateTime.UtcNow.Should().BeBefore(deadline, "the edited project file reaches the badge");
+            await Task.Delay(200, Token);
+        }
+    }
+
+    [Fact]
     public async Task HarnessUiShowsAProjectAddedSinceItsStructureWasRead()
     {
         using var fixture = await SyncFixture.CreateAsync();
