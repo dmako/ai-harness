@@ -537,9 +537,11 @@ public sealed class StorageTests
                 .ThrowExactly<SqliteException>()
                 .Which;
             locked.SqliteErrorCode.Should().Be(5);
+            // SQLite's busy handler counts the sleeps it asked for, and on Linux a signal (the .NET runtime suspends
+            // threads with them) ends a sleep early: the wait can fall short of the budget, never far below it.
             timer
                 .Elapsed.Should()
-                .BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(850))
+                .BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(500), "the writer waited for its budget")
                 .And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(3));
             using var shortBudget = Open(
                 directory.DatabasePath,
@@ -550,8 +552,9 @@ public sealed class StorageTests
                 Scalar(connection, "PRAGMA busy_timeout").Should().Be(100L);
             }
 
-            // Runner noise only adds time, so the fastest of a few attempts measures the budget itself.
-            var fastest = Enumerable
+            // Runner noise only adds time and interrupted sleeps only take it away: the fastest of a few attempts
+            // shows the budget is milliseconds (no whole-second retries), the slowest that it was waited for.
+            var attempts = Enumerable
                 .Range(0, 3)
                 .Select(_ =>
                 {
@@ -562,11 +565,9 @@ public sealed class StorageTests
                         .ThrowExactly<SqliteException>();
                     return timer.Elapsed;
                 })
-                .Min();
-            fastest
-                .Should()
-                .BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(75))
-                .And.BeLessThanOrEqualTo(TimeSpan.FromMilliseconds(750));
+                .ToArray();
+            attempts.Min().Should().BeLessThanOrEqualTo(TimeSpan.FromMilliseconds(750));
+            attempts.Max().Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(75));
             await child.StandardInput.WriteLineAsync("release");
             await child.StandardInput.FlushAsync(TestContext.Current.CancellationToken);
             await ExpectSuccess(child);
