@@ -80,6 +80,18 @@ version and harness's build stamp the file: a new build starts it over, as does
 an unreadable file. Findings are the same as from a full extraction; on NM-2
 (3,540 files) extraction takes 0.3 s instead of 2-3 s, with a 5.7 MiB cache.
 
+A sync's workspace findings start from what its project read already read of
+every member (`WorkspaceEvidenceReader.For`: file lists, texts, builds,
+declarations; member-set results such as duplicates are read anew), so each
+member is listed and built once per sync. Before computing a workspace, the sync
+fingerprints its inputs (`WorkspaceInputs`: harness's build, the global and each
+member's configuration, each member's root, HEAD and `git status` paths with
+their size and modification time, `.harness/` left out, and the workspace's
+decisions and conventions). When the fingerprint equals the one stored beside the
+workspace's knowledge (`<knowledge db>.inputs`) with its last findings, they are
+kept and the sync says so; any change in any member, synced there or not,
+computes them again (TASK-0108).
+
 The complexity reader counts each function's cyclomatic complexity from the
 tokens the clone extractor already holds. It reads no file a second time and
 skips the same test, generated and vendor files. A function nested in another

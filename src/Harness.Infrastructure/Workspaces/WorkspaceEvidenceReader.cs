@@ -34,6 +34,7 @@ public sealed partial class WorkspaceEvidenceReader(IReadOnlyList<WorkspaceMembe
         }
 
         var repository = await AnalysisRepository.OpenAsync(member.Root, Shared, token).ConfigureAwait(false);
+        Counts.List();
         return _repositories.GetOrAdd(member.Id, (repository, new EcosystemReader(repository)));
     }
 

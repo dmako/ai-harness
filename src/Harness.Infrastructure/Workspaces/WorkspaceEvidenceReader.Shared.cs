@@ -49,6 +49,52 @@ public sealed partial class WorkspaceEvidenceReader
 
     public bool Shared { get; }
 
+    /// <summary>How many member file lists and builds this reader (and those made <see cref="For"/> it) read.</summary>
+    internal ReadCounts Counts { get; private init; } = new();
+
+    internal sealed class ReadCounts
+    {
+        private int _listed;
+        private int _built;
+        public int Listed => _listed;
+        public int Built => _built;
+
+        public void List() => Interlocked.Increment(ref _listed);
+
+        public void Build() => Interlocked.Increment(ref _built);
+    }
+
+    /// <summary>
+    /// A reader of <paramref name="subset"/> that starts from what this one read of each member (file lists, text,
+    /// builds, declarations, stacks): a sync's workspace findings reuse its project read (TASK-0108). What depends on
+    /// the member set (duplicates, dependency graph, stack summary) is read anew.
+    /// </summary>
+    public WorkspaceEvidenceReader For(IReadOnlyList<WorkspaceMember> subset)
+    {
+        var reader = new WorkspaceEvidenceReader(subset, Shared) { Counts = Counts };
+        foreach (var pair in _repositories)
+        {
+            reader._repositories.TryAdd(pair.Key, pair.Value);
+        }
+
+        foreach (var pair in _builds)
+        {
+            reader._builds.TryAdd(pair.Key, pair.Value);
+        }
+
+        foreach (var pair in _declarations)
+        {
+            reader._declarations.TryAdd(pair.Key, pair.Value);
+        }
+
+        foreach (var pair in _stacks)
+        {
+            reader._stacks.TryAdd(pair.Key, pair.Value);
+        }
+
+        return reader;
+    }
+
     public IReadOnlyList<WorkspaceMember> Members => members;
 
     /// <summary>The members' duplicate index once read (see <see cref="WorkspaceDuplicateReader.ReadAsync"/>).</summary>
@@ -121,6 +167,7 @@ public sealed partial class WorkspaceEvidenceReader
         }
 
         var (repository, ecosystem) = await RepositoryAsync(member, token).ConfigureAwait(false);
+        Counts.Build();
         return _builds.GetOrAdd(member.Id, new BuildReader(repository, ecosystem).Read());
     }
 

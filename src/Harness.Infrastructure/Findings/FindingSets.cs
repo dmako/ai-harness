@@ -29,6 +29,9 @@ public sealed class FindingSets(
     private readonly WorkspaceStore _workspaces = new(globalConfigurationPath, registry);
     private WorkspaceMember Current => new("", projectId, root, database?.Path ?? "");
 
+    /// <summary>What a sync's project read read of every workspace member, for its workspace findings (TASK-0108).</summary>
+    internal WorkspaceEvidenceReader? Evidence { get; private set; }
+
     private KnowledgeWorkspace[] Workspaces() =>
         _levels
             .Load()
@@ -42,8 +45,15 @@ public sealed class FindingSets(
         CancellationToken token
     )
     {
+        var members = ReadMembers(full);
+        var evidence = new WorkspaceEvidenceReader(members);
+        if (full)
+        {
+            Evidence = evidence;
+        }
+
         // A sync lexes only the files changed since the last one (TASK-0105).
-        var reader = new ArchitectureReader(ReadMembers(full), clones: Clones(full));
+        var reader = new ArchitectureReader(members, evidence, Clones(full));
         var own = database is null ? null : new MemoryStore(database);
         var rules = ArchitectureReader.RulesFor(own, _levels, projectId, token);
         var read = projectRead ?? await reader.ProjectAsync(Current, rules, full, token).ConfigureAwait(false);
@@ -499,14 +509,7 @@ public sealed class FindingSets(
         {
             try
             {
-                var members = _workspaces.Resolve(workspace.Members);
-                var found = (
-                    await new ArchitectureReader(members)
-                        .SystemAsync(token, workspace.Name, _levels)
-                        .ConfigureAwait(false)
-                ).Findings;
-                using var db = _levels.OpenLevel(_levels.Load(), new("workspace", workspace.Name), projectId, token);
-                results.Add(new("workspace " + workspace.Name, new FindingStore(db).Take("", found, token)));
+                results.Add(await WorkspaceAsync(workspace, token).ConfigureAwait(false));
             }
             catch (Exception error) when (ReadError(error))
             {
@@ -515,6 +518,38 @@ public sealed class FindingSets(
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// A workspace's findings, computed from the project read's evidence, or kept as stored when no member's
+    /// inputs changed since they were taken (<see cref="WorkspaceInputs"/>).
+    /// </summary>
+    private async Task<FindingSync> WorkspaceAsync(KnowledgeWorkspace workspace, CancellationToken token)
+    {
+        var where = "workspace " + workspace.Name;
+        var members = _workspaces.Resolve(workspace.Members);
+        var level = new MemoryScope("workspace", workspace.Name);
+        var knowledge = _levels.Load();
+        using var db = _levels.OpenLevel(knowledge, level, projectId, token);
+        var stamp = _levels.KnowledgePath(knowledge, level) + ".inputs";
+        var inputs = await WorkspaceInputs
+            .FingerprintAsync(members, db, globalConfigurationPath, token)
+            .ConfigureAwait(false);
+        var store = new FindingStore(db);
+        if (inputs is not null && WorkspaceInputs.Stored(stamp) == inputs)
+        {
+            return new(where, null) { Kept = store.Current(token).Findings.Count };
+        }
+
+        var evidence = Evidence?.For(members) ?? new WorkspaceEvidenceReader(members);
+        var found = (
+            await new ArchitectureReader(members, evidence)
+                .SystemAsync(token, workspace.Name, _levels)
+                .ConfigureAwait(false)
+        ).Findings;
+        var taken = store.Take("", found, token);
+        WorkspaceInputs.Store(stamp, inputs);
+        return new(where, taken);
     }
 
     private static string MemberName(WorkspaceMember member) => member.Title.Length > 0 ? member.Title : member.Name;
@@ -530,4 +565,8 @@ public sealed class FindingSets(
                 or ArgumentException;
 }
 
-public sealed record FindingSync(string Where, FindingTake? Result, string Error = "");
+public sealed record FindingSync(string Where, FindingTake? Result, string Error = "")
+{
+    /// <summary>Set when the stored findings were kept because no input changed: how many there are.</summary>
+    public int? Kept { get; init; }
+}
