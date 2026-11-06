@@ -36,10 +36,18 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
     internal Dictionary<string, Harness.Core.Architecture.EvaluatedProject> Evaluations { get; } =
         new(StringComparer.Ordinal);
 
-    public static async Task<AnalysisRepository> OpenAsync(string root, CancellationToken token)
+    public static Task<AnalysisRepository> OpenAsync(string root, CancellationToken token) =>
+        OpenAsync(root, detached: false, token);
+
+    /// <summary>
+    /// Lists the repository's files. A detached analysis outlives the request that opened it (harness ui shares
+    /// it between requests), so its reads never stop on that request's token.
+    /// </summary>
+    public static async Task<AnalysisRepository> OpenAsync(string root, bool detached, CancellationToken token)
     {
         var repository = await GitRepository.DiscoverAsync(root, token).ConfigureAwait(false);
-        return new(repository.Root, await repository.ListFilesAsync(token).ConfigureAwait(false), token);
+        var files = await repository.ListFilesAsync(token).ConfigureAwait(false);
+        return new(repository.Root, files, detached ? CancellationToken.None : token);
     }
 
     public string Read(string relative)

@@ -45,7 +45,11 @@ public sealed partial class WorkspaceDuplicateReader(
         public List<string> Notes { get; } = [];
     }
 
-    public async Task<WorkspaceDuplicates> ReadAsync(CancellationToken token)
+    /// <summary>The members' duplicates, read once per evidence reader (system, issues and duplicates share it).</summary>
+    public async Task<WorkspaceDuplicates> ReadAsync(CancellationToken token) =>
+        _evidence.Duplicates ??= await IndexAllAsync(token).ConfigureAwait(false);
+
+    private async Task<WorkspaceDuplicates> IndexAllAsync(CancellationToken token)
     {
         var index = new MemberIndex();
         foreach (var member in members)
@@ -84,8 +88,8 @@ public sealed partial class WorkspaceDuplicateReader(
         {
             var (repository, _) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
             foreach (
-                var declaration in DeclarationReader
-                    .Read(repository)
+                var declaration in _evidence
+                    .Declarations(member, repository)
                     .Where(declaration =>
                         !WorkspaceEvidenceReader.GenericNames.Contains(declaration.Name)
                         && Encoding.UTF8.GetByteCount(declaration.Name) >= 4

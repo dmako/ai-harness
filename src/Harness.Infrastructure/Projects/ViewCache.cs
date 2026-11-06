@@ -20,12 +20,22 @@ public sealed class ViewCache(ProjectLifecycle lifecycle) : IDisposable
 {
     public const int Capacity = 128;
 
+    /// <summary>Shared analyses kept at once: each holds its members' file lists and the text it read.</summary>
+    public const int Analyses = 4;
+
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, TreeWatch> _trees = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, GitRepository?> _repositories = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Entry<object>> _analyses = new(StringComparer.Ordinal);
+    private readonly Lock _analysisLock = new();
     private long _clock;
 
     private sealed record Entry(string Key, JsonNode Value)
+    {
+        public long Used { get; set; }
+    }
+
+    private sealed record Entry<T>(string Key, T Value)
     {
         public long Used { get; set; }
     }
@@ -64,6 +74,64 @@ public sealed class ViewCache(ProjectLifecycle lifecycle) : IDisposable
     }
 
     public int Count => _entries.Count;
+
+    public int AnalysisCount
+    {
+        get
+        {
+            lock (_analysisLock)
+            {
+                return _analyses.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The analysis of these members' working trees (TASK-0093), shared by every view that reads them while their
+    /// HEADs and working trees are unchanged; made by create when there is none or they changed, and the one it
+    /// replaces is dropped. Unlike a view it does not follow the databases: it reads only the trees, so a task or
+    /// memory written does not throw it away (the views over it still follow them). At most
+    /// <see cref="Analyses"/> are kept, the least recently used dropped first.
+    /// </summary>
+    public async Task<T> AnalysisAsync<T>(IReadOnlyList<ViewMember> members, Func<T> create, CancellationToken token)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(members);
+        ArgumentNullException.ThrowIfNull(create);
+        var name = string.Join('\n', members.Select(member => member.Id + "@" + member.Root).Order(StringComparer.Ordinal));
+        var key = await TreesKeyAsync(members, token).ConfigureAwait(false);
+        lock (_analysisLock)
+        {
+            if (_analyses.TryGetValue(name, out var cached) && cached.Key == key && cached.Value is T value)
+            {
+                cached.Used = Interlocked.Increment(ref _clock);
+                return value;
+            }
+
+            var created = create();
+            _analyses[name] = new(key, created) { Used = Interlocked.Increment(ref _clock) };
+            while (_analyses.Count > Analyses)
+            {
+                _analyses.Remove(_analyses.MinBy(pair => pair.Value.Used).Key);
+            }
+
+            return created;
+        }
+    }
+
+    private async Task<string> TreesKeyAsync(IReadOnlyList<ViewMember> members, CancellationToken token)
+    {
+        List<string> parts = [];
+        foreach (var root in members.Select(member => member.Root).Order(StringComparer.Ordinal))
+        {
+            token.ThrowIfCancellationRequested();
+            parts.Add(root);
+            parts.Add(await HeadAsync(root, token).ConfigureAwait(false));
+            parts.Add(_trees.GetOrAdd(root, path => new TreeWatch(path)).Generation);
+        }
+
+        return string.Join('\n', parts);
+    }
 
     private async Task<string> KeyAsync(IReadOnlyList<ViewMember> members, CancellationToken token)
     {
@@ -165,6 +233,10 @@ public sealed class ViewCache(ProjectLifecycle lifecycle) : IDisposable
 
         _trees.Clear();
         _entries.Clear();
+        lock (_analysisLock)
+        {
+            _analyses.Clear();
+        }
     }
 
     /// <summary>

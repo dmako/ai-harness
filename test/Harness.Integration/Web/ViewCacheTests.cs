@@ -1,7 +1,10 @@
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
+using Harness.Core.Workspaces;
+using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Projects;
+using Harness.Infrastructure.Workspaces;
 using Harness.Integration.Sync;
 using Xunit;
 
@@ -81,6 +84,122 @@ public sealed class ViewCacheTests
             .ContainsKey("changed")
             .Should()
             .BeFalse("a caller's change does not reach the cache");
+    }
+
+    [Fact]
+    public async Task AnAnalysisIsSharedUntilAnEditOrACommitButOutlivesDatabaseWritesAndIsBounded()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        using var views = new ViewCache(fixture.Lifecycle);
+        ViewMember[] members = [new("prj_test", fixture.Root, fixture.DatabasePath)];
+        var made = 0;
+        Task<object> GetAsync() => views.AnalysisAsync(members, () => (object)++made, Token);
+
+        (await GetAsync()).Should().Be(1);
+        (await GetAsync()).Should().Be(1, "nothing changed");
+
+        // the analysis reads only the working tree: a knowledge write keeps it (the views over it follow it)
+        using (var database = fixture.Database())
+        {
+            new MemoryStore(database).Put(
+                new()
+                {
+                    Type = "decision",
+                    Content = "Analyses read only the trees",
+                    Source = new("user", "test", "test"),
+                },
+                Token
+            );
+        }
+        (await GetAsync()).Should().Be(1, "a database write keeps the analysis");
+
+        fixture.Write("a.cs", "edited");
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while ((int)await GetAsync() != 2)
+        {
+            DateTime.UtcNow.Should().BeBefore(deadline, "an edit replaces the analysis");
+            await Task.Delay(100, Token);
+        }
+        await fixture.CommitAsync("edit a");
+        (await GetAsync()).Should().Be(3, "a commit moves HEAD");
+
+        // one per member set, the least recently used dropped first
+        for (var index = 0; index < ViewCache.Analyses + 2; index++)
+        {
+            await views.AnalysisAsync<object>(
+                [new("prj_" + index, fixture.Root, fixture.DatabasePath)],
+                () => index,
+                Token
+            );
+        }
+        views.AnalysisCount.Should().Be(ViewCache.Analyses);
+    }
+
+    [Fact]
+    public async Task RequestsSharingAnAnalysisReadEachMemberAndComputeEachPieceOnce()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write("Lib/Lib.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><PackageId>Shop.Lib</PackageId></PropertyGroup></Project>");
+        fixture.Write("Lib/Store.cs", "namespace Shop.Lib;\npublic sealed class OrderStore {}\n");
+        using var other = await SyncFixture.CreateAsync();
+        other.Write("App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Shop.Lib\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        other.Write("App/OrderStore.cs", "namespace Shop.App;\npublic sealed class OrderStore {}\n");
+        WorkspaceMember[] members =
+        [
+            new("lib", "prj_lib", fixture.Root, fixture.DatabasePath),
+            new("app", "prj_app", other.Root, other.DatabasePath),
+        ];
+        var evidence = new WorkspaceEvidenceReader(members, shared: true);
+
+        // the overview's calls arrive together: they take turns and each piece is read once
+        var answers = await Task.WhenAll(
+            Enumerable
+                .Range(0, 6)
+                .Select(index =>
+                    evidence.ExclusiveAsync(
+                        async () =>
+                        {
+                            await evidence.WarmAsync(sources: index % 2 is 0, Token);
+                            return (
+                                Graph: await evidence.DependenciesAsync(Token),
+                                Summary: await evidence.DependencySummaryAsync(Token),
+                                Stack: await evidence.WorkspaceStackAsync(Token),
+                                Duplicates: await new WorkspaceDuplicateReader(members, evidence).ReadAsync(Token)
+                            );
+                        },
+                        Token
+                    )
+                )
+        );
+        answers.Select(a => a.Graph).Distinct().Should().ContainSingle("the dependency graph is computed once");
+        answers.Select(a => a.Summary).Distinct().Should().ContainSingle();
+        answers.Select(a => a.Stack).Distinct().Should().ContainSingle();
+        answers.Select(a => a.Duplicates).Distinct().Should().ContainSingle("the duplicate index is built once");
+        answers[0].Graph.Edges.Should().ContainSingle(edge => edge.From == "prj_app" && edge.To == "prj_lib");
+        answers[0].Duplicates.Groups.Should().Contain(group => group.Name == "OrderStore");
+
+        var reads = members.Sum(member => evidence.RepositoryAsync(member, Token).Result.Repository.PhysicalReads);
+        await evidence.ExclusiveAsync(
+            async () =>
+            {
+                await evidence.WarmAsync(sources: true, Token);
+                return await new ArchitectureReader(members, evidence).SystemAsync(Token);
+            },
+            Token
+        );
+        members
+            .Sum(member => evidence.RepositoryAsync(member, Token).Result.Repository.PhysicalReads)
+            .Should()
+            .Be(reads, "the system view reads what the others already read");
+
+        // a cancelled request leaves the shared repositories usable by the next
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        var refused = () => evidence.ExclusiveAsync(() => evidence.DependenciesAsync(cancelled.Token), cancelled.Token);
+        await refused.Should().ThrowAsync<OperationCanceledException>();
+        (await evidence.ExclusiveAsync(() => evidence.WorkspaceStackAsync(Token), Token))
+            .Should()
+            .BeSameAs(answers[0].Stack);
     }
 
     [Fact]

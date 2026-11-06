@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Harness.Core.Architecture;
 using Harness.Core.Workspaces;
 using Harness.Infrastructure.Architecture;
@@ -6,11 +7,11 @@ namespace Harness.Infrastructure.Workspaces;
 
 public sealed partial class WorkspaceEvidenceReader
 {
-    private readonly Dictionary<string, (ProjectStack? Stack, ProjectBuild? Build)> _stacks = new(
+    private readonly ConcurrentDictionary<string, (ProjectStack? Stack, ProjectBuild? Build)> _stacks = new(
         StringComparer.Ordinal
     );
 
-    public async Task<WorkspaceDependencyGraph> DependencySummaryAsync(CancellationToken token)
+    private async Task<WorkspaceDependencyGraph> ReadDependencySummaryAsync(CancellationToken token)
     {
         var graph = await DependenciesAsync(token).ConfigureAwait(false);
         List<WorkspaceDependencyNode> nodes = [];
@@ -41,7 +42,7 @@ public sealed partial class WorkspaceEvidenceReader
         );
     }
 
-    public async Task<WorkspaceStackSummary> WorkspaceStackAsync(CancellationToken token)
+    private async Task<WorkspaceStackSummary> ReadWorkspaceStackAsync(CancellationToken token)
     {
         Dictionary<string, ProjectStack> stacks = new(StringComparer.Ordinal);
         Dictionary<(string Kind, string Name), Dictionary<string, IReadOnlyList<string>>> rows = [];
@@ -194,12 +195,11 @@ public sealed partial class WorkspaceEvidenceReader
         try
         {
             var (repository, ecosystem) = await RepositoryAsync(member, token).ConfigureAwait(false);
-            model = (new StackReader(repository, ecosystem).Read(), new BuildReader(repository, ecosystem).Read());
+            model = (new StackReader(repository, ecosystem).Read(), await BuildAsync(member, token).ConfigureAwait(false));
         }
         catch (Exception error) when (ReadError(error))
         { /* Missing members do not contribute invented stack or version evidence. */
         }
-        _stacks.Add(member.Id, model);
-        return model;
+        return _stacks.GetOrAdd(member.Id, model);
     }
 }
