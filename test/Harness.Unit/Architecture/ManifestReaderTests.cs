@@ -41,6 +41,48 @@ public sealed class ManifestReaderTests
     }
 
     [Fact]
+    public void EachProjectAndImportIsParsedAndEachPathCheckedOnDiskOncePerAnalysis()
+    {
+        var projects = Enumerable.Range(1, 6).Select(i => $"src/group/P{i}/P{i}.csproj").ToArray();
+        Dictionary<string, string> files = new()
+        {
+            ["Directory.Build.props"] =
+                """<Project><PropertyGroup><LangVersion>latest</LangVersion></PropertyGroup><Import Project="build/common.props" /></Project>""",
+            ["build/common.props"] = """<Project><PropertyGroup><Nullable>enable</Nullable></PropertyGroup></Project>""",
+            ["Directory.Packages.props"] =
+                """<Project><ItemGroup><PackageVersion Include="Serilog" Version="4.0.0" /></ItemGroup></Project>""",
+        };
+        foreach (var project in projects)
+        {
+            files[project] =
+                """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFrameworks>net8.0;net10.0</TargetFrameworks></PropertyGroup><ItemGroup><PackageReference Include="Serilog" /></ItemGroup></Project>""";
+        }
+        using var tree = new ReaderTree(files);
+        var repository = tree.Repository();
+
+        // two readers of one analysis, each evaluating every project twice
+        var evaluated = new[] { new StaticMsBuild(repository), new StaticMsBuild(repository) }
+            .SelectMany(build => projects.Concat(projects).Select(build.Evaluate))
+            .ToArray();
+        evaluated
+            .Should()
+            .AllSatisfy(project =>
+            {
+                project.Frameworks.Should().Equal("net8.0", "net10.0");
+                project.Properties["Nullable"].Should().Be("enable");
+                project.Packages.Should().ContainSingle(p => p.Name == "Serilog" && p.Version == "4.0.0");
+            });
+        repository.XmlParses.Should().Be(projects.Length + 3, "each project and imported file is parsed once");
+        repository.PhysicalReads.Should().Be(projects.Length + 3);
+
+        // the folders the Directory.*.props searches walk up are checked on disk once each, not per project
+        var probes = repository.DiskProbes;
+        probes.Should().BeLessThan(projects.Length * 3 * 4, "a disk check per distinct path segment");
+        new StaticMsBuild(repository).Evaluate("src/group/P1/P1.csproj");
+        repository.DiskProbes.Should().Be(probes);
+    }
+
+    [Fact]
     public void ReadFailuresAreCachedAndXmlDoesNotExecuteExternalEntities()
     {
         using var tree = new ReaderTree(

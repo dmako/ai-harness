@@ -19,8 +19,6 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
     )]
     private static partial Regex Above { get; }
 
-    private readonly Dictionary<string, XElement?> _xml = new(StringComparer.Ordinal);
-
     private sealed class Context
     {
         internal Dictionary<string, string> Properties { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -377,7 +375,8 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
 
     internal XElement? Parse(string file)
     {
-        if (_xml.TryGetValue(file, out var parsed))
+        // parsed once per analysis, whichever reader asks (TASK-0095)
+        if (repository.Xml.TryGetValue(file, out var parsed))
         {
             return parsed;
         }
@@ -394,8 +393,8 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         {
             parsed = null;
         }
-        _xml.Add(file, parsed);
-        return parsed;
+        repository.CountXmlParse();
+        return repository.Xml.GetOrAdd(file, parsed);
     }
 
     private string Nearest(string name, string directory)
