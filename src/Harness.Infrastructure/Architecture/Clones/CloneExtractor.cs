@@ -7,11 +7,14 @@ using Harness.Infrastructure.Architecture.Complexity;
 namespace Harness.Infrastructure.Architecture.Clones;
 
 /// <summary>Bounded file-level function extraction, not a symbol index or compiler analysis.</summary>
-public sealed partial class CloneExtractor(AnalysisRepository repository)
+public sealed partial class CloneExtractor(AnalysisRepository repository, CloneCache? cache = null)
 {
     private IReadOnlyList<CloneFunction>? _functions;
     private readonly List<CloneBranch> _branches = [];
     private readonly List<ComplexityMember> _complexity = [];
+
+    /// <summary>Files lexed by the last extraction; the others came from the cache.</summary>
+    public int Lexed { get; private set; }
 
     public IReadOnlyList<CloneBranch> Branches()
     {
@@ -33,39 +36,125 @@ public sealed partial class CloneExtractor(AnalysisRepository repository)
             return _functions;
         }
 
-        List<CloneFunction> functions = [];
-        List<(string Path, List<CodeToken> Tokens)> go = [];
+        var cached = cache?.Load(repository.Root) ?? new(StringComparer.Ordinal);
+        List<CloneCacheEntry> entries = [];
+        List<(string Path, string Hash)> go = [];
+        var recordedHash = cache?.Recorded(repository.Root) ?? (_ => null);
         foreach (var file in repository.Files.Where(Reads))
         {
+            // The hash sync recorded for the file spares reading it when nothing changed; else its text's.
+            var recorded = recordedHash(file);
+            var language = Language(file);
+            var known = cached.GetValueOrDefault(file);
+            if (recorded is not null && known is not null)
+            {
+                if (language is not "go" && known.Hash == recorded)
+                {
+                    entries.Add(known);
+                    continue;
+                }
+
+                if (language is "go" && known.Hash.StartsWith(recorded + "|", StringComparison.Ordinal))
+                {
+                    go.Add((file, recorded));
+                    continue;
+                }
+            }
+
             var text = repository.Read(file);
             if (Encoding.UTF8.GetByteCount(text) > 1024 * 1024)
             {
                 continue;
             }
 
-            var language = Language(file);
-            var tokens = CloneLexer.Tokenize(text, language);
+            // An empty read (a file that could not be read) is never kept: the next sync reads it again.
+            var hash = text.Length is 0 ? "" : recorded ?? CloneCache.TextHash(text);
             if (language is "go")
             {
-                go.Add((file, tokens));
+                go.Add((file, hash));
+                continue;
             }
-            else
+
+            if (text.Length is 0)
             {
-                functions.AddRange(CFunctions(file, language, tokens));
-                _complexity.AddRange(
-                    language is "cs" ? ComplexityCounter.CSharp(file, tokens) : ComplexityCounter.Script(file, tokens)
+                entries.Add(new(file, "", [], [], []));
+                continue;
+            }
+
+            if (!cached.TryGetValue(file, out var entry) || entry.Hash != hash)
+            {
+                var tokens = CloneLexer.Tokenize(text, language);
+                Lexed++;
+                entry = new(
+                    file,
+                    hash,
+                    CFunctions(file, language, tokens),
+                    language is "cs" ? ComplexityCounter.CSharp(file, tokens) : ComplexityCounter.Script(file, tokens),
+                    []
                 );
             }
+            entries.Add(entry);
         }
+
+        // A Go file's functions depend on its package's other files: its key holds theirs too.
+        var packages = go.GroupBy(file => Directory(file.Path), StringComparer.Ordinal)
+            .ToDictionary(
+                package => package.Key,
+                package =>
+                    CloneCache.Hash(
+                        string.Join('\n', package.Select(file => file.Path + " " + file.Hash).Order(StringComparer.Ordinal))
+                    ),
+                StringComparer.Ordinal
+            );
+        Dictionary<string, List<CodeToken>> lexed = new(StringComparer.Ordinal);
+        List<CodeToken> Tokens((string Path, string Hash) file)
+        {
+            if (!lexed.TryGetValue(file.Path, out var tokens))
+            {
+                lexed[file.Path] = tokens = CloneLexer.Tokenize(repository.Read(file.Path), "go");
+                Lexed++;
+            }
+            return tokens;
+        }
+
         foreach (var file in go)
         {
-            var peers = go.Where(peer => Directory(peer.Path) == Directory(file.Path))
-                .Select(peer => peer.Tokens)
-                .ToArray();
-            functions.AddRange(GoFunctions(file.Path, file.Tokens, peers));
-            _branches.AddRange(GoBranches(file.Path, file.Tokens));
-            _complexity.AddRange(ComplexityCounter.Go(file.Path, file.Tokens));
+            var hash = file.Hash + "|" + packages[Directory(file.Path)];
+            if (!cached.TryGetValue(file.Path, out var entry) || entry.Hash != hash)
+            {
+                var tokens = Tokens(file);
+                var peers = go.Where(peer => Directory(peer.Path) == Directory(file.Path)).Select(Tokens).ToArray();
+                entry = new(
+                    file.Path,
+                    hash,
+                    GoFunctions(file.Path, tokens, peers),
+                    ComplexityCounter.Go(file.Path, tokens),
+                    GoBranches(file.Path, tokens)
+                );
+            }
+            entries.Add(entry);
         }
+
+        List<CloneFunction> functions = [];
+        foreach (var entry in entries)
+        {
+            functions.AddRange(entry.Functions);
+            _complexity.AddRange(entry.Complexity);
+            _branches.AddRange(entry.Branches);
+        }
+
+        if (cache is not null)
+        {
+            var keep = entries.Where(entry => entry.Hash.Length > 0 && entry.Hash[0] is not '|').ToList();
+            if (
+                keep.Count != cached.Count
+                || keep.Any(entry => !ReferenceEquals(entry, cached.GetValueOrDefault(entry.Path)))
+            )
+            {
+                cache.Save(repository.Root, keep);
+            }
+        }
+
         return _functions = functions;
     }
 

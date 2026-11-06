@@ -13,7 +13,11 @@ public sealed record ArchitectureRead(ProjectArchitecture? Architecture, IReadOn
 /// One request caches each member's files/build, or reads them from a shared evidence reader (TASK-0093). Quick
 /// reads omit workspace and stale-knowledge scans.
 /// </summary>
-public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members, WorkspaceEvidenceReader? evidence = null)
+public sealed class ArchitectureReader(
+    IReadOnlyList<WorkspaceMember> members,
+    WorkspaceEvidenceReader? evidence = null,
+    Clones.CloneCache? clones = null
+)
 {
     private readonly WorkspaceEvidenceReader _evidence = evidence ?? new(members);
     private readonly Dictionary<string, Clones.RepeatedCodeReader> _repeated = new(StringComparer.Ordinal);
@@ -58,7 +62,7 @@ public sealed class ArchitectureReader(IReadOnlyList<WorkspaceMember> members, W
         if (!_repeated.TryGetValue(member.Id, out var reader))
         {
             var (repository, _) = await _evidence.RepositoryAsync(member, token).ConfigureAwait(false);
-            reader = new(repository);
+            reader = new(repository, clones);
             _repeated.Add(member.Id, reader);
         }
         return reader;

@@ -6,9 +6,9 @@ using Harness.Core.Retrieval;
 
 namespace Harness.Infrastructure.Architecture.Clones;
 
-public sealed class RepeatedCodeReader(AnalysisRepository repository)
+public sealed class RepeatedCodeReader(AnalysisRepository repository, CloneCache? cache = null)
 {
-    private readonly CloneExtractor _extractor = new(repository);
+    private readonly CloneExtractor _extractor = new(repository, cache);
     private OwnClones? _own;
     public CloneExtractor Extractor => _extractor;
 

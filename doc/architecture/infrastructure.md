@@ -68,6 +68,18 @@ Change coupling combines history and provider evidence to suggest missing usual
 partners. Layering, service and database guesses remain labeled heuristics.
 Coverage gaps do not become negative findings.
 
+A sync extracts functions only from files that changed (TASK-0105). `CloneCache`
+keeps, per repository, one compressed file beside the global configuration
+(`cache/clones/<root hash>.bin`) holding each file's extracted functions,
+complexity members and branches with the content hash they were read from: the
+SHA-256 of the file's bytes, the same hash sync records in its `files` table. A
+sync hands the cache those recorded hashes, so an unchanged file is neither read
+nor lexed; files sync does not record are read and hashed. A Go file's key also
+holds its package's files, since its functions depend on them. The extractor
+version and harness's build stamp the file: a new build starts it over, as does
+an unreadable file. Findings are the same as from a full extraction; on NM-2
+(3,540 files) extraction takes 0.3 s instead of 2-3 s, with a 5.7 MiB cache.
+
 The complexity reader counts each function's cyclomatic complexity from the
 tokens the clone extractor already holds. It reads no file a second time and
 skips the same test, generated and vendor files. A function nested in another

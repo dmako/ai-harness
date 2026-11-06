@@ -42,7 +42,8 @@ public sealed class FindingSets(
         CancellationToken token
     )
     {
-        var reader = new ArchitectureReader(ReadMembers(full));
+        // A sync lexes only the files changed since the last one (TASK-0105).
+        var reader = new ArchitectureReader(ReadMembers(full), clones: Clones(full));
         var own = database is null ? null : new MemoryStore(database);
         var rules = ArchitectureReader.RulesFor(own, _levels, projectId, token);
         var read = projectRead ?? await reader.ProjectAsync(Current, rules, full, token).ConfigureAwait(false);
@@ -59,6 +60,40 @@ public sealed class FindingSets(
             );
         }
         return (FindingStore.Merge(found), read.Architecture is not null);
+    }
+
+    /// <summary>
+    /// The clone cache, with a full read (a sync) given the file hashes sync just recorded for this worktree: files
+    /// whose hash is unchanged are neither read nor lexed again.
+    /// </summary>
+    private CloneCache Clones(bool full)
+    {
+        var cache = CloneCache.For(globalConfigurationPath);
+        if (!full || database is null || root.Length is 0)
+        {
+            return cache;
+        }
+
+        try
+        {
+            var here = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (
+                Projects.ProjectStore.Worktrees(database)
+                    .FirstOrDefault(tree =>
+                        string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(tree.Path)), here, comparison)
+                    )
+                is { } worktree
+            )
+            {
+                cache.Record(root, Sync.SyncStore.FileHashes(database, worktree.Id));
+            }
+        }
+        catch (Exception error) when (ReadError(error))
+        { /* Without recorded hashes every file is read and hashed. */
+        }
+
+        return cache;
     }
 
     /// <summary>This project, with a full read also its workspaces' other members.</summary>
