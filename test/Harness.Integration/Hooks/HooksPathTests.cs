@@ -41,6 +41,8 @@ public sealed class HooksPathTests
     {
         using var fixture = await SyncFixture.CreateAsync();
         var repository = await GitRepository.DiscoverAsync(fixture.Root, Token);
+        // relative folders resolve against the physical work tree (macOS: /private/var, not /var)
+        var root = repository.Root;
 
         // unset: the repository's hooks folder; git is asked once, then the answer is kept
         (await HarnessAnswerAsync(repository)).Should().Be((Path.Combine(repository.CommonDir, "hooks"), 1));
@@ -48,7 +50,7 @@ public sealed class HooksPathTests
 
         // relative to the work tree
         await fixture.GitAsync("config", "core.hooksPath", "githooks");
-        (await HarnessAnswerAsync(repository)).Should().Be((Path.Combine(fixture.Root, "githooks"), 1));
+        (await HarnessAnswerAsync(repository)).Should().Be((Path.Combine(root, "githooks"), 1));
         (await HarnessAnswerAsync(repository)).Starts.Should().Be(0);
 
         // absolute
@@ -61,10 +63,10 @@ public sealed class HooksPathTests
         var included = Path.Combine(fixture.DirectoryRoot, "included.cfg");
         await File.WriteAllTextAsync(included, "[core]\n\thooksPath = from-include\n", Token);
         await fixture.GitAsync("config", "include.path", included);
-        (await HarnessAnswerAsync(repository)).Folder.Should().Be(Path.Combine(fixture.Root, "from-include"));
+        (await HarnessAnswerAsync(repository)).Folder.Should().Be(Path.Combine(root, "from-include"));
         (await HarnessAnswerAsync(repository)).Starts.Should().Be(0);
         await File.WriteAllTextAsync(included, "[core]\n\thooksPath = changed-in-include\n", Token);
-        (await HarnessAnswerAsync(repository)).Should().Be((Path.Combine(fixture.Root, "changed-in-include"), 1));
+        (await HarnessAnswerAsync(repository)).Should().Be((Path.Combine(root, "changed-in-include"), 1));
     }
 
     [Fact]
@@ -80,7 +82,7 @@ public sealed class HooksPathTests
 
         // set in the linked worktree's config.worktree only
         await fixture.GitAsync("-C", linked, "config", "--worktree", "core.hooksPath", "worktree-hooks");
-        (await HarnessAnswerAsync(worktree)).Should().Be((Path.Combine(linked, "worktree-hooks"), 1));
+        (await HarnessAnswerAsync(worktree)).Should().Be((Path.Combine(worktree.Root, "worktree-hooks"), 1));
         (await HarnessAnswerAsync(main)).Folder.Should().Be(Path.Combine(main.CommonDir, "hooks"));
     }
 

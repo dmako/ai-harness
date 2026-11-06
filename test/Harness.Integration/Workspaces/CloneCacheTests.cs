@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Architecture.Clones;
+using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Sync;
 using Harness.Integration.Sync;
 using Xunit;
@@ -25,13 +26,15 @@ public sealed class CloneCacheTests
         fixture.Write("pkg/two.go", "package pkg\n\nfunc Two(x int) int {\n\treturn x + 1\n}\n");
         await fixture.CommitAsync("sources");
         var cache = new CloneCache(Path.Combine(fixture.DirectoryRoot, "cache"));
+        // The cache is keyed by the repository's physical root, as sync records it (macOS: /private/var, not /var).
+        var root = (await GitRepository.DiscoverAsync(fixture.Root, Token)).Root;
         // The fixture's own a.cs and b.cs are C# files too.
         const int Files = 7;
 
         async Task<(CloneExtractor Extractor, AnalysisRepository Repository)> SyncAsync()
         {
             await fixture.RunAsync();
-            cache.Record(fixture.Root, fixture.Hashes());
+            cache.Record(root, fixture.Hashes());
             var repository = await AnalysisRepository.OpenAsync(fixture.Root, Token);
             var extractor = new CloneExtractor(repository, cache);
             extractor.Extract();
@@ -46,7 +49,7 @@ public sealed class CloneCacheTests
 
         var first = await SyncAsync();
         first.Extractor.Lexed.Should().Be(Files);
-        File.Exists(cache.PathFor(fixture.Root)).Should().BeTrue();
+        File.Exists(cache.PathFor(root)).Should().BeTrue();
 
         var unchanged = await SyncAsync();
         unchanged.Extractor.Lexed.Should().Be(0, "no file changed");
@@ -77,7 +80,7 @@ public sealed class CloneCacheTests
         );
         other.Extract();
         other.Lexed.Should().Be(Files);
-        await File.WriteAllTextAsync(cache.PathFor(fixture.Root), "not a cache", Token);
+        await File.WriteAllTextAsync(cache.PathFor(root), "not a cache", Token);
         var corrupt = new CloneExtractor(await AnalysisRepository.OpenAsync(fixture.Root, Token), cache);
         corrupt.Extract();
         corrupt.Lexed.Should().Be(Files);

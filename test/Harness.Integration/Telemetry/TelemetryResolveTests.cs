@@ -65,7 +65,8 @@ public sealed class TelemetryResolveTests
         var starts = new List<string>();
         void Count(string root, IReadOnlyList<string> arguments)
         {
-            if (GitRepository.PathEquals(root, fixture.Root))
+            // the repository's physical root, where git runs (not macOS's /var for /private/var)
+            if (GitRepository.PathEquals(root, repository.Root))
             {
                 lock (starts)
                 {
@@ -182,7 +183,8 @@ public sealed class TelemetryResolveTests
         var starts = 0;
         void Count(string root, IReadOnlyList<string> arguments)
         {
-            if (GitRepository.PathEquals(root, fixture.Root))
+            // the repository's physical root, where git runs (not macOS's /var for /private/var)
+            if (GitRepository.PathEquals(root, repository.Root))
             {
                 Interlocked.Increment(ref starts);
             }

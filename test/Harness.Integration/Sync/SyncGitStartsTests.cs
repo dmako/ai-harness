@@ -12,9 +12,11 @@ public sealed class SyncGitStartsTests
     internal static async Task<List<string>> CountAsync(string root, Func<Task> work)
     {
         List<string> starts = [];
+        // git runs in the repository's physical root (macOS reaches its temporary folder through /var and /private/var)
+        var physical = GitRepository.PhysicalDirectory(Path.GetFullPath(root));
         void Count(string started, IReadOnlyList<string> arguments)
         {
-            if (GitRepository.PathEquals(started, root))
+            if (GitRepository.PathEquals(started, physical))
             {
                 lock (starts)
                 {
