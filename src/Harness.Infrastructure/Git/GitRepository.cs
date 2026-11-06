@@ -128,11 +128,14 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
         );
 
-    private static async Task<(int Code, string Output, string Error)> RunAsync(
-        string root,
-        string[] arguments,
-        CancellationToken cancellationToken
-    )
+    /// <summary>Raised for every git process harness starts, with its root and arguments (tests count them).</summary>
+    internal static event Action<string, IReadOnlyList<string>>? Started;
+
+    /// <summary>
+    /// How harness starts git: <c>git -C root</c>, the repository chosen by the root alone (no inherited GIT_DIR and
+    /// the like), never prompting or paging, without optional locks and with C-locale messages.
+    /// </summary>
+    internal static ProcessStartInfo GitStart(string root, IReadOnlyList<string> arguments)
     {
         var start = new ProcessStartInfo(FindExecutable())
         {
@@ -143,6 +146,7 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
             CreateNoWindow = true,
             StandardOutputEncoding = new UTF8Encoding(false, true),
             StandardErrorEncoding = new UTF8Encoding(false, true),
+            StandardInputEncoding = new UTF8Encoding(false),
         };
         start.ArgumentList.Add("-C");
         start.ArgumentList.Add(root);
@@ -170,22 +174,39 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
         start.Environment["GIT_PAGER"] = "cat";
         start.Environment["GIT_OPTIONAL_LOCKS"] = "0";
         start.Environment["LC_ALL"] = "C";
+        return start;
+    }
+
+    /// <summary>Starts git as <see cref="GitStart"/> describes it.</summary>
+    internal static void StartGit(Process process, string root, IReadOnlyList<string> arguments)
+    {
+        try
+        {
+            process.Start();
+        }
+        catch (Win32Exception exception)
+        {
+            throw new IOException("Git executable could not be started; install Git.", exception);
+        }
+
+        Started?.Invoke(root, arguments);
+    }
+
+    private static async Task<(int Code, string Output, string Error)> RunAsync(
+        string root,
+        string[] arguments,
+        CancellationToken cancellationToken
+    )
+    {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(10));
-        using var process = new Process { StartInfo = start };
+        using var process = new Process { StartInfo = GitStart(root, arguments) };
         var started = false;
         try
         {
-            try
-            {
-                process.Start();
-                started = true;
-                process.StandardInput.Close(); // A read-only Git command must never inherit the MCP protocol input pipe.
-            }
-            catch (Win32Exception exception)
-            {
-                throw new IOException("Git executable could not be started; install Git.", exception);
-            }
+            StartGit(process, root, arguments);
+            started = true;
+            process.StandardInput.Close(); // A read-only Git command must never inherit the MCP protocol input pipe.
 
             var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
             var error = process.StandardError.ReadToEndAsync(deadline.Token);

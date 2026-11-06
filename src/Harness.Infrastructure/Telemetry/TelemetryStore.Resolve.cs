@@ -71,6 +71,9 @@ public sealed partial class TelemetryStore
                 },
                 token
             );
+        // calls served at the same head share one list of what changed since (TASK-0100); null: that head is gone
+        Dictionary<string, string[]?> changedSince = new(StringComparer.Ordinal);
+        List<Pending> pending = [];
         foreach (var call in calls)
         {
             token.ThrowIfCancellationRequested();
@@ -85,18 +88,29 @@ public sealed partial class TelemetryStore
                 }
                 continue;
             }
-            string[] changed;
-            try
+
+            if (!changedSince.TryGetValue(old, out var changed))
             {
-                changed = (await repository.ChangedBetweenAsync(old, head, token).ConfigureAwait(false))
-                    .Where(p => p is not ".harness" && !p.StartsWith(".harness/", StringComparison.Ordinal))
-                    .ToArray();
+                try
+                {
+                    changed = (await repository.ChangedBetweenAsync(old, head, token).ConfigureAwait(false))
+                        .Where(p => p is not ".harness" && !p.StartsWith(".harness/", StringComparison.Ordinal))
+                        .ToArray();
+                }
+                catch (Exception error) when (error is IOException or InvalidDataException)
+                {
+                    changed = null;
+                }
+
+                changedSince[old] = changed;
             }
-            catch (Exception error) when (error is IOException or InvalidDataException)
+
+            if (changed is null)
             {
                 Close(id, "lost");
                 continue;
             }
+
             if (changed.Length is 0)
             {
                 continue;
@@ -105,7 +119,26 @@ public sealed partial class TelemetryStore
             var paths = Query("SELECT DISTINCT path FROM context_units WHERE call_id=$id", ("$id", id))
                 .Select(r => Text(r[0]))
                 .ToHashSet(StringComparer.Ordinal);
-            var callers = await CalleeMissesAsync(repository, old, head, changed, paths, token).ConfigureAwait(false);
+            pending.Add(new(id, old, changed, paths));
+        }
+
+        var functions = await FunctionsAsync(repository, head, pending, token).ConfigureAwait(false);
+        await using var blobs = repository.OpenBlobReader();
+        Dictionary<(string Commit, string Path), string> sources = [];
+        foreach (var (id, old, changed, paths) in pending)
+        {
+            token.ThrowIfCancellationRequested();
+            var callers = await CalleeMissesAsync(
+                    repository,
+                    blobs,
+                    old,
+                    changed,
+                    paths,
+                    functions[old],
+                    sources,
+                    token
+                )
+                .ConfigureAwait(false);
             var wrote = database.WithTransaction(
                 (c, t) =>
                 {
@@ -158,46 +191,116 @@ public sealed partial class TelemetryStore
         return new(count, changedCount, hits, callees, expired);
     }
 
+    /// <summary>A call whose head moved: what changed since, and the files its answer held.</summary>
+    private sealed record Pending(long Id, string Old, string[] Changed, HashSet<string> Paths);
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> NoFunctions =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+
+    /// <summary>The changed files a call's answer missed and whose callers are looked for: the first ten.</summary>
+    private static IEnumerable<string> Missed(IEnumerable<string> changed, HashSet<string> paths) =>
+        changed.Where(p => !paths.Contains(p)).Take(10);
+
+    /// <summary>
+    /// The functions changed in every pending call's missed files, by the call's head: one git diff per head over
+    /// all of them. When that diff fails, each file is asked alone, so one file git refuses costs only itself.
+    /// </summary>
+    private static async Task<Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> FunctionsAsync(
+        GitRepository repo,
+        string to,
+        List<Pending> pending,
+        CancellationToken token
+    )
+    {
+        Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> result = new(StringComparer.Ordinal);
+        foreach (var calls in pending.GroupBy(p => p.Old, StringComparer.Ordinal))
+        {
+            var missed = calls.SelectMany(p => Missed(p.Changed, p.Paths)).Distinct(StringComparer.Ordinal).ToArray();
+            if (missed.Length is 0)
+            {
+                result[calls.Key] = NoFunctions;
+                continue;
+            }
+
+            try
+            {
+                result[calls.Key] = await repo.ChangedFunctionsAsync(calls.Key, to, missed, token)
+                    .ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                Dictionary<string, IReadOnlyList<string>> alone = new(StringComparer.Ordinal);
+                foreach (var path in missed)
+                {
+                    try
+                    {
+                        var one = await repo.ChangedFunctionsAsync(calls.Key, to, [path], token)
+                            .ConfigureAwait(false);
+                        alone[path] = one[path];
+                    }
+                    catch (IOException)
+                    { /* No names for a file git refuses; the others are still looked for. */
+                    }
+                }
+
+                result[calls.Key] = alone;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>A file as it was at a commit: through the blob reader, or git show when the reader cannot.</summary>
+    private static async Task<string> SourceAsync(
+        GitRepository repo,
+        GitBlobReader blobs,
+        string commit,
+        string path,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            return await blobs.ReadAsync(commit, path, token).ConfigureAwait(false) ?? "";
+        }
+        catch (IOException)
+        {
+            try
+            {
+                return await repo.FileAtAsync(commit, path, token).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                return "";
+            }
+        }
+    }
+
     private static async Task<Dictionary<string, string>> CalleeMissesAsync(
         GitRepository repo,
+        GitBlobReader blobs,
         string from,
-        string to,
         IReadOnlyList<string> changed,
         HashSet<string> paths,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> functions,
+        Dictionary<(string Commit, string Path), string> sources,
         CancellationToken token
     )
     {
         Dictionary<string, string> result = new(StringComparer.Ordinal);
-        Dictionary<string, string> sources = new(StringComparer.Ordinal);
-        foreach (var missed in changed.Where(p => !paths.Contains(p)).Take(10))
+        foreach (var missed in Missed(changed, paths))
         {
-            IReadOnlyList<string> names;
-            try
-            {
-                names = await repo.ChangedFunctionsAsync(from, to, missed, token).ConfigureAwait(false);
-            }
-            catch (IOException)
-            {
-                continue;
-            }
-            if (names.Count is 0)
+            if (functions.GetValueOrDefault(missed) is not { Count: > 0 } names)
             {
                 continue;
             }
 
             foreach (var returned in paths.Order(StringComparer.Ordinal))
             {
-                if (!sources.TryGetValue(returned, out var text))
+                if (!sources.TryGetValue((from, returned), out var text))
                 {
-                    try
-                    {
-                        text = await repo.FileAtAsync(from, returned, token).ConfigureAwait(false);
-                    }
-                    catch (IOException)
-                    {
-                        text = "";
-                    }
-                    sources.Add(returned, text);
+                    text = await SourceAsync(repo, blobs, from, returned, token).ConfigureAwait(false);
+                    sources.Add((from, returned), text);
                 }
                 if (CallsAny(text, names))
                 {
