@@ -18,11 +18,8 @@ public sealed class GitHooks(string directory)
     public static async Task<GitHooks> ForAsync(GitRepository repository, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(repository);
-        var configured = await SetupQuery.QueryAsync(
-            "git",
-            ["-C", repository.Root, "config", "--get", "core.hooksPath"],
-            token
-        );
+        // git's answer, kept while the configuration it read is unchanged (TASK-0101)
+        var configured = (await repository.HooksPathAsync(token).ConfigureAwait(false)).Trim();
         return new(
             configured.Length is 0
                 ? Path.Combine(repository.CommonDir, "hooks")

@@ -1,5 +1,6 @@
 using Harness.Core.Projects;
 using Harness.Core.Sync;
+using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
 
@@ -48,6 +49,8 @@ public sealed class ProjectSynchronizer(
         var time = clock ?? TimeProvider.System;
         var started = time.GetUtcNow();
         await using var lease = await WorktreeSyncLock.AcquireAsync(repository.GitDir, token).ConfigureAwait(false);
+        // the files listed while finding what changed serve the findings and metrics of this run (TASK-0101)
+        using var files = GitRepository.ShareFileLists();
         using var database = HarnessDatabase.Open(
             location.DatabasePath,
             new() { BusyTimeout = TimeSpan.FromMilliseconds(location.Configuration.Value.Storage.BusyTimeoutMs) },

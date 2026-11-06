@@ -48,7 +48,10 @@ public static class GitSynchronizer
             }
             else if (run.Head.Length > 0)
             {
-                var changes = ignorer.Filter(await repository.ChangesSinceAsync(run.Base, token).ConfigureAwait(false));
+                // the mode selection has just checked that the base exists (TASK-0101)
+                var changes = ignorer.Filter(
+                    await repository.ChangesSinceAsync(run.Base, verified: true, token).ConfigureAwait(false)
+                );
                 var candidates = changes
                     .Where(change => change.Kind is not "deleted")
                     .Select(change => change.Path)
