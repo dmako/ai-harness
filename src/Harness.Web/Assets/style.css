@@ -1906,3 +1906,23 @@ table.dups { min-width: 45rem; }
 .mstone > .mcpart { padding: 0 0.875rem 0.625rem 2.5rem; }
 .mstone > .mcpart > .mgoal { padding: 0; }
 
+
+/* Work › Tasks: agent sessions started from harness ui, live (TASK-0116) */
+.agentpanel { margin-top: 0.5rem; display: grid; gap: 0.5rem; background: var(--inset); border: 1px solid var(--inset-line); border-radius: var(--radius-md); padding: 0.5rem 0.625rem; }
+.agentpanel.ended { background: none; border-style: dashed; }
+.agenthead { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.agentlog { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; max-height: 22rem; overflow-y: auto; font-size: var(--text-sm); }
+.agentlog:empty { display: none; }
+.ae { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.5rem; align-items: baseline; }
+.ae .aeat { font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.ae .aebody { overflow-wrap: anywhere; white-space: pre-wrap; }
+.ae-user .aebody { color: var(--ink); }
+.ae-approval .aebody { border-left: 3px solid var(--warning); padding-left: 0.5rem; }
+.aebtns { display: inline-flex; gap: 0.375rem; margin-left: 0.25rem; white-space: nowrap; }
+.agentsend { display: grid; gap: 0.375rem; }
+.agentsend textarea { font: inherit; font-size: var(--text-sm); color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.375rem 0.5rem; width: 100%; resize: vertical; }
+.agentbtns { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+.startagent { margin-top: 0.625rem; }
+.startagent summary { cursor: pointer; font-size: var(--text-sm); color: var(--ink-2); min-height: 1.5rem; display: flex; align-items: center; }
+.startagent .aform { margin-top: 0.375rem; }
+@media (max-width: 40em) { .ae { grid-template-columns: minmax(0, 1fr); gap: 0; } }

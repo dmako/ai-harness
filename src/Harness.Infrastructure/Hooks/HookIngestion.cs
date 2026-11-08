@@ -4,6 +4,7 @@ using Harness.Infrastructure.Clients;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Projects;
 using Harness.Infrastructure.Storage;
+using Harness.Infrastructure.Tasks;
 using Harness.Infrastructure.Telemetry;
 
 namespace Harness.Infrastructure.Hooks;
@@ -38,9 +39,10 @@ public sealed class HookIngestion(ProjectLifecycle lifecycle)
                 paths.Add(relative);
             }
         }
+        var at = DateTimeOffset.UtcNow;
         new TelemetryStore(database).RecordEvent(
             new ClientToolEvent(
-                DateTimeOffset.UtcNow,
+                at,
                 client,
                 call.Session,
                 worktree,
@@ -53,6 +55,10 @@ public sealed class HookIngestion(ProjectLifecycle lifecycle)
             ),
             token
         );
+        if (call.TaskId.Length > 0)
+        {
+            new TaskStore(database).RecordSession(client, call.Session, call.TaskId, call.TaskAction, at, token);
+        }
     }
 
     public async Task<ProjectLocation> LocateAsync(string directory, CancellationToken token)

@@ -11,10 +11,26 @@ public sealed record HookCall(
     string McpServer,
     string McpTool,
     IReadOnlyList<string> Paths,
-    string Task
+    string Task,
+    string TaskId = "",
+    string TaskAction = ""
 );
 
-/// <summary>Extracts only names and paths; never retains tool input, output, prompts or patch bodies.</summary>
+/// <summary>What a harness task call did to its task, as <see cref="HookCall.TaskAction"/> carries it.</summary>
+public static class HookTaskActions
+{
+    public const string Claim = "claim";
+    public const string Update = "update";
+    public const string Block = "block";
+    public const string Release = "release";
+    public const string Complete = "complete";
+}
+
+/// <summary>
+/// Extracts only names and paths; never retains tool input, output, prompts or patch bodies. The one exception is
+/// harness's own task tools: the task id of task_claim, task_update, task_complete and a claiming task_next, with
+/// what the call did to it (<see cref="HookTaskActions"/>), so a hook event links its session to the task.
+/// </summary>
 public static class HookPayload
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
@@ -46,6 +62,7 @@ public static class HookPayload
         {
             var server = tool[5..separator];
             var name = tool[(separator + 2)..];
+            var (taskId, action) = server is "harness" ? TaskLink(name, input, root) : ("", "");
             return new(
                 session,
                 cwd,
@@ -54,7 +71,9 @@ public static class HookPayload
                 server,
                 name,
                 [],
-                server is "harness" && name is "get_context" ? String(input, "task") : ""
+                server is "harness" && name is "get_context" ? String(input, "task") : "",
+                taskId,
+                action
             );
         }
         var kind = tool switch
@@ -81,6 +100,123 @@ public static class HookPayload
             }
         }
         return new(session, cwd, tool, kind, "", "", paths, "");
+    }
+
+    // The task a harness task call worked on: the id in its answer (a claiming task_next names it only there), else
+    // the id argument; nothing for a failed call, a task_next that did not claim, or any other tool.
+    private static (string Id, string Action) TaskLink(string name, JsonElement input, JsonElement root)
+    {
+        var action = name switch
+        {
+            "task_claim" => HookTaskActions.Claim,
+            "task_next"
+                when input.ValueKind is JsonValueKind.Object
+                    && input.TryGetProperty("claim", out var claim)
+                    && claim.ValueKind is JsonValueKind.True => HookTaskActions.Claim,
+            "task_update" => String(input, "status") switch
+            {
+                "blocked" => HookTaskActions.Block,
+                "ready" => HookTaskActions.Release,
+                _ => HookTaskActions.Update,
+            },
+            "task_complete" => HookTaskActions.Complete,
+            _ => "",
+        };
+        if (action.Length is 0)
+        {
+            return ("", "");
+        }
+        var answer = root.TryGetProperty("tool_response", out var response) ? response : default;
+        if (Failed(answer))
+        {
+            return ("", "");
+        }
+        var id = AnswerTaskId(answer, 0) ?? (name is "task_next" ? "" : String(input, "id")).Trim();
+        return id.Length is > 0 and <= 128 && !id.Any(char.IsControl) ? (id, action) : ("", "");
+    }
+
+    // An MCP error answer: {"isError": true} (also as JSON text), or a Rust-style {"Err": …} result.
+    private static bool Failed(JsonElement answer)
+    {
+        if (answer.ValueKind is JsonValueKind.String && Json(answer.GetString()) is { } parsed)
+        {
+            using (parsed)
+            {
+                return Failed(parsed.RootElement);
+            }
+        }
+        return answer.ValueKind is JsonValueKind.Object
+            && (
+                answer.TryGetProperty("isError", out var error) && error.ValueKind is JsonValueKind.True
+                || answer.TryGetProperty("Err", out _)
+            );
+    }
+
+    // The id of the "task" object in a harness task answer, wherever the client put the answer: the result object,
+    // its structuredContent, or a text content block (or plain string) holding the JSON.
+    private static string? AnswerTaskId(JsonElement answer, int depth)
+    {
+        if (depth > 4)
+        {
+            return null;
+        }
+        switch (answer.ValueKind)
+        {
+            case JsonValueKind.Object:
+                if (
+                    answer.TryGetProperty("task", out var task)
+                    && task.ValueKind is JsonValueKind.Object
+                    && String(task, "id") is { Length: > 0 } id
+                )
+                {
+                    return id;
+                }
+                foreach (var property in answer.EnumerateObject())
+                {
+                    if (AnswerTaskId(property.Value, depth + 1) is { } found)
+                    {
+                        return found;
+                    }
+                }
+                return null;
+            case JsonValueKind.Array:
+                foreach (var item in answer.EnumerateArray())
+                {
+                    if (AnswerTaskId(item, depth + 1) is { } found)
+                    {
+                        return found;
+                    }
+                }
+                return null;
+            case JsonValueKind.String when Json(answer.GetString()) is { } parsed:
+                using (parsed)
+                {
+                    return AnswerTaskId(parsed.RootElement, depth + 1);
+                }
+            default:
+                return null;
+        }
+    }
+
+    private static JsonDocument? Json(string? text)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+        var trimmed = text.AsSpan().TrimStart();
+        if (trimmed.Length is 0 || trimmed[0] is not ('{' or '['))
+        {
+            return null;
+        }
+        try
+        {
+            return JsonDocument.Parse(text);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static string RequiredString(JsonElement value, string key)

@@ -65,6 +65,9 @@ public interface ITaskSession
 {
     Task<TaskRecord> ReadTaskAsync(string id, CancellationToken cancellationToken);
     Task<IReadOnlyList<TaskEvent>> TaskEventsAsync(string id, CancellationToken cancellationToken);
+
+    /// <summary>The agent sessions that worked on the task, the first started first.</summary>
+    Task<IReadOnlyList<AgentSession>> TaskSessionsAsync(string id, CancellationToken cancellationToken);
     Task<TaskRecord?> NextTaskAsync(string blueprint, CancellationToken cancellationToken);
     Task<TaskClaimResult?> ClaimNextTaskAsync(
         string blueprint,

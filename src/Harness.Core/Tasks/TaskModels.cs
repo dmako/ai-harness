@@ -114,6 +114,43 @@ public sealed record TaskCheck(string Command, string Result, string Output = ""
 
 public sealed record TaskEvent(string Event, string From, string To, string Actor, string Detail, MemoryTimestamp At);
 
+/// <summary>
+/// An agent session (Claude Code, Codex) that worked on a task: started by harness, or seen through harness's hooks
+/// claiming, updating or completing it. One row per task and session; a session may work on several tasks.
+/// </summary>
+public sealed record AgentSession(
+    string TaskId,
+    string Client,
+    string SessionId,
+    string Origin,
+    MemoryTimestamp StartedAt,
+    MemoryTimestamp EndedAt,
+    string Status
+)
+{
+    public const string HookOrigin = "hook";
+    public const string HarnessOrigin = "harness";
+
+    public string Model { get; init; } = "";
+    public string TranscriptPath { get; init; } = "";
+    public long InputTokens { get; init; }
+    public long OutputTokens { get; init; }
+    public long CacheReadTokens { get; init; }
+    public long CacheWriteTokens { get; init; }
+    public long ReasoningTokens { get; init; }
+
+    /// <summary>The API-equivalent price of the tokens; null when a model they were used with has no price.</summary>
+    public double? CostUsd { get; init; }
+
+    /// <summary>The time the session's turns took (not idle time between them), in milliseconds.</summary>
+    public long ActiveMs { get; init; }
+
+    /// <summary>The first and last transcript activity within the task (RFC 3339), or empty while none was read.</summary>
+    public string FirstActivity { get; init; } = "";
+
+    public string LastActivity { get; init; } = "";
+}
+
 public sealed record TaskActor(string Name, string Token = "", bool Privileged = false)
 {
     public string AuditName => string.IsNullOrWhiteSpace(Name) ? "unknown" : Name;

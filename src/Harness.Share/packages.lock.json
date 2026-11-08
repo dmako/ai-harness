@@ -67,7 +67,7 @@
       "harness.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.6.0-localbuild, )",
+          "Harness.Core": "[0.7.0-localbuild, )",
           "Microsoft.Data.Sqlite": "[10.0.14, )",
           "Tomlyn": "[2.10.1, )",
           "YamlDotNet": "[18.1.0, )"
@@ -76,7 +76,7 @@
       "harness.web": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.6.0-localbuild, )"
+          "Harness.Core": "[0.7.0-localbuild, )"
         }
       },
       "Microsoft.Data.Sqlite": {

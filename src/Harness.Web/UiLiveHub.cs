@@ -13,11 +13,17 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
         internal readonly Channel<bool> _wake = Channel.CreateBounded<bool>(1);
         private readonly object _gate = new();
         private JsonObject _pending = [];
+        private List<JsonNode> _agents = [];
 
         internal void Add(JsonObject change)
         {
             lock (_gate)
             {
+                // agent hosts' events (TASK-0116) are passed on as they came, in order, never merged
+                foreach (var batch in change["agents"]?.AsArray().OfType<JsonNode>() ?? [])
+                {
+                    _agents.Add(batch.DeepClone());
+                }
                 foreach (
                     var key in new[] { "registry", "workspaces" }.Where(key => change[key]?.GetValue<bool>() is true)
                 )
@@ -49,12 +55,13 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
             _wake.Writer.TryWrite(true);
         }
 
-        internal JsonObject Take()
+        internal (JsonObject Change, List<JsonNode> Agents) Take()
         {
             lock (_gate)
             {
-                var pending = _pending;
+                var pending = (_pending, _agents);
                 _pending = [];
+                _agents = [];
                 return pending;
             }
         }
@@ -99,7 +106,11 @@ internal sealed class UiLiveHub(Func<IUiChangeSource> source) : IAsyncDisposable
                     await SendAsync(context, ": heartbeat\n\n");
                     continue;
                 }
-                var change = subscriber.Take();
+                var (change, agents) = subscriber.Take();
+                foreach (var batch in agents)
+                {
+                    await SendAsync(context, "event: agent\ndata: " + batch.ToJsonString() + "\n\n");
+                }
                 if (change.Count > 0)
                 {
                     await SendAsync(context, "event: change\ndata: " + change.ToJsonString() + "\n\n");

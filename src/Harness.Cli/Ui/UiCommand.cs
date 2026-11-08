@@ -25,11 +25,13 @@ internal sealed class UiCommand(
     {
         // one view cache for the process: the read services are made per request
         using var views = new ViewCache(lifecycle);
+        // the agent hosts this harness ui started or found: they outlive it
+        await using var agents = new UiAgents();
         await using var app = UiHost.Create(
             settings.Address,
-            _ => new UiReadService(lifecycle, catalog, sessions, views),
-            _ => new UiReadService(lifecycle, catalog, sessions, views),
-            () => new UiChangeSource(lifecycle, catalog)
+            _ => new UiReadService(lifecycle, catalog, sessions, views, agents),
+            _ => new UiReadService(lifecycle, catalog, sessions, views, agents),
+            () => new UiChangeSource(lifecycle, catalog, agents)
         );
         await app.StartAsync(cancellationToken);
         var address = UiHost.Address(app);

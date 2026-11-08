@@ -11,7 +11,8 @@ using Microsoft.Data.Sqlite;
 namespace Harness.Cli.Ui;
 
 /// <summary>One read-only connection per project; unchanged ticks read data_version only.</summary>
-internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalog catalog) : IUiChangeSource
+internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalog catalog, UiAgents? agents = null)
+    : IUiChangeSource
 {
     private readonly Dictionary<string, DatabaseWatch> _databases = new(StringComparer.Ordinal);
     private Dictionary<string, JsonObject> _entries = new(StringComparer.Ordinal);
@@ -82,6 +83,11 @@ internal sealed class UiChangeSource(ProjectLifecycle lifecycle, UiProjectCatalo
         if (result.Count > 0)
         {
             catalog.Forget();
+        }
+        // what the agent hosts did since the last tick (TASK-0116): sent as "agent" events, not as a change
+        if (agents?.Drain() is { Count: > 0 } drained)
+        {
+            result["agents"] = drained;
         }
         return Task.FromResult(result);
     }

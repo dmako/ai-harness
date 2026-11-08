@@ -19,8 +19,8 @@ The publisher defaults to the current host and rejects other target RIDs. Each
 invocation isolates intermediate/output directories. Committed
 `packages.publish.lock.json` files cover the four-RID publish graph. Use
 `--refresh-locks` only to regenerate a deliberately changed graph, review it,
-then return to locked restores. The main archive contains `harness` and
-`harness-graphify`; developer-tools contains `harness-collect` and `harness-share`.
+then return to locked restores. The main archive contains `harness`,
+`harness-graphify` and `harness-agents`; developer-tools contains `harness-collect` and `harness-share`.
 Keep their included SQLite native library beside the executables.
 
 Archives carry README, build metadata, release notes and actual dependency

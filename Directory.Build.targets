@@ -66,12 +66,13 @@
       <AssemblyMetadata Include="Modified" Value="$(RepositoryModified)" />
     </ItemGroup>
   </Target>
-  <!-- The six port assemblies form a DAG; tests and optional companion hosts are outside this rule. -->
+  <!-- The six port assemblies and the agent host (Core, Infrastructure) form a DAG; tests and the other companion hosts are outside this rule. -->
   <Target Name="ValidateHarnessProjectReferences" BeforeTargets="PrepareProjectReferences;_GenerateRestoreProjectPathWalk"
-          Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' ">
+          Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' OR '$(MSBuildProjectName)' == 'Harness.Agents' ">
     <ItemGroup>
       <_HarnessAllowedReference Include="Harness.Core" Condition=" '$(MSBuildProjectName)' != 'Harness.Core' " />
       <_HarnessAllowedReference Include="Harness.Infrastructure;Harness.Providers;Harness.Mcp;Harness.Web" Condition=" '$(MSBuildProjectName)' == 'Harness.Cli' " />
+      <_HarnessAllowedReference Include="Harness.Infrastructure" Condition=" '$(MSBuildProjectName)' == 'Harness.Agents' " />
       <_HarnessUnexpectedReference Include="@(ProjectReference->'%(Filename)')" />
       <_HarnessUnexpectedReference Remove="@(_HarnessAllowedReference)" />
     </ItemGroup>

@@ -130,7 +130,7 @@ public sealed class ProjectLifecycleTests
         inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         _ = inspection.Checks("test");
         inspection.Project!.Id.Should().Be(initialized.Registration.Project.Id);
-        inspection.SchemaVersion.Should().Be(25);
+        inspection.SchemaVersion.Should().Be(27);
         fixture.Snapshot().Should().Equal(before);
 
         var config = Path.Combine(root, ".harness", "config.toml");
@@ -379,7 +379,7 @@ public sealed class ProjectLifecycleTests
         var before = (wal.Length, wal.LastWriteTimeUtc);
         var inspection = await fixture.Lifecycle.InspectAsync(root, TestContext.Current.CancellationToken);
         inspection.Project!.Id.Should().Be(initialized.Registration!.Project.Id);
-        inspection.SchemaVersion.Should().Be(25);
+        inspection.SchemaVersion.Should().Be(27);
         wal.Refresh();
         ((wal.Length, wal.LastWriteTimeUtc)).Should().Be(before);
         using var readOnly = HarnessDatabase.OpenReadOnly(initialized.Location.DatabasePath);

@@ -36,7 +36,7 @@ internal sealed class UiWriteBody
                 "PROJECT_IDS" or "DEPENDS_ON" or "ACCEPTANCE" or "SUPERSEDES" or "EXIT" or "ORDER" => Strings(value),
                 // a task's paths, or a memory's one scope
                 "SCOPE" => Strings(value) || value is JsonValue one && one.TryGetValue<string>(out _),
-                "KEEP_BOTH" or "DRY_RUN" or "FORCE" or "ENABLED" or "SYNC" => value is JsonValue flag
+                "KEEP_BOTH" or "DRY_RUN" or "FORCE" or "ENABLED" or "SYNC" or "ALLOW" => value is JsonValue flag
                     && flag.TryGetValue<bool>(out _),
                 "HIDE_DONE_DAYS" => value is JsonValue number && number.TryGetValue<int>(out _),
                 _ => value is JsonValue text && text.TryGetValue<string>(out _),

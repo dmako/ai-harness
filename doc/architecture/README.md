@@ -13,6 +13,7 @@ remain directories inside these assemblies rather than separate projects.
 | [Web](web.md) | HTTP boundary, embedded frontend and documentation | Core |
 | [Cli](cli.md) | Composition, command tree, setup, UI service adapters | Core, Infrastructure, Providers, Mcp, Web |
 | [Graphify](graphify.md) | Standalone compiler-provider adapter | Core, Infrastructure, Providers |
+| [Agents](agents.md) | Agent host: runs Claude Code and Codex turns for a task | Core, Infrastructure |
 | [Collect](telemetry.md) | Optional developer report collector | Infrastructure, Web |
 | [Share](telemetry.md) | Optional release-file server | Infrastructure, Web |
 
@@ -34,6 +35,8 @@ flowchart TD
     Graphify --> Providers
     Graphify --> Infrastructure
     Graphify --> Core
+    Agents --> Infrastructure
+    Agents --> Core
     Collect --> Web
     Collect --> Infrastructure
     Share --> Web

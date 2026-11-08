@@ -113,7 +113,9 @@ All optional (`harness hooks install --kind …`):
   On Windows they need Git for Windows.
 - **claude-code**: a hook after each tool call that records what the agent
   read, edited and called (names and repository paths only, never
-  contents), to measure how well `get_context` answered; and a
+  contents), to measure how well `get_context` answered, and which
+  session claimed, updated or completed which task (the task's id only;
+  Work › Tasks and `task_get` list a task's agent sessions); and a
   session-start hook telling the agent, in a repository using harness, to
   start with `get_context` and to tell its subagents the same.
 - **codex**: the tool-call hook for Codex (Codex asks once to trust it,
@@ -223,6 +225,12 @@ enabled = false                       # true: sync starts a background run per H
 timeout_ms = 600000                   # a longer run fails and keeps the counted values
 
 [providers.<name>]                # see Providers
+
+[pricing."gpt-6.1-terra"]         # a model's API price, US$ per million tokens
+input = 1.25                      # (harness ships Claude prices; this adds or
+cached_input = 0.125              # overrides one; a price left out keeps the
+cache_write = 1.25                # shipped one, or the input price)
+output = 10.0
 ```
 
 Providers belong in the global file (executable paths are machine
@@ -358,6 +366,47 @@ edited in harness ui (Work › Tasks, Edit…); the edit is recorded as a
 harness ui records a `moved` event on each task it moves, and a
 `dependency removed` event on each task that lost a dependency on a task
 deleted with it; the deleted tasks' own trails go with them.
+
+With the Claude Code or Codex hooks installed, a task lists the agent
+sessions that claimed, updated or completed it (Work › Tasks, `task_get`),
+with what each used: tokens by kind (input, cache read, cache write,
+output, reasoning), the models, the active time (the turns, not the idle
+time between them) and an API-equivalent price, with the task's totals and
+the wall time from its first claim to its completion. harness reads them
+from the clients' own transcripts on your machine (Claude Code's
+`~/.claude/projects`, Codex's `~/.codex/sessions`; `CLAUDE_CONFIG_DIR` and
+`CODEX_HOME` are honoured), counts and times only, never content, and
+reads on from where it stopped on every `harness sync` and whenever a
+task's page opens. A session that worked on several tasks is shared out by
+time: a task gets what the session used after its previous task's last
+event, up to its own last event (or up to now while it still works on it).
+The price is what the same tokens would cost through the API at harness's
+price table (Claude models; others under `[pricing."<model>"]`, see
+Configuration), not what a subscription pays; a model without a price shows
+its tokens only.
+
+**Agents started from harness ui.** A task's Agent sessions › Start an agent
+runs Claude Code or Codex on the task in an agent host, `harness-agents serve`,
+started detached beside `harness`:
+
+- Claude Code runs with stream-json input and output and asks harness for
+  tool permissions (`--permission-prompt-tool stdio`); Codex runs as
+  `codex app-server` with approval policy `untrusted` and sandbox
+  `workspace-write`, so commands it does not know to be safe wait for you.
+- The client gets `HARNESS_TASK_ID` in its environment and is recorded on the
+  task as started by harness.
+- The panel shows its messages, tool calls, approvals and turns live (over
+  `/api/events`, polling while that is offline). Send starts a turn; Stop
+  interrupts the running one (neither client can pause a turn, so pause is
+  Stop, then a new message or Resume); Allow and Deny answer a permission
+  request; Close ends the session. An ended session resumes with a new
+  prompt in a new host.
+- A host closes its session after an hour without a turn. Its state and log
+  stay in `.harness/agents/` beside the project database; commands reach it
+  through a named pipe open to your user only.
+- `HARNESS_CLAUDE_COMMAND` and `HARNESS_CODEX_COMMAND` name the client when
+  it is not on PATH as `claude` or `codex`; `HARNESS_AGENTS_PATH` names the
+  host when it is not beside `harness`.
 
 ## harness ui
 

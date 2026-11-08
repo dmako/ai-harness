@@ -25,6 +25,9 @@ public sealed partial class HarnessStateSession
     public Task<IReadOnlyList<TaskEvent>> TaskEventsAsync(string id, CancellationToken cancellationToken) =>
         TaskOperationAsync(s => s.Events(id, cancellationToken), cancellationToken);
 
+    public Task<IReadOnlyList<AgentSession>> TaskSessionsAsync(string id, CancellationToken cancellationToken) =>
+        TaskOperationAsync(s => s.Sessions(id, cancellationToken), cancellationToken);
+
     public Task<TaskRecord?> NextTaskAsync(string blueprint, CancellationToken cancellationToken) =>
         TaskOperationAsync(s => s.Next(blueprint, cancellationToken), cancellationToken);
 

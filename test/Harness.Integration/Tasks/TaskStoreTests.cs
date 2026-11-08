@@ -666,7 +666,7 @@ public sealed class TaskStoreTests
         }
 
         using var database = HarnessDatabase.Open(path, cancellationToken: Token);
-        database.SchemaVersion().Should().Be(25);
+        database.SchemaVersion().Should().Be(27);
         var store = new TaskStore(database);
         var blueprint = store.Blueprints(Token).Should().ContainSingle().Which.Definition;
         blueprint.Id.Should().Be("M1");

@@ -5466,6 +5466,253 @@ function auditBlock(x) {
   return out;
 }
 
+// sessionsBlock lists the agent sessions that worked on a task (Claude Code, Codex), seen through harness's hooks
+// claiming, updating or completing it, or started from here (TASK-0116): those run in an agent host that outlives
+// harness ui, and their panel follows them live and steers them (Send, Stop, Allow/Deny, Close; Resume once ended).
+// Sessions started elsewhere show the end of their transcript, read-only, and how to resume them in a terminal.
+const AGENT_CLIENTS = { "claude-code": "Claude Code", codex: "Codex" };
+function sessionsBlock(x) {
+  const out = h("div", { class: "tblock" }, h("h4", {}, "Agent sessions"), h("p", { class: "empty" }, "Loading…"));
+  const pid = route().id;
+  const load = () => api(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/sessions`)).then((res) => {
+    const sessions = res.sessions || [];
+    const hosts = res.hosts || [];
+    const t = res.totals || {};
+    const wall = res.claimed_at && res.completed_at ? Date.parse(res.completed_at) - Date.parse(res.claimed_at) : 0;
+    // a session's newest host; hosts still opening their session have no session row yet
+    const hostOf = (s) => hosts.find((o) => o.client === s.client && o.session_id === s.session_id);
+    const pending = hosts.filter((o) => o.alive && !sessions.some((s) => s.client === o.client && s.session_id === o.session_id));
+    fill(out, h("h4", {}, "Agent sessions ", sessions.length > 0 && h("span", { class: "count" }, String(sessions.length))),
+      sessions.length > 0 && h("p", { class: "usage" },
+        usageLine(t),
+        t.active_ms > 0 && ` · active ${durationText(t.active_ms)}`,
+        wall > 0 && h("span", { title: "from the first claim to the completion" }, ` · claimed to done ${durationText(wall)}`)),
+      res.refresh_error && h("p", { class: "muted small" }, `Usage could not be brought up to date: ${res.refresh_error}`),
+      sessions.length === 0 && pending.length === 0 &&
+        h("p", { class: "empty" }, "None recorded. Sessions are linked when they claim, update or complete the task with the harness hooks installed ('harness hooks install'), or start one here."),
+      (sessions.length > 0 || pending.length > 0) && h("ul", { class: "events sessions" },
+        pending.map((o) => h("li", {},
+          h("span", { class: "ev" }, AGENT_CLIENTS[o.client] || o.client), " ",
+          h("span", { class: "muted" }, `started from here ${ago(o.started_at)} · opening the session…`),
+          agentPanel(pid, o, load))),
+        sessions.map((s) => sessionItem(pid, x, s, hostOf(s), load))),
+      startAgentForm(pid, x, load));
+  }).catch((e) => fill(out, h("h4", {}, "Agent sessions"), h("p", { class: "error" }, e.message)));
+  load();
+  return out;
+}
+
+// sessionItem is one session: what it is and used, and its panel: live for a running host, the log and Resume for
+// one harness started that has ended, the transcript tail for one started elsewhere.
+function sessionItem(pid, x, s, host, reload) {
+  const li = h("li", {},
+    h("span", { class: "ev" }, AGENT_CLIENTS[s.client] || s.client), " ",
+    h("code", { title: s.session_id }, s.session_id.slice(0, 8)), " ",
+    sessionPill(s.status), " ",
+    h("span", { class: "muted", title: `first seen ${s.started_at}, last seen ${s.ended_at}` },
+      `${s.origin === "harness" ? "started by harness" : "seen by hooks"} · first ${ago(s.started_at)} · last ${ago(s.ended_at)}`),
+    h("div", { class: "evidence" },
+      s.model && `${s.model} · `, usageLine(s), s.active_ms > 0 && ` · active ${durationText(s.active_ms)}`));
+  if (host && host.alive) li.append(agentPanel(pid, host, reload));
+  else if (s.origin === "harness") li.append(endedAgent(pid, x, s, host, reload));
+  else li.append(transcriptTail(pid, x, s));
+  return li;
+}
+
+// startAgentForm starts Claude Code or Codex on the task in a new agent host, with a first prompt.
+function startAgentForm(pid, x, reload) {
+  const client = h("select", { "aria-label": "Agent" }, Object.entries(AGENT_CLIENTS).map(([k, v]) => h("option", { value: k }, v)));
+  const prompt = h("textarea", { rows: 3, "aria-label": "First prompt" });
+  prompt.value = `Work on task ${x.id}: claim it with harness (task_claim), then do it.`;
+  const model = h("input", { type: "text", placeholder: "default model", "aria-label": "Model (optional)" });
+  const err = h("p", { class: "error", hidden: true });
+  const go = h("button", { type: "button", onclick: async () => {
+    go.disabled = true; err.hidden = true;
+    try {
+      await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`), { client: client.value, prompt: prompt.value, model: model.value.trim() });
+      toast(`${AGENT_CLIENTS[client.value]} started on ${x.id}`);
+      reload();
+    } catch (e) { err.textContent = e.message; err.hidden = false; go.disabled = false; }
+  } }, "Start");
+  return h("details", { class: "startagent" }, h("summary", {}, "Start an agent on this task"),
+    h("div", { class: "aform" },
+      h("div", { class: "frow" }, h("label", {}, "Agent", client), h("label", {}, "Model", model)),
+      h("label", {}, "Prompt", prompt),
+      h("p", { class: "hint muted small" }, "It runs in its own process beside harness ui and goes on when this page or harness ui closes. Tool calls that need permission wait here for Allow or Deny."),
+      err, h("div", {}, go)));
+}
+
+// agentPanels: the open panels by host key, fed by the live stream's "agent" events or, offline, by polling.
+const agentPanels = new Map();
+
+// agentPanel follows a running host: its log, approvals waiting for an answer, and the controls.
+function agentPanel(pid, host, reload) {
+  const log = h("ol", { class: "agentlog", role: "log", "aria-live": "polite", "aria-label": "Agent session log" });
+  const status = h("span", { class: "pill" });
+  const text = h("textarea", { rows: 2, "aria-label": "Message to the agent" });
+  const err = h("p", { class: "error", hidden: true });
+  const base = `agents/${encodeURIComponent(host.key)}`;
+  const command = async (action, body) => {
+    err.hidden = true;
+    try { await post(projectAPI({ id: pid }, `${base}/${action}`), body || {}); }
+    catch (e) { err.textContent = e.message; err.hidden = false; }
+  };
+  const send = h("button", { type: "button", onclick: async () => {
+    if (!text.value.trim()) return;
+    const said = text.value; text.value = "";
+    await command("send", { text: said });
+  } }, "Send");
+  const stop = h("button", { type: "button", class: "ghost", onclick: () => command("stop") }, "Stop");
+  const close = h("button", { type: "button", class: "ghost", onclick: () => command("close") }, "Close session");
+  const answers = new Map(); // approval id -> how to show its answer
+  let last = 0, ended = false;
+  const show = (s) => {
+    const running = s === "running";
+    ended = s === "closed" || s === "failed";
+    const as = { running: "in_progress", idle: "review", closed: "done", failed: "blocked", starting: "claimed" }[s] || "backlog";
+    status.className = `pill st-${as}`;
+    fill(status, h("span", { class: "ico", "aria-hidden": "true" }, STATUS_ICON[as] || "•"), s);
+    send.hidden = running || ended; text.hidden = ended; stop.hidden = !running; close.hidden = ended;
+    if (ended) { agentPanels.delete(host.key); setTimeout(reload, 500); }
+  };
+  const apply = (events) => {
+    for (const e of events || []) {
+      if (e.seq <= last) continue;
+      last = e.seq;
+      if (e.event === "status") { show(e.status); continue; }
+      if (e.event === "answered") { answers.get(e.id)?.(e.allow); continue; }
+      const row = agentEntry(e, (id, allow) => command("approve", { id, allow }));
+      if (!row) continue;
+      if (e.event === "approval") answers.set(e.id, row.answered);
+      log.append(row.el);
+    }
+    log.scrollTop = log.scrollHeight;
+  };
+  show(host.status || "starting");
+  agentPanels.set(host.key, (events) => { if (!log.isConnected) { agentPanels.delete(host.key); return; } apply(events); });
+  const poll = async () => {
+    try {
+      const res = await api(projectAPI({ id: pid }, `${base}/log?after=${last}`));
+      apply(res.events);
+      if (!res.alive && !ended) show(res.status);
+    } catch (e) { err.textContent = e.message; err.hidden = false; }
+  };
+  poll();
+  // without the live stream (offline, or no EventSource) the panel asks every 3 s while it is shown
+  const timer = setInterval(() => {
+    if (!log.isConnected || ended) { clearInterval(timer); return; }
+    if (!live.connected && !document.hidden) poll();
+  }, 3000);
+  return h("div", { class: "agentpanel" },
+    h("div", { class: "agenthead" }, status, " ", h("span", { class: "muted small" }, `agent host ${host.key.slice(0, 8)}`)),
+    log, err,
+    h("div", { class: "agentsend" }, text, h("div", { class: "agentbtns" }, send, stop, close)));
+}
+
+// agentEntry draws one event of a session's log; an approval comes with Allow and Deny until it is answered.
+function agentEntry(e, answer) {
+  const at = e.at ? new Date(e.at).toLocaleTimeString() : "";
+  const line = (cls, ...kids) => h("li", { class: `ae ${cls}` }, h("span", { class: "aeat muted" }, at), h("div", { class: "aebody" }, kids));
+  switch (e.event) {
+    case "user": return { el: line("ae-user", h("b", {}, "You: "), e.text) };
+    case "text": return { el: line("ae-text", e.text) };
+    case "tool": return { el: line("ae-tool", h("code", {}, e.tool || "tool"), " ", e.text) };
+    case "error": return { el: line("ae-error", h("span", { class: "error" }, e.text)) };
+    case "turn": return { el: line("ae-turn", h("span", { class: "muted" },
+      { completed: "Turn done", stopped: "Turn stopped", failed: "Turn failed" }[e.status] || e.status,
+      e.duration_ms > 0 && ` · ${durationText(e.duration_ms)}`,
+      e.cost_usd !== undefined && ` · $${e.cost_usd.toFixed(2)} API-equivalent (session so far)`,
+      e.error && `: ${e.error}`)) };
+    case "session": return e.model ? { el: line("ae-session", h("span", { class: "muted" }, `Session ${(e.session_id || "").slice(0, 8)} · ${e.model}`)) } : null;
+    case "approval": {
+      const btns = h("span", { class: "aebtns" },
+        h("button", { type: "button", onclick: () => answer(e.id, true) }, "Allow"),
+        h("button", { type: "button", class: "ghost", onclick: () => answer(e.id, false) }, "Deny"));
+      const el = line("ae-approval", h("b", {}, "Wants to use "), h("code", {}, e.tool), " ", e.text, " ", btns);
+      return { el, answered: (allow) => fill(btns, h("span", { class: "muted" }, allow ? "allowed" : "denied")) };
+    }
+    default: return null;
+  }
+}
+
+// endedAgent is a session harness started whose host has ended: its log on request, and Resume with a new prompt.
+function endedAgent(pid, x, s, host, reload) {
+  const box = h("div", { class: "agentpanel ended" });
+  const prompt = h("textarea", { rows: 2, "aria-label": "Prompt to resume with" });
+  prompt.value = "Go on.";
+  const err = h("p", { class: "error", hidden: true });
+  const resume = h("button", { type: "button", onclick: async () => {
+    resume.disabled = true; err.hidden = true;
+    try {
+      await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`), { client: s.client, prompt: prompt.value, resume: s.session_id });
+      toast(`${AGENT_CLIENTS[s.client] || s.client} resumed`);
+      reload();
+    } catch (e) { err.textContent = e.message; err.hidden = false; resume.disabled = false; }
+  } }, "Resume");
+  const log = h("ol", { class: "agentlog", "aria-label": "Agent session log" });
+  const showLog = host ? h("button", { type: "button", class: "ghost", onclick: async () => {
+    showLog.hidden = true;
+    try {
+      const res = await api(projectAPI({ id: pid }, `agents/${encodeURIComponent(host.key)}/log`));
+      fill(log, (res.events || []).map((e) => agentEntry(e, () => {})?.el).filter(Boolean));
+    } catch (e) { err.textContent = e.message; err.hidden = false; }
+  } }, "Show log") : null;
+  box.append(h("div", { class: "agentsend" }, prompt, h("div", { class: "agentbtns" }, resume, showLog)), err, log);
+  return box;
+}
+
+// transcriptTail shows a session started elsewhere: the end of its transcript, read-only, and how to resume it.
+function transcriptTail(pid, x, s) {
+  const box = h("div", { class: "agentpanel ended" });
+  const resume = s.client === "codex" ? `codex resume ${s.session_id}` : `claude --resume ${s.session_id}`;
+  const show = h("button", { type: "button", class: "ghost", onclick: async () => {
+    show.hidden = true;
+    const log = h("ol", { class: "agentlog", "aria-label": "Transcript (read-only)" }, h("li", { class: "empty" }, "Loading…"));
+    box.append(log);
+    try {
+      const res = await api(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/sessions/${encodeURIComponent(s.client)}/${encodeURIComponent(s.session_id)}/tail`));
+      const entries = res.entries || [];
+      fill(log, entries.length
+        ? entries.map((e) => agentEntry({ event: e.kind, text: e.text, tool: e.tool, at: e.at }, () => {})?.el).filter(Boolean)
+        : h("li", { class: "empty" }, "Nothing read from its transcript."));
+      log.scrollTop = log.scrollHeight;
+    } catch (e) { fill(log, h("li", { class: "error" }, e.message)); }
+  } }, "Show transcript");
+  box.append(h("p", { class: "small muted" }, "Started elsewhere: harness only reads it. Resume it in a terminal with ", h("code", {}, resume), "."), show);
+  return box;
+}
+
+// usageLine says what sessions used: tokens by kind and, when every model used has a price, the API-equivalent price
+// (what the same tokens would cost through the API; a subscription is not billed per token).
+function usageLine(u) {
+  const tokens = (u.input_tokens || 0) + (u.cache_read_tokens || 0) + (u.cache_write_tokens || 0) + (u.output_tokens || 0);
+  if (tokens === 0) return "no token usage read yet";
+  const parts = [`${tokenCount(tokens)} tokens`, `in ${tokenCount(u.input_tokens || 0)}`, `cache read ${tokenCount(u.cache_read_tokens || 0)}`,
+    `cache write ${tokenCount(u.cache_write_tokens || 0)}`, `out ${tokenCount(u.output_tokens || 0)}`];
+  if (u.reasoning_tokens) parts.push(`reasoning ${tokenCount(u.reasoning_tokens)}`);
+  return h("span", {}, parts.join(" · "), " · ", u.cost_usd !== undefined
+    ? h("b", { title: "What these tokens would cost through the API at harness's price table, not what a subscription pays" }, `$${u.cost_usd.toFixed(2)} API-equivalent`)
+    : h("span", { class: "muted", title: "A model used has no price in harness's table; add one under [pricing.<model>] in the config" }, "no price for this model"));
+}
+
+// tokenCount shortens a token count (12.3k, 4.56M); durationText a duration (45 s, 12 min, 2 h 05 min).
+function tokenCount(n) {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  return n >= 1e4 ? `${(n / 1e3).toFixed(1)}k` : String(n);
+}
+function durationText(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}
+
+// sessionPill shows what a session's last call did to the task, coloured as the task status it led to.
+function sessionPill(status) {
+  const as = { working: "in_progress", blocked: "blocked", released: "ready", completed: "done" }[status] || "backlog";
+  return h("span", { class: `pill st-${as}` }, h("span", { class: "ico", "aria-hidden": "true" }, STATUS_ICON[as] || "•"), status);
+}
+
 // confirmDelete asks before deleting, saying what goes, then does it.
 function confirmDelete({ title, what, lines, confirm, send, done }) {
   const dlg = dialog({ title });
@@ -5498,6 +5745,7 @@ function taskDetail(x, passed) {
         (x.completion.checks || []).length > 0 && h("ul", { class: "checklist" }, x.completion.checks.map((c) =>
           h("li", { class: `res-${c.result}` }, h("span", { class: "ico" }, resIcon[c.result] || "•"), h("div", {}, h("code", {}, c.command), c.output && h("div", { class: "evidence" }, c.output)))))),
       x.notes && h("div", { class: "tblock" }, h("h4", {}, "Notes"), h("p", { class: "muted" }, x.notes)),
+      sessionsBlock(x),
       auditBlock(x)),
     h("aside", { class: "tside" }, kv([
       ["Status", statusPill(x.status)],
@@ -5603,7 +5851,7 @@ async function refresh() {
 // or a form is open in it (it runs once that is over). A dropped stream
 // reconnects by itself and then refetches everything.
 const LIVE_QUIET = 500, LIVE_GAP = 3000;
-const live = { pending: null, timer: 0, last: 0 };
+const live = { pending: null, timer: 0, last: 0, connected: false };
 
 function queueLive(c) {
   const p = live.pending || (live.pending = { registry: false, workspaces: false, all: false, kinds: {}, levels: [] });
@@ -5678,6 +5926,7 @@ function connectLive() {
   function connect() {
     const es = new EventSource("/api/events");
     es.addEventListener("open", () => {
+      live.connected = true;
       stopPolling();
       show(true, "● live", "Changes by agents, the CLI, hooks and sync show up here by themselves.");
       if (opened) queueLive({ all: true }); // whatever changed while disconnected
@@ -5686,7 +5935,12 @@ function connectLive() {
     es.addEventListener("change", (ev) => {
       try { queueLive(JSON.parse(ev.data)); } catch { queueLive({ all: true }); }
     });
+    // an agent host's new events (TASK-0116), straight to its open panel
+    es.addEventListener("agent", (ev) => {
+      try { const b = JSON.parse(ev.data); agentPanels.get(b.key)?.(b.events); } catch { /* the panel polls on reconnect */ }
+    });
     es.addEventListener("error", () => {
+      live.connected = false;
       startPolling();
       show(false, "○ offline — reload", "The live update stream dropped (it reconnects by itself); click to reload now.");
       // the browser retries a dropped stream itself, but not a refused one

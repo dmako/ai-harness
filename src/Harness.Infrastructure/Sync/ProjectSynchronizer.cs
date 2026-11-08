@@ -72,6 +72,7 @@ public sealed class ProjectSynchronizer(
         {
             removed = RemoveGoneWorktrees(database, worktree, token);
             knowledge = SharedKnowledge(database, location.Root, token);
+            AgentUsage(database, location.Configuration.Value, token);
             await NoteSyncAsync(registration, database, token).ConfigureAwait(false);
             await ResolveTelemetryAsync(database, repository, worktree, head.Commit, token).ConfigureAwait(false);
             findings = await new Harness.Infrastructure.Findings.FindingSets(
@@ -160,6 +161,27 @@ public sealed class ProjectSynchronizer(
         && refreshed.IsCompletedSuccessfully
         && refreshed.Result.All(outcome => outcome.Status is "not_needed");
 
+    /// <summary>Reads on the agent sessions' transcripts into their tasks' usage (TASK-0114); best effort.</summary>
+    private static void AgentUsage(
+        HarnessDatabase database,
+        Configuration.HarnessConfiguration configuration,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            Agents.AgentUsageRefresh.Refresh(
+                database,
+                Configuration.ConfigurationLoader.Prices(configuration),
+                Agents.TranscriptRoots.Default(),
+                cancellationToken: token
+            );
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { /* A transcript that cannot be read now is read on from where it stopped by the next sync. */
+        }
+    }
+
     private static Harness.Core.Memory.SharedKnowledgeMerge? SharedKnowledge(
         HarnessDatabase database,
         string root,
@@ -176,7 +198,11 @@ public sealed class ProjectSynchronizer(
         }
     }
 
-    private async Task NoteSyncAsync(ProjectRegistration registration, HarnessDatabase database, CancellationToken token)
+    private async Task NoteSyncAsync(
+        ProjectRegistration registration,
+        HarnessDatabase database,
+        CancellationToken token
+    )
     {
         try
         {

@@ -4,9 +4,11 @@ using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using AwesomeAssertions;
+using Harness.Core.Hooks;
 using Harness.Core.Memory;
 using Harness.Core.Providers;
 using Harness.Core.Tasks;
+using Harness.Infrastructure.Agents;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Tasks;
@@ -964,9 +966,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                     );
                 }
 
-                await page.WaitAsync(
-                    $"{Section("M1")}.textContent.includes('UI-0003')"
-                );
+                await page.WaitAsync($"{Section("M1")}.textContent.includes('UI-0003')");
                 (await ValueAsync(page, State("M1"))).Should().Be(opened);
                 await page.EvaluateAsync($"{Section("M2")}.querySelector('.bpmove-up').click()");
                 await page.WaitAsync(
@@ -1008,7 +1008,9 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                         })()
                         """
                     )
-                ).Should().Be("true,true");
+                )
+                    .Should()
+                    .Be("true,true");
                 await page.CommandAsync("Emulation.clearDeviceMetricsOverride", new { });
 
                 // the Blueprints card keeps its own state: still the summary there
@@ -1027,7 +1029,9 @@ public sealed class UiBrowserTests(SharedBrowser browser)
 
                 // a fresh page load starts collapsed
                 await page.CommandAsync("Page.navigate", new { url = work + "tasks" });
-                await page.WaitAsync("location.hash.endsWith('/work/tasks') && !!document.querySelector('#main .mstone')");
+                await page.WaitAsync(
+                    "location.hash.endsWith('/work/tasks') && !!document.querySelector('#main .mstone')"
+                );
                 await page.CommandAsync("Page.reload", new { ignoreCache = true });
                 await page.WaitAsync(Ready());
                 (await ValueAsync(page, State("M1"))).Should().Be("2l more/false");
@@ -2338,6 +2342,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 Token
             );
             tasks.Create(new TaskDefinition { Id = "UI-0002", Title = "A loose task" }, "", origin, Token);
+            AgentSessions(tasks, fixture.DatabasePath);
             tasks.Propose(
                 new TaskDefinition
                 {
@@ -2436,6 +2441,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                         "knowledge/inbox",
                         "work",
                         "work/tasks",
+                        "work/UI-0001",
                         "work/inbox",
                         "board",
                         "agents",
@@ -2510,6 +2516,12 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                     .ToList();
                 faults.Should().BeEmpty(string.Join("\n", faults.Take(60)));
 
+                // the task's agent sessions were drawn: a transcript, a Resume and a live panel with its approval
+                await page.CommandAsync("Page.navigate", new { url = root + "/#/p/" + id + "/work/UI-0001" });
+                await page.WaitAsync(
+                    "document.querySelectorAll('.agentpanel').length === 3 && document.querySelectorAll('.ae-approval button').length === 2"
+                );
+
                 // the checks do report: a control too small to hit
                 await page.EvaluateAsync(
                     "document.body.append(Object.assign(document.createElement('button'), { textContent: 'x', style: 'width:10px;height:10px;padding:0' }))"
@@ -2518,6 +2530,47 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                     .Should()
                     .Contain(f => f.StartsWith("small-target", StringComparison.Ordinal));
             }
+        );
+    }
+
+    /// <summary>
+    /// A task's agent sessions in each form the page draws (TASK-0116): one seen by hooks (its transcript, read-only),
+    /// one harness started that has ended (Resume), and a running one, whose host's state names this process so it
+    /// counts as alive and whose log holds an approval waiting for an answer.
+    /// </summary>
+    private static void AgentSessions(TaskStore tasks, string databasePath)
+    {
+        var at = DateTimeOffset.UtcNow.AddMinutes(-5);
+        tasks.RecordSession("claude-code", "11111111-hook-session", "UI-0001", HookTaskActions.Claim, at, Token);
+        tasks.RecordRun("codex", "22222222-ended-thread", "UI-0001", "idle", at, Token);
+        tasks.RecordRun("claude-code", "33333333-live-session", "UI-0001", "working", at, Token);
+        var directory = AgentHostFiles.Directory(databasePath);
+        var key = new string('c', 32);
+        AgentHostFiles.WriteState(
+            directory,
+            key,
+            new System.Text.Json.Nodes.JsonObject
+            {
+                ["key"] = key,
+                ["client"] = "claude-code",
+                ["task_id"] = "UI-0001",
+                ["session_id"] = "33333333-live-session",
+                ["pid"] = Environment.ProcessId,
+                ["status"] = "running",
+                ["started_at"] = "2026-11-08T10:00:00.000Z",
+            }
+        );
+        File.WriteAllLines(
+            AgentHostFiles.LogPath(directory, key),
+            [
+                """{"event":"session","seq":1,"at":"2026-11-08T10:00:00.000Z","session_id":"33333333-live-session","model":"claude-sonnet-5-5"}""",
+                """{"event":"status","seq":2,"at":"2026-11-08T10:00:00.000Z","status":"idle"}""",
+                """{"event":"user","seq":3,"at":"2026-11-08T10:00:01.000Z","text":"Work on task UI-0001"}""",
+                """{"event":"status","seq":4,"at":"2026-11-08T10:00:01.000Z","status":"running"}""",
+                """{"event":"tool","seq":5,"at":"2026-11-08T10:00:03.000Z","tool":"Bash","text":"dotnet build --configuration Release --no-restore src/Harness.Cli/Harness.Cli.csproj"}""",
+                """{"event":"text","seq":6,"at":"2026-11-08T10:00:04.000Z","text":"The build passes; now the tests."}""",
+                """{"event":"approval","seq":7,"at":"2026-11-08T10:00:05.000Z","id":"req-1","tool":"Write","text":"src/Harness.Cli/Ui/UiAgents.cs"}""",
+            ]
         );
     }
 

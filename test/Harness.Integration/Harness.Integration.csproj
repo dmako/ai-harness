@@ -9,6 +9,7 @@
     <ProjectReference Include="../../src/Harness.Infrastructure/Harness.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Harness.Mcp/Harness.Mcp.csproj" />
     <ProjectReference Include="../../src/Harness.Graphify/Harness.Graphify.csproj" />
+    <ProjectReference Include="../../src/Harness.Agents/Harness.Agents.csproj" />
     <ProjectReference Include="../../src/Harness.Providers/Harness.Providers.csproj" />
     <ProjectReference Include="../../src/Harness.Web/Harness.Web.csproj" />
     <ProjectReference Include="../../src/Harness.Collect/Harness.Collect.csproj" />
