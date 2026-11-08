@@ -201,30 +201,30 @@
       "harness-agents": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.7.0-localbuild, )",
-          "Harness.Infrastructure": "[0.7.0-localbuild, )"
+          "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Infrastructure": "[0.10.0-localbuild, )"
         }
       },
       "harness-collect": {
         "type": "Project",
         "dependencies": {
-          "Harness.Infrastructure": "[0.7.0-localbuild, )",
-          "Harness.Web": "[0.7.0-localbuild, )"
+          "Harness.Infrastructure": "[0.10.0-localbuild, )",
+          "Harness.Web": "[0.10.0-localbuild, )"
         }
       },
       "harness-graphify": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.7.0-localbuild, )",
-          "Harness.Infrastructure": "[0.7.0-localbuild, )",
-          "Harness.Providers": "[0.7.0-localbuild, )"
+          "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Infrastructure": "[0.10.0-localbuild, )",
+          "Harness.Providers": "[0.10.0-localbuild, )"
         }
       },
       "harness-share": {
         "type": "Project",
         "dependencies": {
-          "Harness.Infrastructure": "[0.7.0-localbuild, )",
-          "Harness.Web": "[0.7.0-localbuild, )"
+          "Harness.Infrastructure": "[0.10.0-localbuild, )",
+          "Harness.Web": "[0.10.0-localbuild, )"
         }
       },
       "harness.core": {
@@ -233,7 +233,7 @@
       "harness.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.7.0-localbuild, )",
+          "Harness.Core": "[0.10.0-localbuild, )",
           "Microsoft.Data.Sqlite": "[10.0.14, )",
           "Tomlyn": "[2.10.1, )",
           "YamlDotNet": "[18.1.0, )"
@@ -242,21 +242,21 @@
       "harness.mcp": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.7.0-localbuild, )",
+          "Harness.Core": "[0.10.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.3.0, )"
         }
       },
       "harness.providers": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.7.0-localbuild, )",
+          "Harness.Core": "[0.10.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.3.0, )"
         }
       },
       "harness.web": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.7.0-localbuild, )"
+          "Harness.Core": "[0.10.0-localbuild, )"
         }
       },
       "Microsoft.Bcl.AsyncInterfaces": {
