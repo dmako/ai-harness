@@ -1,0 +1,38 @@
+== claude run (native)
+agent claude, task TASK-SAMPLE, wall 4.8 s
+identity: MAF session dcc2df86-3db8-4cdf-a234-4be0e2e8a5a4; CLI started with --session-id af9f16b6-120f-4748-9e1c-c98dfe5f7916 (see the transcript file name)
+answer: READY
+usage: in 49063, out 4, total 49067, cached in 31418, reasoning , additional cacheReadInputTokens=31418, cacheCreationInputTokens=17643
+raw: null; properties: -
+message raw: ClaudeCodeSdk.Types.AssistantMessage
+serialized session: {"sessionId":"dcc2df86-3db8-4cdf-a234-4be0e2e8a5a4","stateBag":{}}
+== claude resume via MAF session (native)
+agent claude: resumed {"sessionId":"dcc2df86-3db8-4cdf-a234-4be0e2e8a5a4","stateBag":{}} in 5.2 s
+answer: I haven't given a previous answer in this conversation, so there's no word to repeat.  (remembers: FAIL)
+usage: in 49276, out 132, total 49408, cached in 31424, reasoning , additional cacheReadInputTokens=31424, cacheCreationInputTokens=17850
+raw: null; properties: -
+message raw: ClaudeCodeSdk.Types.AssistantMessage
+message raw: ClaudeCodeSdk.Types.AssistantMessage
+== claude resume-cli (native)
+agent claude: --resume af9f16b6-120f-4748-9e1c-c98dfe5f7916 in 4.9 s
+answer: READY  (remembers: PASS)
+usage: in 49323, out 4, total 49327, cached in 31418, reasoning , additional cacheReadInputTokens=31418, cacheCreationInputTokens=17903
+raw: null; properties: -
+message raw: ClaudeCodeSdk.Types.AssistantMessage
+== claude cancel (native)
+first output after 7.3 s: 1
+2
+3
+4
+5
+6
+7
+8
+9
+10; live: [claude:1024440]
+cancelled: RunStreamingAsync threw OperationCanceledException 0 ms after Cancel()
+3 s after cancel: 0 agent process(es) still alive []
+== codex run (native)
+Unhandled exception. System.InvalidOperationException: Reflection-based serialization has been disabled for this application. Either use the source generator APIs or explicitly configure the 'JsonSerializerOptions.TypeInfoResolver' property.
+   at System.Text.Json.ThrowHelper.ThrowInvalidOperationException_JsonSerializerIsReflectionDisabled() + 0x2b
+   at System.Text.Json.JsonSerializerOptions.ConfigureForJsonSerializer() + 0x31

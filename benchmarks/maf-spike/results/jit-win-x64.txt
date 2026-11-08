@@ -1,0 +1,67 @@
+TASK-0112, Windows 11, 2026-11-08. Console output of the JIT runs (repeated SystemMessage lines and stack traces cut).
+Claude: Claude Code 2.1.317, ClaudeCodeSdk(.MAF) 10.4.4, built normally (PublishAot=true, so reflection JSON is off).
+Codex: codex-cli 0.165.0, CodexSdk(.MAF) 10.0.3, built with -p:PublishAot=false -p:JsonSerializerIsReflectionEnabledByDefault=true,
+because CodexSdk reads the CLI's events with reflection-based System.Text.Json (with reflection off it throws
+"Reflection-based serialization has been disabled" at the first event, under JIT and AOT alike).
+
+== MafSpike run claude <sample> TASK-SAMPLE (Model = "haiku" requested; transcripts show claude-sonnet-5-5 answered)
+agent claude, task TASK-SAMPLE, wall 6.6 s
+identity: claude session 0202ef41-1b7c-4383-9757-89e9aba9c56f (chosen by harness: False)
+answer: READY
+usage: in 49069, out 4, total 49073, cached in 0, reasoning , additional cacheReadInputTokens=0, cacheCreationInputTokens=49067
+raw: null; properties: -
+message raw: ClaudeCodeSdk.Types.SystemMessage   (x11)
+message raw: ClaudeCodeSdk.Types.AssistantMessage
+serialized session: {"sessionId":"0202ef41-1b7c-4383-9757-89e9aba9c56f","stateBag":{}}
+  -> CLI transcript written as 7ee6f5f2-3dad-4fb9-9bce-8c1ec401873d.jsonl: the MAF session id is not the CLI's session id
+
+== MafSpike resume claude <sample>   (new process, MAF DeserializeSessionAsync of the saved session)
+agent claude: resumed {"sessionId":"0202ef41-1b7c-4383-9757-89e9aba9c56f","stateBag":{}} in 6.1 s
+answer: Understood.  (remembers: FAIL)
+usage: in 49126, out 6, total 49132, cached in 30897, reasoning , additional cacheReadInputTokens=30897, cacheCreationInputTokens=18227
+  -> a new CLI transcript d8f5bf21-d06b-4bf5-b0c5-ceb76fb4a3a9.jsonl: a fresh conversation
+
+== MafSpike run claude (SessionId option = a Guid chosen up front), then resume-cli (Resume option = that Guid)
+agent claude, task TASK-SAMPLE, wall 5.6 s
+identity: MAF session 5c168fd2-f9b6-4520-80d5-493ccd70ad7d; CLI started with --session-id 37366adb-6916-4c5d-9d04-cf76057b1437 (see the transcript file name)
+answer: READY
+usage: in 49112, out 4, total 49116, cached in 31418, reasoning , additional cacheReadInputTokens=31418, cacheCreationInputTokens=17692
+agent claude: --resume 37366adb-6916-4c5d-9d04-cf76057b1437 in 5.1 s
+answer: READY  (remembers: PASS)
+usage: in 49372, out 4, total 49376, cached in 31418, reasoning , additional cacheReadInputTokens=31418, cacheCreationInputTokens=17952
+  -> transcript 37366adb-6916-4c5d-9d04-cf76057b1437.jsonl: the CLI used the chosen id, and --resume continued it
+
+== MafSpike cancel claude <sample> TASK-SAMPLE
+first output after 7.9 s: 1 2 3 … 10; live: [claude:640064]
+cancelled: RunStreamingAsync threw OperationCanceledException 7 ms after Cancel()
+3 s after cancel: 0 agent process(es) still alive []
+
+== MafSpike interrupt <sample>   (core ClaudeSdkClient: InterruptAsync, then a second QueryAsync on the same client; run twice)
+connected in 0.0 s
+first assistant message after 4.5 s; interrupting
+Unhandled exception. System.IO.IOException: The pipe is being closed.
+   at ClaudeCodeSdk.ClaudeProcess.WriteJsonLineAsync … at ClaudeCodeSdk.ClaudeSdkClient.QueryAsync
+  -> second run: same result after 5.2 s. After InterruptAsync the CLI's stdin is closed: the process cannot take another turn.
+
+== MafSpike run codex <sample> TASK-SAMPLE   (reflection JSON on)
+agent codex, task TASK-SAMPLE, wall 277.0 s
+identity: codex thread 01a1b887-9e86-7943-b0c9-8aa4caa8d75a (OnThreadStarted reported 01a1b887-9e86-7943-b0c9-8aa4caa8d75a)
+answer: turn.started
+READY
+READY
+usage: in 23065, out 5, total 23070, cached in 0, reasoning 0, additional -
+serialized session: {"threadId":"01a1b887-9e86-7943-b0c9-8aa4caa8d75a","stateBag":{}}
+  -> the rollout shows the turn from task_started 00:20:58.478Z to task_complete 00:21:06.408Z (8 s); the call returned ~270 s later
+
+== MafSpike resume codex <sample>   (new process, MAF DeserializeSessionAsync)
+agent codex: resumed {"threadId":"01a1b887-9e86-7943-b0c9-8aa4caa8d75a","stateBag":{}} in 161.3 s
+answer: turn.started
+READY
+READY  (remembers: PASS)
+usage: in 53595, out 10, total 53605, cached in 22912, reasoning 0, additional -
+  -> the rollout shows this turn from 00:25:39.521Z to 00:25:43.894Z (4 s)
+
+== MafSpike cancel codex <sample> TASK-SAMPLE
+first output after 1.9 s: turn.started; live: [node:1451504, codex:1155388, node:617096]
+cancelled: RunStreamingAsync threw OperationCanceledException 276 ms after Cancel()
+3 s after cancel: 0 agent process(es) still alive []

@@ -1,0 +1,6 @@
+server: fake MCP server, 4096 B answer
+PASS fallback: a missing answer from the first provider falls through to the second - 4105 chars from grep
+PASS union: both providers asked at once, items merged - 76 items from 2 providers
+PASS llm: FunctionInvokingChatClient lets a (scripted) model call an MCP tool - ranked 4105 chars
+PASS embedding: IEmbeddingGenerator reranks provider hits - 38 hits, best 0.56
+all steps passed

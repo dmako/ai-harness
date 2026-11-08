@@ -1,0 +1,5 @@
+Hello.exe 932864 bytes, 0 trim/AOT warnings
+ClaudeCore.exe 3685888 bytes, 0 trim/AOT warnings
+MafSpike.exe 7353856 bytes, 22 trim/AOT warnings (all CodexSdk/CodexSdk.MAF)
+== ClaudeCore run (native, core SDK result message)
+READY session 18ef1304-2ff3-494f-b2d6-3be338f2aadb cost $0.0761 in 2 out 4

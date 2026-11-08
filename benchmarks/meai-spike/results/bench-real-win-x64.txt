@@ -1,0 +1,23 @@
+server: ripwire.exe (ripwire 1.0); tool grep {"pattern":"ProviderResult","limit":20}
+connect 56.3 ms, tools/list 1.8 ms (33 tools); AIFunction answer type: Microsoft.Extensions.AI.TextContent
+rounds 300 (after 30 warm-up), 24 CPUs
+method      | median us |   p90 us |  mean us | alloc B/call | answer chars
+current     |     54706 |    58719 |    55014 |       50,851 |        5,534
+aifunction  |     54995 |    58353 |    55026 |       50,818 |        5,534
+middleware  |     54380 |    58337 |    54862 |       51,146 |        5,534
+
+server: ripwire.exe (ripwire 1.0); tool for {"task":"provider registry fan-out","limit":20}
+connect 72.2 ms, tools/list 2.0 ms (33 tools); AIFunction answer type: Microsoft.Extensions.AI.TextContent
+rounds 300 (after 30 warm-up), 24 CPUs
+method      | median us |   p90 us |  mean us | alloc B/call | answer chars
+current     |     23069 |    25480 |    23422 |       31,514 |        4,150
+aifunction  |     23122 |    25533 |    23393 |       31,500 |        4,150
+middleware  |     23221 |    25231 |    23484 |       32,014 |        4,150
+
+server: codebase-memory-mcp.exe (codebase-memory-mcp 0.12.1); tool search_graph {"project":"C-repos-personal-ai-harness-cs","query":"ProviderRegistry","limit":20,"format":"json"}
+connect 432.8 ms, tools/list 27.1 ms (17 tools); AIFunction answer type: System.Text.Json.JsonElement
+rounds 300 (after 30 warm-up), 24 CPUs
+method      | median us |   p90 us |  mean us | alloc B/call | answer chars
+current     |     33335 |    34721 |    34450 |       60,534 |        4,272
+aifunction  |     33452 |    34961 |    34912 |       81,193 |        4,272
+middleware  |     33295 |    34945 |    34379 |       81,524 |        4,272
