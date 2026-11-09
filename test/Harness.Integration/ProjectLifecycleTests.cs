@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using AwesomeAssertions;
@@ -195,6 +196,84 @@ public sealed class ProjectLifecycleTests
         var gone = await fixture.Lifecycle.InspectAsync(moved, TestContext.Current.CancellationToken);
         gone.GitError.Should().NotBeNull();
     }
+
+    [Fact]
+    public async Task EverySpellingOfARepositoryPathIsOneRepositoryAndOneWorktreeOnWindows()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "only Windows paths ignore case");
+        var token = TestContext.Current.CancellationToken;
+        using var fixture = new ProjectFixture();
+        var created = await fixture.CreateRepositoryAsync("Mixed Case");
+
+        // VS Code opens c:\..., a terminal C:\... (TASK-0117): both are the on-disk spelling.
+        var exact = await GitRepository.DiscoverAsync(created, token);
+        char.IsAsciiLetterUpper(exact.Root[0]).Should().BeTrue();
+        Path.GetFileName(exact.Root).Should().Be("Mixed Case");
+        exact.Root.Should().NotContain("~", "short names are expanded");
+        (await GitRepository.DiscoverAsync(Lower(created), token)).Should().Be(exact);
+        (await GitRepository.DiscoverAsync(created.ToUpperInvariant(), token)).Should().Be(exact);
+        // GitHub's runners have TEMP under C:\Users\RUNNER~1: an 8.3 name is one more spelling.
+        if (ShortPath(created) is { } shortName && shortName.Contains('~', StringComparison.Ordinal))
+        {
+            (await GitRepository.DiscoverAsync(Lower(shortName), token)).Should().Be(exact);
+        }
+
+        var first = await fixture.Lifecycle.InitAsync(Lower(created), cancellationToken: token);
+        var second = await fixture.Lifecycle.InitAsync(created.ToUpperInvariant(), cancellationToken: token);
+        second.Registration!.Worktree.Id.Should().Be(first.Registration!.Worktree.Id);
+        second.Registration.Moved.Should().BeFalse();
+        second.Registration.Copied.Should().BeFalse();
+
+        // A database an earlier harness split: an older row under the lower-case spelling, with synced files.
+        using (var database = HarnessDatabase.Open(second.Location.DatabasePath, cancellationToken: token))
+        using (var connection = database.OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                INSERT INTO worktrees(id, project_id, git_dir, path, linked, branch, head_commit, detached, first_seen_at, last_seen_at)
+                SELECT 'wt_older', project_id, lower(git_dir), lower(path), linked, branch, head_commit, detached, '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z' FROM worktrees;
+                INSERT INTO files(worktree_id, path, hash, size, mtime_ns, updated_at) SELECT id, 'a.txt', 'h', 1, 1, '2000-01-01T00:00:00Z' FROM worktrees;
+                """;
+            await command.ExecuteNonQueryAsync(token);
+            ProjectStore.Worktrees(database).Should().HaveCount(2);
+        }
+
+        var healed = await fixture.Lifecycle.InitAsync(created, cancellationToken: token);
+        healed.Registration!.Worktree.Id.Should().Be("wt_older", "the oldest row is kept");
+        using (var database = HarnessDatabase.Open(healed.Location.DatabasePath, cancellationToken: token))
+        {
+            var worktree = ProjectStore.Worktrees(database).Should().ContainSingle().Which;
+            worktree.Id.Should().Be("wt_older");
+            worktree.GitDir.Should().Be(exact.GitDir, "the kept row takes the on-disk spelling");
+            worktree.Path.Should().Be(exact.Root);
+            using var connection = database.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT group_concat(worktree_id) FROM files";
+            (await command.ExecuteScalarAsync(token)).Should().Be("wt_older");
+        }
+
+        (await fixture.Lifecycle.InspectAsync(Lower(created), token)).Worktrees.Should().ContainSingle();
+    }
+
+    /// <summary>The path in lower case, as VS Code spells the drive (c:\).</summary>
+    private static string Lower(string path) => string.Concat(path.Select(char.ToLowerInvariant));
+
+    /// <summary>The 8.3 spelling of an existing path, or null where the volume keeps no short names.</summary>
+    private static string? ShortPath(string path)
+    {
+        var buffer = new char[1024];
+        var length = GetShortPathNameW(path, buffer, (uint)buffer.Length);
+        return length is 0 || length >= buffer.Length ? null : new string(buffer, 0, (int)length);
+    }
+
+    [SuppressMessage(
+        "Interoperability",
+        "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute to generate P/Invoke marshalling code at compile time",
+        Justification = "Test-only Windows call; the repository disallows unsafe code."
+    )]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+    private static extern uint GetShortPathNameW(string longPath, [Out] char[] shortPath, uint size);
 
     [Fact]
     public async Task InvalidConfigurationBlocksInitBeforeWritesAndInspectionReportsIt()
