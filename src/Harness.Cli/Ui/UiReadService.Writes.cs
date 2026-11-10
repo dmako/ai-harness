@@ -101,6 +101,14 @@ internal sealed partial class UiReadService : IUiWriteApi
         {
             return await FixAsync(project, request.Body, token);
         }
+        if (endpoint is "tasks/{tid}/agents")
+        {
+            return await StartAgentAsync(project, request, token);
+        }
+        if (endpoint is "agents/{key}/{action}")
+        {
+            return await AgentCommandAsync(project, request, token);
+        }
         using var database = Open(project, tasks: true);
         var store = new MemoryStore(database);
         var human = HumanActor.Current();

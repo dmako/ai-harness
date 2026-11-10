@@ -25,7 +25,10 @@ internal sealed class SyncCommand(
     {
         if (settings.Full && settings.Since.Length > 0)
         {
-            await error.Writer.WriteLineAsync("harness sync: --full and --since are mutually exclusive");
+            await error.Writer.WriteLineAsync(
+                "harness sync: --full and --since are mutually exclusive",
+                CancellationToken.None
+            );
             return 2;
         }
         var mode = (settings.Full, settings.Since.Length > 0) switch

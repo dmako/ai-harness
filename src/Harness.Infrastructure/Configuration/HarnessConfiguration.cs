@@ -11,6 +11,9 @@ public sealed record HarnessConfiguration
     public ArchitectureConfiguration Architecture { get; set; } = new();
     public Dictionary<string, ProviderConfiguration> Providers { get; set; } = new(StringComparer.Ordinal);
 
+    /// <summary>Model prices that add to or override harness's shipped price table ([pricing.&lt;model&gt;]).</summary>
+    public Dictionary<string, PriceConfiguration> Pricing { get; set; } = new(StringComparer.Ordinal);
+
     public string ResolveDatabasePath(string stateRoot) => Path.GetFullPath(Storage.DbPath, stateRoot);
 }
 
@@ -80,6 +83,18 @@ public sealed record ComplexityLevels
     public int? Note { get; set; }
     public int? Warn { get; set; }
     public int? Problem { get; set; }
+}
+
+/// <summary>
+/// A model's API price in US dollars per million tokens. Left out, a kind keeps the shipped entry's price; for a
+/// model harness does not ship, cached input and cache writes cost what input costs.
+/// </summary>
+public sealed record PriceConfiguration
+{
+    public double? Input { get; set; }
+    public double? CachedInput { get; set; }
+    public double? CacheWrite { get; set; }
+    public double? Output { get; set; }
 }
 
 public sealed record ConfigurationSources(string Global, string Project);

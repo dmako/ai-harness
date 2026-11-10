@@ -251,6 +251,79 @@
           "additionalProperties": false
         }
       },
+      "sessions": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "description": "the agent sessions that worked on the task (from harness's hooks or started by harness)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "client": {
+              "type": "string"
+            },
+            "session_id": {
+              "type": "string"
+            },
+            "origin": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "started_at": {
+              "type": "string"
+            },
+            "ended_at": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "transcript_path": {
+              "type": "string"
+            },
+            "input_tokens": {
+              "type": "integer"
+            },
+            "output_tokens": {
+              "type": "integer"
+            },
+            "cache_read_tokens": {
+              "type": "integer"
+            },
+            "cache_write_tokens": {
+              "type": "integer"
+            },
+            "reasoning_tokens": {
+              "type": "integer"
+            },
+            "cost_usd": {
+              "type": "number",
+              "description": "API-equivalent price in US dollars at harness's price table"
+            },
+            "active_ms": {
+              "type": "integer"
+            },
+            "first_activity": {
+              "type": "string"
+            },
+            "last_activity": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "client",
+            "session_id",
+            "origin",
+            "status",
+            "started_at",
+            "ended_at"
+          ],
+          "additionalProperties": false
+        }
+      },
       "proposals": {
         "type": [
           "null",

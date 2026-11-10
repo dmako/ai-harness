@@ -74,11 +74,15 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
         var result = await lifecycle.InitAsync(settings.Project, settings.DryRun, cancellationToken);
         var location = result.Location;
         await output.WriteLineAsync(
-            $"{(result.DryRun ? "Would initialize" : "Initializing")} {location.Root} ({result.Head}):"
+            $"{(result.DryRun ? "Would initialize" : "Initializing")} {location.Root} ({result.Head}):",
+            CancellationToken.None
         );
         if (location.StateRoot != location.Root)
         {
-            await output.WriteLineAsync($"  (linked worktree: shared state lives in {location.StateRoot})");
+            await output.WriteLineAsync(
+                $"  (linked worktree: shared state lives in {location.StateRoot})",
+                CancellationToken.None
+            );
         }
 
         foreach (var action in result.Actions)
@@ -88,13 +92,13 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
                 relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
                     ? action.Path
                     : relative;
-            await output.WriteLineAsync($"  {action.Verb, -9} {display, -28} {action.Note}");
+            await output.WriteLineAsync($"  {action.Verb, -9} {display, -28} {action.Note}", CancellationToken.None);
         }
 
-        await output.WriteLineAsync();
+        await output.WriteLineAsync(CancellationToken.None);
         if (result.Registration is not { } registration)
         {
-            await output.WriteLineAsync("Dry run: nothing was changed.");
+            await output.WriteLineAsync("Dry run: nothing was changed.", CancellationToken.None);
         }
         else
         {
@@ -109,7 +113,8 @@ internal sealed class InitCommand(ProjectLifecycle lifecycle, TextWriter output)
                         $"Project {registration.Project.Id} moved from {registration.PreviousRoot}; location updated.",
                     _ =>
                         $"Already initialized: project {registration.Project.Id} (worktree {registration.Worktree.Id}).",
-                }
+                },
+                CancellationToken.None
             );
         }
 
@@ -129,23 +134,32 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
         else
         {
             await output.WriteLineAsync(
-                $"Project     {inspection.Project?.Id ?? "not initialized — run 'harness init'"}"
+                $"Project     {inspection.Project?.Id ?? "not initialized — run 'harness init'"}",
+                CancellationToken.None
             );
-            await output.WriteLineAsync($"Root        {inspection.Location.Root}");
+            await output.WriteLineAsync($"Root        {inspection.Location.Root}", CancellationToken.None);
             if (inspection.Location.StateRoot != inspection.Location.Root)
             {
                 await output.WriteLineAsync(
-                    $"State root  {inspection.Location.StateRoot} (shared with linked worktrees)"
+                    $"State root  {inspection.Location.StateRoot} (shared with linked worktrees)",
+                    CancellationToken.None
                 );
             }
 
-            await output.WriteLineAsync($"Git         {inspection.GitError ?? inspection.Head?.ToString()}");
             await output.WriteLineAsync(
-                $"Database    {inspection.Location.DatabasePath} ({(inspection.Location.Initialized ? $"schema {inspection.SchemaVersion}/19" : "not created")})"
+                $"Git         {inspection.GitError ?? inspection.Head?.ToString()}",
+                CancellationToken.None
+            );
+            await output.WriteLineAsync(
+                $"Database    {inspection.Location.DatabasePath} ({(inspection.Location.Initialized ? $"schema {inspection.SchemaVersion}/19" : "not created")})",
+                CancellationToken.None
             );
             if (inspection.ConfigurationError is not null || inspection.DatabaseError is not null)
             {
-                await output.WriteLineAsync($"Error       {inspection.ConfigurationError ?? inspection.DatabaseError}");
+                await output.WriteLineAsync(
+                    $"Error       {inspection.ConfigurationError ?? inspection.DatabaseError}",
+                    CancellationToken.None
+                );
             }
         }
 
@@ -181,7 +195,7 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
                 results.Add(ProjectOutput.DoctorResult(checks, id, root));
                 if (!settings.Json)
                 {
-                    await output.WriteLineAsync($"{id}  {root}");
+                    await output.WriteLineAsync($"{id}  {root}", CancellationToken.None);
                     await WriteChecksAsync(checks);
                 }
             }
@@ -189,7 +203,8 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
             if (settings.Json)
             {
                 await output.WriteLineAsync(
-                    HarnessJson.Serialize(new JsonObjectMap { ["projects"] = results }, ProjectOutput.JsonOptions)
+                    HarnessJson.Serialize(new JsonObjectMap { ["projects"] = results }, ProjectOutput.JsonOptions),
+                    CancellationToken.None
                 );
             }
         }
@@ -202,7 +217,8 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
             if (settings.Json)
             {
                 await output.WriteLineAsync(
-                    HarnessJson.Serialize(ProjectOutput.DoctorResult(checks), ProjectOutput.JsonOptions)
+                    HarnessJson.Serialize(ProjectOutput.DoctorResult(checks), ProjectOutput.JsonOptions),
+                    CancellationToken.None
                 );
             }
             else

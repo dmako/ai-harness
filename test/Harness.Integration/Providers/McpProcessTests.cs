@@ -332,7 +332,7 @@ internal sealed class ProviderFixture : IDisposable
 #else
             "Release",
 #endif
-            "net10.0",
+            TestDirectory.TargetFramework,
             "Harness.ProviderWorker.dll"
         );
 

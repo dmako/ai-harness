@@ -214,7 +214,9 @@ public static class CloneComparison
         var lengths = s_lengths;
         if (lengths is null || lengths.Length < size)
         {
-            lengths = new int[size > KeptTable ? size : Math.Min(KeptTable, Math.Max(size, (lengths?.Length ?? 0) * 2))];
+            lengths = new int[
+                size > KeptTable ? size : Math.Min(KeptTable, Math.Max(size, (lengths?.Length ?? 0) * 2))
+            ];
             if (lengths.Length <= KeptTable)
             {
                 s_lengths = lengths;

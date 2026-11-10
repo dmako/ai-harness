@@ -63,7 +63,8 @@ internal sealed partial class UiReadService(
     ProjectLifecycle lifecycle,
     UiProjectCatalog catalog,
     UiSessions sessions,
-    ViewCache? views = null
+    ViewCache? views = null,
+    UiAgents? agents = null
 ) : IUiReadApi
 {
     private WorkspaceStore Workspaces => new(lifecycle.GlobalConfigurationPath, lifecycle.Registry);

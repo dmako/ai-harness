@@ -10,7 +10,7 @@ dotnet test --solution Harness.slnx --no-restore '-bl:artifacts/test-{}.binlog' 
 python scripts/format_csharp.py --check
 ```
 
-The .NET 10 Microsoft Testing Platform runner forwards unrecognized options to
+The .NET 11 Microsoft Testing Platform runner forwards unrecognized options to
 the test applications. Do not pass the MSBuild `-m` flag to `dotnet test`: it
 causes exit code 5 during the test-host handshake, reported as zero tests run.
 Use `--max-parallel-test-modules` when test-module concurrency needs a limit;

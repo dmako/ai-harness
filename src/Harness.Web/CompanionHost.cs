@@ -21,7 +21,7 @@ public static class CompanionHost
             || uri.AbsolutePath is not "/"
             || uri.Query.Length > 0
             || uri.Fragment.Length > 0
-            || !int.TryParse(address[(address.LastIndexOf(':') + 1)..], out var port)
+            || !int.TryParse(address[(address.LastIndexOf(':', StringComparison.Ordinal) + 1)..], out var port)
             || port is < 0 or > 65535
         )
         {

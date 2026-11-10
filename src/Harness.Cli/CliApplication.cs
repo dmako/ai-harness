@@ -47,7 +47,7 @@ public static class CliApplication
             && CompletionManager.Shells.Contains(args[1], StringComparer.Ordinal)
         )
         {
-            await stdout.WriteAsync(CompletionScripts.For(args[1]));
+            await stdout.WriteAsync(CompletionScripts.For(args[1]), CancellationToken.None);
             return 0;
         }
         var completing = args.Length > 0 && args[0] is "__complete";
@@ -96,7 +96,7 @@ public static class CliApplication
             {
                 foreach (var failure in parsed.Errors)
                 {
-                    await stderr.WriteLineAsync("harness: " + failure.Message);
+                    await stderr.WriteLineAsync("harness: " + failure.Message, CancellationToken.None);
                 }
                 return 2;
             }
@@ -118,7 +118,7 @@ public static class CliApplication
         }
         catch (ArgumentException exception)
         {
-            await stderr.WriteLineAsync($"harness: {exception.Message}");
+            await stderr.WriteLineAsync($"harness: {exception.Message}", CancellationToken.None);
             return 2;
         }
         catch (Exception exception)
@@ -131,7 +131,7 @@ public static class CliApplication
                         or System.Text.Json.JsonException
             )
         {
-            await stderr.WriteLineAsync($"harness: {exception.Message}");
+            await stderr.WriteLineAsync($"harness: {exception.Message}", CancellationToken.None);
             return 1;
         }
     }
@@ -188,7 +188,8 @@ public static class CliApplication
 
     /// <summary>Nothing, or an option other than help, follows the command at index.</summary>
     private static bool NoSubcommand(string[] args, int index) =>
-        args.Length == index || args[index].StartsWith('-') && args[index] is not ("--help" or "-h");
+        args.Length == index
+        || args[index].StartsWith('-', StringComparison.Ordinal) && args[index] is not ("--help" or "-h");
 
     private static string[] NormalizeLegacyFlags(string[] args)
     {

@@ -193,7 +193,7 @@ public sealed partial class WorkspaceSearchSession
         value.Length switch
         {
             > 7 => value[..^3],
-            > 4 when value.EndsWith('s') => value[..^1],
+            > 4 when value.EndsWith('s', StringComparison.Ordinal) => value[..^1],
             _ => value,
         };
 }

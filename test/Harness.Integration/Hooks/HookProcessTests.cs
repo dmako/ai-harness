@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
+using Harness.Core.Tasks;
 using Harness.Infrastructure.Clients;
 using Harness.Infrastructure.Completion;
+using Harness.Infrastructure.Tasks;
 using Harness.Integration.Clients;
 using Xunit;
 
@@ -169,6 +171,62 @@ public sealed class HookProcessTests
         Events(fixture)[1]!["path"]!.GetValue<string>().Should().BeEmpty();
         var native = Harness.Core.Hooks.HookPayload.NativePath(fixture.Repository.Root);
         native.Should().Be(fixture.Repository.Root);
+    }
+
+    [Fact]
+    public async Task HarnessTaskCallsLinkTheirSessionToTheTaskForBothClients()
+    {
+        using var fixture = await SetupFixture.CreateAsync();
+        using (var database = fixture.Repository.Database())
+        {
+            new TaskStore(database).Import(
+                [new TaskDefinition { Id = "TASK-0001", Title = "One" }],
+                "fixture",
+                cancellationToken: Token
+            );
+            new TaskStore(database).Sessions("TASK-0001", Token).Should().BeEmpty("no hook event came yet");
+        }
+        string Payload(string session, string tool, object input, object response) =>
+            JsonSerializer.Serialize(
+                new
+                {
+                    session_id = session,
+                    cwd = fixture.Repository.Root,
+                    hook_event_name = "PostToolUse",
+                    tool_name = "mcp__harness__" + tool,
+                    tool_input = input,
+                    tool_response = response,
+                }
+            );
+        const string Answer = """{"claim_token":"clm_PRIVATE","task":{"id":"TASK-0001","goal":"PRIVATE"}}""";
+        var claude = new[] { new { type = "text", text = Answer } };
+        var codex = new { content = claude, structuredContent = JsonNode.Parse(Answer) };
+        foreach (
+            var (client, session, tool, input, response) in new (string, string, string, object, object)[]
+            {
+                ("claude-code", "claude-1", "task_claim", new { id = "TASK-0001" }, claude),
+                ("claude-code", "claude-1", "task_update", new { id = "TASK-0001", status = "in_progress" }, claude),
+                ("claude-code", "claude-1", "task_update", new { id = "TASK-0001", status = "ready" }, claude),
+                ("codex", "codex-1", "task_next", new { claim = true }, codex),
+                ("codex", "codex-1", "task_complete", new { id = "TASK-0001", summary = "PRIVATE" }, codex),
+            }
+        )
+        {
+            var result = await fixture.RunAsync(
+                ["hook", "event", "--client", client],
+                Payload(session, tool, input, response),
+                debug: true
+            );
+            (result.Code, result.Error.Trim()).Should().Be((0, "harness hook event: recorded"));
+        }
+
+        using var read = fixture.Repository.Database();
+        new TaskStore(read)
+            .Sessions("TASK-0001", Token)
+            .Select(s => (s.Client, s.SessionId, s.Origin, s.Status))
+            .Should()
+            .Equal(("claude-code", "claude-1", "hook", "released"), ("codex", "codex-1", "hook", "completed"));
+        Events(fixture).ToJsonString().Should().NotContain("PRIVATE");
     }
 
     [Theory]

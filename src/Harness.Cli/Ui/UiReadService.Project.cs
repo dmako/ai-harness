@@ -28,6 +28,7 @@ internal sealed partial class UiReadService
             "structure" => await ViewAsync(project, endpoint, () => StructureAsync(project, token), token),
             "complexity" => await ViewAsync(project, endpoint, () => ComplexityAsync(project, token), token),
             "stack" => await ViewAsync(project, endpoint, () => ProjectStackAsync(project, token), token),
+            "agents/{key}/log" => AgentLog(project, request),
             _ => await ProjectDatabaseAsync(project, endpoint, request, token),
         };
     }
@@ -69,7 +70,15 @@ internal sealed partial class UiReadService
         CancellationToken token
     )
     {
-        using var database = Open(project, endpoint is "tasks" or "tasks-next-id" or "board");
+        using var database = Open(
+            project,
+            endpoint
+                is "tasks"
+                    or "tasks-next-id"
+                    or "board"
+                    or "tasks/{tid}/sessions"
+                    or "tasks/{tid}/sessions/{client}/{sid}/tail"
+        );
         var telemetry = new TelemetryStore(database);
         var tasks = new TaskStore(database);
         return endpoint switch
@@ -92,6 +101,8 @@ internal sealed partial class UiReadService
             "tasks/{tid}/events" => UiJson.Node(
                 new JsonObjectMap { ["events"] = tasks.Events(request.Value("tid"), token).Select(TaskViews.Event) }
             ),
+            "tasks/{tid}/sessions" => TaskSessions(project, database, tasks, request.Value("tid"), token),
+            "tasks/{tid}/sessions/{client}/{sid}/tail" => TranscriptTail(tasks, request, token),
             "blueprints-next-id" => UiJson.Node(new JsonObjectMap { ["id"] = tasks.NextBlueprintId(token) }),
             "tasks-next-id" => UiJson.Node(
                 new JsonObjectMap { ["id"] = tasks.NextId(request.Parameter("prefix"), token) }

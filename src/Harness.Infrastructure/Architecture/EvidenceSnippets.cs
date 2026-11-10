@@ -74,7 +74,7 @@ public static partial class EvidenceSnippets
     {
         var entries = new DirectoryInfo(folder)
             .EnumerateFileSystemInfos()
-            .Where(entry => !entry.Name.StartsWith('.'))
+            .Where(entry => !entry.Name.StartsWith('.', StringComparison.Ordinal))
             .OrderBy(entry => entry is DirectoryInfo ? 0 : 1)
             .ThenBy(entry => entry.Name, StringComparer.Ordinal)
             .Select(entry => entry.Name + (entry is DirectoryInfo ? "/" : ""))

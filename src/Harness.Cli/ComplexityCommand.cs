@@ -16,7 +16,10 @@ internal sealed class ComplexityMeasureCommand(ProjectLifecycle lifecycle, TextW
     {
         if (!MetricsStore.ValidCommit(settings.Commit))
         {
-            await error.Writer.WriteLineAsync("harness complexity measure: --commit must be a commit id");
+            await error.Writer.WriteLineAsync(
+                "harness complexity measure: --commit must be a commit id",
+                CancellationToken.None
+            );
             return 2;
         }
 
@@ -32,7 +35,8 @@ internal sealed class ComplexityMeasureCommand(ProjectLifecycle lifecycle, TextW
                     $"measured {run.Measured.Count} project(s), kept {run.Reused.Count}: {run.Members.Count} members",
                 "failed" => $"failed ({run.Failure}): {run.Error}",
                 _ => run.State,
-            }
+            },
+            CancellationToken.None
         );
         return run.State is "failed" ? 1 : 0;
     }

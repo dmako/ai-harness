@@ -81,6 +81,11 @@ internal static class TaskTools
     {
         var task = await session.ReadTaskAsync(id, token);
         Dictionary<string, object?> output = new() { ["task"] = TaskViews.Task(task) };
+        var sessions = await session.TaskSessionsAsync(id, token);
+        if (sessions.Count > 0)
+        {
+            output["sessions"] = sessions.Select(TaskViews.Session).ToArray();
+        }
         if (!values.TryGetProperty("events", out var events) || !events.GetBoolean())
         {
             return output;

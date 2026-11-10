@@ -13,11 +13,7 @@ public sealed class CloneLexerLineTests
     [Theory]
     [InlineData("src/A.cs", "class C\n{\n    string x = \"abc\n    ;\n    void Y() { }\n}\n", " Y(")]
     [InlineData("src/A.cs", "class C\n{\n    char c = 'a\n    ;\n    void Y() { }\n}\n", " Y(")]
-    [InlineData(
-        "src/A.cs",
-        "class C\n{\n    string x = \"abc\n    , y = \"def\n    ;\n    void Y() { }\n}\n",
-        " Y("
-    )]
+    [InlineData("src/A.cs", "class C\n{\n    string x = \"abc\n    , y = \"def\n    ;\n    void Y() { }\n}\n", " Y(")]
     [InlineData("src/a.ts", "const x = \"abc\nfunction y() { return 1; }\n", "function y(")]
     [InlineData("src/a.ts", "const x = 'abc\nconst z = 'def\nfunction y() { return 1; }\n", "function y(")]
     [InlineData("src/a.go", "package p\n\nvar x = \"abc\nfunc y() int { return 1 }\n", "func y(")]
@@ -30,7 +26,11 @@ public sealed class CloneLexerLineTests
     [InlineData("src/A.cs", "class C\n{\n    string x = \"abc\";\n    void Y() { }\n}\n", " Y(")]
     [InlineData("src/A.cs", "class C\n{\n    string x = @\"a\nb\n\"\"c\"\"\";\n    void Y() { }\n}\n", " Y(")]
     [InlineData("src/A.cs", "class C\n{\n    string x = $@\"a\n{1}\nb\";\n    void Y() { }\n}\n", " Y(")]
-    [InlineData("src/A.cs", "class C\n{\n    string x = \"\"\"\n        a \"q\"\n        \"\"\";\n    void Y() { }\n}\n", " Y(")]
+    [InlineData(
+        "src/A.cs",
+        "class C\n{\n    string x = \"\"\"\n        a \"q\"\n        \"\"\";\n    void Y() { }\n}\n",
+        " Y("
+    )]
     [InlineData("src/A.cs", "class C\n{\n    /* one\n       two\n    */\n    void Y() { }\n}\n", " Y(")]
     [InlineData("src/A.cs", "class C\n{\n    string x = \"a\\\"b\";\n    void Y() { }\n}\n", " Y(")]
     [InlineData("src/a.ts", "const x = `a\nb\n${1}`;\nfunction y() { return 1; }\n", "function y(")]

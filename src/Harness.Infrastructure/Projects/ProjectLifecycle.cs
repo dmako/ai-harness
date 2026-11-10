@@ -259,7 +259,7 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             return (new("create", path, note + " (every option, commented out)"), ConfigurationExample.Text(header));
         }
 
-        var bom = text.StartsWith('\uFEFF') ? "\uFEFF" : "";
+        var bom = text.StartsWith('\uFEFF', StringComparison.Ordinal) ? "\uFEFF" : "";
         var update = ConfigurationExample.Update(text[bom.Length..]);
         if (update.Problem.Length > 0)
         {

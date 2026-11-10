@@ -405,6 +405,83 @@ public sealed class GenericMcpTests
     }
 
     [Fact]
+    public async Task ResolutionMatchesAnotherCaseOfTheRootOnlyWhereTheFileSystemIgnoresCase()
+    {
+        using var fixture = new ProviderFixture();
+        fixture.Write("symbols.json", "[]");
+        var configuration = Configuration(
+            (Capabilities.SymbolSearch, new() { Tool = "symbols", Args = Arguments("""{"project":"{project}"}""") })
+        ) with
+        {
+            Args = [ProviderFixture.Worker, "normal", fixture.Root],
+            Resolve = new()
+            {
+                Tool = "projects",
+                Items = "projects",
+                Match = "root",
+                Value = "name",
+                Fix = "index {root}",
+            },
+        };
+
+        // codebase-memory records C:/... while VS Code opens c:\... (TASK-0117); and the reverse.
+        foreach (
+            var (recorded, opened) in new[]
+            {
+                (fixture.Root.ToUpperInvariant().Replace('\\', '/'), Lower(fixture.Root)),
+                (Lower(fixture.Root), fixture.Root.ToUpperInvariant()),
+            }
+        )
+        {
+            fixture.Write(
+                "projects.json",
+                JsonSerializer.Serialize(new { projects = new[] { new { root = recorded, name = "known" } } })
+            );
+            await using var provider = GenericMcpProvider.Build(
+                "fakeidx",
+                configuration,
+                OperatingSystem.IsWindows() ? opened : fixture.Root,
+                new ProviderProcessFactory(),
+                linkedWorktree: false
+            );
+            if (OperatingSystem.IsWindows())
+            {
+                (await provider.ExecuteAsync(new(Capabilities.SymbolSearch), Token)).Error.Should().BeNull();
+            }
+            else
+            {
+                // Case-sensitive file systems: another case is another directory.
+                await FluentActions
+                    .Awaiting(() => provider.ExecuteAsync(new(Capabilities.SymbolSearch), Token))
+                    .Should()
+                    .ThrowAsync<ProviderNotIndexedException>();
+            }
+        }
+    }
+
+    /// <summary>The path in lower case, as VS Code spells the drive (c:\).</summary>
+    private static string Lower(string path) => string.Concat(path.Select(char.ToLowerInvariant));
+
+    [Fact]
+    public void NotIndexedMemoKeepsOneAnswerForEverySpellingOfARootOnWindows()
+    {
+        using var fixture = new ProviderFixture();
+        var memo = new NotIndexedMemo(Path.Combine(fixture.Root, "memo"));
+        memo.Remember("fakeidx", @"c:\repo", "print", "not known", "index it");
+        var other = memo.Recall("fakeidx", @"C:\REPO", "print");
+        if (OperatingSystem.IsWindows())
+        {
+            other.Should().NotBeNull();
+            memo.Forget("fakeidx", @"C:\Repo");
+            Directory.EnumerateFiles(Path.Combine(fixture.Root, "memo")).Should().BeEmpty();
+        }
+        else
+        {
+            other.Should().BeNull();
+        }
+    }
+
+    [Fact]
     public async Task NotKnownIsRememberedUntilTheIndexTheConfigurationOrADayChangesIt()
     {
         using var fixture = new ProviderFixture();

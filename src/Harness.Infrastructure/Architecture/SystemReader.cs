@@ -192,9 +192,7 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
 
         public Regex Word { get; } =
             EcosystemReader.Rx(
-                @"\b("
-                    + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape))
-                    + @")\b"
+                @"\b(" + string.Join('|', declarations.Keys.Order(StringComparer.Ordinal).Select(Regex.Escape)) + @")\b"
             );
 
         public Dictionary<string, List<(string Member, string At)>> Implementations { get; } =
@@ -342,7 +340,7 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
                 var text = original.Trim();
                 if (
                     text.StartsWith("//", StringComparison.Ordinal)
-                    || text.StartsWith('*')
+                    || text.StartsWith('*', StringComparison.Ordinal)
                     || text.StartsWith("using ", StringComparison.Ordinal)
                 )
                 {

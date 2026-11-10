@@ -14,7 +14,12 @@ namespace LiteDbSpike;
 /// </summary>
 internal static class Bench
 {
-    private static readonly string[] Searches = ["sqlite busy timeout", "commit message format", "native aot trimming release"];
+    private static readonly string[] Searches =
+    [
+        "sqlite busy timeout",
+        "commit message format",
+        "native aot trimming release",
+    ];
 
     public static int Run(string source, int runs)
     {
@@ -67,17 +72,23 @@ internal static class Bench
                 ("file hashes read (all)", (e, _) => e.FileHashes(worktree)),
                 ("file hashes write 50", (e, r) => e.WriteHashes(worktree, paths.Take(50), r)),
                 ($"file hashes write all {paths.Count}", (e, r) => e.WriteHashes(worktree, paths, r)),
-                ("memory search x3", (e, _) =>
-                {
-                    foreach (var text in Searches)
+                (
+                    "memory search x3",
+                    (e, _) =>
                     {
-                        e.Search(text);
+                        foreach (var text in Searches)
+                        {
+                            e.Search(text);
+                        }
                     }
-                }),
+                ),
                 ("findings take (snapshot)", (e, r) => e.TakeFindings(r)),
                 ("findings read current", (e, _) => e.CurrentFindings()),
             };
-            var samples = engines.ToDictionary(e => e.Name, _ => operations.ToDictionary(o => o.Name, _ => new List<double>()));
+            var samples = engines.ToDictionary(
+                e => e.Name,
+                _ => operations.ToDictionary(o => o.Name, _ => new List<double>())
+            );
             for (var run = 0; run < runs + 1; run++)
             {
                 var order = run % 2 is 0 ? engines : engines.Reverse().ToArray();
@@ -97,12 +108,11 @@ internal static class Bench
 
             Console.WriteLine();
             Console.WriteLine($"median ms over {runs} runs (first run discarded as warm-up)");
-            Console.WriteLine($"{"operation",-30}" + string.Concat(engines.Select(e => $"{e.Name,16}")));
+            Console.WriteLine($"{"operation", -30}" + string.Concat(engines.Select(e => $"{e.Name, 16}")));
             foreach (var (name, _) in operations)
             {
                 Console.WriteLine(
-                    $"{name,-30}"
-                        + string.Concat(engines.Select(e => $"{Median(samples[e.Name][name]),16:F2}"))
+                    $"{name, -30}" + string.Concat(engines.Select(e => $"{Median(samples[e.Name][name]), 16:F2}"))
                 );
             }
 
@@ -115,7 +125,7 @@ internal static class Bench
             SqliteConnection.ClearAllPools();
             foreach (var file in Directory.GetFiles(directory).Order(StringComparer.Ordinal))
             {
-                Console.WriteLine($"{Path.GetFileName(file),-24} {new FileInfo(file).Length / 1024.0,10:F0} KiB");
+                Console.WriteLine($"{Path.GetFileName(file), -24} {new FileInfo(file).Length / 1024.0, 10:F0} KiB");
             }
 
             return 0;
@@ -296,17 +306,50 @@ internal static class Bench
             // FindingStore.Take for a changed snapshot: every finding upserted with its status, then marked.
             using var connection = Connection();
             using var transaction = connection.BeginTransaction(deferred: false);
-            var current = new List<(string Key, string Kind, string Level, string Title, long Measure, string Finding, string Hash, string First)>();
-            using (var read = Command(connection, transaction, "SELECT key,kind,level,title,measure,finding,hash,first_seen FROM findings"))
+            var current =
+                new List<(
+                    string Key,
+                    string Kind,
+                    string Level,
+                    string Title,
+                    long Measure,
+                    string Finding,
+                    string Hash,
+                    string First
+                )>();
+            using (
+                var read = Command(
+                    connection,
+                    transaction,
+                    "SELECT key,kind,level,title,measure,finding,hash,first_seen FROM findings"
+                )
+            )
             using (var reader = read.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    current.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7)));
+                    current.Add(
+                        (
+                            reader.GetString(0),
+                            reader.GetString(1),
+                            reader.GetString(2),
+                            reader.GetString(3),
+                            reader.GetInt64(4),
+                            reader.GetString(5),
+                            reader.GetString(6),
+                            reader.GetString(7)
+                        )
+                    );
                 }
             }
 
-            using (var insert = Command(connection, transaction, "INSERT INTO finding_snapshots(commit_sha,taken_at,found,added,changed,gone) VALUES($c,$now,$f,0,$f,0)"))
+            using (
+                var insert = Command(
+                    connection,
+                    transaction,
+                    "INSERT INTO finding_snapshots(commit_sha,taken_at,found,added,changed,gone) VALUES($c,$now,$f,0,$f,0)"
+                )
+            )
             {
                 insert.Parameters.AddWithValue("$c", "run" + run);
                 insert.Parameters.AddWithValue("$now", Now());
@@ -354,7 +397,13 @@ internal static class Bench
             using var connection = Connection();
             using var transaction = connection.BeginTransaction(deferred: true);
             var n = 0;
-            using (var read = Command(connection, transaction, "SELECT key,kind,level,title,measure,finding,hash,status,snapshot,first_seen,last_seen FROM findings WHERE status<>'gone' ORDER BY key"))
+            using (
+                var read = Command(
+                    connection,
+                    transaction,
+                    "SELECT key,kind,level,title,measure,finding,hash,status,snapshot,first_seen,last_seen FROM findings WHERE status<>'gone' ORDER BY key"
+                )
+            )
             using (var reader = read.ExecuteReader())
             {
                 while (reader.Read())
@@ -364,7 +413,11 @@ internal static class Bench
                 }
             }
 
-            using var latest = Command(connection, transaction, "SELECT id,commit_sha,taken_at,found,added,changed,gone FROM finding_snapshots ORDER BY id DESC LIMIT 1");
+            using var latest = Command(
+                connection,
+                transaction,
+                "SELECT id,commit_sha,taken_at,found,added,changed,gone FROM finding_snapshots ORDER BY id DESC LIMIT 1"
+            );
             using var row = latest.ExecuteReader();
             return row.Read() ? n : -1;
         }
@@ -396,7 +449,9 @@ internal static class Bench
         /// <summary>Manual BsonDocument mapping, the only one that is safe under Native AOT (see AotCheck).</summary>
         public static void Import(SqliteEngine sqlite, string path)
         {
-            using var db = new LiteDatabase(new ConnectionString { Filename = path, Connection = ConnectionType.Direct });
+            using var db = new LiteDatabase(
+                new ConnectionString { Filename = path, Connection = ConnectionType.Direct }
+            );
             using var connection = sqlite.Connection();
             db.BeginTrans();
             db.GetCollection("schema").Insert(new BsonDocument { ["_id"] = "version", ["value"] = 25 });
@@ -419,7 +474,12 @@ internal static class Bench
 
             files.EnsureIndex("wt");
             var memories = db.GetCollection("memories");
-            foreach (var row in Rows(connection, "SELECT id,type,content,scope_kind,scope_value,superseded_by,valid_from,valid_until,updated_at FROM memories"))
+            foreach (
+                var row in Rows(
+                    connection,
+                    "SELECT id,type,content,scope_kind,scope_value,superseded_by,valid_from,valid_until,updated_at FROM memories"
+                )
+            )
             {
                 var content = (string)row[2];
                 memories.Insert(
@@ -443,7 +503,12 @@ internal static class Bench
             memories.EnsureIndex("words", "$.words[*]");
             memories.EnsureIndex("type");
             var findings = db.GetCollection("findings");
-            foreach (var row in Rows(connection, "SELECT key,kind,level,title,measure,finding,hash,status,snapshot,first_seen,last_seen FROM findings"))
+            foreach (
+                var row in Rows(
+                    connection,
+                    "SELECT key,kind,level,title,measure,finding,hash,status,snapshot,first_seen,last_seen FROM findings"
+                )
+            )
             {
                 findings.Insert(
                     new BsonDocument
@@ -467,7 +532,12 @@ internal static class Bench
 
             findings.EnsureIndex("status");
             var snapshots = db.GetCollection("finding_snapshots", BsonAutoId.Int64);
-            foreach (var row in Rows(connection, "SELECT id,commit_sha,taken_at,found,added,changed,gone FROM finding_snapshots"))
+            foreach (
+                var row in Rows(
+                    connection,
+                    "SELECT id,commit_sha,taken_at,found,added,changed,gone FROM finding_snapshots"
+                )
+            )
             {
                 snapshots.Insert(
                     new BsonDocument
@@ -539,9 +609,12 @@ internal static class Bench
             {
                 foreach (var doc in memories.Find(BsonExpression.Create("$.words[*] ANY = @0", word)))
                 {
-                    if (!doc["superseded_by"].IsNull
+                    if (
+                        !doc["superseded_by"].IsNull
                         || doc["valid_from"] is { IsString: true } from && string.CompareOrdinal(from.AsString, now) > 0
-                        || doc["valid_until"] is { IsString: true } until && string.CompareOrdinal(until.AsString, now) <= 0)
+                        || doc["valid_until"] is { IsString: true } until
+                            && string.CompareOrdinal(until.AsString, now) <= 0
+                    )
                     {
                         continue;
                     }
@@ -551,7 +624,13 @@ internal static class Bench
                 }
             }
 
-            return [.. hits.OrderByDescending(h => h.Value.Count).ThenByDescending(h => h.Value.Updated, StringComparer.Ordinal).Take(20).Select(h => h.Key)];
+            return
+            [
+                .. hits.OrderByDescending(h => h.Value.Count)
+                    .ThenByDescending(h => h.Value.Updated, StringComparer.Ordinal)
+                    .Take(20)
+                    .Select(h => h.Key),
+            ];
         }
 
         public void TakeFindings(int run)
@@ -587,13 +666,21 @@ internal static class Bench
         {
             // Sorted here: LiteDB's ORDER BY fails on strings over ~1 KB (AotCheck "ORDER BY a long string").
             var n = 0;
-            foreach (var doc in _db.GetCollection("findings").Find("$.status != 'gone'").OrderBy(d => d["key"].AsString, StringComparer.Ordinal))
+            foreach (
+                var doc in _db.GetCollection("findings")
+                    .Find("$.status != 'gone'")
+                    .OrderBy(d => d["key"].AsString, StringComparer.Ordinal)
+            )
             {
                 _ = doc["finding"].AsString;
                 n++;
             }
 
-            var latest = _db.GetCollection("finding_snapshots").Query().OrderByDescending("_id").Limit(1).FirstOrDefault();
+            var latest = _db.GetCollection("finding_snapshots")
+                .Query()
+                .OrderByDescending("_id")
+                .Limit(1)
+                .FirstOrDefault();
             return latest is null ? -1 : n;
         }
 
@@ -620,7 +707,8 @@ internal static class Bench
     private static string KeyId(string key) =>
         Encoding.UTF8.GetByteCount(key) <= 1000
             ? key
-            : "sha256:" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(key)));
+            : "sha256:"
+                + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(key)));
 
     private static string HashOf(string text, int run) =>
         Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text + run)));

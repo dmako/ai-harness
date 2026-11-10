@@ -118,7 +118,7 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                         or TaskUsageException
             )
         {
-            await error.Writer.WriteLineAsync($"harness tasks {verb}: {exception.Message}");
+            await error.Writer.WriteLineAsync($"harness tasks {verb}: {exception.Message}", CancellationToken.None);
             return exception is TaskUsageException ? 2 : 1;
         }
     }
@@ -141,7 +141,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         else
         {
             await output.WriteLineAsync(
-                $"Claimed {claimed.Task.Id} as {claimed.Task.Claimant} until {Local(claimed.Task.LeaseUntil!.Value)}."
+                $"Claimed {claimed.Task.Id} as {claimed.Task.Claimant} until {Local(claimed.Task.LeaseUntil!.Value)}.",
+                CancellationToken.None
             );
         }
     }
@@ -163,7 +164,7 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else
         {
-            await output.WriteLineAsync($"Released {released.Id} (now {released.Status}).");
+            await output.WriteLineAsync($"Released {released.Id} (now {released.Status}).", CancellationToken.None);
         }
     }
 
@@ -202,10 +203,13 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else
         {
-            await output.WriteLineAsync($"Completed {completed.Task.Id}.");
+            await output.WriteLineAsync($"Completed {completed.Task.Id}.", CancellationToken.None);
             if (completed.Unlocked.Count > 0)
             {
-                await output.WriteLineAsync("Now ready: " + string.Join(", ", completed.Unlocked));
+                await output.WriteLineAsync(
+                    "Now ready: " + string.Join(", ", completed.Unlocked),
+                    CancellationToken.None
+                );
             }
         }
     }
@@ -237,45 +241,50 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else if (proposals.Count is 0 && blueprints.Count is 0)
         {
-            await output.WriteLineAsync($"No {proposalStatus} task or blueprint proposals.");
+            await output.WriteLineAsync($"No {proposalStatus} task or blueprint proposals.", CancellationToken.None);
         }
         else
         {
             foreach (var proposal in proposals)
             {
                 await output.WriteLineAsync(
-                    $"{proposal.Id}  [{proposal.Status}] {proposal.Task.Title}  (by {proposal.ProposedBy})"
+                    $"{proposal.Id}  [{proposal.Status}] {proposal.Task.Title}  (by {proposal.ProposedBy})",
+                    CancellationToken.None
                 );
                 if (proposal.Task.Blueprint.Length is not 0)
                 {
-                    await output.WriteLineAsync("    blueprint: " + proposal.Task.Blueprint);
+                    await output.WriteLineAsync("    blueprint: " + proposal.Task.Blueprint, CancellationToken.None);
                 }
 
                 if (proposal.Task.Goal.Length is not 0)
                 {
-                    await output.WriteLineAsync("    goal: " + proposal.Task.Goal);
+                    await output.WriteLineAsync("    goal: " + proposal.Task.Goal, CancellationToken.None);
                 }
 
                 if (proposal.Reason.Length is not 0)
                 {
-                    await output.WriteLineAsync("    why:  " + proposal.Reason);
+                    await output.WriteLineAsync("    why:  " + proposal.Reason, CancellationToken.None);
                 }
 
                 for (var i = 0; i < proposal.Task.Acceptance.Count; i++)
                 {
                     await output.WriteLineAsync(
-                        string.Create(CultureInfo.InvariantCulture, $"    {i + 1}. {proposal.Task.Acceptance[i]}")
+                        string.Create(CultureInfo.InvariantCulture, $"    {i + 1}. {proposal.Task.Acceptance[i]}"),
+                        CancellationToken.None
                     );
                 }
 
                 if (proposal.Result.Length is not 0)
                 {
-                    await output.WriteLineAsync("    became " + proposal.Result);
+                    await output.WriteLineAsync("    became " + proposal.Result, CancellationToken.None);
                 }
 
                 if (proposal.DecidedBy.Length is not 0)
                 {
-                    await output.WriteLineAsync("    " + DecidedLine(proposal.Status, proposal.DecidedBy));
+                    await output.WriteLineAsync(
+                        "    " + DecidedLine(proposal.Status, proposal.DecidedBy),
+                        CancellationToken.None
+                    );
                 }
             }
 
@@ -283,7 +292,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
             if (proposalStatus is "pending")
             {
                 await output.WriteLineAsync(
-                    "\nharness tasks approve <id> creates the task or blueprint; harness tasks reject <id> --note \"why\" closes it."
+                    "\nharness tasks approve <id> creates the task or blueprint; harness tasks reject <id> --note \"why\" closes it.",
+                    CancellationToken.None
                 );
             }
         }
@@ -310,7 +320,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         else
         {
             await output.WriteLineAsync(
-                $"Approved {approved.Proposal.Id}: {approved.Task.Id} ({approved.Task.Status}) {approved.Task.Definition.Title}"
+                $"Approved {approved.Proposal.Id}: {approved.Task.Id} ({approved.Task.Status}) {approved.Task.Definition.Title}",
+                CancellationToken.None
             );
         }
     }
@@ -329,7 +340,7 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else
         {
-            await output.WriteLineAsync($"Rejected {rejected.Id}.");
+            await output.WriteLineAsync($"Rejected {rejected.Id}.", CancellationToken.None);
         }
     }
 
@@ -357,11 +368,14 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else if (tasks.Count is 0)
         {
-            await output.WriteLineAsync("No tasks match.");
+            await output.WriteLineAsync("No tasks match.", CancellationToken.None);
         }
         else
         {
-            await output.WriteLineAsync($"{"ID", -10} {"STATUS", -11} {"MS", -6} {"PRIORITY", -8} TITLE");
+            await output.WriteLineAsync(
+                $"{"ID", -10} {"STATUS", -11} {"MS", -6} {"PRIORITY", -8} TITLE",
+                CancellationToken.None
+            );
             foreach (var t in tasks)
             {
                 var extra = t switch
@@ -371,7 +385,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                     _ => "",
                 };
                 await output.WriteLineAsync(
-                    $"{t.Id, -10} {t.Status, -11} {t.Definition.Blueprint, -6} {t.Definition.Priority, -8} {t.Definition.Title}{extra}"
+                    $"{t.Id, -10} {t.Status, -11} {t.Definition.Blueprint, -6} {t.Definition.Priority, -8} {t.Definition.Title}{extra}",
+                    CancellationToken.None
                 );
             }
         }
@@ -392,28 +407,29 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                 var d = m.Definition;
                 if (i > 0)
                 {
-                    await output.WriteLineAsync();
+                    await output.WriteLineAsync(CancellationToken.None);
                 }
 
                 await output.WriteLineAsync(
                     string.Create(
                         System.Globalization.CultureInfo.InvariantCulture,
                         $"{d.Id, -6} {(d.Title.Length is 0 ? "(not defined in the backlog)" : d.Title)}  [{m.Tasks.GetValueOrDefault("done")}/{m.Total} done]"
-                    )
+                    ),
+                    CancellationToken.None
                 );
                 if (d.Goal.Length is not 0)
                 {
-                    await output.WriteLineAsync("       goal: " + d.Goal);
+                    await output.WriteLineAsync("       goal: " + d.Goal, CancellationToken.None);
                 }
 
                 foreach (var e in d.Exit ?? [])
                 {
-                    await output.WriteLineAsync("       exit: " + e);
+                    await output.WriteLineAsync("       exit: " + e, CancellationToken.None);
                 }
 
                 if (d.Notes.Length is not 0)
                 {
-                    await output.WriteLineAsync("       note: " + d.Notes);
+                    await output.WriteLineAsync("       note: " + d.Notes, CancellationToken.None);
                 }
             }
         }
@@ -428,12 +444,12 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else if (next is null)
         {
-            await output.WriteLineAsync("No ready task.");
+            await output.WriteLineAsync("No ready task.", CancellationToken.None);
         }
         else
         {
             await PrintTaskAsync(next);
-            await output.WriteLineAsync($"\nClaim it with: harness tasks claim {next.Id}");
+            await output.WriteLineAsync($"\nClaim it with: harness tasks claim {next.Id}", CancellationToken.None);
         }
     }
 
@@ -456,11 +472,14 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
             await PrintTaskAsync(task);
             if (settings.Events)
             {
-                await output.WriteLineAsync("\nEvents:");
+                await output.WriteLineAsync("\nEvents:", CancellationToken.None);
                 foreach (var e in events)
                 {
                     var move = e.From.Length is not 0 || e.To.Length is not 0 ? $" {e.From} -> {e.To}" : "";
-                    await output.WriteLineAsync($"  {Local(e.At)}  {e.Event, -18}{move}  by {e.Actor}  {e.Detail}");
+                    await output.WriteLineAsync(
+                        $"  {Local(e.At)}  {e.Event, -18}{move}  by {e.Actor}  {e.Detail}",
+                        CancellationToken.None
+                    );
                 }
             }
         }
@@ -504,8 +523,14 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
         }
         else
         {
-            await output.WriteLineAsync($"Added {created.Id} ({created.Status}): {created.Definition.Title}");
-            await output.WriteLineAsync("Write it into the backlog file with: harness tasks export");
+            await output.WriteLineAsync(
+                $"Added {created.Id} ({created.Status}): {created.Definition.Title}",
+                CancellationToken.None
+            );
+            await output.WriteLineAsync(
+                "Write it into the backlog file with: harness tasks export",
+                CancellationToken.None
+            );
         }
     }
 
@@ -545,7 +570,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                     _ => changed.Status is "ready"
                         ? $"{id} is ready."
                         : $"{id} unblocked; waiting for dependencies (status {changed.Status}).",
-                }
+                },
+                CancellationToken.None
             );
         }
     }
@@ -579,7 +605,7 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
             }
             else if (result.Added.Count is 0 && !result.Created)
             {
-                await output.WriteLineAsync($"{file} already holds every task.");
+                await output.WriteLineAsync($"{file} already holds every task.", CancellationToken.None);
             }
             else
             {
@@ -587,7 +613,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                     string.Create(
                         System.Globalization.CultureInfo.InvariantCulture,
                         $"{(settings.DryRun ? "Would write" : "Wrote")} {result.Added.Count} task(s) into {file}: {string.Join(", ", result.Added)}"
-                    )
+                    ),
+                    CancellationToken.None
                 );
             }
 
@@ -620,7 +647,8 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                 string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
                     $"{(settings.DryRun ? "Would import" : "Imported")} {source}: {imported.Added.Count} added, {imported.Updated.Count} updated, {imported.Unchanged.Count} unchanged."
-                )
+                ),
+                CancellationToken.None
             );
             if (blueprints > 0)
             {
@@ -628,24 +656,26 @@ internal sealed partial class TaskCommandRunner(ProjectLifecycle lifecycle, Text
                     string.Create(
                         System.Globalization.CultureInfo.InvariantCulture,
                         $"Blueprints added or changed: {blueprints}"
-                    )
+                    ),
+                    CancellationToken.None
                 );
             }
 
             if (imported.Updated.Count > 0)
             {
-                await output.WriteLineAsync("Updated: " + string.Join(", ", imported.Updated));
+                await output.WriteLineAsync("Updated: " + string.Join(", ", imported.Updated), CancellationToken.None);
             }
 
             if (imported.Unlocked.Count > 0)
             {
-                await output.WriteLineAsync("Ready: " + string.Join(", ", imported.Unlocked));
+                await output.WriteLineAsync("Ready: " + string.Join(", ", imported.Unlocked), CancellationToken.None);
             }
 
             if (imported.Orphaned.Count > 0)
             {
                 await output.WriteLineAsync(
-                    "In the database but not in the file (kept): " + string.Join(", ", imported.Orphaned)
+                    "In the database but not in the file (kept): " + string.Join(", ", imported.Orphaned),
+                    CancellationToken.None
                 );
             }
         }

@@ -57,7 +57,7 @@ public sealed record MemoryScope(string Kind, string Value = "")
                 return this;
             case "path":
                 var path = Value.Replace('\\', '/');
-                if (path.Length is 0 || path.StartsWith('/'))
+                if (path.Length is 0 || path.StartsWith('/', StringComparison.Ordinal))
                 {
                     throw new ArgumentException(
                         "path scope must be a path relative to the project root, got " + MemoryText.Quote(Value)

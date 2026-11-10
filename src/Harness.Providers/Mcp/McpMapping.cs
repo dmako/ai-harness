@@ -94,7 +94,11 @@ internal static class McpMapping
                 continue;
             }
             var text = value.GetString()!;
-            if (text.StartsWith('{') && text.EndsWith('}') && text.Count(character => character is '{') is 1)
+            if (
+                text.StartsWith('{', StringComparison.Ordinal)
+                && text.EndsWith('}', StringComparison.Ordinal)
+                && text.Count(character => character is '{') is 1
+            )
             {
                 var name = text[1..^1];
                 var replacement = values.GetValueOrDefault(name, "");
@@ -421,7 +425,7 @@ internal static class McpMapping
     internal static string LastSegment(string text)
     {
         text = text.Trim();
-        var dot = text.LastIndexOf('.');
+        var dot = text.LastIndexOf('.', StringComparison.Ordinal);
         return
             text.Contains(' ', StringComparison.Ordinal)
             || text.Contains('\t', StringComparison.Ordinal)

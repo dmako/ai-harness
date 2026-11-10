@@ -471,7 +471,6 @@ public static class CloneSequences
         return differs;
     }
 
-
     private static bool Holds(CloneFunction function, int start, int length)
     {
         var last = function

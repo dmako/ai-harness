@@ -266,7 +266,15 @@ public sealed class SyncTests
                     return Task.FromResult(
                         new ProviderResult
                         {
-                            Items = [new() { Provider = "fixture", Tool = "cycles", Members = ["A", "B"] }],
+                            Items =
+                            [
+                                new()
+                                {
+                                    Provider = "fixture",
+                                    Tool = "cycles",
+                                    Members = ["A", "B"],
+                                },
+                            ],
                         }
                     );
                 }
@@ -663,7 +671,7 @@ internal sealed class SyncFixture : IDisposable
                     "Harness.Cli",
                     "bin",
                     Configuration,
-                    "net10.0",
+                    TestDirectory.TargetFramework,
                     "harness.dll"
                 ),
                 .. args,

@@ -28,7 +28,7 @@ public sealed class CliProcessTests
             "Harness.Cli",
             "bin",
             Configuration,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
         var start = new ProcessStartInfo("dotnet")

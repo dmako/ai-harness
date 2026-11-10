@@ -205,7 +205,10 @@ public sealed partial class WorkspaceEvidenceReader
         try
         {
             var (repository, ecosystem) = await RepositoryAsync(member, token).ConfigureAwait(false);
-            model = (new StackReader(repository, ecosystem).Read(), await BuildAsync(member, token).ConfigureAwait(false));
+            model = (
+                new StackReader(repository, ecosystem).Read(),
+                await BuildAsync(member, token).ConfigureAwait(false)
+            );
         }
         catch (Exception error) when (ReadError(error))
         { /* Missing members do not contribute invented stack or version evidence. */

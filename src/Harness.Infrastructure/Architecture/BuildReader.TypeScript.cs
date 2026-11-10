@@ -132,7 +132,7 @@ public sealed partial class BuildReader
             {
                 globs.Add(text[2..].Trim().Trim('\'', '"'));
             }
-            else if (inPackages && text.Length > 0 && !text.StartsWith('#'))
+            else if (inPackages && text.Length > 0 && !text.StartsWith('#', StringComparison.Ordinal))
             {
                 inPackages = false;
             }
@@ -186,7 +186,8 @@ public sealed partial class BuildReader
             return "test";
         }
 
-        return dir.StartsWith("apps/", StringComparison.Ordinal)
+        return
+            dir.StartsWith("apps/", StringComparison.Ordinal)
             || package.Private && package.Main.Length is 0 && !package.Bin
             ? "entry"
             : "library";
@@ -205,7 +206,7 @@ public sealed partial class BuildReader
         for (var index = 0; index < lines.Length; index++)
         {
             var line = lines[index].Trim();
-            if (line.StartsWith("//", StringComparison.Ordinal) || line.StartsWith('*'))
+            if (line.StartsWith("//", StringComparison.Ordinal) || line.StartsWith('*', StringComparison.Ordinal))
             {
                 continue;
             }
@@ -302,9 +303,7 @@ public sealed partial class BuildReader
                 .Select(name => new BuildPackage(
                     name,
                     Empty(
-                        PackageVersion(source, name) is { Length: > 0 } version
-                            ? version
-                            : PackageVersion(root, name)
+                        PackageVersion(source, name) is { Length: > 0 } version ? version : PackageVersion(root, name)
                     )
                 ))
         );
@@ -532,7 +531,12 @@ public sealed partial class BuildReader
                             (
                                 property.Name.TrimEnd('*'),
                                 Join(directory, path.TrimEnd('*')).TrimEnd('/')
-                                    + (path.EndsWith('*') || path.EndsWith('/') ? "/" : "")
+                                    + (
+                                        path.EndsWith('*', StringComparison.Ordinal)
+                                        || path.EndsWith('/', StringComparison.Ordinal)
+                                            ? "/"
+                                            : ""
+                                    )
                             )
                         );
                     }
@@ -569,7 +573,7 @@ public sealed partial class BuildReader
         HashSet<string> files
     )
     {
-        if (spec.StartsWith('.'))
+        if (spec.StartsWith('.', StringComparison.Ordinal))
         {
             return (Exists(Join(Directory(from), spec), files), "");
         }
@@ -595,7 +599,10 @@ public sealed partial class BuildReader
             }
         }
         var parts = spec.Split('/');
-        return ("", spec.StartsWith('@') && parts.Length > 1 ? parts[0] + "/" + parts[1] : parts[0]);
+        return (
+            "",
+            spec.StartsWith('@', StringComparison.Ordinal) && parts.Length > 1 ? parts[0] + "/" + parts[1] : parts[0]
+        );
     }
 
     private static string Exists(string path, HashSet<string> files)

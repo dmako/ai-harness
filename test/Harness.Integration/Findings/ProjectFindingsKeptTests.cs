@@ -18,7 +18,10 @@ public sealed class ProjectFindingsKeptTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private static string Cycle(string member) =>
-        Harness.Core.Architecture.ArchitectureAnalyzer.Key("cycle", [.. new[] { member, "B" }.Order(StringComparer.Ordinal)]);
+        Harness.Core.Architecture.ArchitectureAnalyzer.Key(
+            "cycle",
+            [.. new[] { member, "B" }.Order(StringComparer.Ordinal)]
+        );
 
     private static string Router(int branches) =>
         "namespace App;\npublic class Router\n{\n    public int Route(int a)\n    {\n"
@@ -50,7 +53,15 @@ public sealed class ProjectFindingsKeptTests
                     Task.FromResult(
                         new ProviderResult
                         {
-                            Items = [new() { Provider = "fixture", Tool = "cycles", Members = [answer, "B"] }],
+                            Items =
+                            [
+                                new()
+                                {
+                                    Provider = "fixture",
+                                    Tool = "cycles",
+                                    Members = [answer, "B"],
+                                },
+                            ],
                         }
                     )
             )
@@ -86,7 +97,9 @@ public sealed class ProjectFindingsKeptTests
         }
 
         await RecomputedAsync("the first sync computes them");
-        Stored().Should().Contain(finding => finding.StartsWith("complexity:Router.cs#Router.Route|", StringComparison.Ordinal));
+        Stored()
+            .Should()
+            .Contain(finding => finding.StartsWith("complexity:Router.cs#Router.Route|", StringComparison.Ordinal));
         Stored().Should().Contain(finding => finding.StartsWith(Cycle("A") + "|", StringComparison.Ordinal));
 
         fixture.Write("Router.cs", Router(25));
@@ -97,7 +110,12 @@ public sealed class ProjectFindingsKeptTests
         await RecomputedAsync("a branch switch");
         fixture.Write(".harness/config.toml", "[architecture.complexity]\nnote = 5\nwarn = 10\nproblem = 20\n");
         await RecomputedAsync("a threshold changed");
-        Stored().Should().Contain(finding => finding.StartsWith("complexity:Router.cs#Router.Route|", StringComparison.Ordinal) && finding.Contains("|problem|", StringComparison.Ordinal));
+        Stored()
+            .Should()
+            .Contain(finding =>
+                finding.StartsWith("complexity:Router.cs#Router.Route|", StringComparison.Ordinal)
+                && finding.Contains("|problem|", StringComparison.Ordinal)
+            );
         using (var db = fixture.Database())
         {
             new MemoryStore(db).Put(

@@ -59,7 +59,7 @@ internal static class HookExecution
                 var fallback = HookPayload.NativePath(Environment.GetEnvironmentVariable("CLAUDE_PROJECT_DIR") ?? ".");
                 var directory = call.Cwd.Length > 0 ? call.Cwd : fallback;
                 await ingestion.LocateAsync(directory, deadline.Token);
-                await output.WriteLineAsync(SessionContext);
+                await output.WriteLineAsync(SessionContext, CancellationToken.None);
             }
             else
             {

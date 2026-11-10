@@ -70,10 +70,12 @@ public sealed class EvidenceTests
         using var fixture = await WorkspaceFixture.CreateAsync();
         Seed(fixture);
         // a package the library publishes that no member uses
-        fixture.Repositories[0].Write(
-            "Unused/Unused.csproj",
-            "<Project><PropertyGroup><PackageId>Acme.Unused</PackageId><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
-        );
+        fixture
+            .Repositories[0]
+            .Write(
+                "Unused/Unused.csproj",
+                "<Project><PropertyGroup><PackageId>Acme.Unused</PackageId><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+            );
         async Task<IReadOnlyList<string>> UnusedAsync(IReadOnlyList<WorkspaceMember> members)
         {
             var evidence = new WorkspaceEvidenceReader(members, shared: true);
@@ -87,8 +89,7 @@ public sealed class EvidenceTests
                 },
                 Token
             );
-            return read
-                .Architecture!.Findings.Where(finding => finding.Kind is "unused")
+            return read.Architecture!.Findings.Where(finding => finding.Kind is "unused")
                 .Select(finding => finding.Title)
                 .ToArray();
         }

@@ -127,8 +127,8 @@ public static class RetrievalRanker
 
     internal static string Extension(string path)
     {
-        var name = path[(path.LastIndexOf('/') + 1)..];
-        var dot = name.LastIndexOf('.');
+        var name = path[(path.LastIndexOf('/', StringComparison.Ordinal) + 1)..];
+        var dot = name.LastIndexOf('.', StringComparison.Ordinal);
         return dot >= 0 ? name[dot..] : "";
     }
 

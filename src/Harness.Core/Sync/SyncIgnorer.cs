@@ -17,7 +17,7 @@ public sealed class SyncIgnorer
             )
             .ToArray();
         _matchers = _patterns
-            .Select(pattern => pattern.EndsWith('/') ? pattern[..^1] : pattern)
+            .Select(pattern => pattern.EndsWith('/', StringComparison.Ordinal) ? pattern[..^1] : pattern)
             .Distinct(StringComparer.Ordinal)
             .ToDictionary(pattern => pattern, Compile, StringComparer.Ordinal);
     }
@@ -47,7 +47,7 @@ public sealed class SyncIgnorer
         path = string.Join('/', segments);
         foreach (var pattern in _patterns)
         {
-            if (pattern.EndsWith('/'))
+            if (pattern.EndsWith('/', StringComparison.Ordinal))
             {
                 var directory = pattern[..^1];
                 if (path == directory || path.StartsWith(directory + "/", StringComparison.Ordinal))
@@ -124,7 +124,7 @@ public sealed class SyncIgnorer
                     regex.Append(Regex.Escape(pattern[i++].ToString()));
                     break;
                 case '[':
-                    var end = pattern.IndexOf(']', i);
+                    var end = pattern.IndexOf(']', i, StringComparison.Ordinal);
                     if (end < 0)
                     {
                         return null;

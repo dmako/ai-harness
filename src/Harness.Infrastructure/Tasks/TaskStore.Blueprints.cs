@@ -731,6 +731,7 @@ public sealed partial class TaskStore
             "DELETE FROM task_external_dependencies WHERE task_id=$id",
             "DELETE FROM task_acceptance WHERE task_id=$id",
             "DELETE FROM task_events WHERE task_id=$id",
+            "DELETE FROM agent_sessions WHERE task_id=$id",
             "DELETE FROM tasks WHERE id=$id",
         ];
         foreach (var id in ids)

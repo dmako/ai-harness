@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using Harness.Core.Projects;
 
 namespace Harness.Infrastructure.Git;
 
@@ -58,13 +59,19 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
         {
             throw new DirectoryNotFoundException("Git directory does not exist: " + path);
         }
+        var windows = OperatingSystem.IsWindows();
+        if (windows)
+        {
+            path = WindowsPaths.LongPath(path);
+        }
+
         var root = Path.GetPathRoot(path)!;
-        var resolved = root;
+        var resolved = windows ? DriveRoot(root) : root;
         foreach (
             var part in path[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
         )
         {
-            var directory = new DirectoryInfo(Path.Combine(resolved, part));
+            var directory = new DirectoryInfo(Path.Combine(resolved, windows ? OnDiskName(resolved, part) : part));
             if (directory.LinkTarget is null)
             {
                 resolved = directory.FullName;
@@ -81,6 +88,56 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
             resolved = PhysicalDirectory(target, remainingLinks - 1);
         }
         return resolved;
+    }
+
+    /// <summary>
+    /// Windows answers in the casing it was asked (c:\ stays c:\), but codebase-memory and other indexes record the
+    /// drive in upper case: one spelling keeps worktree records and provider lookups from splitting (TASK-0117).
+    /// </summary>
+    private static string DriveRoot(string root) =>
+        root.Length >= 2 && root[1] == ':' && char.IsAsciiLetterLower(root[0])
+            ? char.ToUpperInvariant(root[0]) + root[1..]
+            : root;
+
+    private static readonly EnumerationOptions ExactName = new()
+    {
+        MatchType = MatchType.Simple,
+        MatchCasing = MatchCasing.CaseInsensitive,
+        AttributesToSkip = 0,
+        IgnoreInaccessible = true,
+        RecurseSubdirectories = false,
+    };
+
+    /// <summary>The folder's name as stored on disk; the typed name when it cannot be read or names no folder.</summary>
+    private static string OnDiskName(string parent, string part)
+    {
+        if (part.AsSpan().IndexOfAny('*', '?') >= 0)
+        {
+            return part;
+        }
+
+        try
+        {
+            string? found = null;
+            foreach (
+                var name in new DirectoryInfo(parent).EnumerateDirectories(part, ExactName).Select(entry => entry.Name)
+            )
+            {
+                // A case-sensitive folder may hold both spellings: the typed one wins then.
+                if (string.Equals(name, part, StringComparison.Ordinal))
+                {
+                    return part;
+                }
+
+                found ??= name;
+            }
+
+            return found ?? part;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return part;
+        }
     }
 
     public Task<GitHead> ReadHeadAsync(CancellationToken cancellationToken = default)
@@ -118,15 +175,9 @@ public sealed partial record GitRepository(string Root, string GitDir, string Co
     }
 
     /// <summary>Compares paths as the file system does: ignoring case on Windows.</summary>
-    public static StringComparer PathComparer { get; } =
-        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+    public static StringComparer PathComparer => PathIdentity.Comparer;
 
-    public static bool PathEquals(string first, string second) =>
-        string.Equals(
-            Path.GetFullPath(first),
-            Path.GetFullPath(second),
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal
-        );
+    public static bool PathEquals(string first, string second) => PathIdentity.Same(first, second);
 
     /// <summary>Raised for every git process harness starts, with its root and arguments (tests count them).</summary>
     internal static event Action<string, IReadOnlyList<string>>? Started;

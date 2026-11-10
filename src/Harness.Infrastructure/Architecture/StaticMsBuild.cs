@@ -349,16 +349,14 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         bool conditional
     ) =>
         Split(include.Replace('\\', '/'))
-            .Select(path =>
-                new EvaluatedReference(
-                    repository.Relative(
-                        Path.GetFullPath(path, Path.GetDirectoryName(Path.Combine(repository.Root, project))!)
-                    ),
-                    at,
-                    [],
-                    conditional
-                )
-            );
+            .Select(path => new EvaluatedReference(
+                repository.Relative(
+                    Path.GetFullPath(path, Path.GetDirectoryName(Path.Combine(repository.Root, project))!)
+                ),
+                at,
+                [],
+                conditional
+            ));
 
     /// <summary>A package without a version takes the central one; a version still holding $( is unresolved.</summary>
     private static EvaluatedPackage Centrally(EvaluatedPackage package, Dictionary<string, string> central)
@@ -366,11 +364,7 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         var version = (
             package.Version.Length is 0 ? central.GetValueOrDefault(package.Name, "") : package.Version
         ).Trim();
-        return package with
-        {
-            Version = version,
-            Unresolved = version.Contains("$(", StringComparison.Ordinal),
-        };
+        return package with { Version = version, Unresolved = version.Contains("$(", StringComparison.Ordinal) };
     }
 
     internal XElement? Parse(string file)

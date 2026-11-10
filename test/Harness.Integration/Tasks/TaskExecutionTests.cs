@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using AwesomeAssertions;
+using Harness.Core.Hooks;
 using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Storage;
@@ -418,6 +419,37 @@ public sealed class TaskExecutionTests
     }
 
     [Fact]
+    public async Task TaskGetReturnsTheAgentSessionsThatWorkedOnTheTask()
+    {
+        using var state = new State();
+        state.Store.Import([Definition("T-1"), Definition("T-2")], "fixture", cancellationToken: Token);
+        var at = new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.Zero);
+        state.Store.RecordSession("claude-code", "s-1", "T-1", HookTaskActions.Claim, at, Token);
+        state.Store.RecordSession("claude-code", "s-1", "T-1", HookTaskActions.Complete, at.AddMinutes(12), Token);
+        await using var client = await StartAsync(state.Directory, "codex");
+        async Task<JsonElement> GetAsync(string id)
+        {
+            var result = await client.CallToolAsync(
+                "task_get",
+                new Dictionary<string, object?> { ["id"] = id },
+                cancellationToken: Token
+            );
+            result.IsError.Should().NotBe(true);
+            return result.StructuredContent!.Value;
+        }
+
+        var session = (await GetAsync("T-1")).GetProperty("sessions").EnumerateArray().Should().ContainSingle().Subject;
+        session.GetProperty("client").GetString().Should().Be("claude-code");
+        session.GetProperty("session_id").GetString().Should().Be("s-1");
+        session.GetProperty("origin").GetString().Should().Be("hook");
+        session.GetProperty("status").GetString().Should().Be("completed");
+        session.GetProperty("started_at").GetString().Should().Be("2026-11-08T10:00:00Z");
+        session.GetProperty("ended_at").GetString().Should().Be("2026-11-08T10:12:00Z");
+        session.TryGetProperty("cost_usd", out _).Should().BeFalse("no usage is known yet");
+        (await GetAsync("T-2")).TryGetProperty("sessions", out _).Should().BeFalse("no session worked on it");
+    }
+
+    [Fact]
     public async Task ProposedTaskKeepsItsBlueprintNamedByIdIgnoringCaseOrByTitleOnceApproved()
     {
         using var state = new State();
@@ -636,7 +668,7 @@ public sealed class TaskExecutionTests
                             "Harness.Cli",
                             "bin",
                             Configuration,
-                            "net10.0",
+                            TestDirectory.TargetFramework,
                             "harness.dll"
                         ),
                         "mcp",

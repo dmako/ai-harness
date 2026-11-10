@@ -70,7 +70,7 @@ internal sealed class UnixProviderProcess : IProviderProcess
             try
             {
                 Check(Native.posix_spawnattr_setpgroup(attributes.Pointer, 0));
-                Check(Native.posix_spawnattr_setflags(attributes.Pointer, 2)); // POSIX_SPAWN_SETPGROUP
+                Check(Native.posix_spawnattr_setflags(attributes.Pointer, SpawnFlags));
                 using var workingDirectory = new NativeMemory(directory);
                 Check(Native.posix_spawn_file_actions_addchdir_np(actions.Pointer, workingDirectory.Pointer));
                 using var input = Pipe();
@@ -154,10 +154,18 @@ internal sealed class UnixProviderProcess : IProviderProcess
         }
     }
 
+    /// <summary>
+    /// POSIX_SPAWN_SETPGROUP, and on macOS POSIX_SPAWN_CLOEXEC_DEFAULT: the child gets only the descriptors dup2'd for it,
+    /// never another thread's pipe caught between pipe() and fcntl(FD_CLOEXEC) (macOS has no pipe2). An inherited pipe
+    /// end held by a long-lived child keeps a client's standard input from ever reaching end of file.
+    /// </summary>
+    internal static short SpawnFlags => (short)(OperatingSystem.IsMacOS() ? 0x4002 : 0x0002);
+
     private static PipePair Pipe()
     {
         var descriptors = new int[2];
-        if (Native.pipe(descriptors) is not 0)
+        // Linux creates both ends close-on-exec atomically (O_CLOEXEC); elsewhere fcntl follows.
+        if (OperatingSystem.IsLinux() ? Native.pipe2(descriptors, 0x80000) is not 0 : Native.pipe(descriptors) is not 0)
         {
             throw new Win32Exception(Marshal.GetLastPInvokeError());
         }
@@ -305,6 +313,10 @@ internal sealed class UnixProviderProcess : IProviderProcess
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         [DllImport(LibC, SetLastError = true)]
         internal static extern int pipe([Out] int[] descriptors);
+
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        [DllImport(LibC, SetLastError = true)]
+        internal static extern int pipe2([Out] int[] descriptors, int flags);
 
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         [DllImport(LibC, SetLastError = true)]

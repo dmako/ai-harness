@@ -136,6 +136,16 @@ public static partial class ConfigurationExample
                 new("index", "[\"$INDEX_DIR\", \"~/.cache/indexes\"]", "where its indexes are; a change asks again"),
             ]
         ),
+        new(
+            "pricing.<model>",
+            "a model's API price, US$ per million tokens (Claude models are built in)",
+            [
+                new("input", "1.25"),
+                new("cached_input", "0.125", "left out: the built-in price, else the input price"),
+                new("cache_write", "1.25"),
+                new("output", "10.0"),
+            ]
+        ),
     ];
 
     /// <summary>
@@ -144,7 +154,9 @@ public static partial class ConfigurationExample
     /// </summary>
     internal static IReadOnlyList<(string Pattern, IReadOnlyList<string>? Keys)> Schema { get; } =
     [
-        ("", ["storage", "log", "sync", "architecture", "providers"]),
+        ("", ["storage", "log", "sync", "architecture", "providers", "pricing"]),
+        ("pricing", null),
+        ("pricing.*", ["input", "cached_input", "cache_write", "output"]),
         ("storage", ["db_path", "busy_timeout_ms"]),
         ("log", ["level"]),
         ("sync", ["ignore"]),

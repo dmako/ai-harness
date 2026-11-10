@@ -48,7 +48,8 @@ public sealed class ManifestReaderTests
         {
             ["Directory.Build.props"] =
                 """<Project><PropertyGroup><LangVersion>latest</LangVersion></PropertyGroup><Import Project="build/common.props" /></Project>""",
-            ["build/common.props"] = """<Project><PropertyGroup><Nullable>enable</Nullable></PropertyGroup></Project>""",
+            ["build/common.props"] =
+                """<Project><PropertyGroup><Nullable>enable</Nullable></PropertyGroup></Project>""",
             ["Directory.Packages.props"] =
                 """<Project><ItemGroup><PackageVersion Include="Serilog" Version="4.0.0" /></ItemGroup></Project>""",
         };

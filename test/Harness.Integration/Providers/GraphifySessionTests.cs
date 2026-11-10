@@ -337,7 +337,7 @@ public sealed class GraphifySessionTests
             "Harness.Graphify",
             "bin",
             build,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness-graphify.dll"
         );
         var fake = Path.ChangeExtension(ProviderFixture.Worker, ".exe");

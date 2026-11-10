@@ -283,7 +283,11 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
         && !nested.Any(prefix => file.StartsWith(prefix, StringComparison.Ordinal))
         && !Directory(file)
             .Split('/')
-            .Any(part => part is "vendor" or "testdata" || part.StartsWith('.') || part.StartsWith('_'));
+            .Any(part =>
+                part is "vendor" or "testdata"
+                || part.StartsWith('.', StringComparison.Ordinal)
+                || part.StartsWith('_', StringComparison.Ordinal)
+            );
 
     /// <summary>Reads a file's package clause and imports, stopping at its first declaration.</summary>
     private void ReadGoFile(GoModule module, string file)
@@ -441,7 +445,7 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
     private static bool DotnetSkipped(string file) =>
         file.Split('/')
             .Any(part =>
-                part.StartsWith('.')
+                part.StartsWith('.', StringComparison.Ordinal)
                 || part is "bin" or "obj" or "node_modules" or "packages" or "artifacts" or "TestResults" or "vendor"
             );
 }

@@ -175,7 +175,7 @@ public static class MemoryText
         {
             if (rune.Value is '_' or >= '0' and <= '9' or >= 'a' and <= 'z' or >= 'A' and <= 'Z' or > 127)
             {
-                word.Append(rune.ToString());
+                word.Append(rune);
             }
             else
             {
@@ -219,7 +219,7 @@ public static class MemoryText
         {
             if (UnicodeCharacters.IsLetterOrDigit(rune))
             {
-                word.Append(rune.ToString());
+                word.Append(rune);
             }
             else
             {
@@ -260,7 +260,7 @@ public static class MemoryText
         var result = new StringBuilder(text.Length);
         foreach (var rune in text.EnumerateRunes())
         {
-            result.Append(UnicodeCharacters.ToLower(rune).ToString());
+            result.Append(UnicodeCharacters.ToLower(rune));
         }
 
         return result.ToString();

@@ -33,7 +33,7 @@ public sealed class ProviderFacadeProcessTests
             "Harness.Cli",
             "bin",
             workerDirectory,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
         var options = new StdioClientTransportOptions

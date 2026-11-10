@@ -65,9 +65,7 @@ public sealed partial class FindingSets(
         }
         else if (read.Architecture is not null)
         {
-            found.AddRange(
-                await SyncedAsync(reader, own, stored, providers, refreshed, token).ConfigureAwait(false)
-            );
+            found.AddRange(await SyncedAsync(reader, own, stored, providers, refreshed, token).ConfigureAwait(false));
         }
         return (FindingStore.Merge(found), read.Architecture is not null);
     }
@@ -87,13 +85,16 @@ public sealed partial class FindingSets(
         try
         {
             var here = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var comparison = OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
             if (
-                Projects.ProjectStore.Worktrees(database)
+                Projects
+                    .ProjectStore.Worktrees(database)
                     .FirstOrDefault(tree =>
                         string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(tree.Path)), here, comparison)
-                    )
-                is { } worktree
+                    ) is
+                { } worktree
             )
             {
                 cache.Record(root, Sync.SyncStore.FileHashes(database, worktree.Id));

@@ -65,7 +65,11 @@ public sealed class ContextTools(
         }
 
         var path = String(arguments, "path");
-        if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal) || System.IO.Path.IsPathRooted(path))
+        if (
+            path.StartsWith('/', StringComparison.Ordinal)
+            || path.Contains("..", StringComparison.Ordinal)
+            || System.IO.Path.IsPathRooted(path)
+        )
         {
             throw new ArgumentException("path must be relative to the project root");
         }

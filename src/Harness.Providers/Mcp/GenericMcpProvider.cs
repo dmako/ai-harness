@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Harness.Core.Memory;
+using Harness.Core.Projects;
 using Harness.Core.Providers;
 using ModelContextProtocol.Protocol;
 
@@ -553,7 +554,12 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         {
             var root = McpMapping.String(entry.Field(mapping.Match));
             var value = McpMapping.String(entry.Field(mapping.Value));
-            if (root.Length > 0 && value.Length > 0 && Canonical(root) == _canonicalRoot)
+            // The provider may record another spelling of the same path (C:/ for c:\ on Windows).
+            if (
+                root.Length > 0
+                && value.Length > 0
+                && string.Equals(Canonical(root), _canonicalRoot, PathIdentity.Comparison)
+            )
             {
                 Volatile.Write(ref _project, value);
                 _notIndexed?.Forget(Name, _canonicalRoot);
@@ -612,7 +618,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
     {
         foreach (var entry in _configuration.Resolve?.Index ?? [])
         {
-            var value = entry.StartsWith('$') ? Variable(entry[1..]) : entry;
+            var value = entry.StartsWith('$', StringComparison.Ordinal) ? Variable(entry[1..]) : entry;
             if (string.IsNullOrWhiteSpace(value))
             {
                 continue;

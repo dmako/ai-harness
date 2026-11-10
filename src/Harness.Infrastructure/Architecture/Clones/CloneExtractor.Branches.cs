@@ -96,12 +96,7 @@ public sealed partial class CloneExtractor
     }
 
     /// <summary>One choice per comma-separated value from <paramref name="start"/> up to the case's ':'.</summary>
-    private static void AddCaseChoices(
-        List<CodeToken> tokens,
-        int start,
-        int end,
-        List<IReadOnlyList<string>> choices
-    )
+    private static void AddCaseChoices(List<CodeToken> tokens, int start, int end, List<IReadOnlyList<string>> choices)
     {
         var stop = start;
         while (stop < end && tokens[stop].Text is not ":")

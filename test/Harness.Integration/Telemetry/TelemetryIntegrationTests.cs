@@ -129,7 +129,7 @@ public sealed class TelemetryIntegrationTests
             "Harness.Cli",
             "bin",
             Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
@@ -206,14 +206,14 @@ public sealed class TelemetryIntegrationTests
     public async Task WriterErrorsAreContainedAndOldSchemasAreNotMigrated()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Sql("DELETE FROM schema_migrations WHERE version=25; DROP TABLE tool_calls");
+        fixture.Sql("DELETE FROM schema_migrations WHERE version=27; DROP TABLE tool_calls");
         var recorder = new TelemetryRecorder(fixture.DatabasePath, 0);
         recorder.Observe(new ToolObservation(DateTimeOffset.UtcNow, "ping", "", "codex", 1, 1, false));
         await recorder.DisposeAsync();
         recorder.Failures.Should().Be(1);
         recorder.Observe(new ToolObservation(DateTimeOffset.UtcNow, "ping", "", "codex", 1, 1, false));
         using var database = HarnessDatabase.OpenReadOnly(fixture.DatabasePath);
-        database.SchemaVersion().Should().Be(24);
+        database.SchemaVersion().Should().Be(26);
     }
 
     [Fact]

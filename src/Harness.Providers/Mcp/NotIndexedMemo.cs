@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Harness.Core.Projects;
 
 namespace Harness.Providers.Mcp;
 
@@ -32,7 +33,7 @@ public sealed class NotIndexedMemo(string directory, TimeProvider? clock = null)
             if (
                 node is null
                 || (string?)node["fingerprint"] != fingerprint
-                || (string?)node["root"] != root
+                || !string.Equals((string?)node["root"], root, PathIdentity.Comparison)
                 || !DateTimeOffset.TryParse(
                     (string?)node["at"],
                     CultureInfo.InvariantCulture,
@@ -129,11 +130,15 @@ public sealed class NotIndexedMemo(string directory, TimeProvider? clock = null)
         || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
         || name.EndsWith(".lock", StringComparison.OrdinalIgnoreCase);
 
-    private string PathFor(string provider, string root) =>
-        Path.Combine(
+    /// <summary>One file per provider and repository, whichever spelling of the root (c:\ or C:\ on Windows).</summary>
+    private string PathFor(string provider, string root)
+    {
+        var key = OperatingSystem.IsWindows() ? root.ToUpperInvariant() : root;
+        return Path.Combine(
             directory,
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(provider + "\n" + root)))[..32] + ".json"
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(provider + "\n" + key)))[..32] + ".json"
         );
+    }
 
     private static void TryDelete(string path)
     {

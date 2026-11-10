@@ -1,6 +1,6 @@
 # Harness documentation
 
-Harness is a local .NET 10 application that shares project knowledge, tasks and
+Harness is a local .NET 11 application that shares project knowledge, tasks and
 code evidence between agents and a browser UI. Start with the embedded
 [usage guide](../src/Harness.Web/Documentation/guide.md) and
 [command reference](../src/Harness.Web/Documentation/reference.md).

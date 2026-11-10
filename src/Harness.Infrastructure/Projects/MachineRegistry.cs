@@ -121,10 +121,7 @@ public sealed partial class MachineRegistry(string path)
     public async Task<JsonObject> RenameAsync(string id, string? name, string? title, CancellationToken token = default)
     {
         name = name?.Trim();
-        if (
-            name is { Length: > 0 }
-            && !ProjectName.IsMatch(name)
-        )
+        if (name is { Length: > 0 } && !ProjectName.IsMatch(name))
         {
             throw new InvalidOperationException(
                 "short name " + HarnessJson.Serialize(name) + ": use letters, digits, '.', '_' or '-' (max 64)"

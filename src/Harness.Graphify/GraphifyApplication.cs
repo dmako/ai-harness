@@ -23,7 +23,7 @@ public static partial class GraphifyApplication
             var (options, clean, help) = Parse(args);
             if (help)
             {
-                await error.WriteLineAsync(Usage);
+                await error.WriteLineAsync(Usage, CancellationToken.None);
                 return 0;
             }
             await using var sessions = new GraphifySessionManager(options);
@@ -34,7 +34,8 @@ public static partial class GraphifyApplication
                 await using var writer = new StreamWriter(output, leaveOpen: true);
                 await writer
                     .WriteLineAsync(
-                        "removed " + count.ToString(CultureInfo.InvariantCulture) + " stale session record(s)"
+                        "removed " + count.ToString(CultureInfo.InvariantCulture) + " stale session record(s)",
+                        CancellationToken.None
                     )
                     .ConfigureAwait(false);
                 return 0;
@@ -59,7 +60,8 @@ public static partial class GraphifyApplication
             )
         {
             await error.WriteLineAsync(
-                "harness-graphify: " + Harness.Core.Memory.CredentialRedactor.Redact(exception.Message)
+                "harness-graphify: " + Harness.Core.Memory.CredentialRedactor.Redact(exception.Message),
+                CancellationToken.None
             );
             return 1;
         }
@@ -129,8 +131,11 @@ public static partial class GraphifyApplication
 
     private static TimeSpan Duration(string value)
     {
-        var sign = value.StartsWith('-') ? -1 : 1;
-        var remaining = value.StartsWith('-') || value.StartsWith('+') ? value[1..] : value;
+        var sign = value.StartsWith('-', StringComparison.Ordinal) ? -1 : 1;
+        var remaining =
+            value.StartsWith('-', StringComparison.Ordinal) || value.StartsWith('+', StringComparison.Ordinal)
+                ? value[1..]
+                : value;
         if (remaining is "0")
         {
             return TimeSpan.Zero;

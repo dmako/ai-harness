@@ -82,14 +82,27 @@ public static class ProjectStore
                         ("$stamp", stamp)
                     );
                 }
+                else if (
+                    !string.Equals(project.Root, repository.StateRoot, StringComparison.Ordinal)
+                    || !string.Equals(project.DatabasePath, database.Path, StringComparison.Ordinal)
+                )
+                {
+                    // The same place spelled in another case (c:\ for C:\): not a move, only the spelling is fixed.
+                    project = project with
+                    {
+                        Root = repository.StateRoot,
+                        DatabasePath = database.Path,
+                    };
+                    Execute(
+                        connection,
+                        transaction,
+                        "UPDATE projects SET root_path=$root, db_path=$db",
+                        ("$root", project.Root),
+                        ("$db", project.DatabasePath)
+                    );
+                }
 
-                using var find = Command(
-                    connection,
-                    transaction,
-                    "SELECT id FROM worktrees WHERE git_dir=$dir",
-                    ("$dir", repository.GitDir)
-                );
-                var id = find.ExecuteScalar() as string;
+                var id = AdoptWorktree(connection, transaction, repository.GitDir);
                 var worktree = new WorktreeIdentity(
                     id ?? NewId("wt"),
                     repository.Root,
@@ -105,7 +118,7 @@ public static class ProjectStore
                     """
                     INSERT INTO worktrees(id, project_id, git_dir, path, linked, branch, head_commit, detached, first_seen_at, last_seen_at)
                     VALUES ($id, $project, $dir, $path, $linked, $branch, $head, $detached, $stamp, $stamp)
-                    ON CONFLICT(git_dir) DO UPDATE SET path=$path, linked=$linked, branch=$branch, head_commit=$head, detached=$detached, last_seen_at=$stamp
+                    ON CONFLICT(id) DO UPDATE SET git_dir=$dir, path=$path, linked=$linked, branch=$branch, head_commit=$head, detached=$detached, last_seen_at=$stamp
                     """,
                     ("$id", worktree.Id),
                     ("$project", project.Id),
@@ -178,6 +191,54 @@ public static class ProjectStore
             copiedFrom,
             reader.GetString(4)
         );
+    }
+
+    /// <summary>
+    /// The id of the worktree recorded for this Git directory, or null for a new one. Earlier versions kept the casing
+    /// a client typed, so Windows may hold one row per spelling (c:\ and C:\, TASK-0117): the oldest row is kept, the
+    /// others go with their sync state, and their telemetry moves to the kept row.
+    /// </summary>
+    private static string? AdoptWorktree(SqliteConnection connection, SqliteTransaction transaction, string gitDir)
+    {
+        List<(string Id, string GitDir, string FirstSeen)> rows = [];
+        using (var find = Command(connection, transaction, "SELECT id, git_dir, first_seen_at FROM worktrees"))
+        {
+            using var reader = find.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+        }
+
+        var same = rows.Where(row => PathIdentity.Comparer.Equals(row.GitDir, gitDir))
+            .OrderBy(row => row.FirstSeen, StringComparer.Ordinal)
+            .ThenBy(row => row.Id, StringComparer.Ordinal)
+            .ToArray();
+        if (same.Length is 0)
+        {
+            return null;
+        }
+
+        var kept = same[0].Id;
+        foreach (var other in same.Skip(1))
+        {
+            Execute(
+                connection,
+                transaction,
+                """
+                DELETE FROM files WHERE worktree_id=$wt;
+                DELETE FROM sync_state WHERE worktree_id=$wt;
+                DELETE FROM sync_runs WHERE worktree_id=$wt;
+                UPDATE context_calls SET worktree_id=$kept WHERE worktree_id=$wt;
+                UPDATE tool_events SET worktree_id=$kept WHERE worktree_id=$wt;
+                DELETE FROM worktrees WHERE id=$wt;
+                """,
+                ("$wt", other.Id),
+                ("$kept", kept)
+            );
+        }
+
+        return kept;
     }
 
     private static string NewId(string prefix) =>

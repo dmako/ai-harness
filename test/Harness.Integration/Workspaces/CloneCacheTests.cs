@@ -22,7 +22,10 @@ public sealed class CloneCacheTests
         fixture.Write("src/a.cs", Account);
         fixture.Write("src/b.cs", Account.Replace("class A", "class B", StringComparison.Ordinal));
         fixture.Write("src/c.cs", "class C { public int Twice(int x) { if (x > 0) { return x * 2; } return 0; } }");
-        fixture.Write("pkg/one.go", "package pkg\n\nfunc One(x int) int {\n\tif x > 1 {\n\t\treturn x\n\t}\n\treturn Two(x)\n}\n");
+        fixture.Write(
+            "pkg/one.go",
+            "package pkg\n\nfunc One(x int) int {\n\tif x > 1 {\n\t\treturn x\n\t}\n\treturn Two(x)\n}\n"
+        );
         fixture.Write("pkg/two.go", "package pkg\n\nfunc Two(x int) int {\n\treturn x + 1\n}\n");
         await fixture.CommitAsync("sources");
         var cache = new CloneCache(Path.Combine(fixture.DirectoryRoot, "cache"));
@@ -90,7 +93,10 @@ public sealed class CloneCacheTests
         removed.Extractor.Extract().Should().NotContain(function => function.Path == "src/b.cs");
     }
 
-    private static string[] Show(IReadOnlyList<Harness.Core.Architecture.ArchitectureFinding> findings, CloneExtractor extractor) =>
+    private static string[] Show(
+        IReadOnlyList<Harness.Core.Architecture.ArchitectureFinding> findings,
+        CloneExtractor extractor
+    ) =>
         findings
             .Select(f => string.Join('|', f.Kind, f.Key, f.Title, f.Why, f.Rank, string.Join(';', f.Evidence ?? [])))
             .Concat(extractor.Complexity().Select(member => member.ToString()))

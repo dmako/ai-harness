@@ -395,7 +395,15 @@ public static class ReportAnalyzer
                 CultureInfo.InvariantCulture,
                 $", but not in the {after} calls since {Day(last)}: resolved"
             );
-            return new("info", ReportAudience.User, "providers", message, "nothing to do while it stays clean", history, trend);
+            return new(
+                "info",
+                ReportAudience.User,
+                "providers",
+                message,
+                "nothing to do while it stays clean",
+                history,
+                trend
+            );
         }
 
         if (after > 0)

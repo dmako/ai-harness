@@ -30,8 +30,14 @@ public sealed class MarkDoc
 internal static class AotCheck
 {
 #if PRESERVE
-    [System.Diagnostics.CodeAnalysis.DynamicDependency(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.All, typeof(FindingDoc))]
-    [System.Diagnostics.CodeAnalysis.DynamicDependency(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.All, typeof(MarkDoc))]
+    [System.Diagnostics.CodeAnalysis.DynamicDependency(
+        System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.All,
+        typeof(FindingDoc)
+    )]
+    [System.Diagnostics.CodeAnalysis.DynamicDependency(
+        System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.All,
+        typeof(MarkDoc)
+    )]
 #endif
     public static int Run()
     {
@@ -41,7 +47,11 @@ internal static class AotCheck
         try
         {
             using var db = new LiteDatabase(
-                new ConnectionString { Filename = Path.Combine(directory, "aot.db"), Connection = ConnectionType.Shared }
+                new ConnectionString
+                {
+                    Filename = Path.Combine(directory, "aot.db"),
+                    Connection = ConnectionType.Shared,
+                }
             );
             var seen = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);
 
@@ -79,7 +89,9 @@ internal static class AotCheck
                     var col = db.GetCollection("manual");
                     var found = col.Find(BsonExpression.Create("$.kind = @0 AND $.measure >= @1", "complexity", 5))
                         .ToList();
-                    return found.Count == 3 ? $"{found.Count} documents" : throw new InvalidOperationException("" + found.Count);
+                    return found.Count == 3
+                        ? $"{found.Count} documents"
+                        : throw new InvalidOperationException("" + found.Count);
                 }
             );
 
@@ -108,7 +120,9 @@ internal static class AotCheck
                         rows.Add(reader.Current.ToString());
                     }
 
-                    return rows.Count == 2 ? string.Join(" ", rows) : throw new InvalidOperationException(rows.Count + "");
+                    return rows.Count == 2
+                        ? string.Join(" ", rows)
+                        : throw new InvalidOperationException(rows.Count + "");
                 }
             );
 
@@ -151,7 +165,8 @@ internal static class AotCheck
                 "typed LINQ predicate Find(x => x.Kind == \"cycle\" && x.Measure > 3)",
                 () =>
                 {
-                    var found = db.GetCollection<FindingDoc>("typed").Find(x => x.Kind == "cycle" && x.Measure > 3)
+                    var found = db.GetCollection<FindingDoc>("typed")
+                        .Find(x => x.Kind == "cycle" && x.Measure > 3)
                         .ToList();
                     return found.Count == 1 ? "1 document" : throw new InvalidOperationException("" + found.Count);
                 }
@@ -195,7 +210,10 @@ internal static class AotCheck
             db.Dispose();
             foreach (var shared in new[] { false, true })
             {
-                failures += EngineSteps(Path.Combine(directory, shared ? "engine-shared.db" : "engine-direct.db"), shared);
+                failures += EngineSteps(
+                    Path.Combine(directory, shared ? "engine-shared.db" : "engine-direct.db"),
+                    shared
+                );
             }
         }
         catch (Exception error)
@@ -213,8 +231,7 @@ internal static class AotCheck
         }
 
         Console.WriteLine(
-            $"{failures} failure(s); LiteDB {typeof(LiteDatabase).Assembly.GetName().Version}; "
-                + $"{Runtime.Mode}"
+            $"{failures} failure(s); LiteDB {typeof(LiteDatabase).Assembly.GetName().Version}; " + $"{Runtime.Mode}"
         );
         return failures;
     }
@@ -255,7 +272,8 @@ internal static class AotCheck
             () =>
             {
                 var back = findings.FindById("key:3")!;
-                return back.Key == "key:3"
+                return
+                    back.Key == "key:3"
                     && back.Units.SequenceEqual(["A", "B3"])
                     && back.LastSeen == seen.AddMinutes(3)
                     && back.LastSeen.Offset == TimeSpan.Zero
@@ -305,8 +323,10 @@ internal static class AotCheck
                 inner = inner.InnerException;
             }
 
-            Console.WriteLine($"FAIL  {name}: {error.GetType().Name}: {error.Message}"
-                + (ReferenceEquals(inner, error) ? "" : $" <- {inner.GetType().Name}: {inner.Message}"));
+            Console.WriteLine(
+                $"FAIL  {name}: {error.GetType().Name}: {error.Message}"
+                    + (ReferenceEquals(inner, error) ? "" : $" <- {inner.GetType().Name}: {inner.Message}")
+            );
             return 1;
         }
     }

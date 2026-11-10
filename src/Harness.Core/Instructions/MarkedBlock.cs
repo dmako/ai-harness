@@ -24,7 +24,7 @@ public sealed record MarkedBlock(string Begin, string End, string What)
             throw new InvalidDataException(What + " markers are unbalanced or duplicated; fix the file by hand");
         }
 
-        return (source.LastIndexOf('\n', start) + 1, end + End.Length);
+        return (source.LastIndexOf('\n', start, StringComparison.Ordinal) + 1, end + End.Length);
     }
 
     public TextEdit Put(string source, string block)

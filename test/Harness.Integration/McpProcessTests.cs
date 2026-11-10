@@ -81,7 +81,7 @@ public sealed class McpProcessTests
             }
 
             using var database = HarnessDatabase.OpenReadOnly(path);
-            database.SchemaVersion().Should().Be(25);
+            database.SchemaVersion().Should().Be(27);
             database.GetDiagnostic("Unicode 🧪").Should().Be("žluťoučký");
             errors.Should().NotContain(line => line.Contains("Unhandled exception", StringComparison.Ordinal));
         }
@@ -105,6 +105,14 @@ public sealed class McpProcessTests
 #else
         const string Configuration = "Release";
 #endif
-        return Path.Combine(directory.FullName, "src", "Harness.Cli", "bin", Configuration, "net10.0", "harness.dll");
+        return Path.Combine(
+            directory.FullName,
+            "src",
+            "Harness.Cli",
+            "bin",
+            Configuration,
+            TestDirectory.TargetFramework,
+            "harness.dll"
+        );
     }
 }

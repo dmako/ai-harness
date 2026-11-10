@@ -71,10 +71,14 @@ public sealed class WorkspaceFindingsSyncTests
         await StoredAreFullAsync();
 
         // Nothing changed: another member's sync keeps them.
-        (await SyncAsync(1)).Workspace.Kept.Should().Be(first.Result.Found);
+        (await SyncAsync(1))
+            .Workspace.Kept.Should()
+            .Be(first.Result.Found);
 
         // An uncommitted edit in a member, not yet synced there.
-        fixture.Repositories[2].Write("appsettings.json", """{"ConnectionStrings":{"Main":"Server=db;Database=own"}}""");
+        fixture
+            .Repositories[2]
+            .Write("appsettings.json", """{"ConnectionStrings":{"Main":"Server=db;Database=own"}}""");
         (await SyncAsync(0)).Workspace.Kept.Should().BeNull();
         await StoredAreFullAsync();
         (await SyncAsync(0)).Workspace.Kept.Should().NotBeNull();
@@ -110,11 +114,20 @@ public sealed class WorkspaceFindingsSyncTests
         }
 
         (await SyncAsync(0)).Workspace.Kept.Should().BeNull();
-        fixture.Repositories[2].Write("appsettings.json", """{"ConnectionStrings":{"Main":"Server=db;Database=shared"}}""");
+        fixture
+            .Repositories[2]
+            .Write("appsettings.json", """{"ConnectionStrings":{"Main":"Server=db;Database=shared"}}""");
         (await SyncAsync(0)).Workspace.Kept.Should().BeNull();
         await StoredAreFullAsync();
     }
 
     private static string Show(ArchitectureFinding finding) =>
-        string.Join('|', finding.Kind, finding.Key, finding.Title, finding.Level, string.Join(';', finding.Evidence ?? []));
+        string.Join(
+            '|',
+            finding.Kind,
+            finding.Key,
+            finding.Title,
+            finding.Level,
+            string.Join(';', finding.Evidence ?? [])
+        );
 }

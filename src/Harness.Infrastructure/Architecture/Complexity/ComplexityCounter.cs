@@ -266,7 +266,7 @@ internal static partial class ComplexityCounter
         int index;
         if (language is "typescript")
         {
-            if (!text.StartsWith('`'))
+            if (!text.StartsWith('`', StringComparison.Ordinal))
             {
                 return 0;
             }

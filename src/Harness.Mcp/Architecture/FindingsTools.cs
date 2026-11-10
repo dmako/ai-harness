@@ -287,7 +287,7 @@ public static class FindingsTools
         var folder =
             Path.GetExtension(project).EndsWith("proj", StringComparison.Ordinal)
             || Path.GetExtension(project) is ".json"
-                ? project[..Math.Max(0, project.LastIndexOf('/'))]
+                ? project[..Math.Max(0, project.LastIndexOf('/', StringComparison.Ordinal))]
                 : project;
         if (Under(project) || Under(folder))
         {

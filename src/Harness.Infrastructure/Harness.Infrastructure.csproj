@@ -7,5 +7,6 @@
     <InternalsVisibleTo Include="Harness.Integration" />
     <EmbeddedResource Include="Storage/Migrations/*.sql" LogicalName="Harness.Migrations.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Configuration/Packs/*.toml" LogicalName="Harness.Packs.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Configuration/Pricing/pricing.toml" LogicalName="Harness.Pricing.toml" />
   </ItemGroup>
 </Project>

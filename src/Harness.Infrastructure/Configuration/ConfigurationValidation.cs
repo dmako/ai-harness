@@ -61,6 +61,13 @@ internal static class ConfigurationValidation
         {
             ValidateProvider($"providers.{name}", provider);
         }
+        foreach (var (model, price) in configuration.Pricing.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            Require(
+                new[] { price.Input, price.CachedInput, price.CacheWrite, price.Output }.All(v => v is null or >= 0),
+                $"pricing.{model}: prices must be >= 0"
+            );
+        }
     }
 
     private static void ValidateComplexity(ComplexityConfiguration complexity)

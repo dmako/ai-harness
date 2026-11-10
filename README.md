@@ -15,9 +15,9 @@ Code and Codex, with an embedded web UI.
 Intel macOS (`osx-x64`) is no longer supported.
 
 Extract the main archive into one directory and put that directory on your PATH.
-Keep the included SQLite native library beside `harness` and `harness-graphify`
+Keep the included SQLite native library beside `harness`, `harness-graphify` and `harness-agents`
 (`e_sqlite3.dll`, `libe_sqlite3.so`, or `libe_sqlite3.dylib`). These are trimmed
-Native AOT .NET 10 executables: no preinstalled .NET, Node, or
+Native AOT .NET 11 executables: no preinstalled .NET, Node, or
 Python runtime is required for the core. Git is required for sync/history.
 Optional provider backends have their own prerequisites. The separate
 developer-tools archive contains `harness-collect` and `harness-share`.
@@ -63,13 +63,13 @@ quarantine and block them until you explicitly trust them.
 Verify the download against `SHA256SUMS`. After attempting to run a trusted
 binary, open **System Settings > Privacy & Security > Open Anyway**, then confirm
 **Open**, as described in [Apple's instructions](https://support.apple.com/en-us/102445).
-Repeat for `harness-graphify` if it is blocked separately.
+Repeat for `harness-graphify` and `harness-agents` if they are blocked separately.
 
 For trusted command-line downloads, you can instead remove the quarantine
 attribute from the specific extracted binaries:
 
 ```shell
-xattr -d com.apple.quarantine ./harness ./harness-graphify ./libe_sqlite3.dylib
+xattr -d com.apple.quarantine ./harness ./harness-graphify ./harness-agents ./libe_sqlite3.dylib
 ```
 
 Apply the same per-file step to `harness-collect` or `harness-share` if you use

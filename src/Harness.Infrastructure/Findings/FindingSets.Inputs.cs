@@ -55,7 +55,9 @@ public sealed partial class FindingSets
 
             var git = await GitRepository.DiscoverAsync(root, token).ConfigureAwait(false);
             var here = Path.TrimEndingDirectorySeparator(Path.GetFullPath(git.Root));
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var comparison = OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
             var worktree = Projects
                 .ProjectStore.Worktrees(database)
                 .FirstOrDefault(tree =>
@@ -186,7 +188,8 @@ public sealed partial class FindingSets
     private static string? StoredInputs(string path)
     {
         var stored = WorkspaceInputs.Stored(path)?.Split(' ');
-        return stored is [var fingerprint, var at]
+        return
+            stored is [var fingerprint, var at]
             && DateTimeOffset.TryParse(at, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var taken)
             && DateTimeOffset.UtcNow - taken is var age
             && age >= TimeSpan.Zero

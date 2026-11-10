@@ -1,0 +1,16 @@
+server: fake MCP server, 4096 B answer (fake 1.0.0); tool grep {"pattern":"x","limit":20}
+connect 52.7 ms, tools/list 0.9 ms (3 tools); AIFunction answer type: Microsoft.Extensions.AI.TextContent
+rounds 1000 (after 100 warm-up), 24 CPUs
+method      | median us |   p90 us |  mean us | alloc B/call | answer chars
+current     |       121 |      245 |      151 |       43,356 |        4,105
+aifunction  |       122 |      234 |      149 |       43,323 |        4,105
+middleware  |       125 |      238 |      151 |       43,650 |        4,105
+
+server: fake MCP server, 65536 B answer (fake 1.0.0); tool grep {"pattern":"x","limit":20}
+connect 50.2 ms, tools/list 0.8 ms (3 tools); AIFunction answer type: Microsoft.Extensions.AI.TextContent
+rounds 1000 (after 100 warm-up), 24 CPUs
+method      | median us |   p90 us |  mean us | alloc B/call | answer chars
+current     |       960 |     1397 |     1030 |      579,619 |       65,629
+aifunction  |       950 |     1367 |     1029 |      580,251 |       65,629
+middleware  |       948 |     1387 |     1028 |      580,207 |       65,629
+

@@ -1,0 +1,6 @@
+McpOnly: 9325056 bytes, 0 trim/AOT warnings; run:
+4105 
+McpAIFunction: 9383936 bytes, 0 trim/AOT warnings; run:
+4105 
+McpMeai: 11130880 bytes, 0 trim/AOT warnings; run:
+4105 done 2 

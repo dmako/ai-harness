@@ -12,6 +12,11 @@ if (Environment.GetEnvironmentVariable("HARNESS_FAKE_GRAPHIFY") is { Length: > 0
     Environment.ExitCode = await GraphifyWorker.RunAsync(graphifyDirectory, args);
     return;
 }
+if (Environment.GetEnvironmentVariable("HARNESS_FAKE_AGENT") is { Length: > 0 } agent)
+{
+    Environment.ExitCode = await AgentWorker.RunAsync(agent, args);
+    return;
+}
 var mode = args.FirstOrDefault() ?? "normal";
 if (mode is "descendant")
 {

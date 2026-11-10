@@ -179,6 +179,40 @@ public static class TaskViews
         return view;
     }
 
+    public static Dictionary<string, object?> Session(AgentSession s)
+    {
+        Dictionary<string, object?> view = new()
+        {
+            ["client"] = s.Client,
+            ["session_id"] = s.SessionId,
+            ["origin"] = s.Origin,
+            ["status"] = s.Status,
+            ["started_at"] = s.StartedAt.ToRfc3339(),
+            ["ended_at"] = s.EndedAt.ToRfc3339(),
+        };
+        Add(view, "model", s.Model);
+        Add(view, "transcript_path", s.TranscriptPath);
+        if (s.InputTokens + s.OutputTokens + s.CacheReadTokens + s.CacheWriteTokens > 0)
+        {
+            view["input_tokens"] = s.InputTokens;
+            view["output_tokens"] = s.OutputTokens;
+            view["cache_read_tokens"] = s.CacheReadTokens;
+            view["cache_write_tokens"] = s.CacheWriteTokens;
+            view["reasoning_tokens"] = s.ReasoningTokens;
+        }
+        if (s.ActiveMs > 0)
+        {
+            view["active_ms"] = s.ActiveMs;
+        }
+        Add(view, "first_activity", s.FirstActivity);
+        Add(view, "last_activity", s.LastActivity);
+        if (s.CostUsd is { } cost)
+        {
+            view["cost_usd"] = cost;
+        }
+        return view;
+    }
+
     private static void Add(Dictionary<string, object?> view, string key, string value)
     {
         if (value.Length is not 0)

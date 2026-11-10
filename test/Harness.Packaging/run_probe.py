@@ -216,6 +216,8 @@ def probe(main_archive, developer_archive, root, report):
                                        ['--root', str(sandbox.repository), '--graphify', str(root / 'missing-backend')])) as peer:
         peer.initialize()
         check(bool(peer.request('tools/list')['tools']), 'Graphify adapter handshake without optional backend')
+    agents = subprocess.run([str(main / ('harness-agents' + suffix))], capture_output=True, text=True, timeout=60)
+    check(agents.returncode == 2 and 'Usage: harness-agents run' in agents.stderr, 'Agent host usage')
 
     def service(binary, *args):
         child = Child([str(binary), *args], sandbox.repository, sandbox.env)

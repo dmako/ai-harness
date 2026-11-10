@@ -194,7 +194,7 @@ public static class GraphifyDiscovery
     }
 
     private static bool KeepDirectory(string path) =>
-        !System.IO.Path.GetFileName(path).StartsWith('.')
+        !System.IO.Path.GetFileName(path).StartsWith('.', StringComparison.Ordinal)
         && !Skipped.Contains(System.IO.Path.GetFileName(path))
         && new DirectoryInfo(path).LinkTarget is null;
 

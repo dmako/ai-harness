@@ -172,13 +172,11 @@ public sealed class ArchitectureReaderTests
                     "public class Charges(\n    IBillingGrpcService billing)\n{\n    IBillingGrpcService again;\n}\n",
             }
         );
-        var actual = new SystemReader(
-            [
-                new("k", "Contracts", "contracts", contracts.Repository(), true),
-                new("s", "Shop", "shop", client.Repository()),
-                new("o", "Orders", "orders", caller.Repository()),
-            ]
-        ).Read();
+        var actual = new SystemReader([
+            new("k", "Contracts", "contracts", contracts.Repository(), true),
+            new("s", "Shop", "shop", client.Repository()),
+            new("o", "Orders", "orders", caller.Repository()),
+        ]).Read();
 
         var contract = actual.Contracts.Should().ContainSingle(c => c.Name == "IBillingGrpcService").Subject;
         contract.Servers.Should().Equal("s");

@@ -82,7 +82,13 @@ static class Gr
     }
 
     /// <summary>Changes between two trees ('A', 'D', 'M' with the blob hashes), skipping subtrees with equal hashes.</summary>
-    public static void Diff(PrimitiveRepository repo, Hash? from, Hash? to, string prefix, List<(char Kind, string Path, Hash? Old, Hash? New)> into)
+    public static void Diff(
+        PrimitiveRepository repo,
+        Hash? from,
+        Hash? to,
+        string prefix,
+        List<(char Kind, string Path, Hash? Old, Hash? New)> into
+    )
     {
         var a = from is { } f ? Tree(repo, f).Children.ToDictionary(e => e.Name, StringComparer.Ordinal) : [];
         var b = to is { } t ? Tree(repo, t).Children.ToDictionary(e => e.Name, StringComparer.Ordinal) : [];
@@ -126,8 +132,10 @@ static class Gr
     /// </summary>
     public static IEnumerable<string> WithExactRenames(List<(char Kind, string Path, Hash? Old, Hash? New)> changes)
     {
-        var added = changes.Where(c => c.Kind == 'A' && c.New is not null)
-            .GroupBy(c => c.New!.Value).ToDictionary(g => g.Key, g => new Queue<string>(g.Select(c => c.Path)));
+        var added = changes
+            .Where(c => c.Kind == 'A' && c.New is not null)
+            .GroupBy(c => c.New!.Value)
+            .ToDictionary(g => g.Key, g => new Queue<string>(g.Select(c => c.Path)));
         var paired = new HashSet<string>(StringComparer.Ordinal);
         foreach (var c in changes.Where(c => c.Kind == 'D' && c.Old is not null))
         {
@@ -208,7 +216,8 @@ static class Gr
     public static IEnumerable<string> Dirty(PrimitiveRepository repo)
     {
         var status = Status(repo);
-        return status.StagedFiles.Concat(status.UnstagedFiles)
+        return status
+            .StagedFiles.Concat(status.UnstagedFiles)
             .Where(f => f.Status is not GitReader.FileStatus.Unmodified and not GitReader.FileStatus.Ignored)
             .Select(f => f.Path.Replace('\\', '/'))
             .Concat(Untracked(repo, status));
@@ -235,8 +244,13 @@ static class Gr
             {
                 now.Remove(path);
             }
-            else if (file.Status is not GitReader.FileStatus.Unmodified and not GitReader.FileStatus.Ignored
-                     and not GitReader.FileStatus.Untracked && (file.WorkingTreeHash ?? file.IndexHash) is { } hash)
+            else if (
+                file.Status
+                    is not GitReader.FileStatus.Unmodified
+                        and not GitReader.FileStatus.Ignored
+                        and not GitReader.FileStatus.Untracked
+                && (file.WorkingTreeHash ?? file.IndexHash) is { } hash
+            )
             {
                 now[path] = hash;
             }
@@ -280,7 +294,13 @@ static class Gr
             }
 
             var changes = new List<(char, string, Hash?, Hash?)>();
-            Diff(repo, commit.Parents.Count == 1 ? Commit(repo, commit.Parents[0])!.Value.TreeRoot : (Hash?)null, commit.TreeRoot, "", changes);
+            Diff(
+                repo,
+                commit.Parents.Count == 1 ? Commit(repo, commit.Parents[0])!.Value.TreeRoot : (Hash?)null,
+                commit.TreeRoot,
+                "",
+                changes
+            );
             foreach (var entry in WithExactRenames(changes))
             {
                 yield return entry;
@@ -299,7 +319,9 @@ static class Gr
             }
 
             var parentTree = commit.Parents.Count == 1 ? Commit(repo, commit.Parents[0])!.Value.TreeRoot : (Hash?)null;
-            if (paths.Any(p => !Equals(Entry(repo, commit.TreeRoot, p), parentTree is { } t ? Entry(repo, t, p) : null)))
+            if (
+                paths.Any(p => !Equals(Entry(repo, commit.TreeRoot, p), parentTree is { } t ? Entry(repo, t, p) : null))
+            )
             {
                 yield return Hex(commit.Hash);
                 if (++found == limit)

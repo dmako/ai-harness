@@ -86,7 +86,7 @@ public static class ContextJson
             }
             else
             {
-                output.Append(rune.ToString());
+                output.Append(rune);
             }
         }
         output.Append('"');

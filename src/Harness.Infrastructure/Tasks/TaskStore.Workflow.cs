@@ -177,7 +177,7 @@ public sealed partial class TaskStore
     private static string NextId(SqliteConnection c, SqliteTransaction t, string prefix)
     {
         prefix = prefix.Trim();
-        if (prefix.EndsWith('-'))
+        if (prefix.EndsWith('-', StringComparison.Ordinal))
         {
             prefix = prefix[..^1];
         }

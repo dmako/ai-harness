@@ -46,8 +46,8 @@ internal sealed class StatementSplitter(bool go = false)
             && (_key[^1] is "{" || Opens.Contains(_key[0]) || _key[0] is "using" && _key.Count > 1 && _key[1] is "(");
         var callee = Callee(_key);
         var data = _raw.Any(raw =>
-            raw.StartsWith('"') && raw.Length > 2
-            || raw.StartsWith('\'') && raw.Length > 3
+            raw.StartsWith('"', StringComparison.Ordinal) && raw.Length > 2
+            || raw.StartsWith('\'', StringComparison.Ordinal) && raw.Length > 3
             || raw.Length > 0 && char.IsAsciiDigit(raw[0]) && raw is not "0" and not "1"
         );
         Statements.Add(

@@ -45,7 +45,9 @@ public sealed class HooksPathTests
         var root = repository.Root;
 
         // unset: the repository's hooks folder; git is asked once, then the answer is kept
-        (await HarnessAnswerAsync(repository)).Should().Be((Path.Combine(repository.CommonDir, "hooks"), 1));
+        (await HarnessAnswerAsync(repository))
+            .Should()
+            .Be((Path.Combine(repository.CommonDir, "hooks"), 1));
         (await HarnessAnswerAsync(repository)).Starts.Should().Be(0);
 
         // relative to the work tree
