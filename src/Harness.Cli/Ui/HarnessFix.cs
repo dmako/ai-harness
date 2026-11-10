@@ -53,7 +53,7 @@ internal static partial class HarnessFix
             return null;
         }
 
-        var sub = rest is [var next, ..] && !next.StartsWith('-') ? verb + " " + next : verb;
+        var sub = rest is [var next, ..] && !next.StartsWith('-', StringComparison.Ordinal) ? verb + " " + next : verb;
         return Allowed.Contains(sub) && words.Skip(1).All(Token.IsMatch) ? words[1..] : null;
     }
 

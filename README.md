@@ -17,7 +17,7 @@ Intel macOS (`osx-x64`) is no longer supported.
 Extract the main archive into one directory and put that directory on your PATH.
 Keep the included SQLite native library beside `harness`, `harness-graphify` and `harness-agents`
 (`e_sqlite3.dll`, `libe_sqlite3.so`, or `libe_sqlite3.dylib`). These are trimmed
-Native AOT .NET 10 executables: no preinstalled .NET, Node, or
+Native AOT .NET 11 executables: no preinstalled .NET, Node, or
 Python runtime is required for the core. Git is required for sync/history.
 Optional provider backends have their own prerequisites. The separate
 developer-tools archive contains `harness-collect` and `harness-share`.

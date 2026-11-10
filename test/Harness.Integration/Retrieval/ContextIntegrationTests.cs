@@ -205,7 +205,7 @@ public sealed class ContextIntegrationTests
             "Harness.Cli",
             "bin",
             configuration,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
         await using var client = await McpClient.CreateAsync(

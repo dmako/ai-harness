@@ -11,34 +11,55 @@ var seen = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);
 try
 {
     using var db = new FindingContext(path);
-    Step("Insert via generated mapper", () =>
-    {
-        for (var i = 0; i < 10; i++)
+    Step(
+        "Insert via generated mapper",
+        () =>
         {
-            db.Findings.Insert(new FindingEntity { Key = "key:" + i, Kind = i % 2 is 0 ? "cycle" : "complexity", Measure = i, Units = ["A", "B" + i], LastSeen = seen });
-        }
+            for (var i = 0; i < 10; i++)
+            {
+                db.Findings.Insert(
+                    new FindingEntity
+                    {
+                        Key = "key:" + i,
+                        Kind = i % 2 is 0 ? "cycle" : "complexity",
+                        Measure = i,
+                        Units = ["A", "B" + i],
+                        LastSeen = seen,
+                    }
+                );
+            }
 
-        return "10 inserted";
-    });
-    Step("FindById (generated Deserialize)", () =>
-    {
-        var back = db.Findings.FindById("key:3");
-        return back is { Kind: "complexity", Measure: 3 } && back.Units.SequenceEqual(["A", "B3"])
-            ? $"{back.Key} {back.LastSeen:O} ({back.LastSeen.Kind})"
-            : throw new InvalidOperationException("read " + back?.Key);
-    });
-    Step("Find string predicate", () =>
-    {
-        var found = db.Findings.Find("$.Kind = @0 AND $.Measure > @1", "cycle", 3).ToList();
-        return found.Count == 3 ? "3 found" : throw new InvalidOperationException("" + found.Count);
-    });
-    Step("Transaction rollback", () =>
-    {
-        db.BeginTrans();
-        db.Findings.DeleteMany("$.Kind = 'cycle'");
-        db.Rollback();
-        return db.Findings.FindAll().Count() == 10 ? "rolled back" : throw new InvalidOperationException();
-    });
+            return "10 inserted";
+        }
+    );
+    Step(
+        "FindById (generated Deserialize)",
+        () =>
+        {
+            var back = db.Findings.FindById("key:3");
+            return back is { Kind: "complexity", Measure: 3 } && back.Units.SequenceEqual(["A", "B3"])
+                ? $"{back.Key} {back.LastSeen:O} ({back.LastSeen.Kind})"
+                : throw new InvalidOperationException("read " + back?.Key);
+        }
+    );
+    Step(
+        "Find string predicate",
+        () =>
+        {
+            var found = db.Findings.Find("$.Kind = @0 AND $.Measure > @1", "cycle", 3).ToList();
+            return found.Count == 3 ? "3 found" : throw new InvalidOperationException("" + found.Count);
+        }
+    );
+    Step(
+        "Transaction rollback",
+        () =>
+        {
+            db.BeginTrans();
+            db.Findings.DeleteMany("$.Kind = 'cycle'");
+            db.Rollback();
+            return db.Findings.FindAll().Count() == 10 ? "rolled back" : throw new InvalidOperationException();
+        }
+    );
 }
 catch (Exception error)
 {

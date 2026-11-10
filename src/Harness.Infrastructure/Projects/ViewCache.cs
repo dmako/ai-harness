@@ -119,7 +119,10 @@ public sealed class ViewCache(ProjectLifecycle lifecycle) : IDisposable
     {
         ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(create);
-        var name = string.Join('\n', members.Select(member => member.Id + "@" + member.Root).Order(StringComparer.Ordinal));
+        var name = string.Join(
+            '\n',
+            members.Select(member => member.Id + "@" + member.Root).Order(StringComparer.Ordinal)
+        );
         var key = await TreesKeyAsync(members, token).ConfigureAwait(false);
         lock (_analysisLock)
         {

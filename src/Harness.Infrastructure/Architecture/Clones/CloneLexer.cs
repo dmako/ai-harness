@@ -151,7 +151,7 @@ internal static class CloneLexer
             && !_go
             && (
                 Tokens.Count is 0
-                || source[(source.LastIndexOf('\n', Math.Max(0, _index - 1)) + 1).._index]
+                || source[(source.LastIndexOf('\n', Math.Max(0, _index - 1), StringComparison.Ordinal) + 1).._index]
                     .All(item => item is ' ' or '\t')
             );
 

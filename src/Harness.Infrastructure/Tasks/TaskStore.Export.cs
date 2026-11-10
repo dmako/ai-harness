@@ -60,7 +60,7 @@ public sealed partial class TaskStore
             var item = ListItem.Match(text, key.Index + key.Length);
             var indent = item.Success ? item.Groups[1].Value : "  ";
             content = key.Groups[1].Success ? text[..key.Index] + "tasks:" + text[(key.Index + key.Length)..] : text;
-            if (!content.EndsWith('\n'))
+            if (!content.EndsWith('\n', StringComparison.Ordinal))
             {
                 content += "\n";
             }

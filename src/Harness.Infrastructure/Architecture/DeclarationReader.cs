@@ -137,7 +137,7 @@ public static partial class DeclarationReader
                 text = text[..end];
             }
 
-            text = text[(text.LastIndexOf('.') + 1)..];
+            text = text[(text.LastIndexOf('.', StringComparison.Ordinal) + 1)..];
             if (text.Length > 0 && text is not ("implements" or "extends"))
             {
                 result.Add(text);

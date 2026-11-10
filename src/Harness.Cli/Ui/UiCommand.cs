@@ -35,7 +35,7 @@ internal sealed class UiCommand(
         );
         await app.StartAsync(cancellationToken);
         var address = UiHost.Address(app);
-        await output.WriteLineAsync("harness ui on " + address + " (Ctrl-C to stop)");
+        await output.WriteLineAsync("harness ui on " + address + " (Ctrl-C to stop)", CancellationToken.None);
         await output.FlushAsync(cancellationToken);
         if (!settings.NoOpen)
         {
@@ -45,7 +45,10 @@ internal sealed class UiCommand(
             }
             catch (Exception exception) when (exception is IOException or Win32Exception or InvalidOperationException)
             {
-                await error.Writer.WriteLineAsync("harness ui: cannot open browser: " + exception.Message);
+                await error.Writer.WriteLineAsync(
+                    "harness ui: cannot open browser: " + exception.Message,
+                    CancellationToken.None
+                );
             }
         }
         try

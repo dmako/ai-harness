@@ -188,7 +188,7 @@ public static partial class TaskParsing
 
     public static bool IsTestFile(string path)
     {
-        var name = path[(path.LastIndexOf('/') + 1)..];
+        var name = path[(path.LastIndexOf('/', StringComparison.Ordinal) + 1)..];
         var lower = name.ToLowerInvariant();
         if (
             lower.EndsWith("_test.go", StringComparison.Ordinal)
@@ -205,7 +205,7 @@ public static partial class TaskParsing
             return true;
         }
 
-        var slash = path.LastIndexOf('/');
+        var slash = path.LastIndexOf('/', StringComparison.Ordinal);
         return slash >= 0
             && path[..slash]
                 .ToLowerInvariant()
@@ -243,7 +243,7 @@ public static partial class TaskParsing
 
     private static string Singular(string word) =>
         word.Length > 4
-        && word.EndsWith('s')
+        && word.EndsWith('s', StringComparison.Ordinal)
         && !word.EndsWith("ss", StringComparison.Ordinal)
         && !word.EndsWith("us", StringComparison.Ordinal)
         && !word.EndsWith("is", StringComparison.Ordinal)

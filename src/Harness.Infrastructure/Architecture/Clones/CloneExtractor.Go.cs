@@ -430,9 +430,7 @@ public sealed partial class CloneExtractor
         HashSet<string> types
     )
     {
-        var local = unqualified && types.Contains(text)
-            ? Directory(path) + "." + text
-            : LocalName(names, locals, text);
+        var local = unqualified && types.Contains(text) ? Directory(path) + "." + text : LocalName(names, locals, text);
         return (local, "$", local != text && locals.Contains(text));
     }
 
@@ -444,7 +442,7 @@ public sealed partial class CloneExtractor
                 && !locals.Contains(token.Text)
                 && values.Contains(token.Text),
             's' => SignificantString(token.Text),
-            'n' => !token.Text.StartsWith('\'') && token.Text is not "0" and not "1",
+            'n' => !token.Text.StartsWith('\'', StringComparison.Ordinal) && token.Text is not "0" and not "1",
             _ => false,
         };
 
@@ -616,7 +614,7 @@ public sealed partial class CloneExtractor
         try
         {
             var value = text.Length > 1 ? text[1..^1] : text;
-            if (!text.StartsWith('`'))
+            if (!text.StartsWith('`', StringComparison.Ordinal))
             {
                 value = System.Text.RegularExpressions.Regex.Unescape(value);
             }

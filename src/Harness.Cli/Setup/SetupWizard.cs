@@ -186,13 +186,13 @@ internal class SetupTerminal
         var result = WizardResult.Continue;
         var controlC = Console.TreatControlCAsInput;
         Console.TreatControlCAsInput = true;
-        await output.WriteAsync("\x1b[?1049h\x1b[?25l");
+        await output.WriteAsync("\x1b[?1049h\x1b[?25l", CancellationToken.None);
         try
         {
             while (result is WizardResult.Continue)
             {
                 token.ThrowIfCancellationRequested();
-                await output.WriteAsync("\x1b[H\x1b[2J");
+                await output.WriteAsync("\x1b[H\x1b[2J", CancellationToken.None);
                 await wizard.RenderAsync(output, Console.WindowWidth);
                 while (!Console.KeyAvailable)
                 {
@@ -205,11 +205,11 @@ internal class SetupTerminal
         finally
         {
             Console.TreatControlCAsInput = controlC;
-            await output.WriteAsync("\x1b[?25h\x1b[?1049l");
+            await output.WriteAsync("\x1b[?25h\x1b[?1049l", CancellationToken.None);
         }
         if (result is WizardResult.Cancel)
         {
-            await output.WriteLineAsync("Cancelled: nothing changed.");
+            await output.WriteLineAsync("Cancelled: nothing changed.", CancellationToken.None);
             return 0;
         }
         return await wizard.ApplyAsync(output);

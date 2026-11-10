@@ -67,7 +67,8 @@ internal sealed class ExportCommandRunner(
                         ex is HttpRequestException
                             ? "collector request failed (logged; nothing else is affected)"
                             : ex.Message
-                    )
+                    ),
+                CancellationToken.None
             );
             return 1;
         }
@@ -87,13 +88,17 @@ internal sealed class ExportCommandRunner(
     {
         if (settings.Endpoint.Length is 0)
         {
-            await error.Writer.WriteLineAsync("harness telemetry enable: --endpoint is required");
+            await error.Writer.WriteLineAsync(
+                "harness telemetry enable: --endpoint is required",
+                CancellationToken.None
+            );
             return 2;
         }
         DeveloperExport.Enable(state, settings.Endpoint, settings.Token);
         await Export.SaveAsync(state, token);
         await output.WriteLineAsync(
-            $"Telemetry export on: aggregated reports go to {settings.Endpoint} at most daily, after a sync.\n'harness telemetry preview' shows exactly what is sent; 'harness telemetry disable' stops it."
+            $"Telemetry export on: aggregated reports go to {settings.Endpoint} at most daily, after a sync.\n'harness telemetry preview' shows exactly what is sent; 'harness telemetry disable' stops it.",
+            CancellationToken.None
         );
         return 0;
     }
@@ -102,7 +107,7 @@ internal sealed class ExportCommandRunner(
     {
         state.Enabled = false;
         await Export.SaveAsync(state, token);
-        await output.WriteLineAsync("Telemetry export off: nothing more is sent.");
+        await output.WriteLineAsync("Telemetry export off: nothing more is sent.", CancellationToken.None);
         return 0;
     }
 
@@ -126,7 +131,8 @@ internal sealed class ExportCommandRunner(
         if (!state.Enabled)
         {
             await error.Writer.WriteLineAsync(
-                "harness telemetry send: the export is off ('harness telemetry enable --endpoint URL')"
+                "harness telemetry send: the export is off ('harness telemetry enable --endpoint URL')",
+                CancellationToken.None
             );
             return 2;
         }
@@ -141,7 +147,7 @@ internal sealed class ExportCommandRunner(
         }
         if (!automatic)
         {
-            await output.WriteLineAsync($"Sent {body.Length} bytes to {state.Endpoint}.");
+            await output.WriteLineAsync($"Sent {body.Length} bytes to {state.Endpoint}.", CancellationToken.None);
         }
         return 0;
     }

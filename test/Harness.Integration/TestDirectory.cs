@@ -1,10 +1,22 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Versioning;
 
 namespace Harness.Integration;
 
 internal static class TestDirectory
 {
+    /// <summary>
+    /// The target framework folder of the build output (for example net11.0), taken from this test assembly,
+    /// which is built with the same TargetFramework as the projects whose binaries the tests start.
+    /// </summary>
+    public static string TargetFramework { get; } =
+        "net"
+        + new FrameworkName(
+            AppContext.TargetFrameworkName
+                ?? throw new InvalidOperationException("The test host has no target framework name.")
+        ).Version.ToString(2);
+
     [SuppressMessage(
         "Major Code Smell",
         "S2925:Thread.Sleep should not be used in tests",

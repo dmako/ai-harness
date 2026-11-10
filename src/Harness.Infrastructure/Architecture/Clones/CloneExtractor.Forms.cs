@@ -218,8 +218,8 @@ public sealed partial class CloneExtractor
             return token.Line > tokens[index - 1].Line
                 && _open is 0
                 && !",(=+-*/&|?:<>!".Contains(tokens[index - 1].Text[^1], StringComparison.Ordinal)
-                && !token.Text.StartsWith('.')
-                && !token.Text.StartsWith('?')
+                && !token.Text.StartsWith('.', StringComparison.Ordinal)
+                && !token.Text.StartsWith('?', StringComparison.Ordinal)
                 && token.Text is not ("=>" or "&&" or "||");
         }
 

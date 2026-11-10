@@ -2,7 +2,9 @@
 
 **Recommendation: no.** Stay on SQLite. The findings and the reasoning are in [doc/architecture/litedb-spike.md](../../doc/architecture/litedb-spike.md). This folder holds the code and the raw results.
 
-`LiteDbSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like harness. It references LiteDB 5.0.21, the latest stable release, and Microsoft.Data.Sqlite 10.0.14, the version harness pins.
+Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+
+`LiteDbSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like harness. It references LiteDB 5.0.21, the latest stable release, and Microsoft.Data.Sqlite 11.0.0, the version harness pins (10.0.14 when measured).
 
 ## Commands
 

@@ -33,6 +33,7 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
     internal ConcurrentDictionary<string, XElement?> Xml { get; } = new(StringComparer.Ordinal);
 
     internal void CountXmlParse() => Interlocked.Increment(ref _xmlParses);
+
     internal Dictionary<string, Harness.Core.Architecture.EvaluatedProject> Evaluations { get; } =
         new(StringComparer.Ordinal);
 
@@ -151,10 +152,10 @@ public sealed class AnalysisRepository(string root, IReadOnlyList<string> files,
                 }
                 catch (Exception error)
                     when (error
-                        is IOException
-                            or InvalidDataException
-                            or UnauthorizedAccessException
-                            or ArgumentException
+                            is IOException
+                                or InvalidDataException
+                                or UnauthorizedAccessException
+                                or ArgumentException
                     )
                 {
                     return false;

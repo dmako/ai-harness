@@ -145,7 +145,7 @@ public static class TranscriptReader
             && message.ValueKind is JsonValueKind.Object
         )
         {
-            if (Text(message, "model") is { Length: > 0 } named && !named.StartsWith('<'))
+            if (Text(message, "model") is { Length: > 0 } named && !named.StartsWith('<', StringComparison.Ordinal))
             {
                 state["model"] = model = named;
             }

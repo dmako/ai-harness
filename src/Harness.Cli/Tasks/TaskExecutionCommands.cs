@@ -123,8 +123,8 @@ internal static partial class TaskCliInput
             return TimeSpan.Zero;
         }
 
-        var negative = value.StartsWith('-');
-        var input = negative || value.StartsWith('+') ? value[1..] : value;
+        var negative = value.StartsWith('-', StringComparison.Ordinal);
+        var input = negative || value.StartsWith('+', StringComparison.Ordinal) ? value[1..] : value;
         var matches = DurationPattern.Matches(input);
         if (matches.Count is 0 || string.Concat(matches.Select(m => m.Value)) != input)
         {

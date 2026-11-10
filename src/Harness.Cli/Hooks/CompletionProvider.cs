@@ -56,7 +56,7 @@ internal static class CompletionProvider
                 continue;
             }
 
-            if (word.StartsWith('-'))
+            if (word.StartsWith('-', StringComparison.Ordinal))
             {
                 continue;
             }
@@ -82,7 +82,7 @@ internal static class CompletionProvider
 
     /// <summary>A non-boolean option of the command, written without '=value'.</summary>
     private static bool TakesValue(Command? leaf, string word) =>
-        word.StartsWith('-')
+        word.StartsWith('-', StringComparison.Ordinal)
         && !word.Contains('=', StringComparison.Ordinal)
         && leaf?.Options.Any(p => p.Name == word && p.ValueType != typeof(bool)) is true;
 
@@ -96,7 +96,7 @@ internal static class CompletionProvider
         string current
     )
     {
-        if (!current.StartsWith('-'))
+        if (!current.StartsWith('-', StringComparison.Ordinal))
         {
             return container.Subcommands.Count > 0
                 ? container.Subcommands.Where(c => !c.Hidden).Select(c => (c.Name, c.Description ?? ""))

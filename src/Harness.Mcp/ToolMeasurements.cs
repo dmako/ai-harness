@@ -45,9 +45,7 @@ internal static class ToolMeasurements
     private static (bool Empty, string Error) Outcome(CallToolResult result)
     {
         var failed = result.IsError is true;
-        var error = failed
-            ? result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "tool error"
-            : "";
+        var error = failed ? result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "tool error" : "";
         return result.StructuredContent is { ValueKind: JsonValueKind.Object } content
             ? Structured(content, failed, error)
             : (false, error);

@@ -689,7 +689,7 @@ public sealed class StorageTests
             "Worker",
             "bin",
             Configuration,
-            "net10.0",
+            Harness.Integration.TestDirectory.TargetFramework,
             "Harness.StorageWorker.dll"
         );
         File.Exists(worker).Should().BeTrue($"Missing storage worker: {worker}");

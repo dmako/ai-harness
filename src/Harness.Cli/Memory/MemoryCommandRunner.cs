@@ -50,7 +50,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         catch (Exception exception) when (IsExpected(exception))
         {
-            await error.Writer.WriteLineAsync($"harness memory {verb}: {exception.Message}");
+            await error.Writer.WriteLineAsync($"harness memory {verb}: {exception.Message}", CancellationToken.None);
             return 1;
         }
     }
@@ -81,7 +81,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         catch (Exception exception) when (IsExpected(exception))
         {
-            await error.Writer.WriteLineAsync($"harness proposals {verb}: {exception.Message}");
+            await error.Writer.WriteLineAsync($"harness proposals {verb}: {exception.Message}", CancellationToken.None);
             return 1;
         }
     }
@@ -117,15 +117,17 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         await output.WriteLineAsync(
             shared
                 ? $"Shared {memory.Id} with the project in .harness/{KnowledgeFile.FileName}."
-                : $"Withdrew {memory.Id} from project knowledge; it stays as a local memory."
+                : $"Withdrew {memory.Id} from project knowledge; it stays as a local memory.",
+            CancellationToken.None
         );
         await output.WriteLineAsync(
-            $"Commit .harness/{KnowledgeFile.FileName} to {(shared ? "share it with" : "withdraw it from")} the team."
+            $"Commit .harness/{KnowledgeFile.FileName} to {(shared ? "share it with" : "withdraw it from")} the team.",
+            CancellationToken.None
         );
         if (rule.Length is not 0)
         {
-            await output.WriteLineAsync($"Warning: {SharedKnowledgeSync.Ignored(rule)}.");
-            await output.WriteLineAsync($"Fix: {SharedKnowledgeSync.IgnoreFix}.");
+            await output.WriteLineAsync($"Warning: {SharedKnowledgeSync.Ignored(rule)}.", CancellationToken.None);
+            await output.WriteLineAsync($"Fix: {SharedKnowledgeSync.IgnoreFix}.", CancellationToken.None);
         }
 
         return 0;
@@ -161,14 +163,18 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         );
         if (result.Status is "needs_decision")
         {
-            await error.Writer.WriteLineAsync($"harness memory promote: {target} already holds similar memories:");
+            await error.Writer.WriteLineAsync(
+                $"harness memory promote: {target} already holds similar memories:",
+                CancellationToken.None
+            );
             foreach (var similar in result.SimilarAtLevel)
             {
-                await error.Writer.WriteLineAsync("  " + similar);
+                await error.Writer.WriteLineAsync("  " + similar, CancellationToken.None);
             }
 
             await error.Writer.WriteLineAsync(
-                "Nothing changed. Run again with --force if this is a different statement."
+                "Nothing changed. Run again with --force if this is a different statement.",
+                CancellationToken.None
             );
             return 1;
         }
@@ -189,21 +195,28 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         else
         {
-            await output.WriteLineAsync($"Promoted {settings.Id} to {target} as {result.Memory!.Id} (retired here).");
+            await output.WriteLineAsync(
+                $"Promoted {settings.Id} to {target} as {result.Memory!.Id} (retired here).",
+                CancellationToken.None
+            );
             if (result.HoldsIn.Count is 0)
             {
-                await output.WriteLineAsync("No other project records it yet.");
+                await output.WriteLineAsync("No other project records it yet.", CancellationToken.None);
             }
             else
             {
-                await output.WriteLineAsync("It already holds in:");
+                await output.WriteLineAsync("It already holds in:", CancellationToken.None);
                 foreach (var found in result.HoldsIn)
                 {
-                    await output.WriteLineAsync($"  {found.Project}  {found.Memory.Id}  {found.Memory.Content}");
+                    await output.WriteLineAsync(
+                        $"  {found.Project}  {found.Memory.Id}  {found.Memory.Content}",
+                        CancellationToken.None
+                    );
                 }
 
                 await output.WriteLineAsync(
-                    "Those projects keep their own copies, which take precedence there; retire them with 'harness memory retire <id> --project <dir>' to rely on the wider one."
+                    "Those projects keep their own copies, which take precedence there; retire them with 'harness memory retire <id> --project <dir>' to rely on the wider one.",
+                    CancellationToken.None
                 );
             }
         }
@@ -225,7 +238,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         else if (proposals.Count is 0)
         {
-            await output.WriteLineAsync($"No {status} proposals.");
+            await output.WriteLineAsync($"No {status} proposals.", CancellationToken.None);
         }
         else
         {
@@ -233,7 +246,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             {
                 if (index > 0)
                 {
-                    await output.WriteLineAsync();
+                    await output.WriteLineAsync(CancellationToken.None);
                 }
 
                 await PrintProposalAsync(proposals[index]);
@@ -242,7 +255,8 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
             if (status is "pending")
             {
                 await output.WriteLineAsync(
-                    $"\n{proposals.Count} pending. Review: harness proposals approve|reject <id> (show <id> for look-alike memories)"
+                    $"\n{proposals.Count} pending. Review: harness proposals approve|reject <id> (show <id> for look-alike memories)",
+                    CancellationToken.None
                 );
             }
         }
@@ -308,22 +322,25 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         else if (result.Status is "needs_decision")
         {
-            await output.WriteLineAsync($"Not stored: {id} resembles current memories:");
+            await output.WriteLineAsync($"Not stored: {id} resembles current memories:", CancellationToken.None);
             foreach (var similar in result.Similar)
             {
                 await output.WriteLineAsync(
-                    $"  {similar.Memory.Id} ({Percent(similar.Similarity)}%): {similar.Memory.Content}"
+                    $"  {similar.Memory.Id} ({Percent(similar.Similarity)}%): {similar.Memory.Content}",
+                    CancellationToken.None
                 );
             }
 
             await output.WriteLineAsync(
-                "Re-run with --supersede <id> if it replaces one, or --keep-both if it is separate."
+                "Re-run with --supersede <id> if it replaces one, or --keep-both if it is separate.",
+                CancellationToken.None
             );
         }
         else
         {
             await output.WriteLineAsync(
-                $"Approved {id} -> {result.Memory!.Id} ({result.Status}): {result.Memory.Content}"
+                $"Approved {id} -> {result.Memory!.Id} ({result.Status}): {result.Memory.Content}",
+                CancellationToken.None
             );
         }
 
@@ -349,7 +366,7 @@ internal sealed class MemoryCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         else
         {
-            await output.WriteLineAsync($"Rejected {id}.");
+            await output.WriteLineAsync($"Rejected {id}.", CancellationToken.None);
         }
 
         return 0;

@@ -284,7 +284,10 @@ internal sealed partial class UiReadService
                 Analyze(MemberReads.Stacks, async evidence => UiJson.Node(await evidence.DependencySummaryAsync(token)))
             ),
             "adoption" => UiJson.Node(
-                await Analyze(MemberReads.Sources, evidence => evidence.AdoptionAsync(request.Parameter("library"), token))
+                await Analyze(
+                    MemberReads.Sources,
+                    evidence => evidence.AdoptionAsync(request.Parameter("library"), token)
+                )
             ),
             "issues" => await View(() => Analyze(Everything, evidence => IssuesAsync(members, evidence, token))),
             "stack" => await View(() =>

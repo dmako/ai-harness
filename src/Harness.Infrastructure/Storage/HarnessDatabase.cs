@@ -109,7 +109,7 @@ public sealed class HarnessDatabase : IDisposable
     public SqliteConnection OpenConnection()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        // In the pinned 10.0.13 provider, -1 stops its additional whole-second BUSY retry loop.
+        // In the pinned 11.0.0 provider (as in 10.0.13 before it), -1 stops its additional whole-second BUSY retry loop.
         // SQLite's native busy_timeout then owns the budget, including sub-second timeouts.
         // The contention tests protect this provider-specific behavior on package upgrades.
         var connection = new SqliteConnection(_connectionString) { DefaultTimeout = -1 };

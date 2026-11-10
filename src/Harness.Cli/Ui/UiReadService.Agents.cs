@@ -187,7 +187,11 @@ internal sealed partial class UiReadService
                         .Where(part => part.Length > 0)
                 );
                 // what Codex injects as user messages (instructions, environment) starts with a tag
-                if (role is "assistant" or "user" && text.Length > 0 && !text.TrimStart().StartsWith('<'))
+                if (
+                    role is "assistant" or "user"
+                    && text.Length > 0
+                    && !text.TrimStart().StartsWith('<', StringComparison.Ordinal)
+                )
                 {
                     yield return Entry(at, role is "user" ? "user" : "text", text, "");
                 }
@@ -226,7 +230,7 @@ internal sealed partial class UiReadService
         var node = input switch
         {
             JsonNode json => json,
-            string text when text.TrimStart().StartsWith('{') => Parse(text),
+            string text when text.TrimStart().StartsWith('{', StringComparison.Ordinal) => Parse(text),
             string text => JsonValue.Create(text),
             _ => null,
         };

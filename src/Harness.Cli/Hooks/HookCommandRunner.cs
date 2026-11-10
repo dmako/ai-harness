@@ -43,7 +43,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
                 }
                 if (settings.DryRun)
                 {
-                    await output.WriteLineAsync("\nDry run: nothing was written.");
+                    await output.WriteLineAsync("\nDry run: nothing was written.", CancellationToken.None);
                 }
                 return code;
             }
@@ -67,7 +67,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
     {
         var repository = await GitRepository.DiscoverAsync(settings.Project, token);
         var hooks = await GitHooks.ForAsync(repository, token);
-        await output.WriteLineAsync("Git sync hooks (" + hooks.DirectoryPath + "):");
+        await output.WriteLineAsync("Git sync hooks (" + hooks.DirectoryPath + "):", CancellationToken.None);
         var changes = verb is "status"
             ? hooks.Status()
             :
@@ -97,7 +97,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
         var (scope, root) = await ClientScopeAsync(verb, settings, token);
         var targets = ClientHookCleanup.Targets(_paths, client, scope, root);
         var command = verb is "install" ? HookCommand(settings.Command, client) : "";
-        await output.WriteLineAsync(client + " tool-event hook:");
+        await output.WriteLineAsync(client + " tool-event hook:", CancellationToken.None);
         var failed = false;
         foreach (var target in targets)
         {
@@ -108,7 +108,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
             catch (Exception exception) when (EditError(exception))
             {
                 failed = true;
-                await output.WriteLineAsync(target.Path + ": error: " + exception.Message);
+                await output.WriteLineAsync(target.Path + ": error: " + exception.Message, CancellationToken.None);
             }
         }
         return failed ? 1 : 0;
@@ -199,7 +199,8 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
                         var state = CompletionManager.Installed(shell, path) ? "installed" : "not installed";
                         await output.WriteLineAsync(
                             $"{shell, -5} {state, -14} {path}"
-                                + (shell == CompletionManager.Detect() ? " (your shell)" : "")
+                                + (shell == CompletionManager.Detect() ? " (your shell)" : ""),
+                            CancellationToken.None
                         );
                     }
                     return 0;
@@ -220,7 +221,7 @@ internal sealed class HookCommandRunner(TextWriter output, CliErrorOutput error,
                     (true, _, "install") => "added a block to " + target,
                     _ => "removed the block from " + target,
                 };
-                await output.WriteLineAsync(chosen + ": " + message);
+                await output.WriteLineAsync(chosen + ": " + message, CancellationToken.None);
                 return 0;
             }
         );

@@ -21,7 +21,7 @@ public sealed class WorkspaceProcessTests
             "Harness.Cli",
             "bin",
             Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
 

@@ -125,7 +125,7 @@ internal sealed class ClaudeParser : AgentParser
         {
             return;
         }
-        if (Text(message["model"]) is { Length: > 0 } model && !model.StartsWith('<'))
+        if (Text(message["model"]) is { Length: > 0 } model && !model.StartsWith('<', StringComparison.Ordinal))
         {
             Model = model;
         }

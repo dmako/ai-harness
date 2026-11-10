@@ -668,7 +668,7 @@ public sealed class TaskExecutionTests
                             "Harness.Cli",
                             "bin",
                             Configuration,
-                            "net10.0",
+                            TestDirectory.TargetFramework,
                             "harness.dll"
                         ),
                         "mcp",

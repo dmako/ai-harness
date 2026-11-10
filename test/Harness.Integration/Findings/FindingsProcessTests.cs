@@ -60,7 +60,7 @@ public sealed class FindingsProcessTests
             "Harness.Cli",
             "bin",
             Directory.GetParent(ProviderFixture.Worker)!.Parent!.Name,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
@@ -276,7 +276,15 @@ public sealed class FindingsProcessTests
                     {
                         (0, Capabilities.ArchCycles) => new ProviderResult
                         {
-                            Items = [new() { Provider = "fixture", Tool = "cycles", Members = ["A", "B"] }],
+                            Items =
+                            [
+                                new()
+                                {
+                                    Provider = "fixture",
+                                    Tool = "cycles",
+                                    Members = ["A", "B"],
+                                },
+                            ],
                         },
                         (0, _) => new ProviderResult
                         {

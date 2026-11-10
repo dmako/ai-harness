@@ -139,7 +139,7 @@ public sealed partial class EcosystemReader(AnalysisRepository repository)
                 .Evaluate(path)
                 .Packages.Select(package =>
                 {
-                    var split = package.At.LastIndexOf(':');
+                    var split = package.At.LastIndexOf(':', StringComparison.Ordinal);
                     return new ManifestDependency(
                         package.Name,
                         package.Version,

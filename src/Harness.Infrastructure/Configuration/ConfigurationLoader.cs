@@ -51,7 +51,7 @@ public static class ConfigurationLoader
             try
             {
                 var text = planned?.GetValueOrDefault(path) ?? StrictUtf8.GetString(File.ReadAllBytes(path));
-                var layer = Parse(text.StartsWith('\uFEFF') ? text[1..] : text);
+                var layer = Parse(text.StartsWith('\uFEFF', StringComparison.Ordinal) ? text[1..] : text);
                 // Validate unknown keys and types before pack expansion can obscure the source.
                 _ = HarnessJson.Deserialize<HarnessConfiguration>(layer, JsonOptions);
                 ExpandPacks(layer);

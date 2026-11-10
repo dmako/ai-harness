@@ -752,7 +752,7 @@ public sealed class ProjectLifecycleTests
                 "Harness.Cli",
                 "bin",
                 Configuration,
-                "net10.0",
+                TestDirectory.TargetFramework,
                 "harness.dll"
             );
             return RunAsync("dotnet", [binary, .. args]);

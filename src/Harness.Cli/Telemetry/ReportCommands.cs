@@ -57,7 +57,7 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
         }
         catch (Exception ex) when (ReadError(ex))
         {
-            await error.Writer.WriteLineAsync("harness " + verb + ": " + ex.Message);
+            await error.Writer.WriteLineAsync("harness " + verb + ": " + ex.Message, CancellationToken.None);
             return 1;
         }
     }
@@ -84,7 +84,8 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
         if (settings.Json)
         {
             await output.WriteLineAsync(
-                HarnessJson.Serialize(new JsonObjectMap { ["projects"] = own }, TelemetryJson.Options)
+                HarnessJson.Serialize(new JsonObjectMap { ["projects"] = own }, TelemetryJson.Options),
+                CancellationToken.None
             );
         }
         else
@@ -93,7 +94,7 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
             {
                 if (i > 0)
                 {
-                    await output.WriteLineAsync();
+                    await output.WriteLineAsync(CancellationToken.None);
                 }
 
                 await ReportText.ReportAsync(output, own[i]);

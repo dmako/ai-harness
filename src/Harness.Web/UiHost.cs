@@ -38,7 +38,7 @@ public static class UiHost
             || uri.Fragment.Length > 0
             || !IsLoopback(uri.Host)
             || !address.Contains(':', StringComparison.Ordinal)
-            || !int.TryParse(address[(address.LastIndexOf(':') + 1)..], out var port)
+            || !int.TryParse(address[(address.LastIndexOf(':', StringComparison.Ordinal) + 1)..], out var port)
             || port is < 0 or > 65535
         )
         {

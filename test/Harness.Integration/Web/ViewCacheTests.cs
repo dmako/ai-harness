@@ -139,10 +139,16 @@ public sealed class ViewCacheTests
     public async Task RequestsSharingAnAnalysisReadEachMemberAndComputeEachPieceOnce()
     {
         using var fixture = await SyncFixture.CreateAsync();
-        fixture.Write("Lib/Lib.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><PackageId>Shop.Lib</PackageId></PropertyGroup></Project>");
+        fixture.Write(
+            "Lib/Lib.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><PackageId>Shop.Lib</PackageId></PropertyGroup></Project>"
+        );
         fixture.Write("Lib/Store.cs", "namespace Shop.Lib;\npublic sealed class OrderStore {}\n");
         using var other = await SyncFixture.CreateAsync();
-        other.Write("App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Shop.Lib\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        other.Write(
+            "App/App.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Shop.Lib\" Version=\"1.0.0\" /></ItemGroup></Project>"
+        );
         other.Write("App/OrderStore.cs", "namespace Shop.App;\npublic sealed class OrderStore {}\n");
         WorkspaceMember[] members =
         [
@@ -159,7 +165,10 @@ public sealed class ViewCacheTests
                     evidence.ExclusiveAsync(
                         async () =>
                         {
-                            await evidence.WarmAsync(index % 2 is 0 ? MemberReads.Stacks | MemberReads.Sources : MemberReads.Stacks, Token);
+                            await evidence.WarmAsync(
+                                index % 2 is 0 ? MemberReads.Stacks | MemberReads.Sources : MemberReads.Stacks,
+                                Token
+                            );
                             return (
                                 Graph: await evidence.DependenciesAsync(Token),
                                 Summary: await evidence.DependencySummaryAsync(Token),

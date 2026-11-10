@@ -295,7 +295,7 @@ public static class HookPayload
             {
                 continue;
             }
-            var program = words[i][(words[i].LastIndexOf('/') + 1)..];
+            var program = words[i][(words[i].LastIndexOf('/', StringComparison.Ordinal) + 1)..];
             if (
                 program is "grep" or "egrep" or "rg" or "ag" or "ack" or "find" or "fd" or "fgrep"
                 || program is "git" && i + 1 < words.Length && words[i + 1] is "grep" or "ls-files"

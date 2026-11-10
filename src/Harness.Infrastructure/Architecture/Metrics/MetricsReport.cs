@@ -64,7 +64,7 @@ public static class MetricsReport
     public static string Name(string signature)
     {
         var text = signature.Trim();
-        if (text.EndsWith(')'))
+        if (text.EndsWith(')', StringComparison.Ordinal))
         {
             var depth = 0;
             for (var index = text.Length - 1; index >= 0; index--)

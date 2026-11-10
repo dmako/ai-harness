@@ -281,7 +281,7 @@ public sealed class SharedKnowledgeMergeTests
                 "Harness.Cli",
                 "bin",
                 Configuration,
-                "net10.0",
+                TestDirectory.TargetFramework,
                 "harness.dll"
             )
             .Replace('\\', '/');

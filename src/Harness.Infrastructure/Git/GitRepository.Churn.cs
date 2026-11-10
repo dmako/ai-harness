@@ -54,7 +54,7 @@ public sealed partial record GitRepository
                 var path = fields[^1];
                 var current = renamed.GetValueOrDefault(path, path);
                 files.Add(current);
-                if (fields[0].StartsWith('R') && fields.Length is 3)
+                if (fields[0].StartsWith('R', StringComparison.Ordinal) && fields.Length is 3)
                 {
                     renames.Add((fields[1], current));
                 }

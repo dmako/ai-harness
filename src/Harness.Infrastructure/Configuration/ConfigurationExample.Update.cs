@@ -112,7 +112,7 @@ public static partial class ConfigurationExample
         {
             var text = raw[index++];
             var trimmed = text.Trim();
-            if (trimmed.StartsWith('#'))
+            if (trimmed.StartsWith('#', StringComparison.Ordinal))
             {
                 var body = trimmed[1..].Trim();
                 if (HeaderLine.Match(body) is { Success: true } commented)

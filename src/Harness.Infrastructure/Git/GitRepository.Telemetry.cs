@@ -165,7 +165,7 @@ public sealed partial record GitRepository
             return null;
         }
 
-        if (name.StartsWith('"'))
+        if (name.StartsWith('"', StringComparison.Ordinal))
         {
             name = Unquote(name);
         }
@@ -177,7 +177,8 @@ public sealed partial record GitRepository
     private static string Unquote(string quoted)
     {
         var bytes = new List<byte>(quoted.Length);
-        var end = quoted.EndsWith('"') && quoted.Length > 1 ? quoted.Length - 1 : quoted.Length;
+        var end =
+            quoted.EndsWith('"', StringComparison.Ordinal) && quoted.Length > 1 ? quoted.Length - 1 : quoted.Length;
         var i = 1;
         while (i < end)
         {

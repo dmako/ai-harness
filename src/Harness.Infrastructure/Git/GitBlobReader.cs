@@ -86,7 +86,8 @@ public sealed class GitBlobReader : IAsyncDisposable
             || size > int.MaxValue - 1
         )
         {
-            return header.EndsWith(" missing", StringComparison.Ordinal)
+            return
+                header.EndsWith(" missing", StringComparison.Ordinal)
                 || header.EndsWith(" ambiguous", StringComparison.Ordinal)
                 ? null
                 : throw new IOException("git cat-file --batch: unexpected reply " + header);

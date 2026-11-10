@@ -27,7 +27,14 @@ internal static class Contend
                 Process.Start(
                     new ProcessStartInfo(Environment.ProcessPath!)
                     {
-                        ArgumentList = { "contend-child", engine, path, "p" + i, writes.ToString(CultureInfo.InvariantCulture) },
+                        ArgumentList =
+                        {
+                            "contend-child",
+                            engine,
+                            path,
+                            "p" + i,
+                            writes.ToString(CultureInfo.InvariantCulture),
+                        },
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -35,7 +42,9 @@ internal static class Contend
                 )!
             )
             .ToList();
-        var lines = children.Select(child => (Out: child.StandardOutput.ReadToEndAsync(), Err: child.StandardError.ReadToEndAsync())).ToList();
+        var lines = children
+            .Select(child => (Out: child.StandardOutput.ReadToEndAsync(), Err: child.StandardError.ReadToEndAsync()))
+            .ToList();
         foreach (var child in children)
         {
             child.WaitForExit();
@@ -47,13 +56,20 @@ internal static class Contend
         {
             var text = output.Out.Result.Trim();
             var error = output.Err.Result.Trim();
-            Console.WriteLine($"  child exit {child.ExitCode}: {text}{(error.Length > 0 ? " | " + error.Split('\n')[0] : "")}");
+            Console.WriteLine(
+                $"  child exit {child.ExitCode}: {text}{(error.Length > 0 ? " | " + error.Split('\n')[0] : "")}"
+            );
             failed += child.ExitCode is 0 ? 0 : 1;
         }
 
         var (ledger, migrated, rows, counter) = Verify(engine, path);
         var expected = processes * writes;
-        var ok = failed is 0 && ledger == Migrations && migrated == Migrations * MigrationRows && rows == expected && counter == expected;
+        var ok =
+            failed is 0
+            && ledger == Migrations
+            && migrated == Migrations * MigrationRows
+            && rows == expected
+            && counter == expected;
         Console.WriteLine(
             $"{engine}: {processes} processes x {writes} writes in {elapsed.TotalSeconds:F2} s; "
                 + $"ledger {ledger}/{Migrations}, migration rows {migrated}/{Migrations * MigrationRows}, "
@@ -134,11 +150,14 @@ internal static class Contend
         var started = holder.StandardOutput.ReadLine();
         Console.WriteLine($"holder: {started} (holds its write transaction {seconds} s)");
         Measure("read ", () => store.Count().ToString(CultureInfo.InvariantCulture));
-        Measure("write", () =>
-        {
-            store.Write("waiter", 1);
-            return "written";
-        });
+        Measure(
+            "write",
+            () =>
+            {
+                store.Write("waiter", 1);
+                return "written";
+            }
+        );
         holder.WaitForExit();
         Console.WriteLine("holder: " + holder.StandardOutput.ReadToEnd().Trim());
         return 0;
@@ -153,7 +172,9 @@ internal static class Contend
             }
             catch (Exception error)
             {
-                Console.WriteLine($"{what} during the hold: {error.GetType().Name}: {error.Message} after {timer.Elapsed.TotalSeconds:F2} s");
+                Console.WriteLine(
+                    $"{what} during the hold: {error.GetType().Name}: {error.Message} after {timer.Elapsed.TotalSeconds:F2} s"
+                );
             }
         }
     }
@@ -161,14 +182,12 @@ internal static class Contend
     public static int HoldChild(string engine, string path, int seconds)
     {
         using var store = Open(engine, path);
-        store.HoldWrite(
-            () =>
-            {
-                Console.WriteLine("transaction open");
-                Console.Out.Flush();
-                Thread.Sleep(TimeSpan.FromSeconds(seconds));
-            }
-        );
+        store.HoldWrite(() =>
+        {
+            Console.WriteLine("transaction open");
+            Console.Out.Flush();
+            Thread.Sleep(TimeSpan.FromSeconds(seconds));
+        });
         Console.WriteLine("committed");
         return 0;
     }
@@ -186,7 +205,9 @@ internal static class Contend
     {
         if (engine is "sqlite")
         {
-            using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
+            using var connection = new SqliteConnection(
+                new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()
+            );
             connection.Open();
             long Scalar(string sql)
             {
@@ -288,7 +309,11 @@ internal static class Contend
                 {
                     Execute(c, t, $"INSERT INTO rows(process,i) VALUES('{process}',{i})");
                     var n = Scalar(c, t, "SELECT coalesce(max(n),0) FROM counter WHERE id='c'");
-                    Execute(c, t, $"INSERT INTO counter(id,n) VALUES('c',{n + 1}) ON CONFLICT(id) DO UPDATE SET n=excluded.n");
+                    Execute(
+                        c,
+                        t,
+                        $"INSERT INTO counter(id,n) VALUES('c',{n + 1}) ON CONFLICT(id) DO UPDATE SET n=excluded.n"
+                    );
                     return 0;
                 }
             );
@@ -380,7 +405,8 @@ internal static class Contend
         public void Write(string process, int i) =>
             Transaction(() =>
             {
-                _db.GetCollection("rows", BsonAutoId.Int64).Insert(new BsonDocument { ["process"] = process, ["i"] = i });
+                _db.GetCollection("rows", BsonAutoId.Int64)
+                    .Insert(new BsonDocument { ["process"] = process, ["i"] = i });
                 var counter = _db.GetCollection("counter");
                 var n = counter.FindById("c")?["n"].AsInt64 ?? 0;
                 counter.Upsert(new BsonDocument { ["_id"] = "c", ["n"] = n + 1 });
@@ -392,7 +418,8 @@ internal static class Contend
         public void HoldWrite(Action whileHeld) =>
             Transaction(() =>
             {
-                _db.GetCollection("rows", BsonAutoId.Int64).Insert(new BsonDocument { ["process"] = "holder", ["i"] = 0 });
+                _db.GetCollection("rows", BsonAutoId.Int64)
+                    .Insert(new BsonDocument { ["process"] = "holder", ["i"] = 0 });
                 whileHeld();
                 return 0;
             });

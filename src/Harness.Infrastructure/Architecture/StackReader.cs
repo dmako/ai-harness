@@ -133,11 +133,15 @@ public sealed partial class StackReader(AnalysisRepository repository, Ecosystem
         }
 
         var evaluated = ecosystem.Build.Evaluate(file);
-        
+
         if (
             host is 0
-            && (evaluated.PropertyLocations.GetValueOrDefault("OutputType") is string outputType
-                && (outputType.Equals("exe", StringComparison.OrdinalIgnoreCase) || outputType.Equals("winexe", StringComparison.OrdinalIgnoreCase))
+            && (
+                evaluated.PropertyLocations.GetValueOrDefault("OutputType") is string outputType
+                && (
+                    outputType.Equals("exe", StringComparison.OrdinalIgnoreCase)
+                    || outputType.Equals("winexe", StringComparison.OrdinalIgnoreCase)
+                )
             )
         )
         {
@@ -397,7 +401,7 @@ public sealed partial class StackReader(AnalysisRepository repository, Ecosystem
         )
         {
             var trimmed = line.Trim();
-            if (!line.StartsWith(' ') && trimmed.EndsWith(':'))
+            if (!line.StartsWith(' ', StringComparison.Ordinal) && trimmed.EndsWith(':', StringComparison.Ordinal))
             {
                 section = trimmed[..^1];
             }
@@ -482,7 +486,9 @@ public sealed partial class StackReader(AnalysisRepository repository, Ecosystem
         file.Split('/')
             .Any(part =>
                 part is "node_modules" or "bin" or "obj" or "dist" or "build" or "vendor"
-                || part.StartsWith('.') && part.Length > 1 && part is not (".nvmrc" or ".node-version")
+                || part.StartsWith('.', StringComparison.Ordinal)
+                    && part.Length > 1
+                    && part is not (".nvmrc" or ".node-version")
             );
 
     private static string Badge(ProjectStack stack)

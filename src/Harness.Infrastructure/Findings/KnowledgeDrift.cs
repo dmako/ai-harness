@@ -128,8 +128,12 @@ public static partial class KnowledgeDrift
                 return null;
             }
 
-            var dot = p.LastIndexOf('.');
-            if (dot > p.LastIndexOf('/') && Exists(p[..dot]) && CodeName.IsMatch(p[(dot + 1)..]))
+            var dot = p.LastIndexOf('.', StringComparison.Ordinal);
+            if (
+                dot > p.LastIndexOf('/', StringComparison.Ordinal)
+                && Exists(p[..dot])
+                && CodeName.IsMatch(p[(dot + 1)..])
+            )
             {
                 return Contains(p[(dot + 1)..]) ? null : Stale(m, p, MissingCodeName, "heuristic", .7);
             }
@@ -141,7 +145,7 @@ public static partial class KnowledgeDrift
         /// Not only dots, not a URL, and under a top-level folder of the repository or a source file.
         /// </summary>
         private bool PathCandidate(string p) =>
-            !p.Split('/').All(s => s.StartsWith('.'))
+            !p.Split('/').All(s => s.StartsWith('.', StringComparison.Ordinal))
             && !p.Contains("://", StringComparison.Ordinal)
             && (_top.Contains(p.Split('/')[0]) || SourceExtensions.Contains(Path.GetExtension(p)));
 

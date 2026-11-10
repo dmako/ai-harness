@@ -102,7 +102,10 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
                 package => package.Key,
                 package =>
                     CloneCache.Hash(
-                        string.Join('\n', package.Select(file => file.Path + " " + file.Hash).Order(StringComparer.Ordinal))
+                        string.Join(
+                            '\n',
+                            package.Select(file => file.Path + " " + file.Hash).Order(StringComparer.Ordinal)
+                        )
                     ),
                 StringComparer.Ordinal
             );
@@ -175,7 +178,10 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
         Language(file).Length > 0
         && !TaskParsing.IsTestFile(file)
         && !ChangeCoupling.Generated(file)
-        && !file.Split('/').Any(part => part is "node_modules" or "vendor" or "testdata" || part.StartsWith('.'));
+        && !file.Split('/')
+            .Any(part =>
+                part is "node_modules" or "vendor" or "testdata" || part.StartsWith('.', StringComparison.Ordinal)
+            );
 
     private static string Language(string file) =>
         Path.GetExtension(file).ToUpperInvariant() switch

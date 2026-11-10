@@ -148,7 +148,7 @@ public sealed partial class WorkspaceSearchSession
             && !best.Path!.EndsWith(".go", StringComparison.Ordinal)
         )
         {
-            ns = best.QualifiedName[..best.QualifiedName.LastIndexOf('.')];
+            ns = best.QualifiedName[..best.QualifiedName.LastIndexOf('.', StringComparison.Ordinal)];
         }
 
         var (package, space, reference) = await OwningPackageAsync(reader, best.Path!, ns, token).ConfigureAwait(false);

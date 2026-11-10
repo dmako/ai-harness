@@ -188,7 +188,9 @@ internal abstract class InteractiveSession : IAsyncDisposable
                 JsonObject? json = null;
                 try
                 {
-                    json = line.TrimStart().StartsWith('{') ? JsonNode.Parse(line) as JsonObject : null;
+                    json = line.TrimStart().StartsWith('{', StringComparison.Ordinal)
+                        ? JsonNode.Parse(line) as JsonObject
+                        : null;
                 }
                 catch (JsonException)
                 {

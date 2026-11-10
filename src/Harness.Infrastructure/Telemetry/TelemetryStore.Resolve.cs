@@ -194,8 +194,10 @@ public sealed partial class TelemetryStore
     /// <summary>A call whose head moved: what changed since, and the files its answer held.</summary>
     private sealed record Pending(long Id, string Old, string[] Changed, HashSet<string> Paths);
 
-    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> NoFunctions =
-        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> NoFunctions = new Dictionary<
+        string,
+        IReadOnlyList<string>
+    >(StringComparer.Ordinal);
 
     /// <summary>The changed files a call's answer missed and whose callers are looked for: the first ten.</summary>
     private static IEnumerable<string> Missed(IEnumerable<string> changed, HashSet<string> paths) =>
@@ -234,8 +236,7 @@ public sealed partial class TelemetryStore
                 {
                     try
                     {
-                        var one = await repo.ChangedFunctionsAsync(calls.Key, to, [path], token)
-                            .ConfigureAwait(false);
+                        var one = await repo.ChangedFunctionsAsync(calls.Key, to, [path], token).ConfigureAwait(false);
                         alone[path] = one[path];
                     }
                     catch (IOException)

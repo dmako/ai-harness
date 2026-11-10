@@ -146,7 +146,10 @@ public sealed partial record GitRepository
                 .Select(Environment.GetEnvironmentVariable)
                 .Concat(
                     Enumerable
-                        .Range(0, int.TryParse(Environment.GetEnvironmentVariable("GIT_CONFIG_COUNT"), out var n) ? n : 0)
+                        .Range(
+                            0,
+                            int.TryParse(Environment.GetEnvironmentVariable("GIT_CONFIG_COUNT"), out var n) ? n : 0
+                        )
                         .SelectMany(i =>
                             new[]
                             {

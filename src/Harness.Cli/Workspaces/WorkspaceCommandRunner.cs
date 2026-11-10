@@ -44,7 +44,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
                         or Microsoft.Data.Sqlite.SqliteException
             )
         {
-            await error.Writer.WriteLineAsync($"harness {area} {verb}: {exception.Message}");
+            await error.Writer.WriteLineAsync($"harness {area} {verb}: {exception.Message}", CancellationToken.None);
             return 1;
         }
     }
@@ -87,11 +87,12 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             workspace = await Store.RenameAsync(workspace.Name, "", settings.Title, token);
         }
 
-        await output.WriteLineAsync("Created workspace " + workspace.Name + ".");
+        await output.WriteLineAsync("Created workspace " + workspace.Name + ".", CancellationToken.None);
         if (settings.Discover.Length is 0)
         {
             await output.WriteLineAsync(
-                "Add projects: harness workspace join " + workspace.Name + " --project <repository>"
+                "Add projects: harness workspace join " + workspace.Name + " --project <repository>",
+                CancellationToken.None
             );
             return 0;
         }
@@ -99,7 +100,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         foreach (var project in projects)
         {
             await output.WriteLineAsync(
-                "  + " + WorkspaceStore.ShortName(project) + "  " + project["root"]!.GetValue<string>()
+                "  + " + WorkspaceStore.ShortName(project) + "  " + project["root"]!.GetValue<string>(),
+                CancellationToken.None
             );
         }
 
@@ -108,7 +110,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             await output.WriteLineAsync(
                 "No registered projects under "
                     + Path.GetFullPath(settings.Discover)
-                    + " ('harness init' in a repository registers it)."
+                    + " ('harness init' in a repository registers it).",
+                CancellationToken.None
             );
             return 0;
         }
@@ -118,7 +121,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             token
         );
         await output.WriteLineAsync(
-            $"Joined {projects.Count} project(s); 'harness workspace leave {workspace.Name} --project <repository>' removes one."
+            $"Joined {projects.Count} project(s); 'harness workspace leave {workspace.Name} --project <repository>' removes one.",
+            CancellationToken.None
         );
         return 0;
     }
@@ -188,7 +192,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         {
             var added = await Store.JoinAsync(settings.Name, [id], token);
             await output.WriteLineAsync(
-                name + (added.Count is 0 ? " is already in " : " joined ") + settings.Name + "."
+                name + (added.Count is 0 ? " is already in " : " joined ") + settings.Name + ".",
+                CancellationToken.None
             );
         }
         else
@@ -200,7 +205,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
                         removed
                             ? " left " + settings.Name + " (its state is untouched)."
                             : " is not in " + settings.Name + "."
-                    )
+                    ),
+                CancellationToken.None
             );
         }
         return 0;
@@ -210,7 +216,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
     {
         await Store.DeleteAsync(settings.Name, token);
         await output.WriteLineAsync(
-            "Deleted workspace " + settings.Name + " (its projects and their state are untouched)."
+            "Deleted workspace " + settings.Name + " (its projects and their state are untouched).",
+            CancellationToken.None
         );
         return 0;
     }
@@ -226,7 +233,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         if (settings.To.Length is 0 && title is null)
         {
             await error.Writer.WriteLineAsync(
-                "harness workspace rename: give --to <new name>, --title <display name> or --clear-title"
+                "harness workspace rename: give --to <new name>, --title <display name> or --clear-title",
+                CancellationToken.None
             );
             return 2;
         }
@@ -235,12 +243,16 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             "Workspace "
                 + workspace.Name
                 + (workspace.Title.Length > 0 ? ", shown as " + HarnessJson.Serialize(workspace.Title) : "")
-                + "."
+                + ".",
+            CancellationToken.None
         );
         if (workspace.Name != settings.Name)
         {
             await output.WriteLineAsync(
-                "Agents and commands now use workspace:" + workspace.Name + "; its members and knowledge are unchanged."
+                "Agents and commands now use workspace:"
+                    + workspace.Name
+                    + "; its members and knowledge are unchanged.",
+                CancellationToken.None
             );
         }
 
@@ -257,7 +269,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         await output.WriteLineAsync(
             "Forgot "
                 + settings.Id
-                + " (its repository and state are untouched; init, sync or an agent there registers it again)."
+                + " (its repository and state are untouched; init, sync or an agent there registers it again).",
+            CancellationToken.None
         );
         return 0;
     }
@@ -279,7 +292,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         if (name is null && title is null)
         {
             await error.Writer.WriteLineAsync(
-                "harness projects rename: give --to, --reset-name, --title or --clear-title"
+                "harness projects rename: give --to, --reset-name, --title or --clear-title",
+                CancellationToken.None
             );
             return 2;
         }
@@ -294,7 +308,8 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
                         ? ", shown as " + HarnessJson.Serialize(value)
                         : ""
                 )
-                + "."
+                + ".",
+            CancellationToken.None
         );
         return 0;
     }
@@ -326,7 +341,7 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
             {
                 if (project != projects[0])
                 {
-                    await output.WriteLineAsync();
+                    await output.WriteLineAsync(CancellationToken.None);
                 }
 
                 await PrintProjectAsync(project, live);
@@ -338,7 +353,10 @@ internal sealed class WorkspaceCommandRunner(ProjectLifecycle lifecycle, TextWri
         }
         else if (projects.Length is 0)
         {
-            await output.WriteLineAsync("No projects registered yet: 'harness init' in a repository registers it.");
+            await output.WriteLineAsync(
+                "No projects registered yet: 'harness init' in a repository registers it.",
+                CancellationToken.None
+            );
         }
 
         return 0;

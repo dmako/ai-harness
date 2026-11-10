@@ -44,7 +44,7 @@ public sealed class ProviderTools(
             var kind = String(arguments, "kind") is { Length: > 0 } given ? given : "all";
             var capabilities = KindCapabilities(kind);
             var path = String(arguments, "path");
-            if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal))
+            if (path.StartsWith('/', StringComparison.Ordinal) || path.Contains("..", StringComparison.Ordinal))
             {
                 throw new ArgumentException("path must be relative to the project root");
             }

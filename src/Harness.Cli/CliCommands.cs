@@ -722,7 +722,7 @@ internal static class CliCommands
         {
             return found;
         }
-        var split = path.LastIndexOf(' ');
+        var split = path.LastIndexOf(' ', StringComparison.Ordinal);
         var parent = split < 0 ? root : Group(root, groups, path[..split]);
         var command = new Command(path[(split + 1)..]);
         parent.Subcommands.Add(command);

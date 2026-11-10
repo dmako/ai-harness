@@ -25,22 +25,25 @@ internal sealed class DocsCommand(TextWriter output, CliErrorOutput error)
             if (UiAssets.Find(settings.Section) is not { } section)
             {
                 await error.Writer.WriteLineAsync(
-                    "harness docs: no section " + HarnessJson.Serialize(settings.Section) + " (harness docs lists them)"
+                    "harness docs: no section "
+                        + HarnessJson.Serialize(settings.Section)
+                        + " (harness docs lists them)",
+                    CancellationToken.None
                 );
                 return 2;
             }
-            await output.WriteLineAsync(section.Body?.Trim());
+            await output.WriteLineAsync(section.Body?.Trim(), CancellationToken.None);
             return 0;
         }
         foreach (var document in UiAssets.Documents)
         {
-            await output.WriteLineAsync("\n" + document.Title + ":");
+            await output.WriteLineAsync("\n" + document.Title + ":", CancellationToken.None);
             foreach (var section in UiAssets.Sections.Where(s => s.Doc == document.Name))
             {
-                await output.WriteLineAsync($"  {section.Slug, -40} {section.Title}");
+                await output.WriteLineAsync($"  {section.Slug, -40} {section.Title}", CancellationToken.None);
             }
         }
-        await output.WriteLineAsync("\nharness docs <section> prints one.");
+        await output.WriteLineAsync("\nharness docs <section> prints one.", CancellationToken.None);
         return 0;
     }
 }
@@ -124,7 +127,8 @@ internal sealed class SessionCommandRunner(ProjectLifecycle lifecycle, TextWrite
             )
         {
             await error.Writer.WriteLineAsync(
-                "harness providers sessions" + (verb is "list" ? "" : " " + verb) + ": " + exception.Message
+                "harness providers sessions" + (verb is "list" ? "" : " " + verb) + ": " + exception.Message,
+                CancellationToken.None
             );
             return 1;
         }
@@ -166,7 +170,7 @@ internal sealed class SessionCommandRunner(ProjectLifecycle lifecycle, TextWrite
             sessions.FirstOrDefault(s => s.Id.StartsWith(id, StringComparison.Ordinal))
             ?? throw new InvalidOperationException("no session " + id);
         await manager.StopAsync(session.Id, token);
-        await output.WriteLineAsync($"Stopped {Short(session.Id)} ({Home(session.Root)}).");
+        await output.WriteLineAsync($"Stopped {Short(session.Id)} ({Home(session.Root)}).", CancellationToken.None);
         return 0;
     }
 
@@ -201,7 +205,7 @@ internal sealed class SessionCommandRunner(ProjectLifecycle lifecycle, TextWrite
             _ =>
                 $"Started a session for {Home(manager.Root)}; it loads in the background (harness providers sessions).",
         };
-        await output.WriteLineAsync(message);
+        await output.WriteLineAsync(message, CancellationToken.None);
         return 0;
     }
 

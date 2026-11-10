@@ -5,6 +5,8 @@ model-backed provider is added later. The findings and the reasoning are in
 [doc/architecture/meai-spike.md](../../doc/architecture/meai-spike.md). This folder holds the code and the raw
 results.
 
+Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+
 `MeaiSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the
 repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like
 harness. It references:

@@ -72,7 +72,10 @@ internal sealed partial class TaskCommandRunner
         }
         else
         {
-            await output.WriteLineAsync($"{(add ? "Added" : "Saved")} blueprint {saved.Id}: {saved.Title}");
+            await output.WriteLineAsync(
+                $"{(add ? "Added" : "Saved")} blueprint {saved.Id}: {saved.Title}",
+                CancellationToken.None
+            );
         }
     }
 
@@ -107,23 +110,25 @@ internal sealed partial class TaskCommandRunner
             return;
         }
 
-        await output.WriteLineAsync($"Removed blueprint {removed.Id}.");
+        await output.WriteLineAsync($"Removed blueprint {removed.Id}.", CancellationToken.None);
         if (removed.Moved.Count is not 0)
         {
             await output.WriteLineAsync(
-                $"Moved to {(settings.To.Length is 0 ? "no blueprint" : settings.To)}: {string.Join(", ", removed.Moved)}"
+                $"Moved to {(settings.To.Length is 0 ? "no blueprint" : settings.To)}: {string.Join(", ", removed.Moved)}",
+                CancellationToken.None
             );
         }
 
         if (removed.Deleted.Count is not 0)
         {
-            await output.WriteLineAsync("Deleted: " + string.Join(", ", removed.Deleted));
+            await output.WriteLineAsync("Deleted: " + string.Join(", ", removed.Deleted), CancellationToken.None);
         }
 
         if (removed.Unlinked.Count is not 0)
         {
             await output.WriteLineAsync(
-                "No longer depending on a deleted task: " + string.Join(", ", removed.Unlinked)
+                "No longer depending on a deleted task: " + string.Join(", ", removed.Unlinked),
+                CancellationToken.None
             );
         }
     }
@@ -203,7 +208,8 @@ internal sealed partial class TaskCommandRunner
         else
         {
             await output.WriteLineAsync(
-                $"Approved {approved.Proposal.Id}: blueprint {approved.Blueprint.Id} {approved.Blueprint.Title}"
+                $"Approved {approved.Proposal.Id}: blueprint {approved.Blueprint.Id} {approved.Blueprint.Title}",
+                CancellationToken.None
             );
         }
     }
@@ -222,7 +228,7 @@ internal sealed partial class TaskCommandRunner
         }
         else
         {
-            await output.WriteLineAsync($"Rejected {rejected.Id}.");
+            await output.WriteLineAsync($"Rejected {rejected.Id}.", CancellationToken.None);
         }
     }
 }

@@ -186,7 +186,7 @@ public sealed partial class StaticMsBuild
             switch (text[i])
             {
                 case '\'':
-                    var closing = text.IndexOf('\'', i + 1);
+                    var closing = text.IndexOf('\'', i + 1, StringComparison.Ordinal);
                     i = closing < 0 ? text.Length : closing + 1;
                     break;
                 case '(' or ')':

@@ -153,9 +153,7 @@ public sealed partial class WorkspaceEvidenceReader
 
     /// <summary>What a focused view needs of the other members: their builds, when it reads builds or stacks.</summary>
     private static MemberReads PeerReads(MemberReads reads) =>
-        (reads & (MemberReads.Builds | MemberReads.Stacks)) is MemberReads.None
-            ? MemberReads.None
-            : MemberReads.Builds;
+        (reads & (MemberReads.Builds | MemberReads.Stacks)) is MemberReads.None ? MemberReads.None : MemberReads.Builds;
 
     /// <summary>A member's build model, read once.</summary>
     internal async Task<ProjectBuild?> BuildAsync(WorkspaceMember member, CancellationToken token)

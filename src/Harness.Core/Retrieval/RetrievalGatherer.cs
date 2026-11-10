@@ -297,7 +297,7 @@ public static class RetrievalGatherer
                 candidate.Scores["loose"] = 1;
             }
 
-            var filename = candidate.Path[(candidate.Path.LastIndexOf('/') + 1)..];
+            var filename = candidate.Path[(candidate.Path.LastIndexOf('/', StringComparison.Ordinal) + 1)..];
             if (
                 phrase.Length > 0
                 && (candidate.Name + " " + filename).Contains(phrase, StringComparison.OrdinalIgnoreCase)

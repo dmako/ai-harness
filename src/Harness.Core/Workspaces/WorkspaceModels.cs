@@ -72,7 +72,7 @@ public static class WorkspaceReferences
         }
 
         var path = text[(colon + 1)..];
-        var hash = path.LastIndexOf('#');
+        var hash = path.LastIndexOf('#', StringComparison.Ordinal);
         return hash < 0 ? new(text[..colon], path) : new(text[..colon], path[..hash], path[(hash + 1)..]);
     }
 

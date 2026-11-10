@@ -5,6 +5,8 @@ on the CLIs' transcripts, and on harness's own runner over the CLIs' stdio proto
 are in [doc/architecture/maf-sessions-spike.md](../../doc/architecture/maf-sessions-spike.md). This folder holds the
 code and the raw results.
 
+Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+
 `MafSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the
 repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like
 harness. It references ClaudeCodeSdk.MAF 10.4.4 and CodexSdk.MAF 10.0.3, which bring Microsoft.Agents.AI 1.21.0.

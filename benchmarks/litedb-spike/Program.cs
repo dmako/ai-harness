@@ -6,7 +6,10 @@ return args switch
     ["aot"] => AotCheck.Run(),
     ["mutex"] => MutexProbe.Run(),
     ["mutex-child", var name] => MutexProbe.Child(name),
-    ["bench", var source, var runs] => Bench.Run(source, int.Parse(runs, System.Globalization.CultureInfo.InvariantCulture)),
+    ["bench", var source, var runs] => Bench.Run(
+        source,
+        int.Parse(runs, System.Globalization.CultureInfo.InvariantCulture)
+    ),
     ["contend", var engine, var processes, var writes] => Contend.Run(
         engine,
         int.Parse(processes, System.Globalization.CultureInfo.InvariantCulture),
@@ -19,7 +22,10 @@ return args switch
         int.Parse(writes, System.Globalization.CultureInfo.InvariantCulture)
     ),
     ["hold", var engine] => Contend.Hold(engine, 8),
-    ["hold", var engine, var seconds] => Contend.Hold(engine, int.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture)),
+    ["hold", var engine, var seconds] => Contend.Hold(
+        engine,
+        int.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture)
+    ),
     ["hold-child", var engine, var path, var seconds] => Contend.HoldChild(
         engine,
         path,

@@ -2,7 +2,7 @@
 
   <PropertyGroup Label="Configurations">
     <Configurations>Debug;Release</Configurations>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Platforms>AnyCPU;x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <PropertyGroup Label="Code standards and quality">
-    <LangVersion>14.0</LangVersion>
+    <LangVersion>15.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
@@ -40,6 +40,9 @@
     <!-- Disabling static graph restore due to a bug related to NuGetAuditSuppress. See: https://github.com/NuGet/Home/issues/14300 -->
     <RestoreUseStaticGraphEvaluation>false</RestoreUseStaticGraphEvaluation>
     <RestoreSerializeGlobalProperties>true</RestoreSerializeGlobalProperties>
+    <!-- No wwwroot: harness ui assets are embedded resources. Without this, the .NET 11 Web SDK adds hot reload
+         browser-tools modules to Debug builds of the Web SDK executables and fails on their missing endpoints. -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
 
   <PropertyGroup Label="NuGet dependencies management and auditing">

@@ -78,7 +78,7 @@ internal sealed class MigrateCommand(
         var jobs = settings.Jobs is 0 ? DefaultJobs : settings.Jobs;
         if (jobs < 1)
         {
-            await error.Writer.WriteLineAsync("harness migrate: --jobs must be at least 1");
+            await error.Writer.WriteLineAsync("harness migrate: --jobs must be at least 1", CancellationToken.None);
             return 2;
         }
 
@@ -116,7 +116,10 @@ internal sealed class MigrateCommand(
         var ok = machine.Status is "ok" && projects.All(project => project.Status is "ok");
         if (settings.Json)
         {
-            await output.WriteLineAsync(Json(machine, projects, settings.DryRun, jobs).ToJsonString(JsonOptions));
+            await output.WriteLineAsync(
+                Json(machine, projects, settings.DryRun, jobs).ToJsonString(JsonOptions),
+                CancellationToken.None
+            );
         }
         else
         {
@@ -597,7 +600,7 @@ internal sealed class MigrateCommand(
         await Printing.WaitAsync(token);
         try
         {
-            await output.WriteAsync(text.ToString());
+            await output.WriteAsync(text.ToString(), CancellationToken.None);
         }
         finally
         {

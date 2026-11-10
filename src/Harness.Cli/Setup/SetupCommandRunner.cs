@@ -134,7 +134,7 @@ internal sealed class SetupCommandRunner(
             catch (Exception exception) when (EditError(exception))
             {
                 failed = true;
-                await output.WriteLineAsync(label + ": error: " + exception.Message);
+                await output.WriteLineAsync(label + ": error: " + exception.Message, CancellationToken.None);
             }
         }
         if (settings.DryRun)
@@ -143,7 +143,10 @@ internal sealed class SetupCommandRunner(
         }
         else if (spec is not null && !failed)
         {
-            await output.WriteLineAsync("\nRestart Claude Code / Codex sessions to pick up changes.");
+            await output.WriteLineAsync(
+                "\nRestart Claude Code / Codex sessions to pick up changes.",
+                CancellationToken.None
+            );
         }
 
         return failed ? 1 : 0;
@@ -251,7 +254,7 @@ internal sealed class SetupCommandRunner(
         catch (NotRepositoryException)
         { /* User configuration can still be removed outside a repository. */
         }
-        await output.WriteLineAsync("== MCP server entries");
+        await output.WriteLineAsync("== MCP server entries", CancellationToken.None);
         var code = await EntriesAsync(
             new ClientSettings
             {
@@ -263,7 +266,7 @@ internal sealed class SetupCommandRunner(
             null,
             token
         );
-        await output.WriteLineAsync("\n== Hooks");
+        await output.WriteLineAsync("\n== Hooks", CancellationToken.None);
         if (
             await ApplyRemovalsAsync(
                 SetupCleanup.ClientHooks(_paths, repository?.Root, settings.DryRun),
@@ -290,7 +293,7 @@ internal sealed class SetupCommandRunner(
                 code = 1;
             }
 
-            await output.WriteLineAsync("\n== Agent instructions");
+            await output.WriteLineAsync("\n== Agent instructions", CancellationToken.None);
             var result = await InstructionsAsync(
                 new()
                 {
@@ -305,7 +308,7 @@ internal sealed class SetupCommandRunner(
                 code = result;
             }
         }
-        await output.WriteLineAsync("\n== Shell completion");
+        await output.WriteLineAsync("\n== Shell completion", CancellationToken.None);
         if (
             await ApplyRemovalsAsync(
                 await SetupCleanup.CompletionsAsync(_paths.Home, settings.DryRun, token),
@@ -319,21 +322,27 @@ internal sealed class SetupCommandRunner(
             code = 1;
         }
 
-        await output.WriteLineAsync("\n== Project data");
+        await output.WriteLineAsync("\n== Project data", CancellationToken.None);
         if (repository is null)
         {
-            await output.WriteLineAsync("not in a Git repository: no project data here");
+            await output.WriteLineAsync("not in a Git repository: no project data here", CancellationToken.None);
         }
         else
         {
             var directory = Path.GetFullPath(Path.Combine(repository.StateRoot, ".harness"));
             if (!settings.DeleteData)
             {
-                await output.WriteLineAsync("kept " + directory + " (add --delete-data to remove it)");
+                await output.WriteLineAsync(
+                    "kept " + directory + " (add --delete-data to remove it)",
+                    CancellationToken.None
+                );
             }
             else if (settings.DryRun)
             {
-                await output.WriteLineAsync("would delete " + directory + " and forget the project");
+                await output.WriteLineAsync(
+                    "would delete " + directory + " and forget the project",
+                    CancellationToken.None
+                );
             }
             else
             {
@@ -361,11 +370,12 @@ internal sealed class SetupCommandRunner(
                     await lifecycle.Registry.ForgetAsync(project["id"]!.GetValue<string>(), token);
                 }
 
-                await output.WriteLineAsync("deleted " + directory + " and forgot the project");
+                await output.WriteLineAsync("deleted " + directory + " and forgot the project", CancellationToken.None);
             }
         }
         await output.WriteLineAsync(
-            "\nThe binaries stay: delete harness (and harness-graphify) from your PATH to finish."
+            "\nThe binaries stay: delete harness (and harness-graphify) from your PATH to finish.",
+            CancellationToken.None
         );
         if (settings.DryRun)
         {

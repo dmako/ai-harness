@@ -173,7 +173,7 @@ public sealed class UiAgentTests
                 AppContext.BaseDirectory,
                 "../../../../../src/Harness.Agents/bin",
                 Configuration,
-                "net10.0",
+                TestDirectory.TargetFramework,
                 "harness-agents" + suffix
             )
         );

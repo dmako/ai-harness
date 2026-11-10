@@ -21,7 +21,9 @@ namespace Harness.Infrastructure.Findings;
 internal static class WorkspaceInputs
 {
     internal static readonly string Build =
-        typeof(WorkspaceInputs).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        typeof(WorkspaceInputs)
+            .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
         ?? "";
 
     /// <summary>The fingerprint, or null when a member cannot be read (then the findings are computed).</summary>

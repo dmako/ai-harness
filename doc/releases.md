@@ -5,7 +5,7 @@ ARM64 (`linux-arm64`) and Apple Silicon macOS (`osx-arm64`). Intel macOS is not
 supported. See the root [README](../README.md) for OS libraries and unsigned
 macOS download trust steps.
 
-Release executables are trimmed Native AOT .NET 10 applications. Build each RID
+Release executables are trimmed Native AOT .NET 11 applications. Build each RID
 on its native host with the pinned SDK and compiler prerequisites: Visual Studio
 C++ tools and Windows SDK, Linux `clang` and `zlib1g-dev`, or Xcode command-line
 tools. Build Linux releases on the oldest supported distribution; binaries built

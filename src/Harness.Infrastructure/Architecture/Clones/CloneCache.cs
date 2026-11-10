@@ -30,7 +30,9 @@ public sealed class CloneCache(string directory)
         ExtractorVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)
         + "|"
         + (
-            typeof(CloneCache).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            typeof(CloneCache)
+                .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion
             ?? ""
         );
 
@@ -56,8 +58,10 @@ public sealed class CloneCache(string directory)
     internal static string TextHash(string text) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyDictionary<string, string>> _recorded =
-        new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string,
+        IReadOnlyDictionary<string, string>
+    > _recorded = new(StringComparer.Ordinal);
 
     /// <summary>
     /// The content hashes sync recorded for a worktree's files, current for this sync: a file whose recorded hash
@@ -67,9 +71,7 @@ public sealed class CloneCache(string directory)
 
     /// <summary>The recorded key of each file of the worktree at <paramref name="root"/>, if sync gave them.</summary>
     internal Func<string, string?> Recorded(string root) =>
-        _recorded.TryGetValue(Normalize(root), out var hashes)
-            ? path => hashes.GetValueOrDefault(path)
-            : _ => null;
+        _recorded.TryGetValue(Normalize(root), out var hashes) ? path => hashes.GetValueOrDefault(path) : _ => null;
 
     /// <summary>The entries kept for this repository; none when there is no cache, it is unreadable or outdated.</summary>
     internal Dictionary<string, CloneCacheEntry> Load(string root)

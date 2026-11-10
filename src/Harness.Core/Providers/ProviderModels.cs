@@ -39,7 +39,7 @@ public sealed record ProviderRequest(
     public bool Covers(string file)
     {
         var prefix = Path.Replace(System.IO.Path.DirectorySeparatorChar, '/');
-        prefix = prefix.EndsWith('/') ? prefix[..^1] : prefix;
+        prefix = prefix.EndsWith('/', StringComparison.Ordinal) ? prefix[..^1] : prefix;
         return Path.Length is 0 || file == prefix || file.StartsWith(prefix + "/", StringComparison.Ordinal);
     }
 }

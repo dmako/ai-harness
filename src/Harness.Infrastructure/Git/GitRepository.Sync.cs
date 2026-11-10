@@ -230,7 +230,9 @@ public sealed partial record GitRepository
         return result.Code switch
         {
             // with -v Git also reports a matching negation ("!pattern"), which re-includes the path
-            0 when IgnoreRule.Match(rule) is { Success: true } match && !match.Groups[1].Value.StartsWith('!') => rule,
+            0
+                when IgnoreRule.Match(rule) is { Success: true } match
+                    && !match.Groups[1].Value.StartsWith('!', StringComparison.Ordinal) => rule,
             0 or 1 => "",
             _ => throw new IOException("git check-ignore: " + result.Error.Trim()),
         };

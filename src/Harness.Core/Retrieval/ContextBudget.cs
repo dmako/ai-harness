@@ -220,7 +220,7 @@ public static class ContextPacker
         var end = 0;
         while (end < text.Length)
         {
-            var newline = text.IndexOf('\n', end);
+            var newline = text.IndexOf('\n', end, StringComparison.Ordinal);
             var next = newline < 0 ? text.Length : newline + 1;
             var bytes = Encoding.UTF8.GetByteCount(text.AsSpan(end, next - end));
             if ((long)length + bytes + Bytes(Marker) > maximum)

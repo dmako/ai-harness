@@ -150,7 +150,7 @@ public sealed class MemoryMcpProcessTests
             "Harness.Cli",
             "bin",
             Configuration,
-            "net10.0",
+            TestDirectory.TargetFramework,
             "harness.dll"
         );
         var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();

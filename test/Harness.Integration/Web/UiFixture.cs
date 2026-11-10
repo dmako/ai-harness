@@ -42,7 +42,8 @@ internal sealed class UiFixture : IAsyncDisposable
                     AppContext.BaseDirectory,
                     "../../../../../src/Harness.Cli/bin",
                     Configuration,
-                    "net10.0/harness.dll"
+                    TestDirectory.TargetFramework,
+                    "harness.dll"
                 )
             );
         }

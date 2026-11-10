@@ -233,7 +233,11 @@ public sealed class WorkspaceTools(
         var reference = WorkspaceReferences.Parse(path, members);
         var only = reference?.Project ?? "";
         path = reference?.Path.TrimEnd('/') ?? path;
-        if (path.StartsWith('/') || path.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(path))
+        if (
+            path.StartsWith('/', StringComparison.Ordinal)
+            || path.Contains("..", StringComparison.Ordinal)
+            || Path.IsPathRooted(path)
+        )
         {
             throw new ArgumentException("path must be relative to the project root (<project>:<relative path>)");
         }
@@ -261,9 +265,7 @@ public sealed class WorkspaceTools(
         CancellationToken token
     )
     {
-        var impact = await search
-            .ImpactAsync(request.Query, request.Limit, request.Deep, token)
-            .ConfigureAwait(false);
+        var impact = await search.ImpactAsync(request.Query, request.Limit, request.Deep, token).ConfigureAwait(false);
         var answer = new SearchAnswer { Home = impact.Home };
         answer.Hits.AddRange(impact.Hits);
         answer.Errors.AddRange(impact.Errors);

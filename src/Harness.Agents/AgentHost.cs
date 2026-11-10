@@ -47,8 +47,8 @@ public static class AgentHost
         ArgumentNullException.ThrowIfNull(error);
         if (!HostOptions.TryParse(args, out var options, out var problem))
         {
-            await error.WriteLineAsync(problem);
-            await error.WriteLineAsync(Help);
+            await error.WriteLineAsync(problem, CancellationToken.None);
+            await error.WriteLineAsync(Help, CancellationToken.None);
             return Usage;
         }
         if (options.Mode is "serve")

@@ -618,7 +618,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
     {
         foreach (var entry in _configuration.Resolve?.Index ?? [])
         {
-            var value = entry.StartsWith('$') ? Variable(entry[1..]) : entry;
+            var value = entry.StartsWith('$', StringComparison.Ordinal) ? Variable(entry[1..]) : entry;
             if (string.IsNullOrWhiteSpace(value))
             {
                 continue;

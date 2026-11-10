@@ -56,9 +56,10 @@ def verify(release, smoke):
                 data = read(binary['file'])
                 if digest(data) != binary['sha256'] or not binary['repeat_publish_verified']:
                     raise ValueError('Executable hash/repeat check failed')
-                # The Native AOT runtime exports this debugger header. Ordinary
+                # The Native AOT runtime exports a debugger entry point: the debug header
+                # up to .NET 10, the data contract descriptor from .NET 11. Ordinary
                 # managed PE assemblies/apphosts are not accepted on size alone.
-                if b'DotNetRuntimeDebugHeader\0' not in data:
+                if b'DotNetRuntimeDebugHeader\0' not in data and b'DotNetRuntimeContractDescriptor\0' not in data:
                     raise ValueError('Missing Native AOT runtime marker: ' + binary['file'])
                 magic = (b'MZ' if artifact['rid'].startswith('win-') else
                          b'\xcf\xfa\xed\xfe' if artifact['rid'].startswith('osx-') else b'\x7fELF')

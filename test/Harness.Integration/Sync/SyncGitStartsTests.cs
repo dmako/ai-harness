@@ -70,13 +70,16 @@ public sealed class SyncGitStartsTests
             .Files.Changes.Select(change => $"{change.Kind} {change.Path}")
             .Should()
             .BeEquivalentTo("modified a.cs", "added c.cs", "added untracked.cs", "deleted b.cs");
-        fixture.Hashes().Keys.Should().BeEquivalentTo(
-                "a.cs", "c.cs", "untracked.cs", ".gitignore", "app/App.csproj", "app/Program.cs");
+        fixture
+            .Hashes()
+            .Keys.Should()
+            .BeEquivalentTo("a.cs", "c.cs", "untracked.cs", ".gitignore", "app/App.csproj", "app/Program.cs");
         result.Findings.Should().Contain(findings => findings.Where == "project" && findings.Result != null);
         // cat-file, diff, one ls-files for what changed and for the findings, status; and, since an untracked
         // file came with a deleted one, the rename check's ls-tree and hash-object
-        var renames = starts.Where(s => s.StartsWith("ls-tree", StringComparison.Ordinal)
-            || s.StartsWith("hash-object", StringComparison.Ordinal));
+        var renames = starts.Where(s =>
+            s.StartsWith("ls-tree", StringComparison.Ordinal) || s.StartsWith("hash-object", StringComparison.Ordinal)
+        );
         starts.Except(renames).Should().HaveCount(4, string.Join("; ", starts));
         starts.Count(s => s.StartsWith("cat-file", StringComparison.Ordinal)).Should().Be(1);
         starts.Count(s => s.StartsWith("ls-files", StringComparison.Ordinal)).Should().Be(1);
@@ -87,7 +90,10 @@ public sealed class SyncGitStartsTests
     {
         using var fixture = await ProjectAsync();
         ProjectSyncResult? result = null;
-        var starts = await CountAsync(fixture.Root, async () => result = await fixture.RunAsync(new() { Mode = "full" }));
+        var starts = await CountAsync(
+            fixture.Root,
+            async () => result = await fixture.RunAsync(new() { Mode = "full" })
+        );
 
         result!.Files!.Mode.Should().Be("full");
         result.Findings.Should().Contain(findings => findings.Where == "project" && findings.Result != null);
@@ -105,9 +111,7 @@ public sealed class SyncGitStartsTests
             {
                 await repository.ListFilesAsync(TestContext.Current.CancellationToken);
                 fixture.Write("later.cs", "x");
-                (await repository.ListFilesAsync(TestContext.Current.CancellationToken))
-                    .Should()
-                    .Contain("later.cs");
+                (await repository.ListFilesAsync(TestContext.Current.CancellationToken)).Should().Contain("later.cs");
             }
         );
         starts.Should().HaveCount(2);

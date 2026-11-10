@@ -94,9 +94,7 @@ public static class TomlConfigurationEditor
             return new(Update(source, main, spec), "update");
         }
 
-        return owned.Length > 0 || entry
-            ? throw new InvalidDataException(LayoutError)
-            : new(Add(source, spec), "add");
+        return owned.Length > 0 || entry ? throw new InvalidDataException(LayoutError) : new(Add(source, spec), "add");
     }
 
     private static bool Current(JsonObject? entry, ServerSpec spec) =>
@@ -112,7 +110,7 @@ public static class TomlConfigurationEditor
             var (start, end) = RemovedRange(source, tables, item);
             output = output[..start] + output[end..];
         }
-        if (source.EndsWith('\n'))
+        if (source.EndsWith('\n', StringComparison.Ordinal))
         {
             output = string.IsNullOrWhiteSpace(output) ? "" : output.TrimEnd('\n') + "\n";
         }
@@ -142,9 +140,7 @@ public static class TomlConfigurationEditor
             return (start, end);
         }
 
-        while (
-            end > item.Table.CloseBracket!.Span.Offset && source[LineStart(source, end - 1)..end].Trim().Length is 0
-        )
+        while (end > item.Table.CloseBracket!.Span.Offset && source[LineStart(source, end - 1)..end].Trim().Length is 0)
         {
             end = LineStart(source, end - 1);
         }
@@ -155,7 +151,7 @@ public static class TomlConfigurationEditor
     private static string Add(string source, ServerSpec spec)
     {
         var output = source;
-        if (output.Length > 0 && !output.EndsWith('\n'))
+        if (output.Length > 0 && !output.EndsWith('\n', StringComparison.Ordinal))
         {
             output += "\n";
         }
@@ -214,7 +210,7 @@ public static class TomlConfigurationEditor
         List<string> missing
     )
     {
-        var end = source.IndexOf('\n', main.CloseBracket!.Span.Offset);
+        var end = source.IndexOf('\n', main.CloseBracket!.Span.Offset, StringComparison.Ordinal);
         var newline = MarkedBlock.Newline(source);
         return end < 0
             ? (source.Length, 0, newline + string.Join(newline, missing) + newline)
@@ -222,7 +218,7 @@ public static class TomlConfigurationEditor
     }
 
     private static int LineStart(string source, int offset) =>
-        offset <= 0 ? 0 : source.LastIndexOf('\n', offset - 1) + 1;
+        offset <= 0 ? 0 : source.LastIndexOf('\n', offset - 1, StringComparison.Ordinal) + 1;
 
     private static string Args(IReadOnlyList<string> args) => "[" + string.Join(", ", args.Select(Quote)) + "]";
 

@@ -187,7 +187,9 @@ internal sealed class AgentProcessRun : IAgentRun
         JsonObject? json;
         try
         {
-            json = line.TrimStart().StartsWith('{') ? JsonNode.Parse(line) as JsonObject : null;
+            json = line.TrimStart().StartsWith('{', StringComparison.Ordinal)
+                ? JsonNode.Parse(line) as JsonObject
+                : null;
         }
         catch (JsonException)
         {
