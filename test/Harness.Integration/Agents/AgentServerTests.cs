@@ -127,8 +127,14 @@ public sealed class AgentServerTests : IDisposable
     {
         await using var host = await Host.StartAsync(this, client, "", "exit now");
         (await host.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token)).Should().Be(AgentHost.Failed);
-        host.Events.Should()
-            .Contain(e => Is(e, "error") && Text(e, "text").Contains("the client exited", StringComparison.Ordinal));
+        // the host's last events can still be on their way through the pipe when it has ended
+        (
+            await host.WaitAsync(e =>
+                Is(e, "error") && Text(e, "text").Contains("the client exited", StringComparison.Ordinal)
+            )
+        )
+            .Should()
+            .NotBeNull();
         Text(AgentHostFiles.ReadState(State, host.Key)!, "status").Should().Be("failed");
     }
 
