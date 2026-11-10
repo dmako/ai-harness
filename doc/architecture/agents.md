@@ -73,7 +73,7 @@ and steer it.
 `on-request`, Codex's default, let Codex run a command outside the working tree without asking on Windows. A session
 a person supervises asks first instead (`untrusted`).
 
-**The pipe.** `harness-agent-<key>`, `PipeOptions.CurrentUserOnly`, 64 KiB buffers.
+**The pipe.** `harness-agent-<key>` on Windows; on Linux and macOS `ha-<first 16 digits of the key>`, because .NET makes it a Unix socket at `$TMPDIR/CoreFxPipe_<name>` and macOS limits socket paths to 104 bytes. `PipeOptions.CurrentUserOnly`, 64 KiB buffers.
 - Without a buffer, a write on Windows waits until the reader takes it, and a reader that stopped reading held the
   host open.
 - A new connection first gets every event so far, then each new one.

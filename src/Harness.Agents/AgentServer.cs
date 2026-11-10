@@ -328,6 +328,12 @@ internal sealed class AgentServer : IAsyncDisposable
     /// <summary>Numbers, logs and passes on one event, and keeps the state and the task's session row current.</summary>
     private void Emit(JsonObject item)
     {
+        // the state and the session row first, so a client that sees the event (a turn's end) reads them current
+        bool final;
+        lock (_state)
+        {
+            final = Track(item);
+        }
         string line;
         lock (_gate)
         {
@@ -352,14 +358,20 @@ internal sealed class AgentServer : IAsyncDisposable
             {
                 _error("harness-agents: could not log an event: " + exception.Message);
             }
-        }
-        lock (_state)
-        {
-            Track(item);
+            if (final)
+            {
+                // after the final status reached them: the listeners' streams end here
+                foreach (var listener in _listeners)
+                {
+                    listener.Writer.TryComplete();
+                }
+                _listeners.Clear();
+            }
         }
     }
 
-    private void Track(JsonObject item)
+    /// <summary>Applies an event to the state file and the session row; true for a final status (closed, failed).</summary>
+    private bool Track(JsonObject item)
     {
         switch (AgentHostFiles.Text(item, "event"))
         {
@@ -381,18 +393,7 @@ internal sealed class AgentServer : IAsyncDisposable
                     // before the turn starts, so a quick turn's end is recorded after it
                     Record("working");
                 }
-                if (status is AgentHostFiles.Closed or AgentHostFiles.Failed)
-                {
-                    lock (_gate)
-                    {
-                        foreach (var listener in _listeners)
-                        {
-                            listener.Writer.TryComplete();
-                        }
-                        _listeners.Clear();
-                    }
-                }
-                break;
+                return status is AgentHostFiles.Closed or AgentHostFiles.Failed;
             case "turn":
                 _lastActivity = DateTimeOffset.UtcNow;
                 Record(
@@ -407,6 +408,7 @@ internal sealed class AgentServer : IAsyncDisposable
             default:
                 break;
         }
+        return false;
     }
 
     private void WriteState()

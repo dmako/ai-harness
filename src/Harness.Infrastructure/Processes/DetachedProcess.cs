@@ -138,27 +138,40 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
                 ) + "\0\0",
                 unicode: true
             );
-            // BREAKAWAY_FROM_JOB + EXTENDED_STARTUPINFO + UNICODE_ENVIRONMENT + NEW_PROCESS_GROUP + DETACHED_PROCESS.
-            if (
-                !WindowsProviderProcess.Native.CreateProcessW(
+            // EXTENDED_STARTUPINFO + UNICODE_ENVIRONMENT + NEW_PROCESS_GROUP + DETACHED_PROCESS, first with
+            // BREAKAWAY_FROM_JOB so the watch outlives a kill-on-close job of its starter. A containing job without
+            // JOB_OBJECT_LIMIT_BREAKAWAY_OK refuses that with ERROR_ACCESS_DENIED (seen for the .NET 11 test host on
+            // GitHub's Windows runners); the watch then starts inside the job and lives as long as the job does.
+            const int Detached = 0x00080608;
+            const int BreakawayFromJob = 0x01000000;
+            const int AccessDenied = 5;
+            var started = Create(Detached | BreakawayFromJob, ref startup, out var info);
+            if (!started && Marshal.GetLastPInvokeError() is AccessDenied)
+            {
+                started = Create(Detached, ref startup, out info);
+            }
+            if (!started)
+            {
+                throw new Win32Exception(Marshal.GetLastPInvokeError(), "Cannot start the detached graphify watch.");
+            }
+
+            bool Create(
+                int flags,
+                ref WindowsProviderProcess.StartupInfoEx startup,
+                out WindowsProviderProcess.ProcessInfo info
+            ) =>
+                WindowsProviderProcess.Native.CreateProcessW(
                     executable,
                     commandLine.Pointer,
                     IntPtr.Zero,
                     IntPtr.Zero,
                     true,
-                    0x01080608,
+                    flags,
                     block.Pointer,
                     directory,
                     ref startup,
-                    out var info
-                )
-            )
-            {
-                throw new Win32Exception(
-                    Marshal.GetLastPInvokeError(),
-                    "Cannot detach graphify watch; a containing Windows job may forbid process breakaway."
+                    out info
                 );
-            }
 
             using var processHandle = new SafeProcessHandle(info.Process, true);
             using var threadHandle = new SafeWaitHandle(info.Thread, true);

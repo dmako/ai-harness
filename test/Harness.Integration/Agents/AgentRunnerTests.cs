@@ -105,8 +105,10 @@ public sealed class AgentRunnerTests : IDisposable
     {
         await using var run = await Runner(client).StartAsync(Start(client, "hang", "wait"), Token);
         var (agent, descendant) = await Pids();
-        var events = Collect(run);
-        await ProviderFixture.EventuallyAsync(() => Calls().Count is 1);
+        List<AgentEvent> seen = [];
+        var events = Collect(run, seen);
+        // the fake prints its session line after it records the call: cancel only once the run has read it
+        await ProviderFixture.EventuallyAsync(() => Seen(seen).Any(e => e.Kind == AgentEventKind.Session));
 
         await run.CancelAsync();
         var outcome = await run.Completion.WaitAsync(TimeSpan.FromSeconds(10), Token);
@@ -288,14 +290,25 @@ public sealed class AgentRunnerTests : IDisposable
         return database;
     }
 
-    private static async Task<List<AgentEvent>> Collect(IAgentRun run)
+    private static async Task<List<AgentEvent>> Collect(IAgentRun run, List<AgentEvent>? events = null)
     {
-        List<AgentEvent> events = [];
+        events ??= [];
         await foreach (var item in run.Events.WithCancellation(Token))
         {
-            events.Add(item);
+            lock (events)
+            {
+                events.Add(item);
+            }
         }
         return events;
+    }
+
+    private static List<AgentEvent> Seen(List<AgentEvent> events)
+    {
+        lock (events)
+        {
+            return [.. events];
+        }
     }
 
     private List<JsonObject> Calls()

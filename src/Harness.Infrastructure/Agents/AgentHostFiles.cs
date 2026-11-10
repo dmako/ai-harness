@@ -12,7 +12,7 @@ namespace Harness.Infrastructure.Agents;
 /// <summary>
 /// What an agent host (harness-agents serve) shows of itself beside the project database, in agents/: its state
 /// (&lt;key&gt;.json: client, task, session, process, status) and its events (&lt;key&gt;.jsonl, one JSON object per line
-/// with a sequence number). Commands and live events go through its named pipe, harness-agent-&lt;key&gt;, open to the
+/// with a sequence number). Commands and live events go through its named pipe (see <see cref="Pipe"/>), open to the
 /// current user only.
 /// </summary>
 public static class AgentHostFiles
@@ -33,7 +33,12 @@ public static class AgentHostFiles
 
     public static string LogPath(string directory, string key) => Path.Combine(directory, key + ".jsonl");
 
-    public static string Pipe(string key) => PipePrefix + key;
+    /// <summary>
+    /// The host's pipe name: harness-agent-&lt;key&gt; on Windows. Elsewhere .NET makes the pipe a Unix socket at
+    /// $TMPDIR/CoreFxPipe_&lt;name&gt;, and socket paths are limited to 104 bytes on macOS (108 on Linux); macOS's long
+    /// TMPDIR (/var/folders/../T/) left no room for the full key, so the name there is ha- and the key's first 16 digits.
+    /// </summary>
+    public static string Pipe(string key) => OperatingSystem.IsWindows() ? PipePrefix + key : "ha-" + key[..16];
 
     /// <summary>A host key: 32 lowercase hex digits, the only form a pipe or file name is built from.</summary>
     public static bool IsKey(string key) => key.Length is 32 && key.All(char.IsAsciiHexDigitLower);
