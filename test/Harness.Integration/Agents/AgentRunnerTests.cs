@@ -345,19 +345,28 @@ public sealed class AgentRunnerTests : IDisposable
 
     private static int Pid(string path)
     {
-        string text = "";
-        for (var attempt = 0; attempt < 50 && text.Length is 0; attempt++)
+        // the fake creates the file before it writes the id: an empty read waits like a failed one
+        for (var attempt = 0; attempt < 250; attempt++)
+        {
+            if (Read(path) is { Length: > 0 } text)
+            {
+                return int.Parse(text, CultureInfo.InvariantCulture);
+            }
+            Thread.Sleep(20);
+        }
+        throw new TimeoutException("no process id in " + path);
+
+        static string Read(string path)
         {
             try
             {
-                text = File.ReadAllText(path).Trim();
+                return File.ReadAllText(path).Trim();
             }
             catch (IOException)
             {
-                Thread.Sleep(20);
+                return "";
             }
         }
-        return int.Parse(text, CultureInfo.InvariantCulture);
     }
 
     public void Dispose() => TestDirectory.Delete(_root);
