@@ -130,6 +130,8 @@ internal sealed class CodexSession : InteractiveSession
         {
             throw new KeyNotFoundException("no approval request " + id + " is waiting");
         }
+        // before the answer reaches the client, so its reaction is never logged ahead of the answer
+        Answered(id, allow);
         await WriteAsync(
             new()
             {
@@ -139,7 +141,6 @@ internal sealed class CodexSession : InteractiveSession
             },
             cancellationToken
         );
-        Answered(id, allow);
     }
 
     protected override void Read(JsonObject line)

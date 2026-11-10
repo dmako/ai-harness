@@ -4,6 +4,7 @@ using AwesomeAssertions;
 using Harness.Agents;
 using Harness.Core.Agents;
 using Harness.Core.Tasks;
+using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Processes;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Tasks;
@@ -52,7 +53,7 @@ public sealed class AgentRunnerTests : IDisposable
         Arguments(call).Should().ContainInOrder("-p", "--output-format", "stream-json", "--session-id", run.SessionId);
         ((string?)call["task"], (string?)call["prompt"], (string?)call["cwd"])
             .Should()
-            .Be(("TASK-0001", "build it", _root));
+            .Be(("TASK-0001", "build it", Physical(_root)));
     }
 
     [Fact]
@@ -303,6 +304,10 @@ public sealed class AgentRunnerTests : IDisposable
         }
         return events;
     }
+
+    /// <summary>The directory as the client's getcwd reports it: macOS's /var is a link to /private/var.</summary>
+    private static string Physical(string directory) =>
+        OperatingSystem.IsWindows() ? directory : GitRepository.PhysicalDirectory(directory);
 
     private static List<AgentEvent> Seen(List<AgentEvent> events)
     {

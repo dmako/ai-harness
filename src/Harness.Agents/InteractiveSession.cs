@@ -372,6 +372,8 @@ internal sealed class ClaudeSession : InteractiveSession
         var response = allow
             ? new JsonObject { ["behavior"] = "allow", ["updatedInput"] = input?.DeepClone() ?? new JsonObject() }
             : new JsonObject { ["behavior"] = "deny", ["message"] = "Denied by the user in harness ui." };
+        // before the answer reaches the client, so its reaction is never logged ahead of the answer
+        Answered(id, allow);
         await WriteAsync(
             new()
             {
@@ -385,7 +387,6 @@ internal sealed class ClaudeSession : InteractiveSession
             },
             cancellationToken
         );
-        Answered(id, allow);
     }
 
     protected override void Read(JsonObject line)
