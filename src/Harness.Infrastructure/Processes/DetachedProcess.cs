@@ -232,7 +232,12 @@ internal sealed class DetachedProcess(int id, Task<int> completion) : IGraphifyW
             try
             {
                 Check(UnixProviderProcess.Native.posix_spawnattr_setpgroup(attributes.Pointer, 0));
-                Check(UnixProviderProcess.Native.posix_spawnattr_setflags(attributes.Pointer, 2));
+                Check(
+                    UnixProviderProcess.Native.posix_spawnattr_setflags(
+                        attributes.Pointer,
+                        UnixProviderProcess.SpawnFlags
+                    )
+                );
                 using var cwd = new NativeMemory(directory);
                 Check(UnixProviderProcess.Native.posix_spawn_file_actions_addchdir_np(actions.Pointer, cwd.Pointer));
                 foreach (var (handle, target) in new[] { (input, 0), (output, 1), (error, 2) })

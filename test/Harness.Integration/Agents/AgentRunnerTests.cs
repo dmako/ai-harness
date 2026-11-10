@@ -19,6 +19,9 @@ namespace Harness.Integration.Agents;
 public sealed class AgentRunnerTests : IDisposable
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    /// <summary>How long a run may take before the test fails instead of hanging the job.</summary>
+    private static readonly TimeSpan Wait = TimeSpan.FromSeconds(60);
     private readonly string _root = Directory.CreateTempSubdirectory("harness-agents-").FullName;
 
     [Fact]
@@ -26,8 +29,8 @@ public sealed class AgentRunnerTests : IDisposable
     {
         await using var run = await Runner("claude").StartAsync(Start("claude", "normal", "build it"), Token);
         Guid.TryParse(run.SessionId, out _).Should().BeTrue();
-        var events = await Collect(run);
-        var outcome = await run.Completion;
+        var events = await Collect(run).WaitAsync(Wait, Token);
+        var outcome = await run.Completion.WaitAsync(Wait, Token);
 
         (outcome.Status, outcome.SessionId, outcome.Text, outcome.Model)
             .Should()
@@ -56,8 +59,8 @@ public sealed class AgentRunnerTests : IDisposable
     public async Task ClaudeResumesTheSessionItIsGiven()
     {
         await using var run = await Runner("claude").ResumeAsync("abc-1", Start("claude", "normal", "go on"), Token);
-        await Collect(run);
-        var outcome = await run.Completion;
+        await Collect(run).WaitAsync(Wait, Token);
+        var outcome = await run.Completion.WaitAsync(Wait, Token);
         (outcome.Status, outcome.SessionId, outcome.Text)
             .Should()
             .Be((AgentRunStatus.Completed, "abc-1", "resumed abc-1: go on"));
@@ -71,8 +74,8 @@ public sealed class AgentRunnerTests : IDisposable
         await using (var run = await Runner("codex").StartAsync(Start("codex", "normal", "first"), Token))
         {
             run.SessionId.Should().BeEmpty();
-            var events = await Collect(run);
-            var outcome = await run.Completion;
+            var events = await Collect(run).WaitAsync(Wait, Token);
+            var outcome = await run.Completion.WaitAsync(Wait, Token);
             thread = outcome.SessionId;
             Guid.TryParse(thread, out _).Should().BeTrue();
             events[0].Should().Match<AgentEvent>(e => e.Kind == AgentEventKind.Session && e.SessionId == thread);
@@ -86,8 +89,8 @@ public sealed class AgentRunnerTests : IDisposable
         }
         await using (var resumed = await Runner("codex").ResumeAsync(thread, Start("codex", "normal", "next"), Token))
         {
-            await Collect(resumed);
-            var outcome = await resumed.Completion;
+            await Collect(resumed).WaitAsync(Wait, Token);
+            var outcome = await resumed.Completion.WaitAsync(Wait, Token);
             (outcome.Status, outcome.SessionId, outcome.Text)
                 .Should()
                 .Be((AgentRunStatus.Completed, thread, "resumed " + thread + ": next"));
@@ -127,7 +130,7 @@ public sealed class AgentRunnerTests : IDisposable
     {
         await using var run = await Runner(client).StartAsync(Start(client, "linger", "quick"), Token);
         await Collect(run).WaitAsync(TimeSpan.FromSeconds(30), Token);
-        var outcome = await run.Completion;
+        var outcome = await run.Completion.WaitAsync(Wait, Token);
         (outcome.Status, outcome.Text).Should().Be((AgentRunStatus.Completed, "started: quick"));
         var (agent, descendant) = await Pids();
         await ProviderFixture.GoneAsync(agent);
@@ -140,8 +143,8 @@ public sealed class AgentRunnerTests : IDisposable
     public async Task AClientThatExitsBeforeTheTurnEndsFailsWithWhatItSaid(string client)
     {
         await using var run = await Runner(client).StartAsync(Start(client, "fail", "x"), Token);
-        await Collect(run);
-        var outcome = await run.Completion;
+        await Collect(run).WaitAsync(Wait, Token);
+        var outcome = await run.Completion.WaitAsync(Wait, Token);
         outcome.Status.Should().Be(AgentRunStatus.Failed);
         outcome.Error.Should().Contain("(3)").And.Contain("fake agent: boom");
     }
@@ -153,13 +156,9 @@ public sealed class AgentRunnerTests : IDisposable
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await AgentHost.RunAsync(
-            HostArguments("claude", "normal", database.Path),
-            new StringReader(""),
-            output,
-            error,
-            Token
-        );
+        var exit = await AgentHost
+            .RunAsync(HostArguments("claude", "normal", database.Path), new StringReader(""), output, error, Token)
+            .WaitAsync(Wait, Token);
 
         exit.Should().Be(AgentHost.Completed, error.ToString());
         var lines = output
@@ -198,7 +197,7 @@ public sealed class AgentRunnerTests : IDisposable
         await ProviderFixture.EventuallyAsync(() => new TaskStore(database).Sessions("TASK-0001", Token).Count is 1);
         await lifetime.CancelAsync();
 
-        (await host).Should().Be(AgentHost.Cancelled);
+        (await host.WaitAsync(Wait, Token)).Should().Be(AgentHost.Cancelled);
         new TaskStore(database)
             .Sessions("TASK-0001", Token)
             .Single()
@@ -213,7 +212,9 @@ public sealed class AgentRunnerTests : IDisposable
     {
         using var output = new StringWriter();
         using var input = new GatedReader(() => File.Exists(Path.Combine(_root, "agent.pid")));
-        var exit = await AgentHost.RunAsync(HostArguments("claude", "hang", ""), input, output, TextWriter.Null, Token);
+        var exit = await AgentHost
+            .RunAsync(HostArguments("claude", "hang", ""), input, output, TextWriter.Null, Token)
+            .WaitAsync(Wait, Token);
         exit.Should().Be(AgentHost.Cancelled);
         output.ToString().Should().Contain("\"status\":\"cancelled\"");
     }
