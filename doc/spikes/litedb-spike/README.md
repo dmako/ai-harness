@@ -15,7 +15,7 @@ LiteDB's one real benefit is a fully managed engine without the native `e_sqlite
 5. **It lacks what harness relies on.** There is no full-text search. Index keys are capped at 1023 bytes, and finding keys reach 1.3 KB. ORDER BY fails on strings longer than about 250–400 characters. There are no joins, CHECK constraints or partial indexes.
 6. **Its future is uncertain.** The last stable release, 5.0.21, is from July 2024. The 6.0 prerelease refuses to open a database unless the caller acknowledges that "broken databases and data loss are expected".
 
-The code and raw results are in [benchmarks/litedb-spike](../../benchmarks/litedb-spike/README.md).
+How it was measured, and the raw results, are in [measurements.md](measurements.md) and [results/](results/).
 
 **Machines**
 - Windows 11.
@@ -31,18 +31,18 @@ Both used .NET 10.0.403 and LiteDB 5.0.21 against Microsoft.Data.Sqlite 10.0.14.
   - the user's `<global>/knowledge/user.db`.
 
   The global registry is not SQLite: it is `projects.json` and `workspaces.json`, behind `.lock` files.
-- **Connection model** ([HarnessDatabase.cs](../../src/Harness.Infrastructure/Storage/HarnessDatabase.cs)):
+- **Connection model** ([HarnessDatabase.cs](../../../src/Harness.Infrastructure/Storage/HarnessDatabase.cs)):
   - pooled connections, one per operation, with `DefaultTimeout = -1`;
   - `PRAGMA busy_timeout` set per connection, 5 s by default;
   - WAL enabled on open, with a retry loop;
   - writes in immediate transactions (`WithTransaction`, 51 call sites);
   - reads deferred under `PRAGMA query_only` (`ReadTransaction`, 22 call sites);
   - `foreign_keys` on.
-- **Migrations** ([MigrationRunner.cs](../../src/Harness.Infrastructure/Storage/MigrationRunner.cs)):
-  - 25 SQL files in [Storage/Migrations](../../src/Harness.Infrastructure/Storage/Migrations), recorded in the `schema_migrations` ledger with checksums;
+- **Migrations** ([MigrationRunner.cs](../../../src/Harness.Infrastructure/Storage/MigrationRunner.cs)):
+  - 25 SQL files in [Storage/Migrations](../../../src/Harness.Infrastructure/Storage/Migrations), recorded in the `schema_migrations` ledger with checksums;
   - each applied exactly once, even when processes open a new database at the same moment;
   - retries while another process makes progress, and `SchemaTooNewException` for databases newer than the binary;
-  - a backup (`VACUUM INTO`) before upgrading ([DatabaseBackups.cs](../../src/Harness.Infrastructure/Storage/DatabaseBackups.cs)).
+  - a backup (`VACUUM INTO`) before upgrading ([DatabaseBackups.cs](../../../src/Harness.Infrastructure/Storage/DatabaseBackups.cs)).
 
   The two storage warnings in harness memory record why the busy timeout and immediate transactions matter.
 - **Schema:**
@@ -60,8 +60,8 @@ Both used .NET 10.0.403 and LiteDB 5.0.21 against Microsoft.Data.Sqlite 10.0.14.
 
   27 files catch `SqliteException`.
 - **SQLite-specific features outside the stores:**
-  - `PRAGMA data_version`, which is harness ui's cheap change probe in [UiChangeSource.cs](../../src/Harness.Cli/Ui/UiChangeSource.cs);
-  - per-table counts and last row ids in [DatabaseFingerprint.cs](../../src/Harness.Infrastructure/Storage/DatabaseFingerprint.cs), which key the view cache;
+  - `PRAGMA data_version`, which is harness ui's cheap change probe in [UiChangeSource.cs](../../../src/Harness.Cli/Ui/UiChangeSource.cs);
+  - per-table counts and last row ids in [DatabaseFingerprint.cs](../../../src/Harness.Infrastructure/Storage/DatabaseFingerprint.cs), which key the view cache;
   - 19 read-only opens of *other* projects' databases (cross-project tasks, workspace search, duplicates, the overview).
 - **Tests:** 23 test files use SQLite or `HarnessDatabase` directly.
 
@@ -128,7 +128,7 @@ The total excludes fixing or working around the multi-process problem in section
 | [Community.LiteDB.Aot](https://github.com/mrdevrobot/Community-LiteDb-AOT) 1.0.0-preview.1 with its source generator (`size/CommunityAot`) | **Works**: insert, `FindById`, string predicates and rollback. Its generator emits invalid code for types in the global namespace. It returns `DateTime` as local time. Its `LiteDbContext` always builds a direct `LiteEngine`, which is single-process only (section 4). | 8 IL3050 lines (5 distinct), all from the parser. Every `BsonMapper` warning is gone. |
 | LiteDB 6.0.0-prerelease.355 | Refuses to open a database: "Broken databases and data loss are expected … DO NOT RUN IN PRODUCTION!" | — |
 
-Harness builds with `IsAotCompatible` and `TreatWarningsAsErrors` ([Directory.Build.props](../../Directory.Build.props)). Even the cleanest path keeps the parser's IL3050, which becomes one IL3053 per assembly in a normal build. Accepting LiteDB therefore means suppressing an AOT warning for the whole build, and with it the protection the setting gives harness's own code.
+Harness builds with `IsAotCompatible` and `TreatWarningsAsErrors` ([Directory.Build.props](../../../Directory.Build.props)). Even the cleanest path keeps the parser's IL3050, which becomes one IL3053 per assembly in a normal build. Accepting LiteDB therefore means suppressing an AOT warning for the whole build, and with it the protection the setting gives harness's own code.
 
 Community.LiteDB.Aot's approach is the right one if LiteDB is ever used: a generated mapper, the engine API and string predicates. But it removes only the mapper's reflection. It does not change the parser, the engine's locking, or the gaps in section 2.
 

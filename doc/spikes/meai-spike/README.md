@@ -35,7 +35,7 @@ adapter.
      through ModelContextProtocol.Core 2.3.0. Using it adds no new package.
    - The spike runs a scripted model and a stand-in embedding generator over real MCP tools under Native AOT (§4).
 
-The code and raw results are in [benchmarks/meai-spike](../../benchmarks/meai-spike/README.md).
+How it was measured, and the raw results, are in [measurements.md](measurements.md) and [results/](results/).
 
 **Machine**
 - Windows 11 (10.0.26300), 24 logical CPUs.
@@ -77,7 +77,7 @@ The connection to M.E.AI is already there:
   `CallToolResult`. `McpMapping.Text`, `Body` and `ToolError` work on the typed `CallToolResult` (`IsError`,
   `StructuredContent`, content blocks). They would have to decode that `JsonElement` again.
 - **Errors stop being typed.** A failing tool no longer sets `IsError`. Harness would have to look for `"isError":
-  true` inside JSON (see `FirstAnswer` in [Compose.cs](../../benchmarks/meai-spike/Compose.cs)).
+  true` inside JSON (see `FirstAnswer` in the spike's `Compose.cs`).
 - **It needs a tool list first.** `McpClientTool` comes from `tools/list`, or from
   `new McpClientTool(client, new Tool { Name = … })`. Today `GenericMcpProvider` never lists tools. Listing costs
   0.8–2 ms on ripwire and 27 ms on codebase-memory, once per process start.
@@ -123,7 +123,7 @@ only measurable effect is the extra allocation on structured answers.
 
 **Native AOT (win-x64, trimmed).** `MeaiSpike` publishes with **no** trim or AOT warnings, and so does each size
 probe. All four composition steps pass in the native executable:
-[results/compose-win-x64.txt](../../benchmarks/meai-spike/results/compose-win-x64.txt).
+[results/compose-win-x64.txt](results/compose-win-x64.txt).
 
 | Size probe (one MCP tool call) | Executable | vs. MCP only |
 |---|---:|---:|
@@ -139,9 +139,9 @@ carries System.Text.Json and the MCP SDK.
 | Case | Today | With M.E.AI |
 |---|---|---|
 | A new MCP server (e.g. another code index) | A TOML pack in `Configuration/Packs` or `[providers.x]` in config. **No code.** | The same pack is still needed to map answers to capabilities. M.E.AI adds nothing. |
-| Fallback: ask A, then B on a miss | `chain` + `combine = "first"` + `miss` in the pack. **No code.** | An `AIFunction` subclass (`FirstAnswer` in [Compose.cs](../../benchmarks/meai-spike/Compose.cs), about 25 lines). It also has to parse `isError` out of JSON. |
+| Fallback: ask A, then B on a miss | `chain` + `combine = "first"` + `miss` in the pack. **No code.** | An `AIFunction` subclass (`FirstAnswer` in the spike's `Compose.cs`, about 25 lines). It also has to parse `isError` out of JSON. |
 | Union: ask several providers at once | `ProviderRegistry.CallAsync` already does this for every capability, with a deadline per provider. | `Task.WhenAll` over `AIFunction`s, the same as today without the deadlines and telemetry. |
-| Middleware (deadline, logging, telemetry, cache) around a provider | Inside `McpProcessClient.CallAsync` and `ProviderRegistry.CallOneAsync`. | `DelegatingAIFunction` per concern (`DeadlineFunction` in [Bench.cs](../../benchmarks/meai-spike/Bench.cs)). M.E.AI ships no ready-made middleware for functions, only for chat and embedding clients. |
+| Middleware (deadline, logging, telemetry, cache) around a provider | Inside `McpProcessClient.CallAsync` and `ProviderRegistry.CallOneAsync`. | `DelegatingAIFunction` per concern (`DeadlineFunction` in the spike's `Bench.cs`). M.E.AI ships no ready-made middleware for functions, only for chat and embedding clients. |
 | **A model-backed provider** (rerank, semantic memory search, a model choosing tools) | A new `IProvider`, plus a hand-written HTTP client for each vendor. | **A new `IProvider` over `IEmbeddingGenerator`/`IChatClient`.** Any vendor or local client that implements them plugs in, with M.E.AI's logging, OpenTelemetry and caching middleware. Provider tools reach a model through `FunctionInvokingChatClient` unchanged, because `McpClientTool` already is an `AIFunction`. |
 
 This is a sketch of the last row, the only case where M.E.AI saves work: a rerank provider for `get_context`. The

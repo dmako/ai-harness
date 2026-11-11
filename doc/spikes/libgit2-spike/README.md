@@ -4,7 +4,7 @@ GitReader, a fully managed alternative, was evaluated the same way in TASK-0098,
 
 **Recommendation: no.** Keep the external git. Cut the number of git starts instead (see [Follow-ups](#follow-ups)).
 
-Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+The spike's code (`benchmarks/libgit2-spike`) was removed from the repository in TASK-0119. To rerun it, check out commit `a3e435a`, the last one that has it. Since TASK-0118 the projects targeted net11.0 (SDK 11.0.100) and still built and Native AOT-published on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
 
 LibGit2Sharp 0.32.0 (libgit2 `5853918`, from LibGit2Sharp.NativeBinaries 2.0.324) has three problems:
 
@@ -19,7 +19,7 @@ On Linux, starting git costs about 4 ms, so there is nothing to win there.
 
 ## How it was measured
 
-`LibGit2Spike` in this folder is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the repository's build rules out. It is published as trimmed Native AOT, like harness.
+`LibGit2Spike` was a standalone project. It was not in `harness.slnx`, and empty `Directory.*` files kept the repository's build rules out. It was published as trimmed Native AOT, like harness.
 
 - **`bench <repo> [runs]`** runs each of harness's hot git commands two ways:
   - as a git process, the way `GitRepository.RunAsync` runs it (same environment, stdin closed);

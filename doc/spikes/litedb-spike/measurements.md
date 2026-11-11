@@ -1,10 +1,10 @@
-# Spike: replace SQLite with LiteDB? (TASK-0110)
+# LiteDB spike: how it was measured (TASK-0110)
 
-**Recommendation: no.** Stay on SQLite. The findings and the reasoning are in [doc/architecture/litedb-spike.md](../../doc/architecture/litedb-spike.md). This folder holds the code and the raw results.
+**Recommendation: no.** Stay on SQLite. The findings and the reasoning are in [README.md](README.md). This page describes the spike's program and its runs; the raw output is in [`results/`](results/).
 
-Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+The spike's code (`benchmarks/litedb-spike`) was removed from the repository in TASK-0119. To rerun it, check out commit `a3e435a`, the last one that has it. Since TASK-0118 the projects targeted net11.0 (SDK 11.0.100) and still built and Native AOT-published on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
 
-`LiteDbSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like harness. It references LiteDB 5.0.21, the latest stable release, and Microsoft.Data.Sqlite 11.0.0, the version harness pins (10.0.14 when measured).
+`LiteDbSpike` was a standalone project. It was not in `harness.slnx`, and empty `Directory.*` files kept the repository's build rules, analyzers and central package versions out. It was published as trimmed Native AOT, like harness. It referenced LiteDB 5.0.21, the latest stable release, and Microsoft.Data.Sqlite 11.0.0, the version harness pins (10.0.14 when measured).
 
 ## Commands
 
@@ -16,14 +16,14 @@ Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and N
 | `hold <sqlite\|shared> [seconds]` | Another process holds a write transaction while this one reads and then writes. Shows what waits, for how long, and whether it times out. |
 | `mutex` | Holds a named `Mutex`, the lock LiteDB's shared mode relies on, and asks a second process to take it. |
 
-`size/` holds four minimal programs that open a database, insert one record and read it back. Publishing them shows what each engine adds to a Native AOT executable:
+`size/` held four minimal programs that open a database, insert one record and read it back. Publishing them shows what each engine adds to a Native AOT executable:
 
 - `SqliteOnly`: Microsoft.Data.Sqlite.
 - `LiteDbOnly`: LiteDB through `LiteDatabase`.
 - `LiteDbEngineOnly`: LiteDB through `ILiteEngine` only.
 - `CommunityAot`: the `Community.LiteDB.Aot` package with its source generator.
 
-`EngineMapping.cs` applies the principles of [Community.LiteDB.Aot](https://github.com/mrdevrobot/Community-LiteDb-AOT) by hand:
+`EngineMapping.cs` applied the principles of [Community.LiteDB.Aot](https://github.com/mrdevrobot/Community-LiteDb-AOT) by hand:
 
 - A mapper per type converts to and from `BsonDocument`. This is what that project's source generator emits.
 - A typed collection works over `ILiteEngine` directly, so `LiteDatabase` and `BsonMapper` are never used.

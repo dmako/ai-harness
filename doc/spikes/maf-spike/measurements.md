@@ -1,15 +1,18 @@
-# Spike: agent sessions per task through Microsoft Agent Framework? (TASK-0112)
+# MAF sessions spike: how it was measured (TASK-0112)
 
 **Recommendation: no.** Don't use MAF or the ClaudeCodeSdk.MAF / CodexSdk.MAF bridges. Build on harness's hooks,
 on the CLIs' transcripts, and on harness's own runner over the CLIs' stdio protocols. The findings and the reasoning
-are in [doc/architecture/maf-sessions-spike.md](../../doc/architecture/maf-sessions-spike.md). This folder holds the
-code and the raw results.
+are in [README.md](README.md). This page describes the spike's program and its runs; the raw output is in
+[`results/`](results/).
 
-Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+The spike's code (`benchmarks/maf-spike`) was removed from the repository in TASK-0119. To rerun it, check out commit
+`a3e435a`, the last one that has it. Since TASK-0118 the projects targeted net11.0 (SDK 11.0.100) and still built and
+Native AOT-published on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were
+not repeated.
 
-`MafSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the
-repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like
-harness. It references ClaudeCodeSdk.MAF 10.4.4 and CodexSdk.MAF 10.0.3, which bring Microsoft.Agents.AI 1.21.0.
+`MafSpike` was a standalone project. It was not in `harness.slnx`, and empty `Directory.*` files kept the
+repository's build rules, analyzers and central package versions out. It was published as trimmed Native AOT, like
+harness. It referenced ClaudeCodeSdk.MAF 10.4.4 and CodexSdk.MAF 10.0.3, which bring Microsoft.Agents.AI 1.21.0.
 
 **It starts real agent sessions**, which cost tokens.
 - They run read-only: Claude in `plan` mode, Codex in a `read-only` sandbox with approval `never`.
@@ -26,7 +29,7 @@ harness. It references ClaudeCodeSdk.MAF 10.4.4 and CodexSdk.MAF 10.0.3, which b
 | `cancel <claude\|codex> <workdir> <task id>` | Streams a long turn and cancels at the first output. Prints how long cancellation took and which `claude`/`codex`/`node` processes are still alive 3 s later. |
 | `interrupt <workdir>` | Claude only, ClaudeCodeSdk's core `ClaudeSdkClient`: `InterruptAsync` during a turn, then another turn in the same process (a "pause"). |
 
-`size/` holds two size probes:
+`size/` held two size probes:
 - `Hello`: an empty program, as a baseline.
 - `ClaudeCore`: one Claude turn through ClaudeCodeSdk's core client, without MAF. It prints the `ResultMessage`'s
   cost and session id, which the MAF layer drops.

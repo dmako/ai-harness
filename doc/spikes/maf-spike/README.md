@@ -30,8 +30,8 @@ contract of harness's own, with one adapter per CLI.
    ClaudeCodeSdk's `InterruptAsync` closes the CLI's input, so the process cannot take another turn. This reproduced
    twice.
 
-The code and raw results are in [benchmarks/maf-spike](../../benchmarks/maf-spike/README.md). It builds on
-[the M.E.AI spike](meai-spike.md) (TASK-0111).
+How it was measured, and the raw results, are in [measurements.md](measurements.md) and [results/](results/). It builds on
+[the M.E.AI spike](../meai-spike/README.md) (TASK-0111).
 
 **Machine and versions**
 - Windows 11 (10.0.26300); .NET SDK 10.0.403, ILCompiler 10.0.14; win-x64.

@@ -1,15 +1,17 @@
-# Spike: Microsoft.Extensions.AI in the provider layer? (TASK-0111)
+# M.E.AI spike: how it was measured (TASK-0111)
 
 **Recommendation: not in the provider layer.** Use M.E.AI's `IEmbeddingGenerator`/`IChatClient` only if a
-model-backed provider is added later. The findings and the reasoning are in
-[doc/architecture/meai-spike.md](../../doc/architecture/meai-spike.md). This folder holds the code and the raw
-results.
+model-backed provider is added later. The findings and the reasoning are in [README.md](README.md). This page
+describes the spike's program and its runs; the raw output is in [`results/`](results/).
 
-Since TASK-0118 the projects target net11.0 (SDK 11.0.100) and still build and Native AOT-publish on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were not repeated.
+The spike's code (`benchmarks/meai-spike`) was removed from the repository in TASK-0119. To rerun it, check out commit
+`a3e435a`, the last one that has it. Since TASK-0118 the projects targeted net11.0 (SDK 11.0.100) and still built and
+Native AOT-published on win-x64. The measurements here and in `results/` were taken on .NET 10 (SDK 10.0.403) and were
+not repeated.
 
-`MeaiSpike` is a standalone project. It is not in `harness.slnx`, and the empty `Directory.*` files keep the
-repository's build rules, analyzers and central package versions out. It is published as trimmed Native AOT, like
-harness. It references:
+`MeaiSpike` was a standalone project. It was not in `harness.slnx`, and empty `Directory.*` files kept the
+repository's build rules, analyzers and central package versions out. It was published as trimmed Native AOT, like
+harness. It referenced:
 - ModelContextProtocol.Core 2.3.0, the version harness pins, which brings Microsoft.Extensions.AI.Abstractions
   10.11.0;
 - Microsoft.Extensions.AI 10.11.0.
@@ -23,7 +25,7 @@ harness. It references:
 | `compose fake <bytes>` | Four ways of combining providers in M.E.AI's terms, each printing PASS or FAIL: a fallback composite (`FirstAnswer`); a union of two providers asked at once; `FunctionInvokingChatClient` with a scripted `IChatClient` calling an MCP tool; and an `IEmbeddingGenerator` (a hashing stand-in) reranking hits. |
 | `serve <bytes>` | The fake MCP server. It has the tools `grep`, `grep_b` and `miss`; `miss` answers `isError` "symbol not found". |
 
-`size/` holds three minimal programs, all built from the same [size/Probe.cs](size/Probe.cs). Each makes one MCP tool
+`size/` held three minimal programs, all built from the same `size/Probe.cs`. Each makes one MCP tool
 call. Publishing them shows what each level of M.E.AI adds to a Native AOT executable:
 
 - `McpOnly`: `McpClient.CallToolAsync`, as harness does today.

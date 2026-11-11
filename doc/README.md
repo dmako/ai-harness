@@ -14,6 +14,7 @@ code evidence between agents and a browser UI. Start with the embedded
 - [Web UI](architecture/web.md)
 - [Graphify adapter](architecture/graphify.md)
 - [Telemetry and developer tools](architecture/telemetry.md)
+- [Spikes: measured technology decisions](spikes/README.md)
 - [Building, testing and measuring](testing.md)
 - [Releases and platform prerequisites](releases.md)
 - [Trimming and Native AOT](native-aot.md)

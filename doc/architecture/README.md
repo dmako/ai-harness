@@ -49,6 +49,11 @@ and local state evidence, then returns structured JSON and matching text.
 light requests avoid starting optional heavy compiler providers. UI sections
 load independently and can refresh from live change notifications.
 
+The [spikes](../spikes/README.md) record the measurements behind the larger
+technology choices: external git over libgit2, SQLite over LiteDB, MCP calls
+without Microsoft.Extensions.AI, and harness's own agent runner instead of
+Microsoft Agent Framework.
+
 Runtime dependencies are .NET platform libraries and native SQLite. Git and
 provider backends remain external tools where their features require them.
 No Node or Python runtime is shipped or required by the application. Developer

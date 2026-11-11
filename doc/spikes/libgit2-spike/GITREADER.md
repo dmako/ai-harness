@@ -23,7 +23,7 @@ GitReader was added as a column to the TASK-0097 benchmark (`LibGit2Spike`, this
 - **Repositories:** ai-harness-cs at `022af29`, and the large private repository (17,887 commits, 2.4 GiB pack).
 - **Machines:** Windows (git 2.56) and WSL Ubuntu (git 2.55).
 
-GitReader offers HEAD and refs, commits, trees, blobs, work-tree status and untracked files. Everything else is written in [`GitReaderOps.cs`](GitReaderOps.cs) on top of those, the way harness would have to:
+GitReader offers HEAD and refs, commits, trees, blobs, work-tree status and untracked files. Everything else was written in the spike's `GitReaderOps.cs` (removed with the spike's code, see [README.md](README.md)) on top of those, the way harness would have to:
 
 - tree-to-tree diff (equal subtrees are skipped);
 - exact-content rename pairing;
