@@ -113,3 +113,47 @@ whether the file exists, parses and is owner-only, for doctor.
 `harness scm list|add|set|remove` (`src/Harness.Cli/Scm`) drives the store;
 `--token-stdin` reads the token from standard input so it stays out of shell
 history, and output shows tokens only masked.
+
+## Shared HTTP plumbing
+
+`ScmHttpClient` (Harness.Scm) is what both providers call through: relative
+API paths against the connection's base URL (so instances under a sub-path
+work), the provider's token header on each request, a per-request timeout
+(`ScmLimits.Timeout`, reported as `unreachable`), caller cancellation passed
+through as `OperationCanceledException`, one retry after HTTP 429 when the
+server's `Retry-After` is within `ScmLimits.MaxRetryWait`, and paging that
+follows full pages (and GitLab's `X-Next-Page`) up to `ScmLimits.MaxPages`.
+JSON is read with each provider's source-generated `JsonSerializerContext`;
+an answer that is not the expected JSON (an HTML login page, a proxy) is
+`wrong_server`. A failed status becomes an `ScmException` naming the method,
+path and status with the server's `message`, the token removed.
+`SharedHandler` pools connections for the whole process; tests pass a fake
+`HttpMessageHandler` instead.
+
+`UnifiedDiff.Locate` finds a line in a file's hunks: an added line has only a
+new number, a removed one only an old number, and a context line both, which
+GitLab needs for a comment on an unchanged line. `UnifiedDiff.SplitFiles`
+splits a whole `git diff` into files. `ScmDiffBudget.Apply` keeps a merge
+request's diff within the caller's byte budget without dropping files: a file
+that does not fit keeps what fits, cut at a line end, and is marked truncated;
+once the budget is spent the remaining files keep only their paths, marked
+truncated and counted as omitted.
+
+## GitLab
+
+`GitlabProvider` (`src/Harness.Scm.Gitlab`) speaks REST API v4 with the token
+in the `PRIVATE-TOKEN` header. A project is addressed by its URL-encoded full
+path (`api/v4/projects/group%2Fsub%2Frepo`), a merge request by its iid.
+
+| Operation | GitLab call |
+| --- | --- |
+| Test connection | `GET /version` (a missing API is `wrong_server`), then `GET /user` |
+| Projects | `GET /projects?membership=true&visibility=&search=`, paged |
+| Merge requests | `GET /projects/:id/merge_requests?state=opened\|merged\|closed`, paged |
+| Details | `GET .../merge_requests/:iid` and `.../approvals` (left unknown when the token cannot read it) |
+| Comments | `GET .../discussions`, flattened oldest first; system notes are marked, diff notes keep their position and thread |
+| General comment | `POST .../notes` |
+| Diff comment | `POST .../discussions` with a `text` position from the merge request's `diff_refs` (base, start, head SHA), both paths of the file, and the old and/or new line `UnifiedDiff.Locate` finds; a file or line outside the diff is refused before posting |
+| Diff | `GET .../diffs` (GitLab 15.7+), else `GET .../changes`; `too_large` files are marked truncated |
+| Title, description | `PUT .../merge_requests/:iid` |
+| Approve | `POST .../approve` |
