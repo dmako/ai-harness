@@ -46,168 +46,7 @@ internal static class AotCheck
         var failures = 0;
         try
         {
-            using var db = new LiteDatabase(
-                new ConnectionString
-                {
-                    Filename = Path.Combine(directory, "aot.db"),
-                    Connection = ConnectionType.Shared,
-                }
-            );
-            var seen = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);
-
-            failures += Step(
-                "manual BsonDocument insert + Query.EQ/GT + index",
-                () =>
-                {
-                    var col = db.GetCollection("manual");
-                    col.EnsureIndex("kind");
-                    for (var i = 0; i < 10; i++)
-                    {
-                        col.Upsert(
-                            new BsonDocument
-                            {
-                                ["_id"] = "cycle:" + i,
-                                ["kind"] = i % 2 is 0 ? "cycle" : "complexity",
-                                ["measure"] = i,
-                                ["units"] = new BsonArray(new BsonValue[] { "A", "B" + i }),
-                                ["last_seen"] = seen,
-                            }
-                        );
-                    }
-
-                    var found = col.Find(Query.And(Query.EQ("kind", "cycle"), Query.GT("measure", 3))).ToList();
-                    return found.Count == 3 && found.All(d => d["units"].AsArray.Count == 2)
-                        ? $"{found.Count} documents"
-                        : throw new InvalidOperationException("wrong answer: " + found.Count);
-                }
-            );
-
-            failures += Step(
-                "manual BsonExpression string predicate with parameter",
-                () =>
-                {
-                    var col = db.GetCollection("manual");
-                    var found = col.Find(BsonExpression.Create("$.kind = @0 AND $.measure >= @1", "complexity", 5))
-                        .ToList();
-                    return found.Count == 3
-                        ? $"{found.Count} documents"
-                        : throw new InvalidOperationException("" + found.Count);
-                }
-            );
-
-            failures += Step(
-                "partial update: UpdateMany(transform, predicate)",
-                () =>
-                {
-                    var col = db.GetCollection("manual");
-                    var n = col.UpdateMany("{ status: 'gone' }", "$.kind = 'cycle'");
-                    return n == 5 && col.Count("$.status = 'gone'") == 5
-                        ? $"{n} updated"
-                        : throw new InvalidOperationException("" + n);
-                }
-            );
-
-            failures += Step(
-                "aggregate: SQL SELECT COUNT/MAX GROUP BY",
-                () =>
-                {
-                    using var reader = db.Execute(
-                        "SELECT { kind: @key, n: COUNT(*), top: MAX(*.measure) } FROM manual GROUP BY $.kind"
-                    );
-                    var rows = new List<string>();
-                    while (reader.Read())
-                    {
-                        rows.Add(reader.Current.ToString());
-                    }
-
-                    return rows.Count == 2
-                        ? string.Join(" ", rows)
-                        : throw new InvalidOperationException(rows.Count + "");
-                }
-            );
-
-            failures += Step(
-                "typed GetCollection<FindingDoc>().Insert (BsonMapper reflection)",
-                () =>
-                {
-                    var col = db.GetCollection<FindingDoc>("typed");
-                    col.Insert(
-                        new FindingDoc
-                        {
-                            Key = "cycle:A|B",
-                            Kind = "cycle",
-                            Level = "warn",
-                            Measure = 4,
-                            Units = ["A", "B"],
-                            LastSeen = seen,
-                            Mark = new MarkDoc { State = "by_design", Reason = "ok" },
-                        }
-                    );
-                    var raw = db.GetCollection("typed").FindById("cycle:A|B");
-                    return raw is not null && raw["Kind"] == "cycle" && raw["Mark"]["State"] == "by_design"
-                        ? raw.ToString()
-                        : throw new InvalidOperationException("stored " + raw);
-                }
-            );
-
-            failures += Step(
-                "typed FindById (BsonMapper deserialize)",
-                () =>
-                {
-                    var doc = db.GetCollection<FindingDoc>("typed").FindById("cycle:A|B");
-                    return doc is { Kind: "cycle", Measure: 4, Units: ["A", "B"], Mark.State: "by_design" }
-                        ? $"{doc.Key} {doc.Level} {doc.LastSeen:O}"
-                        : throw new InvalidOperationException("read " + (doc?.Kind ?? "null"));
-                }
-            );
-
-            failures += Step(
-                "typed LINQ predicate Find(x => x.Kind == \"cycle\" && x.Measure > 3)",
-                () =>
-                {
-                    var found = db.GetCollection<FindingDoc>("typed")
-                        .Find(x => x.Kind == "cycle" && x.Measure > 3)
-                        .ToList();
-                    return found.Count == 1 ? "1 document" : throw new InvalidOperationException("" + found.Count);
-                }
-            );
-
-            failures += Step(
-                "typed EnsureIndex(x => x.Kind)",
-                () => db.GetCollection<FindingDoc>("typed").EnsureIndex(x => x.Kind) ? "created" : "existed"
-            );
-
-            foreach (var length in new[] { 100, 250, 400, 900, 1100 })
-            {
-                failures += Step(
-                    $"ORDER BY a {length}-character string (finding keys reach 1.3 KB)",
-                    () =>
-                    {
-                        var col = db.GetCollection("long" + length);
-                        for (var i = 0; i < 3; i++)
-                        {
-                            col.Insert(new BsonDocument { ["_id"] = i, ["key"] = new string((char)('a' + i), length) });
-                        }
-
-                        var sorted = col.Query().OrderBy("key").ToList();
-                        return sorted.Count == 3 ? "sorted" : throw new InvalidOperationException("" + sorted.Count);
-                    }
-                );
-            }
-
-            failures += Step(
-                "transaction BeginTrans/Rollback",
-                () =>
-                {
-                    var col = db.GetCollection("manual");
-                    db.BeginTrans();
-                    col.DeleteAll();
-                    db.Rollback();
-                    return col.Count() == 10 ? "rolled back" : throw new InvalidOperationException(col.Count() + "");
-                }
-            );
-
-            db.Dispose();
+            failures += DatabaseSteps(Path.Combine(directory, "aot.db"));
             foreach (var shared in new[] { false, true })
             {
                 failures += EngineSteps(
@@ -234,6 +73,175 @@ internal static class AotCheck
             $"{failures} failure(s); LiteDB {typeof(LiteDatabase).Assembly.GetName().Version}; " + $"{Runtime.Mode}"
         );
         return failures;
+    }
+
+    /// <summary>The LiteDatabase steps, in order; the database is closed before the engine steps open theirs.</summary>
+    private static int DatabaseSteps(string path)
+    {
+        using var db = new LiteDatabase(new ConnectionString { Filename = path, Connection = ConnectionType.Shared });
+        var seen = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);
+        var failures = ManualSteps(db, seen);
+        failures += AggregateSteps(db);
+        failures += TypedWriteSteps(db, seen);
+        failures += TypedReadSteps(db);
+        failures += LongKeySteps(db);
+        failures += Step("transaction BeginTrans/Rollback", () => Rollback(db));
+        return failures;
+    }
+
+    private static int ManualSteps(LiteDatabase db, DateTime seen) =>
+        Step("manual BsonDocument insert + Query.EQ/GT + index", () => ManualInsert(db, seen))
+        + Step(
+            "manual BsonExpression string predicate with parameter",
+            () =>
+            {
+                var col = db.GetCollection("manual");
+                var found = col.Find(BsonExpression.Create("$.kind = @0 AND $.measure >= @1", "complexity", 5))
+                    .ToList();
+                return found.Count == 3
+                    ? $"{found.Count} documents"
+                    : throw new InvalidOperationException("" + found.Count);
+            }
+        );
+
+    private static string ManualInsert(LiteDatabase db, DateTime seen)
+    {
+        var col = db.GetCollection("manual");
+        col.EnsureIndex("kind");
+        for (var i = 0; i < 10; i++)
+        {
+            col.Upsert(
+                new BsonDocument
+                {
+                    ["_id"] = "cycle:" + i,
+                    ["kind"] = i % 2 is 0 ? "cycle" : "complexity",
+                    ["measure"] = i,
+                    ["units"] = new BsonArray(new BsonValue[] { "A", "B" + i }),
+                    ["last_seen"] = seen,
+                }
+            );
+        }
+
+        var found = col.Find(Query.And(Query.EQ("kind", "cycle"), Query.GT("measure", 3))).ToList();
+        return found.Count == 3 && found.All(d => d["units"].AsArray.Count == 2)
+            ? $"{found.Count} documents"
+            : throw new InvalidOperationException("wrong answer: " + found.Count);
+    }
+
+    private static int AggregateSteps(LiteDatabase db) =>
+        Step(
+            "partial update: UpdateMany(transform, predicate)",
+            () =>
+            {
+                var col = db.GetCollection("manual");
+                var n = col.UpdateMany("{ status: 'gone' }", "$.kind = 'cycle'");
+                return n == 5 && col.Count("$.status = 'gone'") == 5
+                    ? $"{n} updated"
+                    : throw new InvalidOperationException("" + n);
+            }
+        )
+        + Step(
+            "aggregate: SQL SELECT COUNT/MAX GROUP BY",
+            () =>
+            {
+                using var reader = db.Execute(
+                    "SELECT { kind: @key, n: COUNT(*), top: MAX(*.measure) } FROM manual GROUP BY $.kind"
+                );
+                var rows = new List<string>();
+                while (reader.Read())
+                {
+                    rows.Add(reader.Current.ToString());
+                }
+
+                return rows.Count == 2
+                    ? string.Join(" ", rows)
+                    : throw new InvalidOperationException(rows.Count + "");
+            }
+        );
+
+    private static int TypedWriteSteps(LiteDatabase db, DateTime seen) =>
+        Step(
+            "typed GetCollection<FindingDoc>().Insert (BsonMapper reflection)",
+            () =>
+            {
+                var col = db.GetCollection<FindingDoc>("typed");
+                col.Insert(
+                    new FindingDoc
+                    {
+                        Key = "cycle:A|B",
+                        Kind = "cycle",
+                        Level = "warn",
+                        Measure = 4,
+                        Units = ["A", "B"],
+                        LastSeen = seen,
+                        Mark = new MarkDoc { State = "by_design", Reason = "ok" },
+                    }
+                );
+                var raw = db.GetCollection("typed").FindById("cycle:A|B");
+                return raw is not null && raw["Kind"] == "cycle" && raw["Mark"]["State"] == "by_design"
+                    ? raw.ToString()
+                    : throw new InvalidOperationException("stored " + raw);
+            }
+        );
+
+    private static int TypedReadSteps(LiteDatabase db) =>
+        Step(
+            "typed FindById (BsonMapper deserialize)",
+            () =>
+            {
+                var doc = db.GetCollection<FindingDoc>("typed").FindById("cycle:A|B");
+                return doc is { Kind: "cycle", Measure: 4, Units: ["A", "B"], Mark.State: "by_design" }
+                    ? $"{doc.Key} {doc.Level} {doc.LastSeen:O}"
+                    : throw new InvalidOperationException("read " + (doc?.Kind ?? "null"));
+            }
+        )
+        + Step(
+            "typed LINQ predicate Find(x => x.Kind == \"cycle\" && x.Measure > 3)",
+            () =>
+            {
+                var found = db.GetCollection<FindingDoc>("typed")
+                    .Find(x => x.Kind == "cycle" && x.Measure > 3)
+                    .ToList();
+                return found.Count == 1 ? "1 document" : throw new InvalidOperationException("" + found.Count);
+            }
+        )
+        + Step(
+            "typed EnsureIndex(x => x.Kind)",
+            () => db.GetCollection<FindingDoc>("typed").EnsureIndex(x => x.Kind) ? "created" : "existed"
+        );
+
+    private static int LongKeySteps(LiteDatabase db)
+    {
+        var failures = 0;
+        foreach (var length in new[] { 100, 250, 400, 900, 1100 })
+        {
+            failures += Step(
+                $"ORDER BY a {length}-character string (finding keys reach 1.3 KB)",
+                () => SortLongKeys(db, length)
+            );
+        }
+        return failures;
+    }
+
+    private static string SortLongKeys(LiteDatabase db, int length)
+    {
+        var col = db.GetCollection("long" + length);
+        for (var i = 0; i < 3; i++)
+        {
+            col.Insert(new BsonDocument { ["_id"] = i, ["key"] = new string((char)('a' + i), length) });
+        }
+
+        var sorted = col.Query().OrderBy("key").ToList();
+        return sorted.Count == 3 ? "sorted" : throw new InvalidOperationException("" + sorted.Count);
+    }
+
+    private static string Rollback(LiteDatabase db)
+    {
+        var col = db.GetCollection("manual");
+        db.BeginTrans();
+        col.DeleteAll();
+        db.Rollback();
+        return col.Count() == 10 ? "rolled back" : throw new InvalidOperationException(col.Count() + "");
     }
 
     /// <summary>Community.LiteDB.Aot's principles (EngineMapping.cs): generated mapper, ILiteEngine, string predicates.</summary>
