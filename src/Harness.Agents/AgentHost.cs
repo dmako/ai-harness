@@ -46,11 +46,15 @@ public static class AgentHost
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
-        if (!HostOptions.TryParse(args, out var options, out var problem))
+        if (!HostOptions.TryParse(args, out var parsed, out var problem))
         {
-            await error.WriteLineAsync(problem, CancellationToken.None);
-            await error.WriteLineAsync(Help, CancellationToken.None);
+            await UsageAsync(error, problem);
             return Usage;
+        }
+        var (options, exit) = await WithPromptFileAsync(parsed, output, error, lifetime);
+        if (options is null)
+        {
+            return exit;
         }
         if (options.Mode is "serve")
         {
@@ -97,6 +101,49 @@ public static class AgentHost
                 _ => Failed,
             };
         }
+    }
+
+    private static async Task UsageAsync(TextWriter error, string problem)
+    {
+        await error.WriteLineAsync(problem, CancellationToken.None);
+        await error.WriteLineAsync(Help, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// The options with the --prompt-file's text as the prompt, or null and the exit code: a file that cannot be read
+    /// is a failed run (an outcome line, exit 1), an empty one for run the usage error a missing prompt is.
+    /// </summary>
+    private static async Task<(HostOptions? Options, int Exit)> WithPromptFileAsync(
+        HostOptions options,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken lifetime
+    )
+    {
+        if (options.PromptFile.Length is 0)
+        {
+            return (options, Completed);
+        }
+        string prompt;
+        try
+        {
+            prompt = await File.ReadAllTextAsync(options.PromptFile, lifetime);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            var failed = new AgentOutcome(AgentRunStatus.Failed, options.Resume)
+            {
+                Error = "cannot read --prompt-file " + options.PromptFile + ": " + exception.Message,
+            };
+            await Write(output, Outcome(failed));
+            return (null, Failed);
+        }
+        if (options.Mode is "run" && prompt.Trim().Length is 0)
+        {
+            await UsageAsync(error, HostOptions.RequiredMessage);
+            return (null, Usage);
+        }
+        return (options with { Start = options.Start with { Prompt = prompt } }, Completed);
     }
 
     private static IAgentRunner Runner(HostOptions options, IProviderProcessFactory processes) =>
@@ -272,6 +319,14 @@ internal sealed record HostOptions(
     /// <summary>serve: how long a session may sit idle before the host closes it.</summary>
     public TimeSpan Idle { get; init; } = TimeSpan.FromMinutes(60);
 
+    /// <summary>
+    /// The --prompt-file, read by the host before the run: parsing never opens it, so a file that cannot be read is a
+    /// failed run, not a usage error.
+    /// </summary>
+    public string PromptFile { get; init; } = "";
+
+    public const string RequiredMessage = "harness-agents: --task, --cwd and a prompt are required";
+
     public static bool TryParse(IReadOnlyList<string> args, out HostOptions options, out string problem)
     {
         options = new("", new("", "", ""), "", "", null);
@@ -283,14 +338,20 @@ internal sealed record HostOptions(
         }
 
         var serve = args[0] is "serve";
-        var prompt = Prompt(parsed.Single);
-        if ((RequiredProblem(parsed.Single, serve, prompt) ?? ServeProblem(parsed.Single, serve)) is { } missing)
+        if (
+            (
+                PromptProblem(parsed.Single)
+                ?? RequiredProblem(parsed.Single, serve)
+                ?? ServeProblem(parsed.Single, serve)
+            ) is
+            { } missing
+        )
         {
             problem = missing;
             return false;
         }
 
-        options = Build(args[0], parsed, prompt);
+        options = Build(args[0], parsed);
         problem = "";
         return true;
     }
@@ -310,16 +371,21 @@ internal sealed record HostOptions(
             ? null
             : "harness-agents: --client must be claude-code or codex";
 
-    private static string Prompt(Dictionary<string, string> single) =>
-        single.TryGetValue("--prompt-file", out var file)
-            ? File.ReadAllText(file)
-            : single.GetValueOrDefault("--prompt", "");
+    private static string? PromptProblem(Dictionary<string, string> single) =>
+        single.ContainsKey("--prompt") && single.ContainsKey("--prompt-file")
+            ? "harness-agents: give --prompt or --prompt-file, not both"
+            : null;
 
-    private static string? RequiredProblem(Dictionary<string, string> single, bool serve, string prompt) =>
+    /// <summary>A --prompt-file's text is checked once the host has read it.</summary>
+    private static string? RequiredProblem(Dictionary<string, string> single, bool serve) =>
         single.GetValueOrDefault("--task", "").Length is 0
         || single.GetValueOrDefault("--cwd", "").Length is 0
-        || (!serve && prompt.Trim().Length is 0)
-            ? "harness-agents: --task, --cwd and a prompt are required"
+        || (
+            !serve
+            && !single.ContainsKey("--prompt-file")
+            && single.GetValueOrDefault("--prompt", "").Trim().Length is 0
+        )
+            ? RequiredMessage
             : null;
 
     /// <summary>serve's key and state, and the idle minutes.</summary>
@@ -342,7 +408,7 @@ internal sealed record HostOptions(
             : null;
     }
 
-    private static HostOptions Build(string mode, HostArguments parsed, string prompt)
+    private static HostOptions Build(string mode, HostArguments parsed)
     {
         var single = parsed.Single;
         // checked by ServeProblem: a positive number when given
@@ -352,7 +418,7 @@ internal sealed record HostOptions(
         var state = single.GetValueOrDefault("--state", "");
         return new(
             single["--client"],
-            new(single["--task"], Path.GetFullPath(single["--cwd"]), prompt)
+            new(single["--task"], Path.GetFullPath(single["--cwd"]), single.GetValueOrDefault("--prompt", ""))
             {
                 Model = single.GetValueOrDefault("--model", ""),
                 Arguments = parsed.ClientArguments,
@@ -369,6 +435,7 @@ internal sealed record HostOptions(
             Key = single.GetValueOrDefault("--key", ""),
             State = state.Length > 0 ? Path.GetFullPath(state) : "",
             Idle = TimeSpan.FromMinutes(idle),
+            PromptFile = single.GetValueOrDefault("--prompt-file", ""),
         };
     }
 
