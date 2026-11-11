@@ -158,280 +158,42 @@ static class Bench
             ExcludeSubmodules = false,
         };
 
+    /// <summary>Revisions and files picked by git so both sides answer the same question.</summary>
+    private sealed record Picks(
+        int Count,
+        string Head,
+        string Base,
+        string From,
+        string File,
+        string[] Paths,
+        DateTimeOffset Since
+    );
+
     public static int Run(string root, int runs)
     {
-        // revisions and files picked by git so both sides answer the same question
-        var count = int.Parse(Git.Read(root, "rev-list", "--count", "HEAD").Trim());
-        var head = Git.Read(root, "rev-parse", "HEAD").Trim();
-        var baseRev = Git.Read(root, "rev-parse", $"HEAD~{Math.Min(20, count - 1)}").Trim();
-        var from = Git.Read(root, "rev-parse", $"HEAD~{Math.Min(10, count - 1)}").Trim();
-        var modified = Git.Nul(Git.Read(root, "diff", "--name-only", "-z", "--diff-filter=M", from, head, "--"));
-        var file =
-            modified.FirstOrDefault(p => p.EndsWith(".cs", StringComparison.Ordinal))
-            ?? modified.FirstOrDefault()
-            ?? Git.Nul(Git.Read(root, "ls-files", "-z")).First();
-        var paths = modified.Take(3).DefaultIfEmpty(file).ToArray();
-        var since = DateTimeOffset.UtcNow.AddDays(-180);
+        var picks = Pick(root);
         Console.WriteLine($"## {root}");
         Console.WriteLine(
-            $"{count} commits; HEAD {head[..12]}; base HEAD~20 {baseRev[..12]}; from HEAD~10 {from[..12]}"
+            $"{picks.Count} commits; HEAD {picks.Head[..12]}; base HEAD~20 {picks.Base[..12]}; from HEAD~10 {picks.From[..12]}"
         );
-        Console.WriteLine($"file {file}; retrieval paths {string.Join(", ", paths)}");
+        Console.WriteLine($"file {picks.File}; retrieval paths {string.Join(", ", picks.Paths)}");
         Console.WriteLine($"git {Git.Read(root, "version").Trim()}; libgit2 {GlobalSettings.Version}");
 
         Command[] commands =
         [
-            new(
-                "ls-files --cached --others --exclude-standard",
-                "#4 file list (sync, every architecture read)",
-                r => Sorted(Git.Nul(Git.Read(r, "ls-files", "-z", "--cached", "--others", "--exclude-standard"))),
-                repo =>
-                    Sorted(
-                        repo.Index.Select(e => N(e.Path))
-                            .Concat(repo.RetrieveStatus(Untracked(false)).Untracked.Select(e => N(e.FilePath)))
-                    )
-            ),
-            new(
-                "status --porcelain=v1 -z -uall",
-                "#5 dirty paths (every sync, coupling)",
-                r =>
-                {
-                    var fields = Git.Nul(Git.Read(r, "status", "--porcelain=v1", "-z", "--untracked-files=all"));
-                    var dirty = new List<string>();
-                    for (var i = 0; i < fields.Length; i++)
-                    {
-                        dirty.Add(fields[i][3..]);
-                        if (fields[i][0] is 'R' or 'C')
-                        {
-                            i++;
-                        }
-                    }
-
-                    return Sorted(dirty);
-                },
-                repo =>
-                    Sorted(
-                        repo.RetrieveStatus(Untracked(true))
-                            .Where(e => e.State is not FileStatus.Unaltered and not FileStatus.Ignored)
-                            .Select(e => N(e.FilePath))
-                    )
-            ),
-            new(
-                "cat-file -e <base>^{commit}",
-                "#3 commit exists (2x per incremental sync)",
-                r => [Git.Run(r, "cat-file", "-e", baseRev + "^{commit}").Code == 0 ? "yes" : "no"],
-                repo => [repo.Lookup<Commit>(baseRev) is null ? "no" : "yes"]
-            ),
-            new(
-                "diff --name-status -M <base> -- + ls-files --others",
-                "#6+#7 changes since the last sync (incremental sync)",
-                r =>
-                    Sorted(
-                        NameStatus(
-                                Git.Nul(
-                                    Git.Read(r, "diff", "--name-status", "-z", "-M", "--no-ext-diff", baseRev, "--")
-                                )
-                            )
-                            .Concat(
-                                Git.Nul(Git.Read(r, "ls-files", "-z", "--others", "--exclude-standard"))
-                                    .Select(p => "? " + p)
-                            )
-                    ),
-                repo =>
-                {
-                    // LibGit2Sharp's tree-to-work-tree diff includes untracked files as added: harness lists them apart
-                    var untracked = repo.RetrieveStatus(Untracked(false))
-                        .Untracked.Select(e => N(e.FilePath))
-                        .ToHashSet(StringComparer.Ordinal);
-                    using var changes = repo.Diff.Compare<TreeChanges>(
-                        repo.Lookup<Commit>(baseRev).Tree,
-                        DiffTargets.Index | DiffTargets.WorkingDirectory,
-                        null,
-                        null,
-                        new CompareOptions { Similarity = SimilarityOptions.Renames }
-                    );
-                    return Sorted(
-                        changes
-                            .Where(c => !(c.Status is ChangeKind.Added && untracked.Contains(N(c.Path))))
-                            .Select(Change)
-                            .Concat(untracked.Select(p => "? " + p))
-                    );
-                }
-            ),
-            new(
-                "log --since=180d --no-merges --name-status -M",
-                "#11 churn (every change_coupling call)",
-                r =>
-                {
-                    var text = Git.Read(
-                        r,
-                        "-c",
-                        "core.quotePath=false",
-                        "log",
-                        "--no-merges",
-                        "--since=" + since.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                        "--format=%x1e",
-                        "--name-status",
-                        "-M"
-                    );
-                    var entries = text.Split('\x1e', StringSplitOptions.RemoveEmptyEntries)
-                        .SelectMany(commit =>
-                            commit
-                                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                                .Select(line => line.Split('\t'))
-                                .Select(f =>
-                                    f[0][0] is 'R' or 'C' ? $"{f[0][..1]} {f[1]} -> {f[2]}" : $"{f[0][..1]} {f[1]}"
-                                )
-                        );
-                    return [.. entries.Order(StringComparer.Ordinal)];
-                },
-                repo =>
-                {
-                    var entries = new List<string>();
-                    var filter = new CommitFilter
-                    {
-                        IncludeReachableFrom = repo.Head.Tip,
-                        SortBy = CommitSortStrategies.Time,
-                    };
-                    foreach (var commit in repo.Commits.QueryBy(filter))
-                    {
-                        if (commit.Committer.When < since)
-                        {
-                            break;
-                        }
-
-                        var parents = commit.Parents.ToArray();
-                        if (parents.Length > 1)
-                        {
-                            continue;
-                        }
-
-                        using var changes = repo.Diff.Compare<TreeChanges>(
-                            parents.FirstOrDefault()?.Tree,
-                            commit.Tree,
-                            new CompareOptions { Similarity = SimilarityOptions.Renames }
-                        );
-                        entries.AddRange(changes.Select(Change));
-                    }
-
-                    return [.. entries.Order(StringComparer.Ordinal)];
-                }
-            ),
-            new(
-                "log -n 5 --no-merges -- <3 paths>",
-                "#12 recent commits (get_context, cached per session)",
-                r =>
-                    [
-                        .. Git.Read(r, ["log", "-n", "5", "--no-merges", "--format=%H", "HEAD", "--", .. paths])
-                            .Split('\n', StringSplitOptions.RemoveEmptyEntries),
-                    ],
-                repo =>
-                {
-                    var found = new List<string>();
-                    var filter = new CommitFilter
-                    {
-                        IncludeReachableFrom = repo.Head.Tip,
-                        SortBy = CommitSortStrategies.Time,
-                    };
-                    foreach (var commit in repo.Commits.QueryBy(filter))
-                    {
-                        var parents = commit.Parents.ToArray();
-                        if (parents.Length > 1)
-                        {
-                            continue;
-                        }
-
-                        if (paths.Any(p => commit[p]?.Target.Id != parents.FirstOrDefault()?[p]?.Target.Id))
-                        {
-                            found.Add(commit.Sha);
-                            if (found.Count == 5)
-                            {
-                                break;
-                            }
-                        }
-                    }
-
-                    return found;
-                }
-            ),
-            new(
-                "diff --name-only <from> <to>",
-                "#13 telemetry resolve (per pending get_context)",
-                r =>
-                    Sorted(
-                        Git.Nul(
-                            Git.Read(r, "diff", "--name-only", "-z", "--no-renames", "--no-ext-diff", from, head, "--")
-                        )
-                    ),
-                repo =>
-                {
-                    using var changes = repo.Diff.Compare<TreeChanges>(
-                        repo.Lookup<Commit>(from).Tree,
-                        repo.Lookup<Commit>(head).Tree
-                    );
-                    return Sorted(changes.Select(c => N(c.Path)));
-                }
-            ),
-            new(
-                "diff -U0 <from> <to> -- <file> (hunk headers)",
-                "#14 changed functions (up to 10 per resolved call)",
-                r =>
-                    [
-                        .. Git.Read(r, "diff", "-U0", "--no-color", "--no-ext-diff", from, head, "--", file)
-                            .Split('\n')
-                            .Where(l => l.StartsWith("@@", StringComparison.Ordinal)),
-                    ],
-                repo =>
-                {
-                    // Compare<Patch> kills the process under Native AOT (see README); blob-to-blob ContentChanges works
-                    var changes = repo.Diff.Compare(
-                        (Blob)repo.Lookup<Commit>(from)[file].Target,
-                        (Blob)repo.Lookup<Commit>(head)[file].Target,
-                        new CompareOptions { ContextLines = 0, InterhunkLines = 0 }
-                    );
-                    return [.. changes.Patch.Split('\n').Where(l => l.StartsWith("@@", StringComparison.Ordinal))];
-                }
-            ),
-            new(
-                "show <from>:<file>",
-                "#15 file at a commit (telemetry resolve)",
-                r => [Git.Read(r, "show", from + ":" + file)],
-                repo => [((Blob)repo.Lookup<Commit>(from)[file].Target).GetContentText()]
-            ),
-            new(
-                "config --get core.hooksPath",
-                "#16 hooks folder (ui hooks endpoint)",
-                r => [Git.Run(r, "config", "--get", "core.hooksPath").Output.Trim()],
-                repo => [repo.Config.Get<string>("core.hooksPath")?.Value ?? ""]
-            ),
-            new(
-                "check-ignore .harness/knowledge.toml",
-                "#10 is the shared knowledge file ignored (ui, when it exists)",
-                r =>
-                    [
-                        Git.Run(r, "check-ignore", "-q", "--", ".harness/knowledge.toml").Code == 0
-                            ? "ignored"
-                            : "not ignored",
-                    ],
-                repo => [repo.Ignore.IsPathIgnored(".harness/knowledge.toml") ? "ignored" : "not ignored"]
-            ),
+            FileList(),
+            DirtyPaths(),
+            CommitExists(picks),
+            ChangesSince(picks),
+            Churn(picks),
+            RecentCommits(picks),
+            ChangedBetween(picks),
+            HunkHeaders(picks),
+            FileAtCommit(picks),
+            HooksPath(),
+            KnowledgeIgnored(),
         ];
-
-        // TASK-0098: the same commands through GitReader; a command missing here has no GitReader equivalent
-        var gr = new Dictionary<string, Func<GitReader.Primitive.PrimitiveRepository, IReadOnlyList<string>>>(
-            StringComparer.Ordinal
-        )
-        {
-            [commands[0].Name] = repo => Sorted(Gr.FileList(repo)),
-            [commands[1].Name] = repo => Sorted(Gr.Dirty(repo)),
-            [commands[2].Name] = repo => [Gr.Commit(repo, GitReader.Hash.Parse(baseRev)) is null ? "no" : "yes"],
-            [commands[3].Name] = repo => Sorted(Gr.ChangesSince(repo, GitReader.Hash.Parse(baseRev))),
-            [commands[4].Name] = repo => [.. Gr.Churn(repo, since).Order(StringComparer.Ordinal)],
-            [commands[5].Name] = repo => [.. Gr.RecentCommits(repo, paths, 5)],
-            [commands[6].Name] = repo =>
-                Sorted(Gr.ChangedBetween(repo, GitReader.Hash.Parse(from), GitReader.Hash.Parse(head))),
-            [commands[8].Name] = repo => [Gr.FileAt(repo, GitReader.Hash.Parse(from), file)],
-        };
+        var gr = ReaderCommands(commands, picks);
 
         var load = Stopwatch.StartNew();
         using var shared = new Repository(root);
@@ -465,44 +227,353 @@ static class Bench
         Console.WriteLine("|---|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---|");
         foreach (var command in commands)
         {
-            var (gitFirst, gitAnswer) = Timed(() => command.ByGit(root));
-            var gitMedian = Median(runs, () => command.ByGit(root));
-            var (libFirst, libAnswer) = Timed(() => command.ByLibGit2(shared));
-            var libMedian = Median(runs, () => command.ByLibGit2(shared));
-            var fresh = Median(
-                Math.Min(runs, 3),
-                () =>
-                {
-                    using var r = new Repository(root);
-                    command.ByLibGit2(r);
-                }
-            );
-            var readerCells = "— | — | — | no equivalent";
-            if (gr.TryGetValue(command.Name, out var byReader))
-            {
-                var (grFirst, grAnswer) = Timed(() => byReader(reader));
-                var grMedian = Median(runs, () => byReader(reader));
-                var grFresh = Median(
-                    Math.Min(runs, 3),
-                    () =>
-                    {
-                        using var r = Gr.Open(root);
-                        byReader(r);
-                    }
-                );
-                readerCells = $"{grFirst:F1} | {grMedian:F1} | {grFresh:F1} | {Same(gitAnswer, grAnswer)}";
-                Dump(command, "gitreader", grAnswer);
-            }
-
-            Dump(command, "libgit2", libAnswer);
-
-            Console.WriteLine(
-                $"| `{command.Name}` | {command.Use} | {gitFirst:F1} | {gitMedian:F1} | {libFirst:F1} | {libMedian:F1} | {fresh:F1} | {Same(gitAnswer, libAnswer)} | {readerCells} |"
-            );
+            Row(root, runs, command, shared, reader, gr.GetValueOrDefault(command.Name));
         }
 
         return 0;
     }
+
+    private static Picks Pick(string root)
+    {
+        var count = int.Parse(Git.Read(root, "rev-list", "--count", "HEAD").Trim());
+        var head = Git.Read(root, "rev-parse", "HEAD").Trim();
+        var baseRev = Git.Read(root, "rev-parse", $"HEAD~{Math.Min(20, count - 1)}").Trim();
+        var from = Git.Read(root, "rev-parse", $"HEAD~{Math.Min(10, count - 1)}").Trim();
+        var modified = Git.Nul(Git.Read(root, "diff", "--name-only", "-z", "--diff-filter=M", from, head, "--"));
+        var file =
+            modified.FirstOrDefault(p => p.EndsWith(".cs", StringComparison.Ordinal))
+            ?? modified.FirstOrDefault()
+            ?? Git.Nul(Git.Read(root, "ls-files", "-z")).First();
+        var paths = modified.Take(3).DefaultIfEmpty(file).ToArray();
+        return new(count, head, baseRev, from, file, paths, DateTimeOffset.UtcNow.AddDays(-180));
+    }
+
+    /// <summary>One command's table row: git, libgit2 and (when it has the command) GitReader.</summary>
+    private static void Row(
+        string root,
+        int runs,
+        Command command,
+        Repository shared,
+        GitReader.Primitive.PrimitiveRepository reader,
+        Func<GitReader.Primitive.PrimitiveRepository, IReadOnlyList<string>>? byReader
+    )
+    {
+        var (gitFirst, gitAnswer) = Timed(() => command.ByGit(root));
+        var gitMedian = Median(runs, () => command.ByGit(root));
+        var (libFirst, libAnswer) = Timed(() => command.ByLibGit2(shared));
+        var libMedian = Median(runs, () => command.ByLibGit2(shared));
+        var fresh = Median(
+            Math.Min(runs, 3),
+            () =>
+            {
+                using var r = new Repository(root);
+                command.ByLibGit2(r);
+            }
+        );
+        var readerCells = "— | — | — | no equivalent";
+        if (byReader is not null)
+        {
+            var (grFirst, grAnswer) = Timed(() => byReader(reader));
+            var grMedian = Median(runs, () => byReader(reader));
+            var grFresh = Median(
+                Math.Min(runs, 3),
+                () =>
+                {
+                    using var r = Gr.Open(root);
+                    byReader(r);
+                }
+            );
+            readerCells = $"{grFirst:F1} | {grMedian:F1} | {grFresh:F1} | {Same(gitAnswer, grAnswer)}";
+            Dump(command, "gitreader", grAnswer);
+        }
+
+        Dump(command, "libgit2", libAnswer);
+
+        Console.WriteLine(
+            $"| `{command.Name}` | {command.Use} | {gitFirst:F1} | {gitMedian:F1} | {libFirst:F1} | {libMedian:F1} | {fresh:F1} | {Same(gitAnswer, libAnswer)} | {readerCells} |"
+        );
+    }
+
+    /// <summary>TASK-0098: the same commands through GitReader; a command missing here has no GitReader equivalent.</summary>
+    private static Dictionary<string, Func<GitReader.Primitive.PrimitiveRepository, IReadOnlyList<string>>> ReaderCommands(
+        Command[] commands,
+        Picks picks
+    ) =>
+        new(StringComparer.Ordinal)
+        {
+            [commands[0].Name] = repo => Sorted(Gr.FileList(repo)),
+            [commands[1].Name] = repo => Sorted(Gr.Dirty(repo)),
+            [commands[2].Name] = repo =>
+                [Gr.Commit(repo, GitReader.Hash.Parse(picks.Base)) is null ? "no" : "yes"],
+            [commands[3].Name] = repo => Sorted(Gr.ChangesSince(repo, GitReader.Hash.Parse(picks.Base))),
+            [commands[4].Name] = repo => [.. Gr.Churn(repo, picks.Since).Order(StringComparer.Ordinal)],
+            [commands[5].Name] = repo => [.. Gr.RecentCommits(repo, picks.Paths, 5)],
+            [commands[6].Name] = repo =>
+                Sorted(Gr.ChangedBetween(repo, GitReader.Hash.Parse(picks.From), GitReader.Hash.Parse(picks.Head))),
+            [commands[8].Name] = repo => [Gr.FileAt(repo, GitReader.Hash.Parse(picks.From), picks.File)],
+        };
+
+    private static Command FileList() =>
+        new(
+            "ls-files --cached --others --exclude-standard",
+            "#4 file list (sync, every architecture read)",
+            r => Sorted(Git.Nul(Git.Read(r, "ls-files", "-z", "--cached", "--others", "--exclude-standard"))),
+            repo =>
+                Sorted(
+                    repo.Index.Select(e => N(e.Path))
+                        .Concat(repo.RetrieveStatus(Untracked(false)).Untracked.Select(e => N(e.FilePath)))
+                )
+        );
+
+    private static Command DirtyPaths() =>
+        new(
+            "status --porcelain=v1 -z -uall",
+            "#5 dirty paths (every sync, coupling)",
+            r =>
+            {
+                var fields = Git.Nul(Git.Read(r, "status", "--porcelain=v1", "-z", "--untracked-files=all"));
+                var dirty = new List<string>();
+                for (var i = 0; i < fields.Length; i++)
+                {
+                    dirty.Add(fields[i][3..]);
+                    if (fields[i][0] is 'R' or 'C')
+                    {
+                        i++;
+                    }
+                }
+
+                return Sorted(dirty);
+            },
+            repo =>
+                Sorted(
+                    repo.RetrieveStatus(Untracked(true))
+                        .Where(e => e.State is not FileStatus.Unaltered and not FileStatus.Ignored)
+                        .Select(e => N(e.FilePath))
+                )
+        );
+
+    private static Command CommitExists(Picks picks) =>
+        new(
+            "cat-file -e <base>^{commit}",
+            "#3 commit exists (2x per incremental sync)",
+            r => [Git.Run(r, "cat-file", "-e", picks.Base + "^{commit}").Code == 0 ? "yes" : "no"],
+            repo => [repo.Lookup<Commit>(picks.Base) is null ? "no" : "yes"]
+        );
+
+    private static Command ChangesSince(Picks picks) =>
+        new(
+            "diff --name-status -M <base> -- + ls-files --others",
+            "#6+#7 changes since the last sync (incremental sync)",
+            r =>
+                Sorted(
+                    NameStatus(
+                            Git.Nul(
+                                Git.Read(r, "diff", "--name-status", "-z", "-M", "--no-ext-diff", picks.Base, "--")
+                            )
+                        )
+                        .Concat(
+                            Git.Nul(Git.Read(r, "ls-files", "-z", "--others", "--exclude-standard"))
+                                .Select(p => "? " + p)
+                        )
+                ),
+            repo =>
+            {
+                // LibGit2Sharp's tree-to-work-tree diff includes untracked files as added: harness lists them apart
+                var untracked = repo.RetrieveStatus(Untracked(false))
+                    .Untracked.Select(e => N(e.FilePath))
+                    .ToHashSet(StringComparer.Ordinal);
+                using var changes = repo.Diff.Compare<TreeChanges>(
+                    repo.Lookup<Commit>(picks.Base).Tree,
+                    DiffTargets.Index | DiffTargets.WorkingDirectory,
+                    null,
+                    null,
+                    new CompareOptions { Similarity = SimilarityOptions.Renames }
+                );
+                return Sorted(
+                    changes
+                        .Where(c => !(c.Status is ChangeKind.Added && untracked.Contains(N(c.Path))))
+                        .Select(Change)
+                        .Concat(untracked.Select(p => "? " + p))
+                );
+            }
+        );
+
+    private static Command Churn(Picks picks) =>
+        new(
+            "log --since=180d --no-merges --name-status -M",
+            "#11 churn (every change_coupling call)",
+            r => ChurnByGit(r, picks.Since),
+            repo => ChurnByLibGit2(repo, picks.Since)
+        );
+
+    private static IReadOnlyList<string> ChurnByGit(string root, DateTimeOffset since)
+    {
+        var text = Git.Read(
+            root,
+            "-c",
+            "core.quotePath=false",
+            "log",
+            "--no-merges",
+            "--since=" + since.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            "--format=%x1e",
+            "--name-status",
+            "-M"
+        );
+        var entries = text.Split('\x1e', StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(commit =>
+                commit
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.Split('\t'))
+                    .Select(f => f[0][0] is 'R' or 'C' ? $"{f[0][..1]} {f[1]} -> {f[2]}" : $"{f[0][..1]} {f[1]}")
+            );
+        return [.. entries.Order(StringComparer.Ordinal)];
+    }
+
+    private static IReadOnlyList<string> ChurnByLibGit2(Repository repo, DateTimeOffset since)
+    {
+        var entries = new List<string>();
+        var filter = new CommitFilter { IncludeReachableFrom = repo.Head.Tip, SortBy = CommitSortStrategies.Time };
+        foreach (var commit in repo.Commits.QueryBy(filter))
+        {
+            if (commit.Committer.When < since)
+            {
+                break;
+            }
+
+            var parents = commit.Parents.ToArray();
+            if (parents.Length > 1)
+            {
+                continue;
+            }
+
+            using var changes = repo.Diff.Compare<TreeChanges>(
+                parents.FirstOrDefault()?.Tree,
+                commit.Tree,
+                new CompareOptions { Similarity = SimilarityOptions.Renames }
+            );
+            entries.AddRange(changes.Select(Change));
+        }
+
+        return [.. entries.Order(StringComparer.Ordinal)];
+    }
+
+    private static Command RecentCommits(Picks picks) =>
+        new(
+            "log -n 5 --no-merges -- <3 paths>",
+            "#12 recent commits (get_context, cached per session)",
+            r =>
+                [
+                    .. Git.Read(r, ["log", "-n", "5", "--no-merges", "--format=%H", "HEAD", "--", .. picks.Paths])
+                        .Split('\n', StringSplitOptions.RemoveEmptyEntries),
+                ],
+            repo => RecentCommitsByLibGit2(repo, picks.Paths)
+        );
+
+    private static IReadOnlyList<string> RecentCommitsByLibGit2(Repository repo, string[] paths)
+    {
+        var found = new List<string>();
+        var filter = new CommitFilter { IncludeReachableFrom = repo.Head.Tip, SortBy = CommitSortStrategies.Time };
+        foreach (var commit in repo.Commits.QueryBy(filter))
+        {
+            var parents = commit.Parents.ToArray();
+            if (parents.Length > 1)
+            {
+                continue;
+            }
+
+            if (paths.Any(p => commit[p]?.Target.Id != parents.FirstOrDefault()?[p]?.Target.Id))
+            {
+                found.Add(commit.Sha);
+                if (found.Count == 5)
+                {
+                    break;
+                }
+            }
+        }
+
+        return found;
+    }
+
+    private static Command ChangedBetween(Picks picks) =>
+        new(
+            "diff --name-only <from> <to>",
+            "#13 telemetry resolve (per pending get_context)",
+            r =>
+                Sorted(
+                    Git.Nul(
+                        Git.Read(
+                            r,
+                            "diff",
+                            "--name-only",
+                            "-z",
+                            "--no-renames",
+                            "--no-ext-diff",
+                            picks.From,
+                            picks.Head,
+                            "--"
+                        )
+                    )
+                ),
+            repo =>
+            {
+                using var changes = repo.Diff.Compare<TreeChanges>(
+                    repo.Lookup<Commit>(picks.From).Tree,
+                    repo.Lookup<Commit>(picks.Head).Tree
+                );
+                return Sorted(changes.Select(c => N(c.Path)));
+            }
+        );
+
+    private static Command HunkHeaders(Picks picks) =>
+        new(
+            "diff -U0 <from> <to> -- <file> (hunk headers)",
+            "#14 changed functions (up to 10 per resolved call)",
+            r =>
+                [
+                    .. Git.Read(r, "diff", "-U0", "--no-color", "--no-ext-diff", picks.From, picks.Head, "--", picks.File)
+                        .Split('\n')
+                        .Where(l => l.StartsWith("@@", StringComparison.Ordinal)),
+                ],
+            repo =>
+            {
+                // Compare<Patch> kills the process under Native AOT (see README); blob-to-blob ContentChanges works
+                var changes = repo.Diff.Compare(
+                    (Blob)repo.Lookup<Commit>(picks.From)[picks.File].Target,
+                    (Blob)repo.Lookup<Commit>(picks.Head)[picks.File].Target,
+                    new CompareOptions { ContextLines = 0, InterhunkLines = 0 }
+                );
+                return [.. changes.Patch.Split('\n').Where(l => l.StartsWith("@@", StringComparison.Ordinal))];
+            }
+        );
+
+    private static Command FileAtCommit(Picks picks) =>
+        new(
+            "show <from>:<file>",
+            "#15 file at a commit (telemetry resolve)",
+            r => [Git.Read(r, "show", picks.From + ":" + picks.File)],
+            repo => [((Blob)repo.Lookup<Commit>(picks.From)[picks.File].Target).GetContentText()]
+        );
+
+    private static Command HooksPath() =>
+        new(
+            "config --get core.hooksPath",
+            "#16 hooks folder (ui hooks endpoint)",
+            r => [Git.Run(r, "config", "--get", "core.hooksPath").Output.Trim()],
+            repo => [repo.Config.Get<string>("core.hooksPath")?.Value ?? ""]
+        );
+
+    private static Command KnowledgeIgnored() =>
+        new(
+            "check-ignore .harness/knowledge.toml",
+            "#10 is the shared knowledge file ignored (ui, when it exists)",
+            r =>
+                [
+                    Git.Run(r, "check-ignore", "-q", "--", ".harness/knowledge.toml").Code == 0
+                        ? "ignored"
+                        : "not ignored",
+                ],
+            repo => [repo.Ignore.IsPathIgnored(".harness/knowledge.toml") ? "ignored" : "not ignored"]
+        );
 
     /// <summary>With LG2SPIKE_DUMP set to a folder, writes each library's full answer there (to compare AOT with JIT).</summary>
     private static void Dump(Command command, string library, IReadOnlyList<string> answer)
