@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Harness.Core.Agents;
 using Harness.Core.Providers;
@@ -274,38 +275,140 @@ internal sealed record HostOptions(
     public static bool TryParse(IReadOnlyList<string> args, out HostOptions options, out string problem)
     {
         options = new("", new("", "", ""), "", "", null);
+        var parsed = new HostArguments();
+        if ((ShapeProblem(args) ?? parsed.Read(args) ?? ClientProblem(parsed.Single)) is { } invalid)
+        {
+            problem = invalid;
+            return false;
+        }
+
+        var serve = args[0] is "serve";
+        var prompt = Prompt(parsed.Single);
+        if ((RequiredProblem(parsed.Single, serve, prompt) ?? ServeProblem(parsed.Single, serve)) is { } missing)
+        {
+            problem = missing;
+            return false;
+        }
+
+        options = Build(args[0], parsed, prompt);
+        problem = "";
+        return true;
+    }
+
+    /// <summary>The command first, then name/value pairs.</summary>
+    private static string? ShapeProblem(IReadOnlyList<string> args)
+    {
         if (args.Count is 0 || args[0] is not ("run" or "serve"))
         {
-            problem = "harness-agents: expected the command 'run' or 'serve'";
-            return false;
+            return "harness-agents: expected the command 'run' or 'serve'";
         }
-        Dictionary<string, string> single = new(StringComparer.Ordinal);
-        List<string> clientArguments = [];
-        List<string> commandArguments = [];
-        Dictionary<string, string> environment = new(StringComparer.Ordinal);
-        if (args.Count % 2 is 0)
+        return args.Count % 2 is 0 ? "harness-agents: every option needs a value" : null;
+    }
+
+    private static string? ClientProblem(Dictionary<string, string> single) =>
+        single.GetValueOrDefault("--client", "") is AgentClients.Claude or AgentClients.Codex
+            ? null
+            : "harness-agents: --client must be claude-code or codex";
+
+    private static string Prompt(Dictionary<string, string> single) =>
+        single.TryGetValue("--prompt-file", out var file)
+            ? File.ReadAllText(file)
+            : single.GetValueOrDefault("--prompt", "");
+
+    private static string? RequiredProblem(Dictionary<string, string> single, bool serve, string prompt) =>
+        single.GetValueOrDefault("--task", "").Length is 0
+        || single.GetValueOrDefault("--cwd", "").Length is 0
+        || (!serve && prompt.Trim().Length is 0)
+            ? "harness-agents: --task, --cwd and a prompt are required"
+            : null;
+
+    /// <summary>serve's key and state, and the idle minutes.</summary>
+    private static string? ServeProblem(Dictionary<string, string> single, bool serve)
+    {
+        if (
+            serve
+            && (
+                !Harness.Infrastructure.Agents.AgentHostFiles.IsKey(single.GetValueOrDefault("--key", ""))
+                || single.GetValueOrDefault("--state", "").Length is 0
+            )
+        )
         {
-            problem = "harness-agents: every option needs a value";
-            return false;
+            return "harness-agents: serve needs --key (32 hex digits) and --state";
         }
-        for (var pair = 1; pair < args.Count; pair += 2)
+        return
+            single.TryGetValue("--idle-minutes", out var minutes)
+            && (!int.TryParse(minutes, CultureInfo.InvariantCulture, out var idle) || idle < 1)
+            ? "harness-agents: --idle-minutes must be a positive number"
+            : null;
+    }
+
+    private static HostOptions Build(string mode, HostArguments parsed, string prompt)
+    {
+        var single = parsed.Single;
+        // checked by ServeProblem: a positive number when given
+        var idle = single.TryGetValue("--idle-minutes", out var minutes)
+            ? int.Parse(minutes, CultureInfo.InvariantCulture)
+            : 60;
+        var state = single.GetValueOrDefault("--state", "");
+        return new(
+            single["--client"],
+            new(single["--task"], Path.GetFullPath(single["--cwd"]), prompt)
+            {
+                Model = single.GetValueOrDefault("--model", ""),
+                Arguments = parsed.ClientArguments,
+                Environment = parsed.Environment,
+            },
+            single.GetValueOrDefault("--resume", ""),
+            single.GetValueOrDefault("--db", ""),
+            single.TryGetValue("--command", out var executable)
+                ? new AgentCommand(executable, parsed.CommandArguments)
+                : null
+        )
         {
-            var (name, value) = (args[pair], args[pair + 1]);
+            Mode = mode,
+            Key = single.GetValueOrDefault("--key", ""),
+            State = state.Length > 0 ? Path.GetFullPath(state) : "",
+            Idle = TimeSpan.FromMinutes(idle),
+        };
+    }
+
+    /// <summary>The options read from the command line's name/value pairs.</summary>
+    private sealed class HostArguments
+    {
+        public Dictionary<string, string> Single { get; } = new(StringComparer.Ordinal);
+        public List<string> ClientArguments { get; } = [];
+        public List<string> CommandArguments { get; } = [];
+        public Dictionary<string, string> Environment { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Reads the pairs after the command; the problem with the first bad one, or null.</summary>
+        public string? Read(IReadOnlyList<string> args)
+        {
+            for (var pair = 1; pair < args.Count; pair += 2)
+            {
+                if (Add(args[pair], args[pair + 1]) is { } problem)
+                {
+                    return problem;
+                }
+            }
+            return null;
+        }
+
+        private string? Add(string name, string value)
+        {
             if (!name.StartsWith("--", StringComparison.Ordinal))
             {
-                problem = "harness-agents: unexpected argument " + name;
-                return false;
+                return "harness-agents: unexpected argument " + name;
             }
             switch (name)
             {
                 case "--arg":
-                    clientArguments.Add(value);
+                    ClientArguments.Add(value);
                     break;
                 case "--command-arg":
-                    commandArguments.Add(value);
+                    CommandArguments.Add(value);
                     break;
                 case "--env" when value.Split('=', 2) is [{ Length: > 0 } variable, var setting]:
-                    environment[variable] = setting;
+                    Environment[variable] = setting;
                     break;
                 case "--client"
                 or "--task"
@@ -319,68 +422,12 @@ internal sealed record HostOptions(
                 or "--key"
                 or "--state"
                 or "--idle-minutes":
-                    single[name] = value;
+                    Single[name] = value;
                     break;
                 default:
-                    problem = "harness-agents: unknown option " + name;
-                    return false;
+                    return "harness-agents: unknown option " + name;
             }
+            return null;
         }
-        var client = single.GetValueOrDefault("--client", "");
-        if (client is not (AgentClients.Claude or AgentClients.Codex))
-        {
-            problem = "harness-agents: --client must be claude-code or codex";
-            return false;
-        }
-        var task = single.GetValueOrDefault("--task", "");
-        var directory = single.GetValueOrDefault("--cwd", "");
-        var prompt = single.TryGetValue("--prompt-file", out var file)
-            ? File.ReadAllText(file)
-            : single.GetValueOrDefault("--prompt", "");
-        var serve = args[0] is "serve";
-        if (task.Length is 0 || directory.Length is 0 || (!serve && prompt.Trim().Length is 0))
-        {
-            problem = "harness-agents: --task, --cwd and a prompt are required";
-            return false;
-        }
-        var key = single.GetValueOrDefault("--key", "");
-        var state = single.GetValueOrDefault("--state", "");
-        if (serve && (!Harness.Infrastructure.Agents.AgentHostFiles.IsKey(key) || state.Length is 0))
-        {
-            problem = "harness-agents: serve needs --key (32 hex digits) and --state";
-            return false;
-        }
-        var idle = 60;
-        if (
-            single.TryGetValue("--idle-minutes", out var minutes)
-            && (!int.TryParse(minutes, System.Globalization.CultureInfo.InvariantCulture, out idle) || idle < 1)
-        )
-        {
-            problem = "harness-agents: --idle-minutes must be a positive number";
-            return false;
-        }
-        var command = single.TryGetValue("--command", out var executable)
-            ? new AgentCommand(executable, commandArguments)
-            : null;
-        options = new(
-            client,
-            new(task, Path.GetFullPath(directory), prompt)
-            {
-                Model = single.GetValueOrDefault("--model", ""),
-                Arguments = clientArguments,
-                Environment = environment,
-            },
-            single.GetValueOrDefault("--resume", ""),
-            single.GetValueOrDefault("--db", ""),
-            command
-        )
-        {
-            Mode = args[0],
-            Key = key,
-            State = state.Length > 0 ? Path.GetFullPath(state) : "",
-            Idle = TimeSpan.FromMinutes(idle),
-        };
-        problem = "";
-        return true;
     }
 }
