@@ -68,6 +68,8 @@ public static class CliApplication
         builder.Services.AddSingleton<MemoryCommandRunner>();
         builder.Services.AddSingleton<TaskCommandRunner>();
         builder.Services.AddSingleton<WorkspaceCommandRunner>();
+        builder.Services.AddSingleton(Harness.Cli.Scm.CliInput.Console);
+        builder.Services.AddSingleton<Harness.Cli.Scm.ScmCommandRunner>();
         builder.Services.AddSingleton<ReportCommandRunner>();
         builder.Services.AddSingleton<ExportCommandRunner>();
         builder.Services.AddSingleton<SessionCommandRunner>();

@@ -13,8 +13,9 @@ features without pulling in storage, MCP or the web stack.
 | Harness.Scm.Gitlab | GitLab REST API v4 provider | Harness.Scm |
 | Harness.Scm.Forgejo | Forgejo REST API v1 provider | Harness.Scm |
 
-Mcp may reference Harness.Scm (its tools take the contracts); Cli composes the
-providers. `Directory.Build.targets` enforces this graph like the rest of
+Mcp may reference Harness.Scm (its tools take the contracts), Infrastructure
+implements its configuration store (so Agents, through Infrastructure, sees it
+too), and Cli composes the providers. `Directory.Build.targets` enforces this graph like the rest of
 harness's assemblies.
 
 ```mermaid
@@ -22,6 +23,7 @@ flowchart TD
     Gitlab[Harness.Scm.Gitlab] --> Scm[Harness.Scm]
     Forgejo[Harness.Scm.Forgejo] --> Scm
     Mcp --> Scm
+    Infrastructure --> Scm
     Cli --> Gitlab
     Cli --> Forgejo
     Cli --> Scm
@@ -87,3 +89,27 @@ local paths and `file://` are not remotes.
 
 A result without a match carries the reason (the remote's host and path and the
 SCMs configured), so callers can tell the user what to change.
+
+## Machine configuration
+
+SCM connections are machine-wide: `IScmConfiguration` (in Harness.Scm) lists,
+finds, adds, updates and removes them, and `ScmConfigurationFile`
+(Infrastructure, `src/Harness.Infrastructure/Scm`) implements it over
+`scm.toml` beside the global `config.toml`, one `[scm.<name>]` table per SCM
+with `type`, `url` and `token` or `token_env`. `ScmEntryRules` validates
+names (1-64 letters, digits, `-`, `_`, `.`; unique ignoring case), types,
+base URLs, tokens and variable names, and failures throw
+`ScmConfigurationException`.
+
+Entries come back as `ScmEntry`: endpoint, token source and the token masked.
+Only `Resolve(name)` returns an `ScmConnection` with the token, read from the
+file or from the named environment variable at that moment. Writes take the
+machine-file lock (`scm.toml.lock`), write a temporary file restricted to the
+owner before any token is in it (an owner-only, non-inherited ACL on Windows,
+mode 600 elsewhere), and replace the file atomically, so a file whose
+permissions were widened is tightened by the next write. `Inspect()` reports
+whether the file exists, parses and is owner-only, for doctor.
+
+`harness scm list|add|set|remove` (`src/Harness.Cli/Scm`) drives the store;
+`--token-stdin` reads the token from standard input so it stays out of shell
+history, and output shows tokens only masked.

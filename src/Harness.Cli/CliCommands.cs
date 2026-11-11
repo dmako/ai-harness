@@ -691,6 +691,7 @@ internal static class CliCommands
                     .CreateInstance<Harness.Cli.Workspaces.ProjectsRenameCommand>(services)
                     .ExecuteAsync(settings, token)
         );
+        AddScm(root, groups, services);
         groups["hooks"].Aliases.Add("hook");
         groups["tasks"].Aliases.Add("task");
         groups["workspace"].Aliases.Add("workspaces");
@@ -714,6 +715,48 @@ internal static class CliCommands
             groups["hooks"].Subcommands.Add(command);
         }
         return root;
+    }
+
+    private static void AddScm(RootCommand root, Dictionary<string, Command> groups, IServiceProvider services)
+    {
+        var scm = Group(root, groups, "scm");
+        scm.Description = "Manage this machine's SCM connections (GitLab, Forgejo)";
+        Add(
+            scm,
+            "list",
+            "List the configured SCMs (tokens masked)",
+            Harness.Cli.Scm.ScmBindings.BindList,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Scm.ScmListCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            scm,
+            "add",
+            "Add an SCM: name, --type, --url and a token",
+            Harness.Cli.Scm.ScmBindings.BindAdd,
+            (settings, token) =>
+                ActivatorUtilities.CreateInstance<Harness.Cli.Scm.ScmAddCommand>(services).ExecuteAsync(settings, token)
+        );
+        Add(
+            scm,
+            "set",
+            "Change an SCM's type, URL, token or name",
+            Harness.Cli.Scm.ScmBindings.BindSet,
+            (settings, token) =>
+                ActivatorUtilities.CreateInstance<Harness.Cli.Scm.ScmSetCommand>(services).ExecuteAsync(settings, token)
+        );
+        Add(
+            scm,
+            "remove",
+            "Remove an SCM",
+            Harness.Cli.Scm.ScmBindings.BindRemove,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Scm.ScmRemoveCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
     }
 
     private static Command Group(RootCommand root, Dictionary<string, Command> groups, string path)

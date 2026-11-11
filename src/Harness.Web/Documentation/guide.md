@@ -259,6 +259,15 @@ telemetry if you turn it on.
   (`harness workspace`): workspace-level knowledge applies to all members,
   and searches can span them.
 
+## Connecting GitLab and Forgejo
+
+harness can work with merge requests on GitLab and Forgejo servers. Add each
+server once per machine with an access token, for example
+`harness scm add work --type gitlab --url https://gitlab.example.com --token-stdin`
+and paste the token; `harness scm list` shows what is configured, with tokens
+masked. The connections live in `scm.toml` beside the global configuration,
+readable only by you (see SCM connections in the reference).
+
 ## Updating harness
 
 After replacing the binaries, run `harness migrate` once, from anywhere. It

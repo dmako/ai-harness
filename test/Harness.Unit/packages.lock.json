@@ -218,6 +218,7 @@
           "Harness.Infrastructure": "[0.10.0-localbuild, )",
           "Harness.Mcp": "[0.10.0-localbuild, )",
           "Harness.Providers": "[0.10.0-localbuild, )",
+          "Harness.Scm": "[0.10.0-localbuild, )",
           "Harness.Web": "[0.10.0-localbuild, )",
           "Spectre.Console": "[0.57.2, )",
           "System.CommandLine": "[3.0.0, )"
@@ -230,6 +231,7 @@
         "type": "Project",
         "dependencies": {
           "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Scm": "[0.10.0-localbuild, )",
           "Microsoft.Data.Sqlite": "[11.0.0, )",
           "Tomlyn": "[2.11.1, )",
           "YamlDotNet": "[18.1.0, )"

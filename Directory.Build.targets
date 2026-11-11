@@ -72,7 +72,7 @@
           Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' OR '$(MSBuildProjectName)' == 'Harness.Agents' OR '$(MSBuildProjectName)' == 'Harness.Scm' OR '$(MSBuildProjectName)' == 'Harness.Scm.Gitlab' OR '$(MSBuildProjectName)' == 'Harness.Scm.Forgejo' ">
     <ItemGroup>
       <_HarnessAllowedReference Include="Harness.Core" Condition=" '$(MSBuildProjectName)' != 'Harness.Core' AND '$(MSBuildProjectName)' != 'Harness.Scm' AND '$(MSBuildProjectName)' != 'Harness.Scm.Gitlab' AND '$(MSBuildProjectName)' != 'Harness.Scm.Forgejo' " />
-      <_HarnessAllowedReference Include="Harness.Scm" Condition=" '$(MSBuildProjectName)' == 'Harness.Scm.Gitlab' OR '$(MSBuildProjectName)' == 'Harness.Scm.Forgejo' OR '$(MSBuildProjectName)' == 'Harness.Mcp' " />
+      <_HarnessAllowedReference Include="Harness.Scm" Condition=" '$(MSBuildProjectName)' == 'Harness.Scm.Gitlab' OR '$(MSBuildProjectName)' == 'Harness.Scm.Forgejo' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Agents' " />
       <_HarnessAllowedReference Include="Harness.Infrastructure;Harness.Providers;Harness.Mcp;Harness.Web;Harness.Scm;Harness.Scm.Gitlab;Harness.Scm.Forgejo" Condition=" '$(MSBuildProjectName)' == 'Harness.Cli' " />
       <_HarnessAllowedReference Include="Harness.Infrastructure" Condition=" '$(MSBuildProjectName)' == 'Harness.Agents' " />
       <_HarnessUnexpectedReference Include="@(ProjectReference->'%(Filename)')" />

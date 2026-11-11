@@ -7,7 +7,7 @@ remain directories inside these assemblies rather than separate projects.
 | Assembly | Responsibility | Project dependencies |
 | --- | --- | --- |
 | [Core](core.md) | Domain models, validation, retrieval, analysis and shared contracts | None |
-| [Infrastructure](infrastructure.md) | SQLite, files, Git, configuration, project/workspace state | Core |
+| [Infrastructure](infrastructure.md) | SQLite, files, Git, configuration, project/workspace state, the SCM file | Core, Scm |
 | [Providers](providers.md) | Capability routing and supervised external protocols | Core |
 | [Mcp](mcp.md) | MCP server, schemas, tool adapters and context rendering | Core, Scm |
 | [Web](web.md) | HTTP boundary, embedded frontend and documentation | Core |
@@ -47,6 +47,7 @@ flowchart TD
     Cli --> ScmProviders[Scm.Gitlab / Scm.Forgejo]
     Mcp --> Scm
     ScmProviders --> Scm
+    Infrastructure --> Scm
 ```
 
 A typical agent request enters MCP, validates its arguments, gathers provider
