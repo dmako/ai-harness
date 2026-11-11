@@ -36,7 +36,7 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
             return _functions;
         }
 
-        var cached = cache?.Load(repository.Root) ?? new(StringComparer.Ordinal);
+        var cached = Cached();
         List<CloneCacheEntry> entries = [];
         List<(string Path, string Hash)> go = [];
         var recordedHash = cache?.Recorded(repository.Root) ?? (_ => null);
@@ -46,56 +46,120 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
             var recorded = recordedHash(file);
             var language = Language(file);
             var known = cached.GetValueOrDefault(file);
-            if (recorded is not null && known is not null)
-            {
-                if (language is not "go" && known.Hash == recorded)
-                {
-                    entries.Add(known);
-                    continue;
-                }
-
-                if (language is "go" && known.Hash.StartsWith(recorded + "|", StringComparison.Ordinal))
-                {
-                    go.Add((file, recorded));
-                    continue;
-                }
-            }
-
-            var text = repository.Read(file);
-            if (Encoding.UTF8.GetByteCount(text) > 1024 * 1024)
-            {
-                continue;
-            }
-
-            // An empty read (a file that could not be read) is never kept: the next sync reads it again.
-            var hash = text.Length is 0 ? "" : recorded ?? CloneCache.TextHash(text);
             if (language is "go")
             {
-                go.Add((file, hash));
-                continue;
+                if (GoFile(file, recorded, known) is { } package)
+                {
+                    go.Add(package);
+                }
             }
-
-            if (text.Length is 0)
+            else if (FileEntry(file, language, recorded, known) is { } entry)
             {
-                entries.Add(new(file, "", [], [], []));
-                continue;
+                entries.Add(entry);
             }
-
-            if (!cached.TryGetValue(file, out var entry) || entry.Hash != hash)
-            {
-                var tokens = CloneLexer.Tokenize(text, language);
-                Lexed++;
-                entry = new(
-                    file,
-                    hash,
-                    CFunctions(file, language, tokens),
-                    language is "cs" ? ComplexityCounter.CSharp(file, tokens) : ComplexityCounter.Script(file, tokens),
-                    []
-                );
-            }
-            entries.Add(entry);
         }
 
+        entries.AddRange(GoEntries(go, cached));
+        Save(cached, entries);
+        _complexity.AddRange(entries.SelectMany(entry => entry.Complexity));
+        _branches.AddRange(entries.SelectMany(entry => entry.Branches));
+        return _functions = entries.SelectMany(entry => entry.Functions).ToList();
+    }
+
+    /// <summary>The cached entries by path; empty without a cache.</summary>
+    private Dictionary<string, CloneCacheEntry> Cached() =>
+        cache?.Load(repository.Root) ?? new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// A C# or TypeScript file's entry: the cached one while its hash holds, else lexed; null if skipped.
+    /// </summary>
+    private CloneCacheEntry? FileEntry(string file, string language, string? recorded, CloneCacheEntry? known)
+    {
+        if (recorded is not null && known?.Hash == recorded)
+        {
+            return known;
+        }
+
+        if (ReadText(file) is not { } text)
+        {
+            return null;
+        }
+
+        // An empty read (a file that could not be read) is never kept: the next sync reads it again.
+        if (text.Length is 0)
+        {
+            return new(file, "", [], [], []);
+        }
+
+        var hash = recorded ?? CloneCache.TextHash(text);
+        if (known?.Hash == hash)
+        {
+            return known;
+        }
+
+        var tokens = CloneLexer.Tokenize(text, language);
+        Lexed++;
+        return new(
+            file,
+            hash,
+            CFunctions(file, language, tokens),
+            language is "cs" ? ComplexityCounter.CSharp(file, tokens) : ComplexityCounter.Script(file, tokens),
+            []
+        );
+    }
+
+    /// <summary>A Go file with its own hash (its package's is added later); null if skipped.</summary>
+    private (string Path, string Hash)? GoFile(string file, string? recorded, CloneCacheEntry? known)
+    {
+        if (
+            recorded is not null
+            && known is not null
+            && known.Hash.StartsWith(recorded + "|", StringComparison.Ordinal)
+        )
+        {
+            return (file, recorded);
+        }
+
+        // An empty read (a file that could not be read) is never kept: the next sync reads it again.
+        if (ReadText(file) is not { } text)
+        {
+            return null;
+        }
+
+        return (file, text.Length is 0 ? "" : recorded ?? CloneCache.TextHash(text));
+    }
+
+    /// <summary>The file's text, or null when it is over 1 MiB.</summary>
+    private string? ReadText(string file)
+    {
+        var text = repository.Read(file);
+        return Encoding.UTF8.GetByteCount(text) > 1024 * 1024 ? null : text;
+    }
+
+    /// <summary>Writes the entries to the cache when they differ from what it held.</summary>
+    private void Save(Dictionary<string, CloneCacheEntry> cached, List<CloneCacheEntry> entries)
+    {
+        if (cache is null)
+        {
+            return;
+        }
+
+        var keep = entries.Where(entry => entry.Hash.Length > 0 && entry.Hash[0] is not '|').ToList();
+        if (
+            keep.Count != cached.Count
+            || keep.Any(entry => !ReferenceEquals(entry, cached.GetValueOrDefault(entry.Path)))
+        )
+        {
+            cache.Save(repository.Root, keep);
+        }
+    }
+
+    /// <summary>The Go files' entries: cached while the file's and its package's hashes hold, else lexed.</summary>
+    private List<CloneCacheEntry> GoEntries(
+        List<(string Path, string Hash)> go,
+        Dictionary<string, CloneCacheEntry> cached
+    )
+    {
         // A Go file's functions depend on its package's other files: its key holds theirs too.
         var packages = go.GroupBy(file => Directory(file.Path), StringComparer.Ordinal)
             .ToDictionary(
@@ -120,6 +184,7 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
             return tokens;
         }
 
+        List<CloneCacheEntry> entries = [];
         foreach (var file in go)
         {
             var hash = file.Hash + "|" + packages[Directory(file.Path)];
@@ -137,28 +202,7 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
             }
             entries.Add(entry);
         }
-
-        List<CloneFunction> functions = [];
-        foreach (var entry in entries)
-        {
-            functions.AddRange(entry.Functions);
-            _complexity.AddRange(entry.Complexity);
-            _branches.AddRange(entry.Branches);
-        }
-
-        if (cache is not null)
-        {
-            var keep = entries.Where(entry => entry.Hash.Length > 0 && entry.Hash[0] is not '|').ToList();
-            if (
-                keep.Count != cached.Count
-                || keep.Any(entry => !ReferenceEquals(entry, cached.GetValueOrDefault(entry.Path)))
-            )
-            {
-                cache.Save(repository.Root, keep);
-            }
-        }
-
-        return _functions = functions;
+        return entries;
     }
 
     public EvidenceFunction? Locate(EvidenceSite site)
