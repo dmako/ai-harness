@@ -249,6 +249,9 @@
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
       },
+      "harness.scm": {
+        "type": "Project"
+      },
       "harness.web": {
         "type": "Project",
         "dependencies": {

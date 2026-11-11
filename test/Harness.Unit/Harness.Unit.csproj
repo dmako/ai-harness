@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Harness.Cli/Harness.Cli.csproj" />
+    <ProjectReference Include="../../src/Harness.Scm/Harness.Scm.csproj" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="AwesomeAssertions" />
   </ItemGroup>
