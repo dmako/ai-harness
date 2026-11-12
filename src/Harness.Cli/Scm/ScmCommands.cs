@@ -49,6 +49,12 @@ internal sealed class ScmSetCommand(ScmCommandRunner runner)
         runner.SetAsync(settings, cancellationToken);
 }
 
+internal sealed class ScmTestCommand(ScmCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(ScmNameSettings settings, CancellationToken cancellationToken) =>
+        runner.TestAsync(settings, cancellationToken);
+}
+
 internal sealed class ScmRemoveCommand(ScmCommandRunner runner)
 {
     public Task<int> ExecuteAsync(ScmNameSettings settings, CancellationToken cancellationToken) =>

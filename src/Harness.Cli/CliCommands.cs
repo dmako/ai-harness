@@ -749,6 +749,16 @@ internal static class CliCommands
         );
         Add(
             scm,
+            "test",
+            "Test the connection to one SCM, or all of them",
+            Harness.Cli.Scm.ScmBindings.BindTest,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Scm.ScmTestCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            scm,
             "remove",
             "Remove an SCM",
             Harness.Cli.Scm.ScmBindings.BindRemove,

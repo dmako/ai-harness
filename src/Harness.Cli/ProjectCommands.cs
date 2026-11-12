@@ -171,22 +171,53 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
     }
 }
 
-internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation information, TextWriter output)
+internal sealed class DoctorCommand(
+    ProjectLifecycle lifecycle,
+    BuildInformation information,
+    TextWriter output,
+    Harness.Cli.Scm.ScmHttpOptions scmHttp
+)
 {
+    private Harness.Infrastructure.Scm.ScmConfigurationFile ScmStore =>
+        Harness.Infrastructure.Scm.ScmConfigurationFile.ForGlobal(lifecycle.GlobalConfigurationPath);
+
     public async Task<int> ExecuteAsync(DoctorSettings settings, CancellationToken cancellationToken)
     {
         List<object> results = [];
         var failed = false;
         if (settings.All)
         {
+            // the machine's SCMs are tested once; each project adds whether its own project is reachable
+            var (scmChecks, scmTests) = await Harness.Cli.Scm.ScmDoctor.MachineAsync(
+                ScmStore,
+                scmHttp.Handler,
+                cancellationToken
+            );
             var entries = lifecycle.Registry.Load()["projects"]!.AsArray();
             foreach (var entry in entries)
             {
                 var root = entry!["root"]?.GetValue<string>() ?? "";
                 var id = entry["id"]?.GetValue<string>() ?? "";
-                var checks = Directory.Exists(root)
-                    ? (await lifecycle.InspectAsync(root, cancellationToken)).Checks(information.Version)
-                    :
+                List<HealthCheck> checks;
+                if (Directory.Exists(root))
+                {
+                    var inspection = await lifecycle.InspectAsync(root, cancellationToken);
+                    checks = [.. inspection.Checks(information.Version)];
+                    if (inspection.Scm is { } scm && scmTests.Count > 0)
+                    {
+                        checks.Add(
+                            await Harness.Cli.Scm.ScmDoctor.ProjectCheckAsync(
+                                scm,
+                                scmTests,
+                                scmHttp.Handler,
+                                cancellationToken
+                            )
+                        );
+                    }
+                }
+                else
+                {
+                    checks =
                     [
                         new HealthCheck(
                             "project",
@@ -195,6 +226,8 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
                             "restore it, or remove it from the registry"
                         ),
                     ];
+                }
+
                 failed |= checks.Any(check => check.Level == "fail");
                 results.Add(ProjectOutput.DoctorResult(checks, id, root));
                 if (!settings.Json)
@@ -204,19 +237,36 @@ internal sealed class DoctorCommand(ProjectLifecycle lifecycle, BuildInformation
                 }
             }
 
+            failed |= scmChecks.Any(check => check.Level == "fail");
             if (settings.Json)
             {
                 await output.WriteLineAsync(
-                    HarnessJson.Serialize(new JsonObjectMap { ["projects"] = results }, ProjectOutput.JsonOptions),
+                    HarnessJson.Serialize(
+                        new JsonObjectMap { ["projects"] = results, ["scm"] = ProjectOutput.DoctorResult(scmChecks) },
+                        ProjectOutput.JsonOptions
+                    ),
                     CancellationToken.None
                 );
+            }
+            else
+            {
+                await output.WriteLineAsync("SCM connections on this machine", CancellationToken.None);
+                await WriteChecksAsync(scmChecks);
             }
         }
         else
         {
-            var checks = (await lifecycle.InspectAsync(settings.Project, cancellationToken)).Checks(
-                information.Version
-            );
+            var inspection = await lifecycle.InspectAsync(settings.Project, cancellationToken);
+            List<HealthCheck> checks =
+            [
+                .. inspection.Checks(information.Version),
+                .. await Harness.Cli.Scm.ScmDoctor.ChecksAsync(
+                    ScmStore,
+                    inspection.Scm,
+                    scmHttp.Handler,
+                    cancellationToken
+                ),
+            ];
             failed = checks.Any(check => check.Level == "fail");
             if (settings.Json)
             {

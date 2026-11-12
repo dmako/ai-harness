@@ -47,7 +47,7 @@ uninstall` alone lets you pick what to remove.
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
 | `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
-| `harness doctor` | Checks the installation, database, clients, hooks and providers, with a fix for each problem (`--all`: every project on the machine). |
+| `harness doctor` | Checks the installation, database, clients, hooks, providers and SCM connections, with a fix for each problem (`--all`: every project on the machine). |
 | `harness status` | The project, its Git state, database and clients. |
 | `harness sync` | Refreshes the recorded state (branch, HEAD, files, findings). The Git hooks run it for you. |
 | `harness instructions` | Adds the harness guidance for agents to AGENTS.md / CLAUDE.md (`--remove`). |
@@ -57,7 +57,7 @@ uninstall` alone lets you pick what to remove.
 | `harness proposals` | Knowledge agents proposed: list, show, approve, reject. |
 | `harness projects` | Every repository on this machine that uses harness (`forget <id>` drops one from the list). |
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
-| `harness scm` | This machine's SCM connections (GitLab, Forgejo): `list`, `add`, `set`, `remove` (see SCM connections). |
+| `harness scm` | This machine's SCM connections (GitLab, Forgejo): `list`, `add`, `set`, `remove`, `test` (see SCM connections). |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
 | `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
@@ -360,6 +360,7 @@ token rejected, not permitted, wrong server type) with its fix.
 | `harness scm add <name> --type gitlab\|forgejo --url <url> --token-stdin` | Adds an SCM; the token is read from the first line of standard input. `--token-env <VAR>` reads it from that environment variable on every call instead of storing it; `--token <t>` works but can leave the token in your shell history. |
 | `harness scm set <name> [--type] [--url] [--token-stdin\|--token\|--token-env] [--rename <new>]` | Changes an SCM; a new token or variable replaces the old one. |
 | `harness scm remove <name>` | Removes an SCM. |
+| `harness scm test [<name>] [--json]` | Tests one SCM, or all of them side by side: the server's version and the token's user, or what failed and how to fix it. Exits 1 when a test fails. |
 
 Names are 1-64 letters, digits, `-`, `_` or `.` and unique ignoring case;
 the URL is the server's base address (`https://gitlab.example.com`, or
@@ -395,6 +396,11 @@ name = "work"              # an SCM from 'harness scm list'
 project = "group/sub/repo" # with name: its path there, no matching
 remote = "upstream"        # or: match only this remote
 ```
+
+`harness doctor` checks them too: that `scm.toml` reads and is readable only by
+you, that each SCM has its token and answers its connection test (all tested
+at once, 15 s at most each), and which SCM and project this repository is on
+and whether the token reaches that project. No SCM configured is only noted.
 
 ## Tasks
 

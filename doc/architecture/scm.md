@@ -237,3 +237,16 @@ SCMs through `/api/scm` (see [web](web.md)); the last test of each saved SCM
 is kept while harness ui runs. `ScmProviders` (Cli) holds the provider registry
 and the connection test the UI, `harness scm test` and doctor share, with a
 15 s request timeout so a dead server does not hold a page.
+
+## Doctor and harness scm test
+
+`ScmDoctor` (Cli) turns SCM state into doctor's `HealthCheck`s: `scm` (scm.toml
+readable, else a failure; owner-only, else a warning with the fix; nothing
+configured is `info`), `scm:<name>` per SCM (its token present, its connection
+test passing, else the failure kind and hint) and `scm project` (the
+resolution, and for a match one `GetProjectAsync` with that SCM's token;
+unmatched remotes warn with the reason, no remote is `info`). SCMs are tested
+in parallel through `ScmProviders` with its 15 s timeout; `doctor --all` tests
+them once and adds each project's `scm project` check. `harness scm test` runs
+the same tests for one SCM or all of them and exits 1 when one fails. Tests
+inject a fake server through `ScmHttpOptions`.

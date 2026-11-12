@@ -12,6 +12,19 @@ internal static class ScmBindings
         return result => new ScmSettings { Json = result.GetValue(json) };
     }
 
+    internal static Func<ParseResult, ScmNameSettings> BindTest(Command command)
+    {
+        var json = Json(command);
+        var name = new Argument<string>("name")
+        {
+            Arity = ArgumentArity.ZeroOrOne,
+            DefaultValueFactory = _ => "",
+            Description = "The SCM to test; all of them when left out",
+        };
+        command.Arguments.Add(name);
+        return result => new ScmNameSettings { Json = result.GetValue(json), Name = result.GetValue(name) ?? "" };
+    }
+
     internal static Func<ParseResult, ScmNameSettings> BindRemove(Command command)
     {
         var json = Json(command);

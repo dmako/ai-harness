@@ -267,7 +267,8 @@ server once per machine with an access token, for example
 and paste the token; `harness scm list` shows what is configured, with tokens
 masked. harness ui's Machine page manages the same connections, with a Test
 connection button that says whether the server answers and accepts the token,
-and what to fix if not. The connections live in `scm.toml` beside the global
+`harness scm test` does the same from a terminal, and `harness doctor` checks
+every connection and this project's SCM. The connections live in `scm.toml` beside the global
 configuration, readable only by you (see SCM connections in the reference).
 
 ## Updating harness
