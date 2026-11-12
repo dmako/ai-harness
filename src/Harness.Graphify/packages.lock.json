@@ -108,8 +108,8 @@
       "harness.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
-          "Harness.Scm": "[0.10.0-localbuild, )",
+          "Harness.Core": "[0.11.0-localbuild, )",
+          "Harness.Scm": "[0.11.0-localbuild, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[11.0.0, )",
           "Microsoft.Data.Sqlite": "[11.0.0, )",
           "Tomlyn": "[2.11.1, )",
@@ -119,7 +119,7 @@
       "harness.providers": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Core": "[0.11.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
       },
