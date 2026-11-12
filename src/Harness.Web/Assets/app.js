@@ -2142,6 +2142,7 @@ async function renderMachine(main) {
       h("div", { class: "setrow" }, h("div", {}, h("b", {}, "Open projects on"), h("p", { class: "muted small" }, "The view a project opens on from the sidebar.")),
         seg("Default project view", PROJECT_VIEWS, defaultView(), (v) => store.set("projectView", v))))),
     section("Board", "Kept on this machine: how a project's Board starts until it is set there.", boardDefaults()),
+    section("SCM connections", "GitLab and Forgejo servers whose merge requests agents can work with. Kept on this machine in scm.toml, readable only by you; a token goes in but never comes back to this page.", scmConnections()),
     section("Developer telemetry", "Anonymous, aggregated numbers for the harness developer: how well harness serves agents. Never code, paths, queries or names.", tel),
     section("C# sessions (graphify-csharp)", "Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone.",
       graphifySessions(null)),
@@ -2169,6 +2170,92 @@ function boardDefaults() {
   };
   api("/api/board-defaults").then((r) => draw(r.defaults || {})).catch((e) => fill(box, h("p", { class: "error" }, e.message)));
   return box;
+}
+
+// scmConnections lists this machine's SCM connections (scm.toml) with add,
+// edit, remove and a connection test; tokens are only ever shown masked
+// (from the C# rewrite: TASK-0126).
+const SCM_TYPES = { gitlab: "GitLab", forgejo: "Forgejo" };
+const SCM_FAILURES = { unreachable: "Unreachable", tls: "TLS failed", unauthorized: "Token rejected", forbidden: "Not permitted",
+  not_found: "Not found", wrong_server: "Wrong server type", invalid: "Refused", rate_limited: "Rate limited", server: "Server error" };
+function scmTestLine(t) {
+  if (!t) return h("p", { class: "scmtest muted small" }, "Not tested yet.");
+  if (t.ok) {
+    return h("p", { class: "scmtest ok" }, levelPill("ok"),
+      h("span", {}, `Connected${t.version ? ` to version ${t.version}` : ""}${t.user ? ` as ${t.user}` : ""}.`));
+  }
+  return h("div", { class: "scmtest bad" },
+    h("p", {}, levelPill("fail"), h("span", {}, h("b", {}, SCM_FAILURES[t.failure] || "Failed"), t.message ? `: ${t.message}` : "")),
+    t.hint && h("p", { class: "muted small" }, t.hint));
+}
+function scmConnections() {
+  const box = h("div", { class: "scmbox" }, h("p", { class: "empty" }, "Loading…"));
+  const load = () => api("/api/scm").then(draw).catch((e) => fill(box, h("p", { class: "error" }, e.message)));
+  const add = h("button", { type: "button", onclick: () => scmForm(null, load) }, icon("plus"), " Add SCM");
+  const row = (e) => {
+    const result = h("div", {}, scmTestLine(e.last_test));
+    const test = h("button", { type: "button", class: "ghost", onclick: async () => {
+      test.disabled = true; fill(result, h("p", { class: "scmtest muted small" }, "Testing…"));
+      try { fill(result, scmTestLine((await post("/api/scm/test", { name: e.name })).test)); }
+      catch (err) { fill(result, h("p", { class: "error" }, err.message)); }
+      test.disabled = false;
+    } }, "Test connection");
+    const token = e.token_source === "env" ? `token from $${e.token_env}${e.token_available ? ` (${e.token})` : " (not set)"}` : `token ${e.token}`;
+    return h("li", { class: "scmrow", "data-scm": e.name },
+      h("div", { class: "scmmain" },
+        h("div", { class: "scmname" }, h("b", {}, e.name), h("span", { class: "pill" }, SCM_TYPES[e.type] || e.type)),
+        h("code", { class: "scmurl", title: e.url }, e.url),
+        h("span", { class: "muted small" }, token),
+        result),
+      h("div", { class: "scmacts" }, test,
+        iconButton("edit", `Edit SCM ${e.name}`, () => scmForm(e, load)),
+        iconButton("trash", `Remove SCM ${e.name}`, () => confirmDelete({
+          title: `Remove SCM ${e.name}?`, what: e.url,
+          lines: ["Its token is deleted from this machine.", "Projects on this server lose the merge request tools until it is added again."],
+          confirm: "Remove", send: () => post(`/api/scm/${encodeURIComponent(e.name)}/remove`), done: `Removed SCM ${e.name}`,
+        }))));
+  };
+  const draw = (r) => fill(box,
+    (r.scm || []).length
+      ? h("ul", { class: "scmlist card" }, r.scm.map(row))
+      : emptyState("inbox", "No SCM yet", "Add a GitLab or Forgejo server with an access token to let agents read and review its merge requests."),
+    h("div", { class: "scmfoot" }, add, r.file && h("span", { class: "muted small" }, "Stored in ", h("code", { title: r.file }, r.file))));
+  load();
+  return box;
+}
+// scmForm adds an SCM, or edits one (an empty token keeps the stored one);
+// its test checks the values as typed, before they are saved.
+function scmForm(entry, reload) {
+  const dlg = dialog({ title: entry ? `Edit SCM ${entry.name}` : "Add an SCM", sub: "GitLab (API v4) or Forgejo (API v1), authenticated with an access token." });
+  const name = h("input", { type: "text", value: entry ? entry.name : "", autocomplete: "off", spellcheck: "false", "aria-label": "Name" });
+  const type = h("select", { "aria-label": "Type" },
+    !entry && h("option", { value: "", selected: true, disabled: true }, "Choose a type"),
+    Object.entries(SCM_TYPES).map(([v, t]) => h("option", { value: v, selected: entry ? entry.type === v : false }, t)));
+  const url = h("input", { type: "url", value: entry ? entry.url : "", placeholder: "https://gitlab.example.com", spellcheck: "false", "aria-label": "URL" });
+  const token = h("input", { type: "password", autocomplete: "new-password", placeholder: entry ? "(unchanged)" : "", "aria-label": "Token" });
+  const result = h("div", { class: "scmresult" });
+  const err = h("p", { class: "error", hidden: true });
+  const values = () => ({ name: name.value.trim(), type: type.value, url: url.value.trim(), token: token.value.trim() });
+  const test = h("button", { type: "button", class: "ghost", onclick: async () => {
+    test.disabled = true; err.hidden = true; fill(result, h("p", { class: "scmtest muted small" }, "Testing…"));
+    try { fill(result, scmTestLine((await post("/api/scm/test", { ...values(), name: entry ? entry.name : values().name })).test)); }
+    catch (e) { fill(result); err.textContent = e.message; err.hidden = false; }
+    test.disabled = false;
+  } }, "Test connection");
+  const save = h("button", { type: "button", onclick: async () => {
+    save.disabled = true; err.hidden = true;
+    try {
+      await post(entry ? `/api/scm/${encodeURIComponent(entry.name)}/edit` : "/api/scm", values());
+      dlg.close(); toast(entry ? `SCM ${values().name || entry.name} saved` : `SCM ${values().name} added`); reload();
+    } catch (e) { err.textContent = e.message; err.hidden = false; save.disabled = false; }
+  } }, entry ? "Save" : "Add SCM");
+  dlg.set(null, [
+    field("Name", name, "How projects and the CLI refer to it: letters, digits, '-', '_' or '.'."),
+    field("Type", type),
+    field("URL", url, "The server's base address; an instance under a path keeps it (https://host/gitlab)."),
+    field("Token", token, entry ? "Leave empty to keep the stored token." : "A personal or project access token with API access (GitLab: api)."),
+    result, err,
+  ], [h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Cancel"), test, save]);
 }
 
 // telemetryCard is the opt-in as a switch: on asks for the collector's

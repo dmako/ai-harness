@@ -36,6 +36,10 @@ internal sealed partial class UiReadService : IUiWriteApi
             {
                 return await SetTelemetryAsync(request.Body, token);
             }
+            if (endpoint.StartsWith("/api/scm", StringComparison.Ordinal))
+            {
+                return await WriteScmAsync(request, token);
+            }
             if (endpoint is "/api/graphify/sessions/{action}")
             {
                 return await WriteGraphifyAsync(request, token);

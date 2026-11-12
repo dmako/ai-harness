@@ -45,6 +45,10 @@ public static class UiRoutes
         "/api/workspaces/{name}/delete",
         "/api/workspaces/{name}/rename",
         "/api/projects/{id}/rename",
+        "/api/scm",
+        "/api/scm/test",
+        "/api/scm/{name}/edit",
+        "/api/scm/{name}/remove",
     ];
     public static IReadOnlyList<string> Reads { get; } =
     [
@@ -95,5 +99,6 @@ public static class UiRoutes
         "/api/workspaces/{name}/findings",
         "/api/workspaces/{name}/stack",
         "/api/stacks",
+        "/api/scm",
     ];
 }

@@ -92,6 +92,7 @@ internal sealed partial class UiReadService(
                 "/api/search" => await SearchAsync(request, token),
                 "/api/activity" => await ActivityAsync(request, token),
                 "/api/stacks" => await StacksAsync(token),
+                "/api/scm" => Scm(),
                 "/api/graphify/sessions" => await GraphifySessionsAsync(request, token),
                 "/api/knowledge" or "/api/knowledge/memories/{mid}" => Knowledge(request, token),
                 _ => throw new UiRequestException(404, "unknown endpoint"),

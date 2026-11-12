@@ -349,7 +349,10 @@ workspace's architecture, shared code and version differences.
 
 harness can talk to GitLab (REST API v4) and Forgejo (REST API v1) servers,
 authenticated with an access token only. Connections are set up once per
-machine and serve every project on it.
+machine and serve every project on it, with `harness scm` or in harness ui
+under Machine › SCM connections, where Test connection checks the server's
+version and the token's user and names the failure (unreachable, TLS,
+token rejected, not permitted, wrong server type) with its fix.
 
 | Command | What it does |
 |---|---|

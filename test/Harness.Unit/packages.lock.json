@@ -219,6 +219,8 @@
           "Harness.Mcp": "[0.10.0-localbuild, )",
           "Harness.Providers": "[0.10.0-localbuild, )",
           "Harness.Scm": "[0.10.0-localbuild, )",
+          "Harness.Scm.Forgejo": "[0.10.0-localbuild, )",
+          "Harness.Scm.Gitlab": "[0.10.0-localbuild, )",
           "Harness.Web": "[0.10.0-localbuild, )",
           "Spectre.Console": "[0.57.2, )",
           "System.CommandLine": "[3.0.0, )"

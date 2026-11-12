@@ -229,3 +229,11 @@ embed (`ScmRemoteUrls.Safe`). `HarnessStateSession` implements
 `IScmProjectContext`, so MCP tools resolve the session's project;
 `project_overview` and `harness status` (`scm` in `--json`, an `SCM` line in
 text) show the resolution once an SCM is configured.
+
+## harness ui
+
+Machine › SCM connections lists, adds, edits, removes and tests the machine's
+SCMs through `/api/scm` (see [web](web.md)); the last test of each saved SCM
+is kept while harness ui runs. `ScmProviders` (Cli) holds the provider registry
+and the connection test the UI, `harness scm test` and doctor share, with a
+15 s request timeout so a dead server does not hold a page.

@@ -10,6 +10,8 @@
     <ProjectReference Include="../Harness.Mcp/Harness.Mcp.csproj" />
     <ProjectReference Include="../Harness.Web/Harness.Web.csproj" />
     <ProjectReference Include="../Harness.Scm/Harness.Scm.csproj" />
+    <ProjectReference Include="../Harness.Scm.Gitlab/Harness.Scm.Gitlab.csproj" />
+    <ProjectReference Include="../Harness.Scm.Forgejo/Harness.Scm.Forgejo.csproj" />
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="Spectre.Console" />
     <InternalsVisibleTo Include="Harness.Unit" />

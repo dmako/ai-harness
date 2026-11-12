@@ -242,8 +242,8 @@ edit dialog, with `harness tasks blueprints edit <id> --color <name>`, or as
 
 A workspace has the same views over its members. Machine holds this page's
 settings, the Board's defaults (the sort and done-age of a project that has
-not chosen its own), the C# sessions, and the switch for the opt-in developer
-telemetry. How harness itself performs (relevance per provider, latency)
+not chosen its own), the SCM connections (add, edit, remove and test them),
+the C# sessions, and the switch for the opt-in developer telemetry. How harness itself performs (relevance per provider, latency)
 is for the harness developer: it is not shown here, only sent in that
 telemetry if you turn it on.
 
@@ -265,8 +265,10 @@ harness can work with merge requests on GitLab and Forgejo servers. Add each
 server once per machine with an access token, for example
 `harness scm add work --type gitlab --url https://gitlab.example.com --token-stdin`
 and paste the token; `harness scm list` shows what is configured, with tokens
-masked. The connections live in `scm.toml` beside the global configuration,
-readable only by you (see SCM connections in the reference).
+masked. harness ui's Machine page manages the same connections, with a Test
+connection button that says whether the server answers and accepts the token,
+and what to fix if not. The connections live in `scm.toml` beside the global
+configuration, readable only by you (see SCM connections in the reference).
 
 ## Updating harness
 

@@ -24,6 +24,12 @@ replacement/keep-both choices. Reviewing a task does not create it; promotion
 previews do not create wider stores. Finding/task/knowledge proposals stay
 pending until an author approves or rejects them.
 
+Machine › SCM connections (`GET /api/scm`; `POST /api/scm`,
+`/api/scm/{name}/edit`, `/api/scm/{name}/remove` and `/api/scm/test`) is served by
+the CLI's `UiReadService` over Harness.Scm's configuration store and providers.
+Entries carry the token only masked; a test of the form's unsaved values may use
+a saved entry's token by name, so an edit is tested without typing it again.
+
 ## Live updates
 
 Server-sent events publish invalidations rather than shipping unrestricted state.
