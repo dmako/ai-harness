@@ -107,6 +107,18 @@ public interface IScmConfiguration
 
     /// <summary>The file's existence, readability and permissions, for doctor.</summary>
     ScmFileState Inspect();
+
+    /// <summary>
+    /// The SCM chosen on this machine for a repository, named by its common git directory (so its worktrees share the
+    /// choice); null when none was chosen. Throws <see cref="ScmConfigurationException" /> when the file is unreadable.
+    /// </summary>
+    string? ChoiceFor(string repository);
+
+    /// <summary>
+    /// Chooses a configured SCM for a repository (by its common git directory), or clears the choice when
+    /// <paramref name="name" /> is null or empty; throws when no SCM has that name.
+    /// </summary>
+    Task SetChoiceAsync(string repository, string? name, CancellationToken cancellationToken);
 }
 
 /// <summary>Validation shared by every place SCMs are configured.</summary>

@@ -164,6 +164,46 @@ public sealed partial class TelemetryStore
         return rows.Length is 0 ? null : rows;
     }
 
+    /// <summary>
+    /// The MCP tool calls whose tool name starts with <paramref name="prefix" /> (the scm_ tools), per UTC day from
+    /// <paramref name="since" /> to <paramref name="now" />: calls, failed calls and slow calls, every day listed.
+    /// </summary>
+    public IReadOnlyList<ProviderDay> ToolDays(
+        string prefix,
+        DateTimeOffset since,
+        DateTimeOffset now,
+        long slowMs = 3000
+    )
+    {
+        ArgumentNullException.ThrowIfNull(prefix);
+        List<ProviderDay> days = [];
+        for (var day = since.UtcDateTime.Date; day <= now.UtcDateTime; day = day.AddDays(1))
+        {
+            days.Add(new ProviderDay { Day = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) });
+        }
+
+        var byDay = days.ToDictionary(day => day.Day, StringComparer.Ordinal);
+        foreach (
+            var row in Query(
+                "SELECT at,duration_ms,error IS NOT NULL FROM tool_calls WHERE at >= $from AND substr(tool,1,$n) = $prefix",
+                ("$from", Stamp(since)),
+                ("$n", prefix.Length),
+                ("$prefix", prefix)
+            )
+        )
+        {
+            var at = Text(row[0]);
+            if (byDay.TryGetValue(at[..Math.Min(at.Length, 10)], out var day))
+            {
+                day.Calls++;
+                day.Errors += Int(row[2]) is not 0 ? 1 : 0;
+                day.Slow += Long(row[1]) >= slowMs ? 1 : 0;
+            }
+        }
+
+        return days;
+    }
+
     public IReadOnlyList<ProviderTrend> Trends(DateTimeOffset since, DateTimeOffset now, long slowMs = 3000)
     {
         List<string> days = [];

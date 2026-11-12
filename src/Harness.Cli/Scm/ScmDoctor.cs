@@ -211,6 +211,20 @@ internal static class ScmDoctor
             {
                 ScmResolutionStatus.NoRemote => new HealthCheck(Name, "info", resolution.Reason),
                 ScmResolutionStatus.NoScm => new HealthCheck(Name, "info", resolution.Reason),
+                ScmResolutionStatus.Ambiguous => new HealthCheck(
+                    Name,
+                    "warn",
+                    resolution.Reason,
+                    "choose the SCM this project uses with 'harness scm use <name>' (one of "
+                        + string.Join(", ", resolution.Candidates.Select(endpoint => endpoint.Name))
+                        + "), or set [scm] name in .harness/config.toml"
+                ),
+                ScmResolutionStatus.Invalid when resolution.Source is ScmChoiceSource.Machine => new HealthCheck(
+                    Name,
+                    "warn",
+                    resolution.Reason,
+                    "choose an SCM that serves the repository with 'harness scm use <name>', or go back to detecting it with 'harness scm use --auto'"
+                ),
                 _ => new HealthCheck(
                     Name,
                     "warn",

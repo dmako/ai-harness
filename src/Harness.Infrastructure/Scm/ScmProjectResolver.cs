@@ -40,13 +40,18 @@ public sealed class ScmProjectResolver(IScmConfiguration configuration, string? 
         return Resolve(repository, overrides);
     }
 
-    /// <summary>The repository's resolution; a null repository has no remotes.</summary>
+    /// <summary>
+    /// The repository's resolution, with the SCM chosen for it on this machine (by its common git directory, so its
+    /// worktrees share the choice); a null repository has no remotes and no choice.
+    /// </summary>
     public ScmResolution Resolve(GitRepository? repository, ScmProjectOverride? overrides)
     {
         IReadOnlyList<ScmEndpoint> endpoints;
+        string? choice;
         try
         {
             endpoints = configuration.List().Select(entry => entry.Endpoint).ToList();
+            choice = repository is null ? null : configuration.ChoiceFor(RepositoryKey(repository));
         }
         catch (ScmConfigurationException exception)
         {
@@ -54,7 +59,21 @@ public sealed class ScmProjectResolver(IScmConfiguration configuration, string? 
         }
 
         var remotes = repository is null ? [] : Remotes(repository.CommonDir);
-        return ScmProjectMatcher.Resolve(endpoints, remotes, overrides);
+        return ScmProjectMatcher.Resolve(
+            endpoints,
+            remotes,
+            (overrides ?? new ScmProjectOverride()) with
+            {
+                Choice = choice ?? "",
+            }
+        );
+    }
+
+    /// <summary>The key a repository's SCM choice is stored under: its common git directory.</summary>
+    public static string RepositoryKey(GitRepository repository)
+    {
+        ArgumentNullException.ThrowIfNull(repository);
+        return Path.GetFullPath(repository.CommonDir);
     }
 
     /// <summary>The remotes of the repository whose common git directory is given, in config order.</summary>

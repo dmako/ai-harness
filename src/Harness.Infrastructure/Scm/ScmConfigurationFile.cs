@@ -3,6 +3,7 @@ using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
+using Harness.Core.Projects;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Telemetry;
@@ -78,7 +79,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             ),
         };
         var saved = await UpdateFileAsync(
-                records =>
+                (records, _) =>
                 {
                     if (records.Any(entry => Same(entry.Name, record.Name)))
                     {
@@ -103,7 +104,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
         Record? updated = null;
         var saved = await UpdateFileAsync(
-                records =>
+                (records, choices) =>
                 {
                     var index = records.FindIndex(entry => Same(entry.Name, name));
                     if (index < 0)
@@ -118,6 +119,12 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                         if (records.Where((_, other) => other != index).Any(entry => Same(entry.Name, renamed)))
                         {
                             throw new ScmConfigurationException($"An SCM named '{renamed}' already exists.");
+                        }
+
+                        // the repositories that chose it keep it under its new name
+                        foreach (var repository in choices.Where(choice => Same(choice.Value, record.Name)).ToList())
+                        {
+                            choices[repository.Key] = renamed;
                         }
 
                         record = record with { Name = renamed };
@@ -161,12 +168,57 @@ public sealed class ScmConfigurationFile : IScmConfiguration
     {
         var removed = false;
         await UpdateFileAsync(
-                records => removed = records.RemoveAll(entry => Same(entry.Name, name)) > 0,
+                (records, choices) =>
+                {
+                    removed = records.RemoveAll(entry => Same(entry.Name, name)) > 0;
+                    // the repositories that chose it go back to matching their remotes
+                    foreach (var repository in choices.Where(choice => Same(choice.Value, name)).ToList())
+                    {
+                        choices.Remove(repository.Key);
+                    }
+                },
                 cancellationToken
             )
             .ConfigureAwait(false);
         return removed;
     }
+
+    public string? ChoiceFor(string repository)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repository);
+        return LoadAll().Choices.GetValueOrDefault(RepositoryKey(repository));
+    }
+
+    public async Task SetChoiceAsync(string repository, string? name, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repository);
+        var key = RepositoryKey(repository);
+        await UpdateFileAsync(
+                (records, choices) =>
+                {
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        choices.Remove(key);
+                        return;
+                    }
+
+                    var record =
+                        records.FirstOrDefault(entry => Same(entry.Name, name.Trim()))
+                        ?? throw new ScmConfigurationException(
+                            $"No SCM is named '{name.Trim()}' (configured: "
+                                + (records.Count is 0 ? "none" : string.Join(", ", records.Select(entry => entry.Name)))
+                                + ")."
+                        );
+                    choices[key] = record.Name;
+                },
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>A repository's key: its common git directory, full path in its on-disk spelling.</summary>
+    private static string RepositoryKey(string repository) =>
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(repository));
 
     public ScmConnection Resolve(string name)
     {
@@ -266,7 +318,10 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
     private static ScmEndpoint Endpoint(Record record) => new(record.Name, record.Kind, record.Url);
 
-    private List<Record> Load()
+    private List<Record> Load() => LoadAll().Records;
+
+    /// <summary>The SCMs, and the SCM chosen per repository (keyed by common git directory, as paths compare).</summary>
+    private (List<Record> Records, Dictionary<string, string> Choices) LoadAll()
     {
         string text;
         try
@@ -275,7 +330,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         }
         catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
         {
-            return [];
+            return ([], new Dictionary<string, string>(PathIdentity.Comparer));
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException)
@@ -286,7 +341,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         return Parse(text);
     }
 
-    private List<Record> Parse(string text)
+    private (List<Record> Records, Dictionary<string, string> Choices) Parse(string text)
     {
         TomlTable document;
         try
@@ -302,27 +357,62 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             );
         }
 
-        if (!document.TryGetValue("scm", out var section))
-        {
-            return [];
-        }
-
-        if (section is not TomlTable tables)
-        {
-            throw new ScmConfigurationException($"{FilePath}: 'scm' must be a table of [scm.<name>] tables.");
-        }
-
         List<Record> records = [];
-        foreach (var (name, value) in tables)
+        if (document.TryGetValue("scm", out var section))
         {
-            records.Add(ParseEntry(name, value as TomlTable));
-            if (records.Count(entry => Same(entry.Name, name)) > 1)
+            if (section is not TomlTable tables)
             {
-                throw new ScmConfigurationException($"{FilePath}: the SCM name '{name}' appears twice.");
+                throw new ScmConfigurationException($"{FilePath}: 'scm' must be a table of [scm.<name>] tables.");
+            }
+
+            foreach (var (name, value) in tables)
+            {
+                records.Add(ParseEntry(name, value as TomlTable));
+                if (records.Count(entry => Same(entry.Name, name)) > 1)
+                {
+                    throw new ScmConfigurationException($"{FilePath}: the SCM name '{name}' appears twice.");
+                }
             }
         }
 
-        return records;
+        return (records, ParseChoices(document));
+    }
+
+    /// <summary>
+    /// The <c>[project."&lt;common git dir&gt;"]</c> tables: the SCM chosen for each repository on this machine. A
+    /// choice naming no configured SCM is kept, so resolution can report it instead of silently matching another.
+    /// </summary>
+    private Dictionary<string, string> ParseChoices(TomlTable document)
+    {
+        var choices = new Dictionary<string, string>(PathIdentity.Comparer);
+        if (!document.TryGetValue("project", out var section))
+        {
+            return choices;
+        }
+
+        if (section is not TomlTable projects)
+        {
+            throw new ScmConfigurationException(
+                $"{FilePath}: 'project' must be a table of [project.\"<repository>\"] tables."
+            );
+        }
+
+        foreach (var (repository, value) in projects)
+        {
+            if (value is not TomlTable table || !table.TryGetValue("scm", out var name) || name is not string chosen)
+            {
+                throw new ScmConfigurationException(
+                    $"{FilePath}: [project.\"{repository}\"] must have scm = \"<name>\"."
+                );
+            }
+
+            if (chosen.Trim().Length > 0)
+            {
+                choices[RepositoryKey(repository)] = chosen.Trim();
+            }
+        }
+
+        return choices;
     }
 
     private Record ParseEntry(string name, TomlTable? table)
@@ -365,15 +455,21 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
     private static string FirstLine(string text) => text.Split('\n', 2)[0].Trim();
 
-    /// <summary>Applies an edit under the lock and writes the file; returns the records as saved (tokens encrypted).</summary>
-    private async Task<List<Record>> UpdateFileAsync(Action<List<Record>> edit, CancellationToken cancellationToken)
+    /// <summary>
+    /// Applies an edit to the SCMs and the repositories' choices under the lock and writes the file; returns the
+    /// records as saved (tokens encrypted).
+    /// </summary>
+    private async Task<List<Record>> UpdateFileAsync(
+        Action<List<Record>, Dictionary<string, string>> edit,
+        CancellationToken cancellationToken
+    )
     {
         StorageFiles.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         await using var lease = await AtomicMachineFile
             .LockAsync(FilePath + ".lock", cancellationToken)
             .ConfigureAwait(false);
-        var records = Load();
-        edit(records);
+        var (records, choices) = LoadAll();
+        edit(records, choices);
         // every stored token leaves this method encrypted, the ones read in plain text included; under the lock, so
         // only one process at a time may create the first key. A write also tightens a key folder others could open.
         if (records.Any(record => record.TokenEnv is null && (record.Token ?? record.Protected) is not null))
@@ -408,7 +504,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             }
 
             PrivateExportFiles.OwnerOnly(temporary);
-            await File.WriteAllBytesAsync(temporary, Utf8.GetBytes(Render(records)), cancellationToken)
+            await File.WriteAllBytesAsync(temporary, Utf8.GetBytes(Render(records, choices)), cancellationToken)
                 .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             File.Move(temporary, FilePath, overwrite: true);
@@ -425,7 +521,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
     /// <summary>A record as saved: encrypted, with its plain token still in hand, so showing it decrypts nothing.</summary>
     private ScmEntry Saved(List<Record> records, string name) => View(records.First(entry => Same(entry.Name, name)));
 
-    internal static string Render(IEnumerable<Record> records)
+    internal static string Render(IEnumerable<Record> records, IReadOnlyDictionary<string, string>? choices = null)
     {
         var builder = new StringBuilder();
         builder.Append(
@@ -452,6 +548,18 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                     $"SCM '{record.Name}': a token must be encrypted before it is written."
                 );
             }
+        }
+
+        // the SCM chosen per repository on this machine ('harness scm use', harness ui)
+        foreach (
+            var (repository, name) in (choices ?? new Dictionary<string, string>()).OrderBy(
+                choice => choice.Key,
+                StringComparer.Ordinal
+            )
+        )
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"\n[project.{Quote(repository)}]\n");
+            builder.Append(CultureInfo.InvariantCulture, $"scm = {Quote(name)}\n");
         }
 
         return builder.ToString();

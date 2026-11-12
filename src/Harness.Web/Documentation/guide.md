@@ -313,6 +313,25 @@ name = "work"
 project = "group/sub/repo"
 ```
 
+**Several connections for one server.** You may add the same server more than
+once, with different tokens (your own and a review bot's, say). harness then
+cannot tell which one a project should use, and says so. Choose it for this
+machine on the project's Agents › Tools & providers page, where the SCM card
+under Used here lists the connections serving the project (Automatic goes back
+to detecting it), or with:
+
+```
+harness scm use bot          # this repository uses SCM bot on this machine
+harness scm use --auto       # detect it from the remotes again
+harness scm which            # which SCM and project, and how it was chosen
+```
+
+The choice is kept in `scm.toml` on your machine, not in the repository:
+teammates name their connections as they like. A `[scm] name` in the project's
+`.harness/config.toml`, which is shared, still wins over it. The same card tests
+the connection and whether the project is reachable with its token, and shows
+how often agents called the `scm_` tools and how many calls failed.
+
 **Agentic code review.** Ask your agent to review a merge request, for example
 "review merge request 42". It reads the request (`scm_get_merge_request_details`),
 its diff (`scm_get_merge_request_diff`) and the discussion so far

@@ -88,6 +88,7 @@ internal sealed partial class UiReadService
             ),
             "report" => await ReportAsync(project, database, request, token),
             "providers" => await ProvidersAsync(project, database, request, token),
+            "scm" => await ProjectScmAsync(project, database, request, token),
             "hooks" => await HooksAsync(project, database, token),
             "memories" => Memories(project, database, request, token),
             "memories/{mid}" => MemoryDetail(database, request.Value("mid"), token),

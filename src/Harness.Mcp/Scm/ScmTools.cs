@@ -219,8 +219,13 @@ public static class ScmTools
         resolution.Status switch
         {
             ScmResolutionStatus.NoScm => NoScm,
+            ScmResolutionStatus.Ambiguous => $"This project's SCM is not known: {resolution.Reason} Ask the user which "
+                + "connection to use ("
+                + string.Join(", ", resolution.Candidates.Select(endpoint => endpoint.Name))
+                + "): they choose it with 'harness scm use <name>' or in harness ui under Agents › Tools & providers.",
             _ => $"This project's SCM is not known: {resolution.Reason} Run 'harness doctor' for the SCM checks; "
-                + "the user can set [scm] name and project in .harness/config.toml.",
+                + "the user can choose one with 'harness scm use <name>', or set [scm] name and project in "
+                + ".harness/config.toml.",
         };
 
     private static Dictionary<string, object?> Answer(ScmEndpoint endpoint, Dictionary<string, object?> body)

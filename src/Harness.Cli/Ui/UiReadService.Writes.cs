@@ -113,6 +113,10 @@ internal sealed partial class UiReadService : IUiWriteApi
         {
             return await AgentCommandAsync(project, request, token);
         }
+        if (endpoint is "scm/choice" or "scm/test")
+        {
+            return await WriteProjectScmAsync(project, request, token);
+        }
         using var database = Open(project, tasks: true);
         var store = new MemoryStore(database);
         var human = HumanActor.Current();

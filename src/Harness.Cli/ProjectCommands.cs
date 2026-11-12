@@ -156,7 +156,11 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
             );
             if (inspection.Scm is { Status: not Harness.Scm.ScmResolutionStatus.NoScm } scm)
             {
-                await output.WriteLineAsync($"SCM         {scm.Summary()}", CancellationToken.None);
+                // how it was chosen, auto-detection included: several SCMs may serve one server
+                var detected = scm is { Match: not null, Source: Harness.Scm.ScmChoiceSource.Automatic }
+                    ? ", " + scm.Chosen()
+                    : "";
+                await output.WriteLineAsync($"SCM         {scm.Summary()}{detected}", CancellationToken.None);
             }
             if (inspection.ConfigurationError is not null || inspection.DatabaseError is not null)
             {

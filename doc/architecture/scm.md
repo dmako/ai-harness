@@ -321,12 +321,33 @@ connection is seen at once.
 1. the project's `[scm]` configuration first: `name` restricts matching to that
    SCM, `remote` to that remote, and `name` with `project` fixes the project
    without matching; a name or remote that does not exist is `invalid`;
-2. otherwise the remotes, `origin` first and then the others in config order,
+2. without `[scm] name`, the SCM chosen for the repository on this machine
+   (`ScmProjectOverride.Choice`) restricts matching the same way, with `[scm]
+   project` and `remote` still applied; a choice naming a removed SCM, or one
+   that serves none of the remotes, is `invalid` with the fix ('harness scm use
+   <name>' or '--auto') rather than silently dropped;
+3. otherwise the remotes, `origin` first and then the others in config order,
    each URL and then its push URLs through `ScmMatcher`; the first match wins;
-3. a remote that matches several SCMs equally is `ambiguous` and stops the
+4. a remote that matches several SCMs equally is `ambiguous` and stops the
    search rather than falling through to a later remote;
-4. otherwise `no_scm` (nothing configured), `no_remote` or `no_match`, with a
+5. otherwise `no_scm` (nothing configured), `no_remote` or `no_match`, with a
    reason naming the remotes seen and the SCMs configured.
+
+Every resolution carries its `Source` (`auto`, `machine` or `config`) and its
+`Candidates`: the SCMs that serve the first matching remote equally (one server
+configured under several names and tokens), whichever was chosen.
+
+The machine's choice lives in `scm.toml` beside the connections, one
+`[project."<common git dir>"]` table with `scm = "<name>"` per repository
+(`IScmConfiguration.ChoiceFor` and `SetChoiceAsync`), so worktrees share it and
+it is never committed with the project. It is written under the same lock as
+the connections: renaming an SCM renames the choices that name it, removing it
+removes them. `ScmProjectResolver` looks the choice up by the repository's
+common directory, so status, doctor, the `scm_` tools and harness ui all apply
+it. `harness scm use <name>|--auto` and `harness scm which` (Cli,
+`ScmCommandRunner.Project`) set and show it; `ScmProjectChoice`, shared with
+harness ui, refuses an SCM that does not serve the repository instead of
+storing it.
 
 Remote URLs are shown without the password or token an http(s) remote may
 embed (`ScmRemoteUrls.Safe`). `HarnessStateSession` implements
@@ -341,6 +362,18 @@ SCMs through `/api/scm` (see [web](web.md)); the last test of each saved SCM
 is kept while harness ui runs. `ScmProviders` (Cli) holds the provider registry
 and the connection test the UI, `harness scm test` and doctor share, with a
 15 s request timeout so a dead server does not hold a page.
+
+A project's Agents › Tools & providers page has an SCM card under Used here,
+loaded on its own from `GET /api/projects/{id}/scm?days=N`: the resolution
+(`Describe()`), how it was chosen, the machine's choice, `[scm] name` when the
+project's configuration fixes it, the candidates with their token source
+(masked), the last test, and the `scm_` tool calls of the project's database over
+the selected days (per tool from `TelemetryStore.Metrics`, per day from
+`TelemetryStore.ToolDays`). `POST /api/projects/{id}/scm/choice` (`name`, empty
+for automatic) sets the choice through `ScmProjectChoice` and answers the new
+card; `POST /api/projects/{id}/scm/test` runs the connection test and doctor's
+`scm project` check (`ScmDoctor.ProjectCheckAsync`) for the project's SCM. Both
+are harness ui writes, with their origin and header checks.
 
 ## Doctor and harness scm test
 

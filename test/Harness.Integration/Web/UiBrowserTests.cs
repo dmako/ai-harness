@@ -2428,6 +2428,69 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     /// <summary>
+    /// Agents › Tools &amp; providers › Used here shows the project's SCM (TASK-0132): two connections serve its server,
+    /// so it asks for a choice; choosing one keeps it on this machine, Test checks the connection and the project, and
+    /// the scm_ calls agents made are counted.
+    /// </summary>
+    [Fact]
+    public async Task ToolsPageChoosesAndTestsTheProjectsScmAndShowsItsCalls()
+    {
+        var executable = Browser();
+        var (fixture, gitlab) = await UiScmProjectTests.TwoConnectionsAsync();
+        using var _ = fixture;
+        await using var __ = gitlab;
+        var id = UiWriteTests.ProjectId(fixture);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/agents/tools" }
+                );
+                await page.WaitAsync("!!document.querySelector('.scmcard select[aria-label=\"SCM connection\"]')");
+                (await ValueAsync(page, "document.querySelector('.scmcard').textContent"))
+                    .Should()
+                    .Contain("matches several SCMs")
+                    .And.Contain("scm_get_merge_request_diff")
+                    .And.Contain("3 scm_ calls");
+                (await ValueAsync(page, "String(document.querySelectorAll('.scmcard select option').length)"))
+                    .Should()
+                    .Be("3");
+                (await ValueAsync(page, "String(!!document.querySelector('.scmcard .daychart'))")).Should().Be("true");
+
+                await page.EvaluateAsync(
+                    "(() => { const s = document.querySelector('.scmcard select'); s.value = 'work'; s.dispatchEvent(new Event('change')); })()"
+                );
+                await page.WaitAsync(
+                    "document.querySelector('.scmcard')?.textContent.includes('chosen on this machine')"
+                );
+                Harness
+                    .Infrastructure.Scm.ScmConfigurationFile.ForGlobal(Path.Combine(fixture.Global, "config.toml"))
+                    .ChoiceFor(Path.Combine(fixture.Root, ".git"))
+                    .Should()
+                    .Be("work");
+                (await ValueAsync(page, "document.querySelector('.scmcard').textContent"))
+                    .Should()
+                    .Contain("group/repo")
+                    .And.Contain("from remote origin");
+
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.scmcard button')].find(b => b.textContent.trim() === 'Test connection').click()"
+                );
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('.scmcard .scmtest')].some(e => e.textContent.includes('reachable (group/repo)'))"
+                );
+                (await ValueAsync(page, "document.querySelector('.scmcard .scmtest').textContent"))
+                    .Should()
+                    .Contain("as reviewer");
+                (await ValueAsync(page, "document.body.innerHTML")).Should().NotContain("glpat-");
+            }
+        );
+    }
+
+    /// <summary>
     /// Every page, at a desktop and a phone width, dark and light, with every fold closed and open, passes the Go
     /// harness's layout and accessibility checks (checks.js: overflow, overlapping or clipped text, squeezed columns,
     /// controls under 24 px, contrast under WCAG AA, sections showing an error) and raises no script error.
@@ -2520,6 +2583,19 @@ public sealed class UiBrowserTests(SharedBrowser browser)
             new("forge", "forgejo", "https://git.example.org", null, "HARNESS_TEST_FORGE_TOKEN_UNSET"),
             Token
         );
+        // a second connection to the same server: the project's SCM card on Agents › Tools & providers asks for a
+        // choice, so its connection select is checked at both widths
+        await scm.AddAsync(
+            new(
+                "forge-review-bot-with-a-long-name",
+                "forgejo",
+                "https://git.example.org",
+                null,
+                "HARNESS_TEST_FORGE_TOKEN_UNSET"
+            ),
+            Token
+        );
+        await fixture.GitAsync("remote", "add", "origin", "https://git.example.org/owner/repo.git");
 
         string checks;
         using (var stream = typeof(UiBrowserTests).Assembly.GetManifestResourceStream("checks.js")!)

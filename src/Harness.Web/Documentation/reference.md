@@ -362,6 +362,8 @@ token rejected, not permitted, wrong server type) with its fix.
 | `harness scm set <name> [--type] [--url] [--token-stdin\|--token\|--token-env] [--rename <new>]` | Changes an SCM; a new token or variable replaces the old one. |
 | `harness scm remove <name>` | Removes an SCM. |
 | `harness scm test [<name>] [--json]` | Tests one SCM, or all of them side by side: the server's version and the token's user, or what failed and how to fix it. Exits 1 when a test fails. |
+| `harness scm use <name>\|--auto [--project <dir>] [--json]` | Chooses the SCM this repository uses on this machine (one that serves its remotes), or with `--auto` forgets the choice and detects it from the remotes again. |
+| `harness scm which [--project <dir>] [--json]` | Shows the repository's SCM, project and remote, how it was chosen, and the connections that serve it equally. Exits 1 when no SCM serves it. |
 
 Names are 1-64 letters, digits, `-`, `_` or `.` and unique ignoring case;
 the URL is the server's base address (`https://gitlab.example.com`, or
@@ -418,6 +420,32 @@ name = "work"              # an SCM from 'harness scm list'
 project = "group/sub/repo" # with name: its path there, no matching
 remote = "upstream"        # or: match only this remote
 ```
+
+When several connections serve the same server (one URL, different tokens),
+a remote matches them equally and the project's SCM is ambiguous until one is
+chosen. Choose it per repository on this machine with `harness scm use <name>`,
+or on the project's Agents › Tools & providers page (the SCM card in Used
+here). The choice is stored in `scm.toml`, keyed by the repository's common Git
+directory so its worktrees share it:
+
+```toml
+[project."/home/me/src/service/.git"]
+scm = "bot"
+```
+
+Renaming the connection keeps the choice; removing it forgets the choice. The
+SCM is chosen in this order:
+
+1. `[scm] name` in the project's `.harness/config.toml` (shared with the team);
+2. the connection chosen for the repository on this machine;
+3. the remotes, as above.
+
+A choice still applies `[scm] project` and `remote`. A choice that names a
+removed connection, or one that no longer serves the remotes, is reported by
+`harness status`, `harness doctor` and harness ui with the fix (`harness scm use
+<name>` or `--auto`), never silently replaced. `harness status` says how the SCM
+was chosen (`detected from the remotes`, `chosen on this machine` or `set in
+.harness/config.toml`; `source` in `--json`).
 
 `harness doctor` checks them too: that `scm.toml` reads and is readable only by
 you, that each SCM has its token and answers its connection test (all tested

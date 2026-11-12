@@ -759,6 +759,24 @@ internal static class CliCommands
         );
         Add(
             scm,
+            "use",
+            "Choose the SCM this project uses on this machine (--auto: detect it from the remotes again)",
+            Harness.Cli.Scm.ScmBindings.BindUse,
+            (settings, token) =>
+                ActivatorUtilities.CreateInstance<Harness.Cli.Scm.ScmUseCommand>(services).ExecuteAsync(settings, token)
+        );
+        Add(
+            scm,
+            "which",
+            "Show which SCM and project this repository uses, and how it was chosen",
+            Harness.Cli.Scm.ScmBindings.BindWhich,
+            (settings, token) =>
+                ActivatorUtilities
+                    .CreateInstance<Harness.Cli.Scm.ScmWhichCommand>(services)
+                    .ExecuteAsync(settings, token)
+        );
+        Add(
+            scm,
             "remove",
             "Remove an SCM",
             Harness.Cli.Scm.ScmBindings.BindRemove,

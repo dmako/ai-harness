@@ -69,6 +69,62 @@ internal static class ScmBindings
         };
     }
 
+    internal static Func<ParseResult, ScmUseSettings> BindUse(Command command)
+    {
+        var json = Json(command);
+        var project = Project(command);
+        var name = new Argument<string>("name")
+        {
+            Arity = ArgumentArity.ZeroOrOne,
+            DefaultValueFactory = _ => "",
+            Description = "The SCM this project uses on this machine",
+        };
+        command.Arguments.Add(name);
+        var auto = new Option<bool>("--auto")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "Forget the choice: detect the SCM from the repository's remotes again",
+        };
+        command.Options.Add(auto);
+        command.Validators.Add(result =>
+        {
+            var named = (result.GetValue(name) ?? "").Length > 0;
+            if (named == result.GetValue(auto))
+            {
+                result.AddError("Give an SCM's name, or --auto to detect it from the remotes again.");
+            }
+        });
+        return result => new ScmUseSettings
+        {
+            Json = result.GetValue(json),
+            Project = result.GetValue(project) ?? ".",
+            Name = result.GetValue(name) ?? "",
+            Auto = result.GetValue(auto),
+        };
+    }
+
+    internal static Func<ParseResult, ScmProjectSettings> BindWhich(Command command)
+    {
+        var json = Json(command);
+        var project = Project(command);
+        return result => new ScmProjectSettings
+        {
+            Json = result.GetValue(json),
+            Project = result.GetValue(project) ?? ".",
+        };
+    }
+
+    private static Option<string> Project(Command command)
+    {
+        var option = new Option<string>("--project")
+        {
+            DefaultValueFactory = _ => ".",
+            Description = "Directory inside the repository",
+        };
+        command.Options.Add(option);
+        return option;
+    }
+
     private static Option<bool> Json(Command command)
     {
         var option = new Option<bool>("--json")

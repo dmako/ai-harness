@@ -12,10 +12,31 @@ public sealed record ScmRemote(string Name, string Address, IReadOnlyList<string
     public string SafeAddress => ScmRemoteUrls.Safe(Address);
 }
 
-/// <summary>A project's <c>[scm]</c> configuration: an SCM, project or remote chosen by hand. Empty fields are unset.</summary>
-public sealed record ScmProjectOverride(string Name = "", string Project = "", string Remote = "")
+/// <summary>
+/// A project's <c>[scm]</c> configuration (an SCM, project or remote chosen by hand) and the SCM chosen for the
+/// repository on this machine. Empty fields are unset.
+/// </summary>
+/// <param name="Choice">
+/// The SCM chosen for this repository on this machine ('harness scm use', harness ui); used when <paramref name="Name" />
+/// is unset, since the project's configuration is shared with the team and wins.
+/// </param>
+public sealed record ScmProjectOverride(string Name = "", string Project = "", string Remote = "", string Choice = "")
 {
+    /// <summary>Whether the project's [scm] configuration sets nothing (the machine's choice aside).</summary>
     public bool IsEmpty => Name.Length is 0 && Project.Length is 0 && Remote.Length is 0;
+}
+
+/// <summary>How a project's SCM was chosen.</summary>
+public enum ScmChoiceSource
+{
+    /// <summary>Matched from the repository's remotes.</summary>
+    Automatic,
+
+    /// <summary>Chosen for this repository on this machine ('harness scm use', harness ui).</summary>
+    Machine,
+
+    /// <summary>Set by [scm] name in the project's .harness/config.toml, which is shared with the team.</summary>
+    Configuration,
 }
 
 public enum ScmResolutionStatus
@@ -52,6 +73,24 @@ public sealed record ScmResolution(
     string Reason
 )
 {
+    /// <summary>How the SCM was (or was to be) chosen.</summary>
+    public ScmChoiceSource Source { get; init; } = ScmChoiceSource.Automatic;
+
+    /// <summary>
+    /// The SCMs that serve the repository's remote equally well (the same server under different names and tokens),
+    /// whichever was chosen; one of them may be chosen for the project. Empty when none serves it.
+    /// </summary>
+    public IReadOnlyList<ScmEndpoint> Candidates { get; init; } = [];
+
+    public static string Name(ScmChoiceSource source) =>
+        source switch
+        {
+            ScmChoiceSource.Automatic => "auto",
+            ScmChoiceSource.Machine => "machine",
+            ScmChoiceSource.Configuration => "config",
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, "Unknown choice source."),
+        };
+
     public static string Name(ScmResolutionStatus status) =>
         status switch
         {
@@ -70,7 +109,16 @@ public sealed record ScmResolution(
     /// </summary>
     public Dictionary<string, object?> Describe()
     {
-        Dictionary<string, object?> wire = new(StringComparer.Ordinal) { ["status"] = Name(Status) };
+        Dictionary<string, object?> wire = new(StringComparer.Ordinal)
+        {
+            ["status"] = Name(Status),
+            ["source"] = Name(Source),
+        };
+        if (Candidates.Count > 1)
+        {
+            wire["candidates"] = Candidates.Select(endpoint => endpoint.Name).ToArray();
+        }
+
         if (Match is { } match)
         {
             wire["name"] = match.Endpoint.Name;
@@ -95,7 +143,7 @@ public sealed record ScmResolution(
         return wire;
     }
 
-    /// <summary>One line for text output: "work (gitlab) group/repo" or the reason.</summary>
+    /// <summary>One line for text output: "work (gitlab) group/repo from remote origin, chosen on this machine" or the reason.</summary>
     public string Summary()
     {
         if (Match is not { } match)
@@ -104,8 +152,18 @@ public sealed record ScmResolution(
         }
 
         var from = Remote is null ? "" : $" from remote {Remote}";
-        return $"{match.Endpoint.Name} ({ScmKinds.Name(match.Endpoint.Kind)}) {match.Project}{from}";
+        var chosen = Source is ScmChoiceSource.Automatic ? "" : ", " + Chosen();
+        return $"{match.Endpoint.Name} ({ScmKinds.Name(match.Endpoint.Kind)}) {match.Project}{from}{chosen}";
     }
+
+    /// <summary>How the SCM was chosen, in words.</summary>
+    public string Chosen() =>
+        Source switch
+        {
+            ScmChoiceSource.Machine => "chosen on this machine",
+            ScmChoiceSource.Configuration => "set in .harness/config.toml",
+            _ => "detected from the remotes",
+        };
 }
 
 /// <summary>The current project's SCM, for tools that act on it (MCP, doctor, status).</summary>
@@ -142,9 +200,11 @@ public static class ScmRemoteUrls
 
 /// <summary>
 /// Chooses a repository's SCM: the project's [scm] configuration first (an SCM by name, a fixed project, a remote),
-/// otherwise the remotes in order (origin first, then the rest as git config lists them), the first whose URL (or
-/// a push URL) <see cref="ScmMatcher" /> maps to one SCM winning. A remote that matches several SCMs equally stops
-/// the search as ambiguous instead of falling through to a later remote.
+/// then the SCM chosen for the repository on this machine (limiting matching to it, the project path still from the
+/// remotes or [scm] project), otherwise the remotes in order (origin first, then the rest as git config lists them),
+/// the first whose URL (or a push URL) <see cref="ScmMatcher" /> maps to one SCM winning. A remote that matches
+/// several SCMs equally stops the search as ambiguous instead of falling through to a later remote; a machine choice
+/// that is missing or does not serve the remotes is invalid, never silently dropped.
 /// </summary>
 public static class ScmProjectMatcher
 {
@@ -167,20 +227,70 @@ public static class ScmProjectMatcher
             );
         }
 
+        var (name, source) = overrides switch
+        {
+            { Name.Length: > 0 } => (overrides.Name, ScmChoiceSource.Configuration),
+            { Choice.Length: > 0 } => (overrides.Choice, ScmChoiceSource.Machine),
+            _ => ("", ScmChoiceSource.Automatic),
+        };
+        var resolution = Choose(endpoints, remotes, ordered, overrides, name, source);
+        return resolution with
+        {
+            Source = source,
+            Candidates = Candidates(
+                endpoints,
+                overrides.Remote.Length > 0 ? ordered.Where(remote => remote.Name == overrides.Remote) : ordered
+            ),
+        };
+    }
+
+    /// <summary>The SCMs that serve the first remote any SCM serves, equally well; empty when none does.</summary>
+    public static IReadOnlyList<ScmEndpoint> Candidates(
+        IReadOnlyList<ScmEndpoint> endpoints,
+        IEnumerable<ScmRemote> remotes
+    )
+    {
+        foreach (var remote in remotes)
+        {
+            foreach (var url in new[] { remote.Address }.Concat(remote.PushAddresses))
+            {
+                var result = ScmMatcher.Match(endpoints, url);
+                if (result.Status is not ScmMatchStatus.NoMatch)
+                {
+                    return result.Candidates;
+                }
+            }
+        }
+
+        return [];
+    }
+
+    private static ScmResolution Choose(
+        IReadOnlyList<ScmEndpoint> endpoints,
+        IReadOnlyList<ScmRemote> remotes,
+        List<ScmRemote> ordered,
+        ScmProjectOverride overrides,
+        string name,
+        ScmChoiceSource source
+    )
+    {
+        var configured = string.Join(", ", endpoints.Select(endpoint => endpoint.Name));
         ScmEndpoint? chosen = null;
-        if (overrides.Name.Length > 0)
+        if (name.Length > 0)
         {
             chosen = endpoints.FirstOrDefault(endpoint =>
-                string.Equals(endpoint.Name, overrides.Name, StringComparison.OrdinalIgnoreCase)
+                string.Equals(endpoint.Name, name, StringComparison.OrdinalIgnoreCase)
             );
             if (chosen is null)
             {
                 return Failed(
                     ScmResolutionStatus.Invalid,
                     ordered,
-                    $"The project's [scm] name '{overrides.Name}' is not a configured SCM (configured: "
-                        + string.Join(", ", endpoints.Select(endpoint => endpoint.Name))
-                        + ")."
+                    source is ScmChoiceSource.Configuration
+                        ? $"The project's [scm] name '{name}' is not a configured SCM (configured: {configured})."
+                        : $"The SCM chosen for this project on this machine, '{name}', is not configured (configured: "
+                            + $"{configured}); choose another with 'harness scm use <name>', or detect it from the "
+                            + "remotes again with 'harness scm use --auto'."
                 );
             }
         }
@@ -228,7 +338,22 @@ public static class ScmProjectMatcher
             );
         }
 
-        return MatchRemotes(chosen is null ? endpoints : [chosen], ordered, remotes, overrides);
+        var matched = MatchRemotes(chosen is null ? endpoints : [chosen], ordered, remotes, overrides);
+        if (source is ScmChoiceSource.Machine && matched.Status is ScmResolutionStatus.NoMatch)
+        {
+            // a choice that no longer serves the repository (its remote or the SCM's URL changed) is not ignored
+            return Failed(
+                ScmResolutionStatus.Invalid,
+                remotes,
+                $"The SCM chosen for this project on this machine, '{chosen!.Name}' "
+                    + $"({chosen.BaseUrl.AbsoluteUri.TrimEnd('/')}), does not serve this repository's remotes ("
+                    + string.Join(", ", ordered.Select(remote => remote.Name + " " + remote.SafeAddress))
+                    + "); choose one that does with 'harness scm use <name>', or detect it from the remotes again "
+                    + "with 'harness scm use --auto'."
+            );
+        }
+
+        return matched;
     }
 
     private static ScmResolution MatchRemotes(

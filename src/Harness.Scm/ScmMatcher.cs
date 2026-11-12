@@ -75,7 +75,8 @@ public static class ScmMatcher
                 winners.Select(winner => winner.endpoint).ToList(),
                 $"{remote} matches several SCMs equally: "
                     + string.Join(", ", winners.Select(winner => winner.endpoint.Name))
-                    + "; choose one in the project's [scm] configuration."
+                    + "; choose one for this project with 'harness scm use <name>' (or in harness ui under Agents › Tools & providers), "
+                    + "or set [scm] name in its .harness/config.toml."
             );
         }
 

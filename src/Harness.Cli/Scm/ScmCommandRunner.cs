@@ -11,7 +11,7 @@ namespace Harness.Cli.Scm;
 /// 'harness scm list|add|set|remove': the machine's SCM connections in scm.toml. Tokens are shown only masked, and
 /// failures name the field at fault, never the token.
 /// </summary>
-internal sealed class ScmCommandRunner(
+internal sealed partial class ScmCommandRunner(
     ProjectLifecycle lifecycle,
     TextWriter output,
     CliErrorOutput error,
