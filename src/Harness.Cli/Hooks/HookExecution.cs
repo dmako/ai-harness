@@ -11,7 +11,7 @@ internal static class HookExecution
         - Start every task with get_context (the task in words, naming the symbols you know), then search_project (kind impact before changing a symbol), package_api and decisions_for, before Grep, Glob or greps through Bash.
         - When you delegate to a subagent, say in its prompt: "This repository uses harness: start with get_context and search with search_project before Grep or Bash greps."
         - If a harness answer is empty or fails, say so and fall back for that question; keep using harness for the next one.
-        - AGENTS.md (or CLAUDE.md) holds the rest of the harness guidance: goals, decisions, tasks and memory.
+        - AGENTS.md (or CLAUDE.md) holds the rest of the harness guidance: goals, decisions, tasks, memory and merge request reviews (scm_ tools).
         """;
 
     // This entry point precedes command parsing and host construction: malformed hook arguments,

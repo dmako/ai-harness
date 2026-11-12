@@ -1926,3 +1926,26 @@ table.dups { min-width: 45rem; }
 .startagent summary { cursor: pointer; font-size: var(--text-sm); color: var(--ink-2); min-height: 1.5rem; display: flex; align-items: center; }
 .startagent .aform { margin-top: 0.375rem; }
 @media (max-width: 40em) { .ae { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+/* Machine › SCM connections (TASK-0126): one row per SCM, its details
+   beside its actions, wrapping under them on a narrow screen */
+.scmlist { list-style: none; margin: 0; padding: 0; }
+.scmrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+.scmrow:first-child { border-top: none; }
+.scmmain { display: grid; gap: 0.25rem; min-width: 0; flex: 1 1 18rem; }
+.scmname { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.scmurl { overflow-wrap: anywhere; }
+.scmacts { display: flex; align-items: center; gap: 0.25rem; flex: none; }
+.scmtest { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0; }
+.scmtest.bad { display: grid; gap: 0.25rem; }
+.scmtest.bad p { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0; }
+.scmfoot { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; }
+.scmfoot code { overflow-wrap: anywhere; }
+/* a project's SCM in Agents › Tools & providers (TASK-0132): the connection,
+   its choice, a test and the scm_ calls */
+.scmcard { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.scmcard .scmpick { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; min-width: 0; }
+.scmcard .scmpick select { flex: 1 1 16rem; width: 100%; min-width: 0; min-height: 2rem; text-overflow: ellipsis; }
+.scmcard .scmcalls { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.125rem; font-size: var(--text-sm); }
+.scmcard .scmcalls li { display: flex; gap: 0.5rem; flex-wrap: wrap; overflow-wrap: anywhere; }
+.scmcard .scmacts { margin-top: 0.25rem; }
+.scmresult:empty { display: none; }

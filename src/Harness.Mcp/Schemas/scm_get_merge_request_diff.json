@@ -1,0 +1,116 @@
+{
+  "description": "Get a merge request's changes as unified diff hunks per file, within a size budget: files that do not fit are kept, marked truncated. Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo or GitHub pull request #number)"
+      }
+    },
+    "required": [
+      "merge_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_get_merge_request_diff",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer"
+      },
+      "files": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "old_path": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "new_path": {
+              "type": "string"
+            },
+            "new_file": {
+              "type": "boolean"
+            },
+            "deleted_file": {
+              "type": "boolean"
+            },
+            "renamed_file": {
+              "type": "boolean"
+            },
+            "binary": {
+              "type": "boolean"
+            },
+            "diff": {
+              "type": "string",
+              "description": "the file's unified diff hunks"
+            },
+            "truncated": {
+              "type": "boolean",
+              "description": "hunks were left out to fit the budget, or the SCM did not send them"
+            }
+          },
+          "required": [
+            "new_path",
+            "diff",
+            "truncated"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "omitted_files": {
+        "type": "integer",
+        "description": "files listed with no hunks because the budget was spent"
+      },
+      "max_bytes": {
+        "type": "integer"
+      },
+      "hint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id",
+      "files",
+      "truncated",
+      "omitted_files",
+      "max_bytes"
+    ],
+    "additionalProperties": false
+  }
+}

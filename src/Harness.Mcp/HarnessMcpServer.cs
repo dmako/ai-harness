@@ -72,7 +72,12 @@ public static class HarnessMcpServer
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         await using var ownedSession = session;
-        var providerTools = new ProviderTools(providers, session as IProviderProjectSession, workspaceTools);
+        var providerTools = new ProviderTools(
+            providers,
+            session as IProviderProjectSession,
+            workspaceTools,
+            session as Harness.Scm.IScmProjectContext
+        );
         var couplingTools = new CouplingTools(providers, session as IChangeCouplingSession);
         var contextTools = new ContextTools(providers, session as IContextProjectSession, workspaceTools);
         await using var transport = new CompatibleStdioTransport(input, output);
@@ -262,6 +267,7 @@ public static class HarnessMcpServer
             "change_coupling" => CouplingAsync(call, tools.Coupling),
             "get_context" => ContextAsync(call, tools.Context),
             _ when ProviderTools.Handles(call.Name) => ProvidersAsync(call, tools.Providers),
+            _ when Harness.Mcp.Scm.ScmTools.Handles(call.Name) => ScmAsync(call),
             _ when call.Name.StartsWith("task_", StringComparison.Ordinal) => TasksAsync(call),
             _ => MemoryAsync(call),
         };
@@ -294,9 +300,21 @@ public static class HarnessMcpServer
 
     private static async Task<CallToolResult> ProvidersAsync(ToolCall call, ProviderTools? providers) =>
         Success(
-            await (providers ?? new ProviderTools(project: call.Session as IProviderProjectSession)).CallAsync(
+            await (
+                providers
+                ?? new ProviderTools(
+                    project: call.Session as IProviderProjectSession,
+                    scm: call.Session as Harness.Scm.IScmProjectContext
+                )
+            ).CallAsync(call.Name, call.Arguments, call.Token)
+        );
+
+    private static async Task<CallToolResult> ScmAsync(ToolCall call) =>
+        Success(
+            await Harness.Mcp.Scm.ScmTools.CallAsync(
                 call.Name,
                 call.Arguments,
+                call.Session as Harness.Scm.IScmSession,
                 call.Token
             )
         );

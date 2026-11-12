@@ -50,6 +50,26 @@
         "resolved": "2.23.0",
         "contentHash": "nWArUZTdU7iqZLycLKWe0TDms48KKGE6pONH2terYNa8REXiqixrMOkf1sk5DHGMaUTqONU2YkS4SAXBhLStgw=="
       },
+      "Microsoft.AspNetCore.Cryptography.Internal": {
+        "type": "Transitive",
+        "resolved": "11.0.0",
+        "contentHash": "Rv1aSRRqCOcpN5SGs7wnyF1tOZ6I/H6ccCc55qGnD8pKKTHdyTYR+56Ge/o8Lkw1PfC9rZDvrD9ud4VnXBXhEA=="
+      },
+      "Microsoft.AspNetCore.DataProtection": {
+        "type": "Transitive",
+        "resolved": "11.0.0",
+        "contentHash": "3mhCghDVwqGrUV3TmjKRS5FwgZuuCSqTwQR/4Hfae4PkyBvZBwy87cgBx2ws7hoRaSrDnLEIpWo+mlLGMaaezw==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Cryptography.Internal": "11.0.0",
+          "Microsoft.AspNetCore.DataProtection.Abstractions": "11.0.0",
+          "System.Security.Cryptography.Xml": "11.0.0"
+        }
+      },
+      "Microsoft.AspNetCore.DataProtection.Abstractions": {
+        "type": "Transitive",
+        "resolved": "11.0.0",
+        "contentHash": "FfqcYp1Y76iSwDxNik8ihG5qFEz6upOjmwE5XS86isTBSDSLQWSqTTfjwhFvDbGCw5BFItOGicBub1I86kl8zQ=="
+      },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
         "resolved": "11.0.0",
@@ -138,6 +158,14 @@
         "resolved": "6.0.1",
         "contentHash": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw=="
       },
+      "System.Security.Cryptography.Xml": {
+        "type": "Transitive",
+        "resolved": "11.0.0",
+        "contentHash": "RfXWeKcljjYZx5l/4i+6V4G8jP690jbHDhg4Wa/tNdNWvXn/c0WyyQySbpYLTuXB0fqzfttPoBCWMc8DFJNQzA==",
+        "dependencies": {
+          "System.Security.Cryptography.Pkcs": "11.0.0"
+        }
+      },
       "xunit.analyzers": {
         "type": "Transitive",
         "resolved": "2.3.0",
@@ -209,30 +237,30 @@
       "harness-agents": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
-          "Harness.Infrastructure": "[0.10.0-localbuild, )"
+          "Harness.Core": "[0.11.0-localbuild, )",
+          "Harness.Infrastructure": "[0.11.0-localbuild, )"
         }
       },
       "harness-collect": {
         "type": "Project",
         "dependencies": {
-          "Harness.Infrastructure": "[0.10.0-localbuild, )",
-          "Harness.Web": "[0.10.0-localbuild, )"
+          "Harness.Infrastructure": "[0.11.0-localbuild, )",
+          "Harness.Web": "[0.11.0-localbuild, )"
         }
       },
       "harness-graphify": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
-          "Harness.Infrastructure": "[0.10.0-localbuild, )",
-          "Harness.Providers": "[0.10.0-localbuild, )"
+          "Harness.Core": "[0.11.0-localbuild, )",
+          "Harness.Infrastructure": "[0.11.0-localbuild, )",
+          "Harness.Providers": "[0.11.0-localbuild, )"
         }
       },
       "harness-share": {
         "type": "Project",
         "dependencies": {
-          "Harness.Infrastructure": "[0.10.0-localbuild, )",
-          "Harness.Web": "[0.10.0-localbuild, )"
+          "Harness.Infrastructure": "[0.11.0-localbuild, )",
+          "Harness.Web": "[0.11.0-localbuild, )"
         }
       },
       "harness.core": {
@@ -241,7 +269,9 @@
       "harness.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Core": "[0.11.0-localbuild, )",
+          "Harness.Scm": "[0.11.0-localbuild, )",
+          "Microsoft.AspNetCore.DataProtection.Extensions": "[11.0.0, )",
           "Microsoft.Data.Sqlite": "[11.0.0, )",
           "Tomlyn": "[2.11.1, )",
           "YamlDotNet": "[18.1.0, )"
@@ -250,21 +280,35 @@
       "harness.mcp": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Core": "[0.11.0-localbuild, )",
+          "Harness.Scm": "[0.11.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
       },
       "harness.providers": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Core": "[0.11.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
+      },
+      "harness.scm": {
+        "type": "Project"
       },
       "harness.web": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.10.0-localbuild, )"
+          "Harness.Core": "[0.11.0-localbuild, )"
+        }
+      },
+      "Microsoft.AspNetCore.DataProtection.Extensions": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "K8lC1C8DOgAPEBbtJzQhgPQopKR+uMrK3ZXFZD0Hf6+tA6XzE/GEEIMpscwFgBT2say4lnALQ0Gb5YfSiE1tLw==",
+        "dependencies": {
+          "Microsoft.AspNetCore.DataProtection": "11.0.0",
+          "Microsoft.Extensions.DependencyInjection": "11.0.0"
         }
       },
       "Microsoft.Bcl.AsyncInterfaces": {
@@ -284,6 +328,12 @@
           "SQLitePCLRaw.core": "3.0.5"
         }
       },
+      "Microsoft.Extensions.DependencyInjection": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "KygQMITBDDPXw7+AAgdwQvVAaTXuDsc1iCAuvhO73ERxKX+d92cdbgZmpoYF7DIUq2hfs/yO2KD87uIreRy3MA=="
+      },
       "ModelContextProtocol.Core": {
         "type": "CentralTransitive",
         "requested": "[2.4.0, )",
@@ -292,6 +342,12 @@
         "dependencies": {
           "Microsoft.Extensions.AI.Abstractions": "10.11.0"
         }
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "G8mTjSWrwaPJ2bJRbKuI4ZqdKUYcANK0KtNH3s8/va3nXiF/Pk/yhv2R17rv5PBKJO5+ZXDyhTnZXh0W9v0J8w=="
       },
       "Tomlyn": {
         "type": "CentralTransitive",
@@ -321,6 +377,12 @@
         "type": "Transitive",
         "resolved": "6.0.1",
         "contentHash": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw=="
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "G8mTjSWrwaPJ2bJRbKuI4ZqdKUYcANK0KtNH3s8/va3nXiF/Pk/yhv2R17rv5PBKJO5+ZXDyhTnZXh0W9v0J8w=="
       }
     },
     "net11.0/linux-x64": {
@@ -338,6 +400,12 @@
         "type": "Transitive",
         "resolved": "6.0.1",
         "contentHash": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw=="
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "G8mTjSWrwaPJ2bJRbKuI4ZqdKUYcANK0KtNH3s8/va3nXiF/Pk/yhv2R17rv5PBKJO5+ZXDyhTnZXh0W9v0J8w=="
       }
     },
     "net11.0/osx-arm64": {
@@ -355,6 +423,12 @@
         "type": "Transitive",
         "resolved": "6.0.1",
         "contentHash": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw=="
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "G8mTjSWrwaPJ2bJRbKuI4ZqdKUYcANK0KtNH3s8/va3nXiF/Pk/yhv2R17rv5PBKJO5+ZXDyhTnZXh0W9v0J8w=="
       }
     },
     "net11.0/win-x64": {
@@ -372,6 +446,12 @@
         "type": "Transitive",
         "resolved": "6.0.1",
         "contentHash": "IQ4NXP/B3Ayzvw0rDQzVTYsCKyy0Jp9KI6aYcK7UnGVlR9+Awz++TIPCQtPYfLJfOpm8ajowMR09V7quD3sEHw=="
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "G8mTjSWrwaPJ2bJRbKuI4ZqdKUYcANK0KtNH3s8/va3nXiF/Pk/yhv2R17rv5PBKJO5+ZXDyhTnZXh0W9v0J8w=="
       }
     }
   }

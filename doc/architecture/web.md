@@ -24,6 +24,21 @@ replacement/keep-both choices. Reviewing a task does not create it; promotion
 previews do not create wider stores. Finding/task/knowledge proposals stay
 pending until an author approves or rejects them.
 
+Machine › SCM connections (`GET /api/scm`; `POST /api/scm`,
+`/api/scm/{name}/edit`, `/api/scm/{name}/remove` and `/api/scm/test`) is served by
+the CLI's `UiReadService` over Harness.Scm's configuration store and providers.
+Entries carry the token only masked; a test of the form's unsaved values may use
+a saved entry's token by name, so an edit is tested without typing it again.
+
+A project's SCM card on Agents › Tools & providers (`GET
+/api/projects/{id}/scm?days=N`; `POST /api/projects/{id}/scm/choice` and
+`/api/projects/{id}/scm/test`) shows which connection the project uses and how it
+was chosen, lets the author choose among the connections serving its remote (kept
+in scm.toml on this machine), tests it with doctor's project check, and counts
+the `scm_` MCP tool calls in the project's database. It loads after the page,
+independently of the provider cards, and never carries a token (see
+[SCM integration](scm.md#harness-ui)).
+
 ## Live updates
 
 Server-sent events publish invalidations rather than shipping unrestricted state.

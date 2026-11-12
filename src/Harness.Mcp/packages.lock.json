@@ -42,6 +42,9 @@
       },
       "harness.core": {
         "type": "Project"
+      },
+      "harness.scm": {
+        "type": "Project"
       }
     },
     "net11.0/linux-arm64": {},

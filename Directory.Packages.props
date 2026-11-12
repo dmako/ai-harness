@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.Authorization" Version="$(NetSdkVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.Extensions" Version="$(NetSdkVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="$(NetSdkVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="$(NetSdkVersion)" />
     <PackageVersion Include="System.Collections.Immutable" Version="$(NetSdkVersion)" />

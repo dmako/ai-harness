@@ -28,7 +28,7 @@ public sealed class MemoryMcpProcessTests
             await using var claude = await StartAsync(root, "claude-code");
             await using var codex = await StartAsync(root, "codex");
             var tools = await claude.ListToolsAsync(cancellationToken: Token);
-            tools.Count.Should().Be(32);
+            tools.Count.Should().Be(42);
             tools
                 .Select(tool => tool.Name)
                 .Should()

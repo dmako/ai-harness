@@ -38,6 +38,7 @@ public sealed class AuxiliaryCliTests
                 "memory",
                 "projects",
                 "workspace",
+                "scm",
                 "docs",
                 "providers",
                 "completion",

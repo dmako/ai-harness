@@ -242,8 +242,8 @@ edit dialog, with `harness tasks blueprints edit <id> --color <name>`, or as
 
 A workspace has the same views over its members. Machine holds this page's
 settings, the Board's defaults (the sort and done-age of a project that has
-not chosen its own), the C# sessions, and the switch for the opt-in developer
-telemetry. How harness itself performs (relevance per provider, latency)
+not chosen its own), the SCM connections (add, edit, remove and test them),
+the C# sessions, and the switch for the opt-in developer telemetry. How harness itself performs (relevance per provider, latency)
 is for the harness developer: it is not shown here, only sent in that
 telemetry if you turn it on.
 
@@ -258,6 +258,89 @@ telemetry if you turn it on.
   repositories (a service and its library), put them in a workspace
   (`harness workspace`): workspace-level knowledge applies to all members,
   and searches can span them.
+
+## Merge requests on GitLab, Forgejo and GitHub
+
+harness lets agents read and review the merge requests of a project hosted on
+GitLab (REST API v4), Forgejo (REST API v1, also Gitea) or GitHub (github.com
+or GitHub Enterprise Server; there they are pull requests): list them, read the
+details, diff and comments, comment on the whole request or on one changed
+line, change the title or description, and approve.
+
+**Connect a server once per machine.** Only access tokens are supported:
+
+- GitLab: a personal, group or project access token with the `api` scope
+  (`read_api` is enough for reading, but not for comments or approvals);
+- Forgejo: an access token with repository read and write (comments, reviews,
+  edits), user read (for the connection test) and issue write (general
+  comments live on the pull request's issue);
+- GitHub: a fine-grained personal access token with Pull requests read and
+  write (Contents and Metadata read come with it), or a classic token with the
+  `repo` scope. Its URL is `https://github.com`, or your Enterprise Server's
+  address (harness calls its `/api/v3`).
+
+```
+harness scm add work --type gitlab --url https://gitlab.example.com --token-stdin
+```
+
+and paste the token (`--token-env NAME` reads it from an environment variable
+on every call instead of storing it). The type is always given. `harness scm
+list` shows the connections with tokens masked, `harness scm set` changes one
+and `harness scm remove` drops it. harness ui has the same under Machine › SCM
+connections, where the token is a password field that is never shown again.
+Both store them in `scm.toml` beside the global `config.toml`, written so that
+only you can read it, with each stored token encrypted by keys in `scm-keys/`
+next to it: keep the two together in backups and on other machines (see the
+reference's SCM connections for what the encryption does and does not protect).
+
+**Check it.** `harness scm test` (or Test connection in harness ui) shows the
+server's version and the token's user, or what failed: unreachable, TLS,
+token rejected, not permitted, wrong server type, each with its fix.
+`harness doctor` does the same for every connection, warns if `scm.toml` can
+be read by others, and says which SCM and project the current repository is
+on and whether the token reaches it.
+
+**Which project.** A project needs no setup: harness takes the repository's
+git remotes (`origin` first), finds the connection whose host (and path, for
+an instance under one) the remote's URL is on, and takes the rest of the URL as
+the project: `git@gitlab.example.com:group/sub/repo.git` is `group/sub/repo`.
+`harness status` shows it. When the remotes do not say (a mirror, an SSH host
+alias), set it in the project's `.harness/config.toml`:
+
+```toml
+[scm]
+name = "work"
+project = "group/sub/repo"
+```
+
+**Several connections for one server.** You may add the same server more than
+once, with different tokens (your own and a review bot's, say). harness then
+cannot tell which one a project should use, and says so. Choose it for this
+machine on the project's Agents › Tools & providers page, where the SCM card
+under Used here lists the connections serving the project (Automatic goes back
+to detecting it), or with:
+
+```
+harness scm use bot          # this repository uses SCM bot on this machine
+harness scm use --auto       # detect it from the remotes again
+harness scm which            # which SCM and project, and how it was chosen
+```
+
+The choice is kept in `scm.toml` on your machine, not in the repository:
+teammates name their connections as they like. A `[scm] name` in the project's
+`.harness/config.toml`, which is shared, still wins over it. The same card tests
+the connection and whether the project is reachable with its token, and shows
+how often agents called the `scm_` tools and how many calls failed.
+
+**Agentic code review.** Ask your agent to review a merge request, for example
+"review merge request 42". It reads the request (`scm_get_merge_request_details`),
+its diff (`scm_get_merge_request_diff`) and the discussion so far
+(`scm_get_merge_request_comments`), reads the code around the changes in the
+working tree, then leaves one comment per finding on the line it is about
+(`scm_add_merge_request_diff_comment`) and a summary
+(`scm_add_merge_request_comment`). Agents change a title or description, or
+approve, only when you ask: those act as the token's user. If an agent says
+no SCM matches the project, `harness doctor` tells why.
 
 ## Updating harness
 

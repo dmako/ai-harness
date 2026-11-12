@@ -1,0 +1,185 @@
+{
+  "description": "Get one merge request in full: description, branches, commit SHAs, approvals, reviewers, labels and merge status. Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo or GitHub pull request #number)"
+      }
+    },
+    "required": [
+      "merge_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_get_merge_request_details",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer"
+      },
+      "merge_request": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "the merge request's number in the project (pass it as merge_request_id)"
+          },
+          "title": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "description": "opened, merged or closed"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_branch": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "web_url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "global_id": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "base_sha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "start_sha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "merged_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approved": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "whether the approval rules are met; null when the SCM does not say"
+          },
+          "approved_by": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "reviewers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "merge_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "state",
+          "source_branch",
+          "target_branch",
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id",
+      "merge_request"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -47,7 +47,7 @@ uninstall` alone lets you pick what to remove.
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
 | `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
-| `harness doctor` | Checks the installation, database, clients, hooks and providers, with a fix for each problem (`--all`: every project on the machine). |
+| `harness doctor` | Checks the installation, database, clients, hooks, providers and SCM connections, with a fix for each problem (`--all`: every project on the machine). |
 | `harness status` | The project, its Git state, database and clients. |
 | `harness sync` | Refreshes the recorded state (branch, HEAD, files, findings). The Git hooks run it for you. |
 | `harness instructions` | Adds the harness guidance for agents to AGENTS.md / CLAUDE.md (`--remove`). |
@@ -57,6 +57,7 @@ uninstall` alone lets you pick what to remove.
 | `harness proposals` | Knowledge agents proposed: list, show, approve, reject. |
 | `harness projects` | Every repository on this machine that uses harness (`forget <id>` drops one from the list). |
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
+| `harness scm` | This machine's SCM connections (GitLab, Forgejo, GitHub): `list`, `add`, `set`, `remove`, `test` (see SCM connections). |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
 | `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
@@ -226,6 +227,11 @@ timeout_ms = 600000                   # a longer run fails and keeps the counted
 
 [providers.<name>]                # see Providers
 
+[scm]                             # see SCM connections: this project's SCM
+name = "work"                     # when its git remotes do not match one
+project = "group/sub/repo"
+remote = "origin"
+
 [pricing."gpt-6.1-terra"]         # a model's API price, US$ per million tokens
 input = 1.25                      # (harness ships Claude prices; this adds or
 cached_input = 0.125              # overrides one; a price left out keeps the
@@ -338,6 +344,135 @@ finds them, `join`/`leave` change membership. Knowledge recorded at
 workspace level applies to every member; `harness search --workspace` and
 the agents' `scope: "workspace"` search all members; harness ui shows the
 workspace's architecture, shared code and version differences.
+
+## SCM connections
+
+harness can talk to GitLab (REST API v4), Forgejo (REST API v1) and GitHub
+(github.com or Enterprise Server, REST API) servers,
+authenticated with an access token only. Connections are set up once per
+machine and serve every project on it, with `harness scm` or in harness ui
+under Machine › SCM connections, where Test connection checks the server's
+version and the token's user and names the failure (unreachable, TLS,
+token rejected, not permitted, wrong server type) with its fix.
+
+| Command | What it does |
+|---|---|
+| `harness scm list [--json]` | Name, type, URL and token source of each SCM; tokens only masked (`****abcd`). |
+| `harness scm add <name> --type gitlab\|forgejo\|github --url <url> --token-stdin` | Adds an SCM; the token is read from the first line of standard input. `--token-env <VAR>` reads it from that environment variable on every call instead of storing it; `--token <t>` works but can leave the token in your shell history. |
+| `harness scm set <name> [--type] [--url] [--token-stdin\|--token\|--token-env] [--rename <new>]` | Changes an SCM; a new token or variable replaces the old one. |
+| `harness scm remove <name>` | Removes an SCM. |
+| `harness scm test [<name>] [--json]` | Tests one SCM, or all of them side by side: the server's version and the token's user, or what failed and how to fix it. Exits 1 when a test fails. |
+| `harness scm use <name>\|--auto [--project <dir>] [--json]` | Chooses the SCM this repository uses on this machine (one that serves its remotes), or with `--auto` forgets the choice and detects it from the remotes again. |
+| `harness scm which [--project <dir>] [--json]` | Shows the repository's SCM, project and remote, how it was chosen, and the connections that serve it equally. Exits 1 when no SCM serves it. |
+
+Names are 1-64 letters, digits, `-`, `_` or `.` and unique ignoring case;
+the URL is the server's base address (`https://gitlab.example.com`, or
+`https://host/gitlab` for an instance under a path; `https://github.com` for
+GitHub, whose API harness calls at `api.github.com`, or an Enterprise Server's
+address, under its `/api/v3`). The type is always given explicitly.
+
+They are stored in `scm.toml` beside the global `config.toml`, one table per
+SCM:
+
+```toml
+[scm.work]
+type = "gitlab"
+url = "https://gitlab.example.com"
+token_protected = "CfDJ8..." # the token, encrypted; or: token_env = "WORK_GITLAB_TOKEN"
+```
+
+Stored tokens are encrypted (ASP.NET Core Data Protection) with keys kept in
+`scm-keys/` beside `scm.toml`. harness creates that folder readable only by
+you (an owner-only ACL on Windows, where the keys are also protected with your
+Windows account; mode 700 elsewhere) and writes `scm.toml` readable only by you
+through a locked, atomic replace; a file or folder you widened yourself is
+tightened again on the next change. Tokens never appear in harness's output,
+logs or telemetry.
+
+- **Upgrading**: a `token = "..."` saved by an older harness keeps working and
+  is shown as unencrypted (`harness scm list`, `harness doctor`); the next
+  change with `harness scm` or in harness ui saves every stored token
+  encrypted.
+- **Backups and other machines**: `scm.toml` and `scm-keys/` belong together.
+  Back them up, move them and, in a container, mount them on the same volume
+  together. Without its keys a token cannot be decrypted (on Windows, not by
+  another account either): `harness doctor` says so, and you store it again
+  with `harness scm set <name> --token-stdin`.
+- **What it protects**: a copy of `scm.toml` on its own (a backup, a synced
+  dotfiles folder, a file attached to a support request) no longer reveals your
+  tokens. It does not protect against programs running as you, coding agents
+  included, which can decrypt them just as harness does, nor, on Linux and
+  macOS, against anyone who can read your whole configuration folder. To keep a
+  token out of harness's files altogether, use `token_env` with your own secret
+  manager.
+
+Each project finds its SCM from its git remotes: `origin` first, then the
+other remotes, the first whose URL (after `insteadOf` rewrites) is on a
+configured SCM's host and below its base URL. The rest of the URL's path is
+the project (`group/sub/repo` on GitLab, `owner/repo` on Forgejo and GitHub). Worktrees
+use their repository's remotes. `harness status` shows the result (an `SCM`
+line; `scm` in `--json`), as does the agents' `project_overview`. When the
+remotes do not say, set it in the project's `.harness/config.toml`:
+
+```toml
+[scm]
+name = "work"              # an SCM from 'harness scm list'
+project = "group/sub/repo" # with name: its path there, no matching
+remote = "upstream"        # or: match only this remote
+```
+
+When several connections serve the same server (one URL, different tokens),
+a remote matches them equally and the project's SCM is ambiguous until one is
+chosen. Choose it per repository on this machine with `harness scm use <name>`,
+or on the project's Agents › Tools & providers page (the SCM card in Used
+here). The choice is stored in `scm.toml`, keyed by the repository's common Git
+directory so its worktrees share it:
+
+```toml
+[project."/home/me/src/service/.git"]
+scm = "bot"
+```
+
+Renaming the connection keeps the choice; removing it forgets the choice. The
+SCM is chosen in this order:
+
+1. `[scm] name` in the project's `.harness/config.toml` (shared with the team);
+2. the connection chosen for the repository on this machine;
+3. the remotes, as above.
+
+A choice still applies `[scm] project` and `remote`. A choice that names a
+removed connection, or one that no longer serves the remotes, is reported by
+`harness status`, `harness doctor` and harness ui with the fix (`harness scm use
+<name>` or `--auto`), never silently replaced. `harness status` says how the SCM
+was chosen (`detected from the remotes`, `chosen on this machine` or `set in
+.harness/config.toml`; `source` in `--json`).
+
+`harness doctor` checks them too: that `scm.toml` reads and is readable only by
+you, that each SCM has its token and answers its connection test (all tested
+at once, 15 s at most each), and which SCM and project this repository is on
+and whether the token reaches that project. No SCM configured is only noted.
+
+Agents work with the project's merge requests through these MCP tools. Each
+acts on the current project's SCM and project; `merge_request_id` is the number
+the SCM shows (GitLab `!7` is 7, Forgejo or GitHub pull request `#7` is 7).
+
+| Tool | Arguments (default) | Does |
+|---|---|---|
+| `scm_get_projects` | `search`, `visibility` (`private`; or `internal`, `public`), `scm` (the project's) | projects the token's user can access |
+| `scm_list_merge_requests` | `state` (`opened`; or `merged`, `closed`) | the project's merge requests, latest first |
+| `scm_get_merge_request_details` | `merge_request_id` | description, branches, SHAs, approvals, reviewers, labels |
+| `scm_get_merge_request_comments` | `merge_request_id` | general and diff-line comments, oldest first |
+| `scm_add_merge_request_comment` | `merge_request_id`, `comment` | a general comment |
+| `scm_add_merge_request_diff_comment` | `merge_request_id`, `comment`, `file_path`, `line_number`, `line_type` (`new`; or `old` for a removed line) | a comment on one diff line |
+| `scm_get_merge_request_diff` | `merge_request_id` | the changes per file, at most 60 KB, cut files marked truncated |
+| `scm_set_merge_request_title` | `merge_request_id`, `title` | renames the merge request |
+| `scm_set_merge_request_description` | `merge_request_id`, `description` | replaces its description |
+| `scm_approve_merge_request` | `merge_request_id` | approves it as the token's user |
+
+A tool that cannot reach the SCM says why and what to do: no SCM configured
+(`harness scm add`), no remote matching one (`[scm]` above, `harness doctor`),
+or the server's answer (`unauthorized`, `forbidden`, `not_found`, `invalid`
+for a line outside the diff, `rate_limited`) with its fix.
 
 ## Tasks
 

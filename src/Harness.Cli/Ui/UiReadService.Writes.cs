@@ -36,6 +36,10 @@ internal sealed partial class UiReadService : IUiWriteApi
             {
                 return await SetTelemetryAsync(request.Body, token);
             }
+            if (endpoint.StartsWith("/api/scm", StringComparison.Ordinal))
+            {
+                return await WriteScmAsync(request, token);
+            }
             if (endpoint is "/api/graphify/sessions/{action}")
             {
                 return await WriteGraphifyAsync(request, token);
@@ -108,6 +112,10 @@ internal sealed partial class UiReadService : IUiWriteApi
         if (endpoint is "agents/{key}/{action}")
         {
             return await AgentCommandAsync(project, request, token);
+        }
+        if (endpoint is "scm/choice" or "scm/test")
+        {
+            return await WriteProjectScmAsync(project, request, token);
         }
         using var database = Open(project, tasks: true);
         var store = new MemoryStore(database);

@@ -122,6 +122,11 @@
       "stale": {
         "type": "string"
       },
+      "scm": {
+        "type": "object",
+        "description": "The configured SCM and project the repository's remotes point to (status, name, type, url, project, remote), or why none matched (status, reason, remotes); left out when no SCM is configured.",
+        "additionalProperties": true
+      },
       "hint": {
         "type": "string"
       }

@@ -26,6 +26,9 @@ public sealed record ProjectInspection(
     /// <summary>Whether Git carries the shared knowledge file to the team, when the worktree has one.</summary>
     public HealthCheck? Knowledge { get; init; }
 
+    /// <summary>The SCM and project the repository's remotes (or its [scm] configuration) point to.</summary>
+    public Harness.Scm.ScmResolution? Scm { get; init; }
+
     public object Status() =>
         new JsonObjectMap
         {
@@ -76,6 +79,7 @@ public sealed record ProjectInspection(
                 .Select(pair => pair.Key)
                 .Order(StringComparer.Ordinal)
                 .ToArray(),
+            ["scm"] = Scm?.Describe(),
         };
 
     public IReadOnlyList<HealthCheck> Checks(string binaryVersion)

@@ -8,6 +8,10 @@ typed arguments, options and settings without reflection-based attributes.
 `CliApplication` normalizes supported aliases and legacy flag spellings, routes
 output/errors, owns the host lifetime and maps cancellation to exit code 130.
 `hooks`/`hook`, `tasks`/`task` and `workspace`/`workspaces` are aliases.
+`scm` (list, add, set, remove, test) manages the machine's SCM connections through
+Harness.Scm's configuration store, and `doctor` adds their checks (see
+[SCM integration](scm.md)); `mcp` hands the session the GitLab, Forgejo and GitHub
+providers for the `scm_` tools.
 
 Command handlers delegate feature work to named runners instead of putting
 implementations into dispatch switch arms. CLI views own their presentation and

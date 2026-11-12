@@ -1,0 +1,159 @@
+{
+  "description": "Comment on one line of a merge request's diff: a changed line, or a context line shown with it. The line must be in the diff (scm_get_merge_request_diff). Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo or GitHub pull request #number)"
+      },
+      "comment": {
+        "type": "string",
+        "description": "the comment, in Markdown"
+      },
+      "file_path": {
+        "type": "string",
+        "description": "the file's path in the repository (its new path; its old one for a removed line)"
+      },
+      "line_number": {
+        "type": "integer",
+        "description": "the line's number in the file on the side line_type names"
+      },
+      "line_type": {
+        "type": "string",
+        "description": "new (default): a line of the changed file (added or context); old: a line of the original file (removed)"
+      }
+    },
+    "required": [
+      "merge_request_id",
+      "comment",
+      "file_path",
+      "line_number"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_add_merge_request_diff_comment",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer"
+      },
+      "comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "general, or diff for a comment on a diff line"
+          },
+          "body": {
+            "type": "string"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "system": {
+            "type": "boolean",
+            "description": "a server-generated note (pushed commits, status changes)"
+          },
+          "thread_id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "web_url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "position": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "file_path": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "old_path": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "new_line": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "old_line": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "body",
+          "system"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id",
+      "comment"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -6,7 +6,7 @@ Source: [`src/Harness.Agents`](../../src/Harness.Agents), contract in
 `harness-agents` runs one agent turn for a task and owns the client's process. It is a separate Native AOT executable
 next to `harness` (TASK-0115), so a session started from harness ui outlives harness ui, and harness itself carries no
 agent code. Why harness speaks the clients' own protocols instead of Microsoft Agent Framework:
-[the spike](maf-sessions-spike.md).
+[the spike](../spikes/maf-spike/README.md).
 
 ## Contract
 

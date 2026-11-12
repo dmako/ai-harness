@@ -233,6 +233,111 @@ public sealed class AgentRunnerTests : IDisposable
             .Be(AgentHost.Usage);
     }
 
+    [Fact]
+    public async Task APromptFileThatCannotBeReadIsAFailedRunNotACrash()
+    {
+        using var database = Database("TASK-0001");
+        var missing = Path.Combine(_root, "absent", "prompt.txt");
+        foreach (var file in new[] { missing, _root })
+        {
+            using var output = new StringWriter();
+            var args = WithPromptFile(HostArguments("claude", "normal", database.Path), file);
+
+            (await AgentHost.RunAsync(args, TextReader.Null, output, TextWriter.Null, Token))
+                .Should()
+                .Be(AgentHost.Failed);
+            var outcome = JsonNode.Parse(output.ToString())!;
+            ((string?)outcome["event"], (string?)outcome["status"]).Should().Be(("outcome", "failed"));
+            ((string)outcome["error"]!).Should().StartWith("cannot read --prompt-file " + file + ": ");
+        }
+        File.Exists(Path.Combine(_root, "agent.pid")).Should().BeFalse("no client was started");
+        new TaskStore(database).Sessions("TASK-0001", Token).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ServeWithAPromptFileThatCannotBeReadIsAFailedRun()
+    {
+        using var output = new StringWriter();
+        string[] args =
+        [
+            "serve",
+            "--client",
+            AgentClients.Codex,
+            "--task",
+            "TASK-0001",
+            "--cwd",
+            _root,
+            "--prompt-file",
+            Path.Combine(_root, "absent.txt"),
+            "--key",
+            "0123456789abcdef0123456789abcdef",
+            "--state",
+            Path.Combine(_root, "state"),
+        ];
+
+        (await AgentHost.RunAsync(args, TextReader.Null, output, TextWriter.Null, Token)).Should().Be(AgentHost.Failed);
+        output.ToString().Should().Contain("\"status\":\"failed\"").And.Contain("cannot read --prompt-file");
+        Directory.Exists(Path.Combine(_root, "state")).Should().BeFalse("the host never started");
+    }
+
+    [Fact]
+    public async Task APromptFileIsReadByTheHostAndMustNotBeEmptyOrGivenWithAPrompt()
+    {
+        var file = Path.Combine(_root, "prompt.txt");
+        await File.WriteAllTextAsync(file, "build it", Token);
+        using var output = new StringWriter();
+        (
+            await AgentHost.RunAsync(
+                WithPromptFile(HostArguments("claude", "normal", ""), file),
+                TextReader.Null,
+                output,
+                TextWriter.Null,
+                Token
+            )
+        )
+            .Should()
+            .Be(AgentHost.Completed);
+        output.ToString().Should().Contain("started: build it");
+
+        using var both = new StringWriter();
+        (
+            await AgentHost.RunAsync(
+                [.. HostArguments("claude", "normal", ""), "--prompt-file", file],
+                TextReader.Null,
+                TextWriter.Null,
+                both,
+                Token
+            )
+        )
+            .Should()
+            .Be(AgentHost.Usage);
+        both.ToString().Should().Contain("give --prompt or --prompt-file, not both").And.Contain("Usage:");
+
+        await File.WriteAllTextAsync(file, " \n", Token);
+        using var empty = new StringWriter();
+        using var emptyOutput = new StringWriter();
+        (
+            await AgentHost.RunAsync(
+                WithPromptFile(HostArguments("claude", "normal", ""), file),
+                TextReader.Null,
+                emptyOutput,
+                empty,
+                Token
+            )
+        )
+            .Should()
+            .Be(AgentHost.Usage);
+        empty.ToString().Should().Contain("--task, --cwd and a prompt are required").And.Contain("Usage:");
+        emptyOutput.ToString().Should().BeEmpty();
+    }
+
+    /// <summary>The arguments with their --prompt replaced by a --prompt-file.</summary>
+    private static string[] WithPromptFile(string[] args, string file)
+    {
+        var at = Array.IndexOf(args, "--prompt");
+        return [.. args[..at], "--prompt-file", file, .. args[(at + 2)..]];
+    }
+
     private static IAgentRunner Runner(string client)
     {
         var command = new AgentCommand("dotnet", [ProviderFixture.Worker]);

@@ -127,51 +127,59 @@ public static class TranscriptReader
         {
             return null;
         }
-        var prompt = type is "user" && Prompt(root);
-        long active = 0;
-        if (!prompt && Time(state, "last_at") is { } last && at > last)
-        {
-            active = (long)Math.Min((at - last).TotalMilliseconds, MaximumGap.TotalMilliseconds);
-        }
-        if (Time(state, "last_at") is not { } previous || at > previous)
-        {
-            state["last_at"] = at.ToString("O", CultureInfo.InvariantCulture);
-        }
-        var model = state["model"]?.GetValue<string>() ?? "";
-        var tokens = TokenCounts.Zero;
-        if (
+        var active = Active(state, at, type is "user" && Prompt(root));
+        var tokens =
             type is "assistant"
             && root.TryGetProperty("message", out var message)
             && message.ValueKind is JsonValueKind.Object
-        )
+                ? AssistantUsage(message, state)
+                : TokenCounts.Zero;
+        return new(at, state["model"]?.GetValue<string>() ?? "", tokens, active);
+    }
+
+    /// <summary>
+    /// The active time since the session's last line (none before a prompt, which starts a turn), capped at
+    /// <see cref="MaximumGap"/>; moves the state's last_at forward.
+    /// </summary>
+    private static long Active(JsonObject state, DateTimeOffset at, bool prompt)
+    {
+        var last = Time(state, "last_at");
+        if (last is null || at > last.Value)
         {
-            if (Text(message, "model") is { Length: > 0 } named && !named.StartsWith('<', StringComparison.Ordinal))
-            {
-                state["model"] = model = named;
-            }
-            var messageId = Text(message, "id");
-            if (
-                (messageId.Length is 0 || messageId != state["last_id"]?.GetValue<string>())
-                && message.TryGetProperty("usage", out var usage)
-                && usage.ValueKind is JsonValueKind.Object
-            )
-            {
-                tokens = new(
-                    Number(usage, "input_tokens"),
-                    Number(usage, "cache_read_input_tokens"),
-                    Number(usage, "cache_creation_input_tokens"),
-                    Number(usage, "output_tokens"),
-                    usage.TryGetProperty("output_tokens_details", out var details)
-                        ? Number(details, "thinking_tokens")
-                        : 0
-                );
-            }
-            if (messageId.Length > 0)
-            {
-                state["last_id"] = messageId;
-            }
+            state["last_at"] = at.ToString("O", CultureInfo.InvariantCulture);
         }
-        return new(at, model, tokens, active);
+        return !prompt && last is { } previous && at > previous
+            ? (long)Math.Min((at - previous).TotalMilliseconds, MaximumGap.TotalMilliseconds)
+            : 0;
+    }
+
+    /// <summary>
+    /// An assistant message's tokens, unless the state's last message id shows its usage was already counted;
+    /// records the message's model and id in the state.
+    /// </summary>
+    private static TokenCounts AssistantUsage(JsonElement message, JsonObject state)
+    {
+        if (Text(message, "model") is { Length: > 0 } named && !named.StartsWith('<', StringComparison.Ordinal))
+        {
+            state["model"] = named;
+        }
+        var messageId = Text(message, "id");
+        var counted = messageId.Length > 0 && messageId == state["last_id"]?.GetValue<string>();
+        if (messageId.Length > 0)
+        {
+            state["last_id"] = messageId;
+        }
+        if (counted || !message.TryGetProperty("usage", out var usage) || usage.ValueKind is not JsonValueKind.Object)
+        {
+            return TokenCounts.Zero;
+        }
+        return new(
+            Number(usage, "input_tokens"),
+            Number(usage, "cache_read_input_tokens"),
+            Number(usage, "cache_creation_input_tokens"),
+            Number(usage, "output_tokens"),
+            usage.TryGetProperty("output_tokens_details", out var details) ? Number(details, "thinking_tokens") : 0
+        );
     }
 
     // A prompt starts a turn: the user's own message, not a tool result or harness-added meta text.

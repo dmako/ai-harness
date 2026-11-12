@@ -14,6 +14,9 @@ public sealed record HarnessConfiguration
     /// <summary>Model prices that add to or override harness's shipped price table ([pricing.&lt;model&gt;]).</summary>
     public Dictionary<string, PriceConfiguration> Pricing { get; set; } = new(StringComparer.Ordinal);
 
+    /// <summary>The project's SCM chosen by hand ([scm]), when its remotes do not map to one.</summary>
+    public ScmProjectConfiguration Scm { get; set; } = new();
+
     public string ResolveDatabasePath(string stateRoot) => Path.GetFullPath(Storage.DbPath, stateRoot);
 }
 
@@ -95,6 +98,19 @@ public sealed record PriceConfiguration
     public double? CachedInput { get; set; }
     public double? CacheWrite { get; set; }
     public double? Output { get; set; }
+}
+
+/// <summary>
+/// [scm]: an SCM configured on this machine by name, the project's path on it (group/sub/repo, owner/repo) and the
+/// remote to match; each is optional and empty fields leave the choice to the remotes.
+/// </summary>
+public sealed record ScmProjectConfiguration
+{
+    public string Name { get; set; } = "";
+    public string Project { get; set; } = "";
+    public string Remote { get; set; } = "";
+
+    public Harness.Scm.ScmProjectOverride ToOverride() => new(Name.Trim(), Project.Trim(), Remote.Trim());
 }
 
 public sealed record ConfigurationSources(string Global, string Project);

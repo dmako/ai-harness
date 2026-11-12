@@ -2302,6 +2302,195 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     /// <summary>
+    /// Machine › SCM connections (TASK-0126): an SCM is added through the form after testing the typed values,
+    /// tested from its row, edited (a refused URL shown in the form, a new token that the server rejects) and
+    /// removed after confirming; the token reaches scm.toml but never the page or its answers.
+    /// </summary>
+    [Fact]
+    public async Task MachineScmSectionAddsTestsEditsAndRemovesConnectionsWithoutShowingTokens()
+    {
+        const string Good = "glpat-good-token-0123456789";
+        const string Bad = "glpat-wrong-token-9876543210";
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        await using var gitlab = new FakeGitlabServer(Good);
+        var file = Path.Combine(fixture.Global, "scm.toml");
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var root = server.Client.BaseAddress!.ToString().TrimEnd('/');
+                await page.CommandAsync("Page.navigate", new { url = root + "/#/machine" });
+                await page.WaitAsync("document.querySelector('.scmbox')?.textContent.includes('No SCM yet')");
+
+                async Task Click(string scope, string text) =>
+                    await page.EvaluateAsync(
+                        $"[...document.querySelectorAll('{scope} button')].find(b => b.textContent.trim() === '{text}').click()"
+                    );
+                async Task Fill(string label, string value) =>
+                    await page.EvaluateAsync(
+                        $"document.querySelector('dialog[open] [aria-label=\"{label}\"]').value = '{value}'"
+                    );
+
+                // add: the typed values are tested before they are saved
+                await Click(".scmfoot", "Add SCM");
+                await page.WaitAsync("!!document.querySelector('dialog[open] input[aria-label=Name]')");
+                await Fill("Name", "work");
+                await Fill("Type", "gitlab");
+                await Fill("URL", gitlab.Url);
+                await Fill("Token", Good);
+                await Click("dialog[open]", "Test connection");
+                await page.WaitAsync(
+                    "document.querySelector('dialog[open] .scmtest.ok')?.textContent.includes('17.5.0-ee as reviewer')"
+                );
+                await Click("dialog[open]", "Add SCM");
+                await page.WaitAsync(
+                    "!document.querySelector('dialog[open]') && !!document.querySelector('.scmrow[data-scm=work]')"
+                );
+                // stored encrypted: the token itself never reaches the file
+                (await File.ReadAllTextAsync(file, Token))
+                    .Should()
+                    .Contain("token_protected")
+                    .And.NotContain(Good);
+                (await ValueAsync(page, "document.querySelector('.scmrow[data-scm=work]').textContent"))
+                    .Should()
+                    .Contain("GitLab")
+                    .And.Contain(gitlab.Url)
+                    .And.Contain("token ****6789");
+
+                // the row's test, and its result kept for the next load
+                await Click(".scmrow[data-scm=work]", "Test connection");
+                await page.WaitAsync("!!document.querySelector('.scmrow[data-scm=work] .scmtest.ok')");
+                await page.CommandAsync("Page.reload", new { ignoreCache = true });
+                await page.WaitAsync("!!document.querySelector('.scmrow[data-scm=work] .scmtest.ok')");
+
+                // edit: a refused URL is shown in the form; a new token the server rejects fails the test
+                await page.EvaluateAsync("document.querySelector('button[aria-label=\"Edit SCM work\"]').click()");
+                await page.WaitAsync(
+                    "document.querySelector('dialog[open] input[aria-label=Token]')?.placeholder === '(unchanged)'"
+                );
+                await Fill("URL", "gitlab.example.com");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync(
+                    "document.querySelector('dialog[open] p.error:not([hidden])')?.textContent.includes('http')"
+                );
+                await Fill("URL", gitlab.Url);
+                await Fill("Token", Bad);
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync("!document.querySelector('dialog[open]')");
+                await Click(".scmrow[data-scm=work]", "Test connection");
+                await page.WaitAsync(
+                    "document.querySelector('.scmrow[data-scm=work] .scmtest.bad')?.textContent.includes('Token rejected')"
+                );
+                (await ValueAsync(page, "document.querySelector('.scmrow[data-scm=work] .scmtest.bad').textContent"))
+                    .Should()
+                    .Contain("harness scm set");
+
+                // a Forgejo connection to a GitLab server is told it is the wrong server type
+                (
+                    await ValueAsync(
+                        page,
+                        $$"""
+                        fetch('/api/scm/test', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Harness-UI': '1' },
+                          body: JSON.stringify({ type: 'forgejo', url: '{{gitlab.Url}}', token: '{{Good}}' }) })
+                          .then(r => r.json()).then(j => j.test.failure)
+                        """
+                    )
+                )
+                    .Should()
+                    .Be("wrong_server");
+
+                // no answer and no page text holds a token
+                foreach (var token in new[] { Good, Bad })
+                {
+                    (await ValueAsync(page, "fetch('/api/scm').then(r => r.text())")).Should().NotContain(token);
+                    (await ValueAsync(page, "document.body.innerHTML")).Should().NotContain(token);
+                }
+
+                // writes need the UI's header, like every other write
+                (
+                    await ValueAsync(
+                        page,
+                        "fetch('/api/scm/work/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(r => String(r.status))"
+                    )
+                )
+                    .Should()
+                    .Be("403");
+
+                // remove, after confirming
+                await page.EvaluateAsync("document.querySelector('button[aria-label=\"Remove SCM work\"]').click()");
+                await Click("dialog[open]", "Remove");
+                await page.WaitAsync("document.querySelector('.scmbox')?.textContent.includes('No SCM yet')");
+                (await File.ReadAllTextAsync(file, Token)).Should().NotContain("[scm.work]");
+            }
+        );
+    }
+
+    /// <summary>
+    /// Agents › Tools &amp; providers › Used here shows the project's SCM (TASK-0132): two connections serve its server,
+    /// so it asks for a choice; choosing one keeps it on this machine, Test checks the connection and the project, and
+    /// the scm_ calls agents made are counted.
+    /// </summary>
+    [Fact]
+    public async Task ToolsPageChoosesAndTestsTheProjectsScmAndShowsItsCalls()
+    {
+        var executable = Browser();
+        var (fixture, gitlab) = await UiScmProjectTests.TwoConnectionsAsync();
+        using var _ = fixture;
+        await using var __ = gitlab;
+        var id = UiWriteTests.ProjectId(fixture);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/agents/tools" }
+                );
+                await page.WaitAsync("!!document.querySelector('.scmcard select[aria-label=\"SCM connection\"]')");
+                (await ValueAsync(page, "document.querySelector('.scmcard').textContent"))
+                    .Should()
+                    .Contain("matches several SCMs")
+                    .And.Contain("scm_get_merge_request_diff")
+                    .And.Contain("3 scm_ calls");
+                (await ValueAsync(page, "String(document.querySelectorAll('.scmcard select option').length)"))
+                    .Should()
+                    .Be("3");
+                (await ValueAsync(page, "String(!!document.querySelector('.scmcard .daychart'))")).Should().Be("true");
+
+                await page.EvaluateAsync(
+                    "(() => { const s = document.querySelector('.scmcard select'); s.value = 'work'; s.dispatchEvent(new Event('change')); })()"
+                );
+                await page.WaitAsync(
+                    "document.querySelector('.scmcard')?.textContent.includes('chosen on this machine')"
+                );
+                Harness
+                    .Infrastructure.Scm.ScmConfigurationFile.ForGlobal(Path.Combine(fixture.Global, "config.toml"))
+                    .ChoiceFor(Path.Combine(fixture.Root, ".git"))
+                    .Should()
+                    .Be("work");
+                (await ValueAsync(page, "document.querySelector('.scmcard').textContent"))
+                    .Should()
+                    .Contain("group/repo")
+                    .And.Contain("from remote origin");
+
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.scmcard button')].find(b => b.textContent.trim() === 'Test connection').click()"
+                );
+                await page.WaitAsync(
+                    "[...document.querySelectorAll('.scmcard .scmtest')].some(e => e.textContent.includes('reachable (group/repo)'))"
+                );
+                (await ValueAsync(page, "document.querySelector('.scmcard .scmtest').textContent"))
+                    .Should()
+                    .Contain("as reviewer");
+                (await ValueAsync(page, "document.body.innerHTML")).Should().NotContain("glpat-");
+            }
+        );
+    }
+
+    /// <summary>
     /// Every page, at a desktop and a phone width, dark and light, with every fold closed and open, passes the Go
     /// harness's layout and accessibility checks (checks.js: overflow, overlapping or clipped text, squeezed columns,
     /// controls under 24 px, contrast under WCAG AA, sections showing an error) and raises no script error.
@@ -2383,6 +2572,30 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 memories.SetShared(id, shared, Token);
             }
         }
+
+        // Machine › SCM connections with an entry: one with a stored token, one read from an unset variable
+        var scm = new Harness.Infrastructure.Scm.ScmConfigurationFile(Path.Combine(fixture.Global, "scm.toml"));
+        await scm.AddAsync(
+            new("work", "gitlab", "https://gitlab.example.com/gitlab", "glpat-0123456789abcdef", null),
+            Token
+        );
+        await scm.AddAsync(
+            new("forge", "forgejo", "https://git.example.org", null, "HARNESS_TEST_FORGE_TOKEN_UNSET"),
+            Token
+        );
+        // a second connection to the same server: the project's SCM card on Agents › Tools & providers asks for a
+        // choice, so its connection select is checked at both widths
+        await scm.AddAsync(
+            new(
+                "forge-review-bot-with-a-long-name",
+                "forgejo",
+                "https://git.example.org",
+                null,
+                "HARNESS_TEST_FORGE_TOKEN_UNSET"
+            ),
+            Token
+        );
+        await fixture.GitAsync("remote", "add", "origin", "https://git.example.org/owner/repo.git");
 
         string checks;
         using (var stream = typeof(UiBrowserTests).Assembly.GetManifestResourceStream("checks.js")!)

@@ -367,7 +367,13 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         }
 
         var location = new ProjectLocation(root, state, loaded.Value.ResolveDatabasePath(state), repository, loaded);
-        var inspection = new ProjectInspection(location, head, gitError, configError);
+        var inspection = new ProjectInspection(location, head, gitError, configError)
+        {
+            Scm = new Scm.ScmProjectResolver(Scm.ScmConfigurationFile.ForGlobal(GlobalConfigurationPath)).Resolve(
+                repository,
+                loaded.Value.Scm.ToOverride()
+            ),
+        };
         if (repository is not null && File.Exists(Memory.SharedKnowledgeSync.PathIn(root)))
         {
             inspection = inspection with { Knowledge = await KnowledgeCheckAsync(repository, cancellationToken) };
