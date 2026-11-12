@@ -252,6 +252,7 @@
         "type": "Project",
         "dependencies": {
           "Harness.Core": "[0.10.0-localbuild, )",
+          "Harness.Scm": "[0.10.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
       },

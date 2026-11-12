@@ -154,6 +154,10 @@ internal sealed class StatusCommand(ProjectLifecycle lifecycle, TextWriter outpu
                 $"Database    {inspection.Location.DatabasePath} ({(inspection.Location.Initialized ? $"schema {inspection.SchemaVersion}/19" : "not created")})",
                 CancellationToken.None
             );
+            if (inspection.Scm is { Status: not Harness.Scm.ScmResolutionStatus.NoScm } scm)
+            {
+                await output.WriteLineAsync($"SCM         {scm.Summary()}", CancellationToken.None);
+            }
             if (inspection.ConfigurationError is not null || inspection.DatabaseError is not null)
             {
                 await output.WriteLineAsync(

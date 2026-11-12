@@ -679,6 +679,79 @@ public sealed class ProjectLifecycleTests
             .EnumerateArray()
             .Select(item => item.GetProperty("kind").GetString() + ":" + item.GetProperty("state").GetString());
 
+    [Fact]
+    public async Task StatusNamesTheScmAndProjectTheRemotesPointToInWorktreesAndWithAnOverride()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var fixture = new ProjectFixture();
+        var root = await fixture.CreateRepositoryAsync("scm-repo");
+        await fixture.GitAsync(root, "remote", "add", "upstream", "https://git.example.org/owner/repo.git");
+        await fixture.GitAsync(root, "remote", "add", "origin", "git@gitlab.example.com:group/sub/repo.git");
+        await fixture.GitAsync(
+            root,
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init"
+        );
+        var worktree = Path.Combine(fixture.Root, "scm-worktree");
+        await fixture.GitAsync(root, "worktree", "add", "-b", "feature", worktree);
+
+        var none = await fixture.CliAsync("status", "--json", "--project", root);
+        JsonElement.Parse(none.Output).GetProperty("scm").GetProperty("status").GetString().Should().Be("no_scm");
+        (await fixture.CliAsync("status", "--project", root)).Output.Should().NotContain("SCM ");
+
+        var store = new Harness.Infrastructure.Scm.ScmConfigurationFile(
+            Path.Combine(fixture.GlobalDirectory, "scm.toml")
+        );
+        await store.AddAsync(
+            new("work", "gitlab", "https://gitlab.example.com", "glpat-integration-0123456789", null),
+            token
+        );
+        await store.AddAsync(new("forge", "forgejo", "https://git.example.org", null, "FORGE_TOKEN"), token);
+
+        foreach (var directory in new[] { root, worktree })
+        {
+            var status = await fixture.CliAsync("status", "--json", "--project", directory);
+            status.Code.Should().Be(0, status.Error);
+            status.Output.Should().NotContain("glpat-integration");
+            var scm = JsonElement.Parse(status.Output).GetProperty("scm");
+            scm.GetProperty("status").GetString().Should().Be("matched");
+            scm.GetProperty("name").GetString().Should().Be("work");
+            scm.GetProperty("type").GetString().Should().Be("gitlab");
+            scm.GetProperty("project").GetString().Should().Be("group/sub/repo");
+            scm.GetProperty("remote").GetString().Should().Be("origin");
+        }
+
+        (await fixture.CliAsync("status", "--project", root))
+            .Output.Should()
+            .Contain("SCM         work (gitlab) group/sub/repo from remote origin");
+
+        Directory.CreateDirectory(Path.Combine(root, ".harness"));
+        await File.WriteAllTextAsync(ConfigurationPaths.ProjectPath(root), "[scm]\nremote = \"upstream\"\n", token);
+        var chosen = JsonElement
+            .Parse((await fixture.CliAsync("status", "--json", "--project", root)).Output)
+            .GetProperty("scm");
+        chosen.GetProperty("name").GetString().Should().Be("forge");
+        chosen.GetProperty("project").GetString().Should().Be("owner/repo");
+        chosen.GetProperty("overridden").GetBoolean().Should().BeTrue();
+
+        await File.WriteAllTextAsync(
+            ConfigurationPaths.ProjectPath(root),
+            "[scm]\nname = \"missing\"\nproject = \"a/b\"\n",
+            token
+        );
+        var invalid = JsonElement
+            .Parse((await fixture.CliAsync("status", "--json", "--project", root)).Output)
+            .GetProperty("scm");
+        invalid.GetProperty("status").GetString().Should().Be("invalid");
+        invalid.GetProperty("reason").GetString().Should().Contain("'missing'");
+    }
+
     /// <summary>A registered project whose database an older harness (schema 23) wrote, without init's files.</summary>
     private static async Task<string> OldProjectAsync(ProjectFixture fixture, string name)
     {

@@ -52,6 +52,15 @@ public static partial class ConfigurationExample
             ]
         ),
         new(
+            "scm",
+            "this project's SCM when its git remotes do not match one ('harness scm' configures them)",
+            [
+                new("name", "\"work\"", "an SCM from 'harness scm list'"),
+                new("project", "\"group/sub/repo\"", "its path on that SCM (owner/repo on Forgejo)"),
+                new("remote", "\"origin\"", "match only this remote"),
+            ]
+        ),
+        new(
             "providers.codebase-memory",
             "symbol and text search, overview (any language)",
             [new("command", "\"/path/to/codebase-memory-mcp\"")]
@@ -154,7 +163,8 @@ public static partial class ConfigurationExample
     /// </summary>
     internal static IReadOnlyList<(string Pattern, IReadOnlyList<string>? Keys)> Schema { get; } =
     [
-        ("", ["storage", "log", "sync", "architecture", "providers", "pricing"]),
+        ("", ["storage", "log", "sync", "architecture", "providers", "pricing", "scm"]),
+        ("scm", ["name", "project", "remote"]),
         ("pricing", null),
         ("pricing.*", ["input", "cached_input", "cache_write", "output"]),
         ("storage", ["db_path", "busy_timeout_ms"]),

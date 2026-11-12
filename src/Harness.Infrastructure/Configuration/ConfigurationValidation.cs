@@ -57,6 +57,7 @@ internal static class ConfigurationValidation
             "log.level must be debug, info, warn or error"
         );
         ValidateComplexity(configuration.Architecture.Complexity);
+        ValidateScm(configuration.Scm);
         foreach (var (name, provider) in configuration.Providers.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             ValidateProvider($"providers.{name}", provider);
@@ -88,6 +89,27 @@ internal static class ConfigurationValidation
                 $"architecture.complexity ({language}) must satisfy 1 <= note <= warn <= problem"
             );
         }
+    }
+
+    /// <summary>The [scm] fields' shape; whether the named SCM exists is told when the project is resolved.</summary>
+    private static void ValidateScm(ScmProjectConfiguration scm)
+    {
+        Require(
+            scm.Name.Trim().Length is 0 || Harness.Scm.ScmEntryRules.IsValidName(scm.Name.Trim()),
+            "scm.name: " + Harness.Scm.ScmEntryRules.NameRule
+        );
+        var project = scm.Project.Trim().Trim('/');
+        Require(
+            project.Length is 0
+                || project.Split('/') is { Length: >= 2 } parts
+                    && parts.All(part => part.Length > 0 && !part.Any(char.IsWhiteSpace)),
+            "scm.project must be the project's full path, e.g. group/repo or owner/repo"
+        );
+        Require(
+            scm.Project.Trim().Length is 0 || scm.Name.Trim().Length > 0,
+            "scm.project needs scm.name: the SCM the project is on"
+        );
+        Require(!scm.Remote.Any(char.IsWhiteSpace), "scm.remote must be a remote's name");
     }
 
     private static void ValidateProvider(string key, ProviderConfiguration provider)

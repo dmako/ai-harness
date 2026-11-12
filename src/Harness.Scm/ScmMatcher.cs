@@ -39,7 +39,7 @@ public static class ScmMatcher
                 ScmMatchStatus.NoMatch,
                 null,
                 [],
-                $"'{address}' is not a URL an SCM serves (http, https, ssh, git or scp-like user@host:path)."
+                $"'{ScmRemoteUrls.Safe(address)}' is not a URL an SCM serves (http, https, ssh, git or scp-like user@host:path)."
             );
         }
 

@@ -198,3 +198,34 @@ Where it differs from GitLab:
   caller's byte budget applies.
 - **Drafts**: a pull request is a draft when the server says so or its title
   starts with `WIP:` or `[WIP]`.
+
+## A project's SCM
+
+`ScmProjectResolver` (Infrastructure) tells which configured SCM and project a
+repository belongs to, without running git (a git process costs about 150 ms on
+Windows). `GitConfigFile` reads the repository's `config` from its common git
+directory, so linked worktrees resolve like their main working tree and each
+workspace member against its own repository. Remote URLs (and push URLs) are
+rewritten by `url.<base>.insteadOf` rules from that file and the user's global
+git config (`GIT_CONFIG_GLOBAL`, else `$XDG_CONFIG_HOME/git/config` and
+`~/.gitconfig`). The remotes are cached per repository until one of those
+files changes; the SCMs are read from `scm.toml` on each call, so a changed
+connection is seen at once.
+
+`ScmProjectMatcher` (Harness.Scm) then decides:
+
+1. the project's `[scm]` configuration first: `name` restricts matching to that
+   SCM, `remote` to that remote, and `name` with `project` fixes the project
+   without matching; a name or remote that does not exist is `invalid`;
+2. otherwise the remotes, `origin` first and then the others in config order,
+   each URL and then its push URLs through `ScmMatcher`; the first match wins;
+3. a remote that matches several SCMs equally is `ambiguous` and stops the
+   search rather than falling through to a later remote;
+4. otherwise `no_scm` (nothing configured), `no_remote` or `no_match`, with a
+   reason naming the remotes seen and the SCMs configured.
+
+Remote URLs are shown without the password or token an http(s) remote may
+embed (`ScmRemoteUrls.Safe`). `HarnessStateSession` implements
+`IScmProjectContext`, so MCP tools resolve the session's project;
+`project_overview` and `harness status` (`scm` in `--json`, an `SCM` line in
+text) show the resolution once an SCM is configured.

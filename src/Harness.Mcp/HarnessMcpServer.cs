@@ -72,7 +72,12 @@ public static class HarnessMcpServer
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         await using var ownedSession = session;
-        var providerTools = new ProviderTools(providers, session as IProviderProjectSession, workspaceTools);
+        var providerTools = new ProviderTools(
+            providers,
+            session as IProviderProjectSession,
+            workspaceTools,
+            session as Harness.Scm.IScmProjectContext
+        );
         var couplingTools = new CouplingTools(providers, session as IChangeCouplingSession);
         var contextTools = new ContextTools(providers, session as IContextProjectSession, workspaceTools);
         await using var transport = new CompatibleStdioTransport(input, output);
@@ -294,11 +299,13 @@ public static class HarnessMcpServer
 
     private static async Task<CallToolResult> ProvidersAsync(ToolCall call, ProviderTools? providers) =>
         Success(
-            await (providers ?? new ProviderTools(project: call.Session as IProviderProjectSession)).CallAsync(
-                call.Name,
-                call.Arguments,
-                call.Token
-            )
+            await (
+                providers
+                ?? new ProviderTools(
+                    project: call.Session as IProviderProjectSession,
+                    scm: call.Session as Harness.Scm.IScmProjectContext
+                )
+            ).CallAsync(call.Name, call.Arguments, call.Token)
         );
 
     private static async Task<CallToolResult> TasksAsync(ToolCall call) =>

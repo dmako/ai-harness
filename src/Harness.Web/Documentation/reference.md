@@ -227,6 +227,11 @@ timeout_ms = 600000                   # a longer run fails and keeps the counted
 
 [providers.<name>]                # see Providers
 
+[scm]                             # see SCM connections: this project's SCM
+name = "work"                     # when its git remotes do not match one
+project = "group/sub/repo"
+remote = "origin"
+
 [pricing."gpt-6.1-terra"]         # a model's API price, US$ per million tokens
 input = 1.25                      # (harness ships Claude prices; this adds or
 cached_input = 0.125              # overrides one; a price left out keeps the
@@ -372,6 +377,21 @@ The file holds tokens, so harness writes it readable only by you (an
 owner-only ACL on Windows, mode 600 elsewhere) through a locked, atomic
 replace; a file you widened yourself is tightened again on the next change.
 Tokens never appear in harness's output, logs or telemetry.
+
+Each project finds its SCM from its git remotes: `origin` first, then the
+other remotes, the first whose URL (after `insteadOf` rewrites) is on a
+configured SCM's host and below its base URL. The rest of the URL's path is
+the project (`group/sub/repo` on GitLab, `owner/repo` on Forgejo). Worktrees
+use their repository's remotes. `harness status` shows the result (an `SCM`
+line; `scm` in `--json`), as does the agents' `project_overview`. When the
+remotes do not say, set it in the project's `.harness/config.toml`:
+
+```toml
+[scm]
+name = "work"              # an SCM from 'harness scm list'
+project = "group/sub/repo" # with name: its path there, no matching
+remote = "upstream"        # or: match only this remote
+```
 
 ## Tasks
 

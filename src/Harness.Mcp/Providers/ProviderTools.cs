@@ -8,7 +8,8 @@ namespace Harness.Mcp.Providers;
 public sealed class ProviderTools(
     IProviderRegistry? registry = null,
     IProviderProjectSession? project = null,
-    WorkspaceTools? workspace = null
+    WorkspaceTools? workspace = null,
+    Harness.Scm.IScmProjectContext? scm = null
 )
 {
     public static bool Handles(string name) =>
@@ -454,6 +455,15 @@ public sealed class ProviderTools(
         if (snapshot.Stack is { } stack)
         {
             output["stack"] = stack;
+        }
+
+        if (scm is not null)
+        {
+            var resolution = await scm.ResolveScmAsync(token).ConfigureAwait(false);
+            if (resolution.Status is not Harness.Scm.ScmResolutionStatus.NoScm)
+            {
+                output["scm"] = resolution.Describe();
+            }
         }
 
         if (registry?.IndexedProviders().Count > 0)
