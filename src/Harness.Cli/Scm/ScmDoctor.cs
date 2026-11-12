@@ -106,7 +106,7 @@ internal static class ScmDoctor
                 new HealthCheck(
                     "scm",
                     "info",
-                    "no SCM configured (optional: 'harness scm add' lets agents work with GitLab and Forgejo merge requests)"
+                    "no SCM configured (optional: 'harness scm add' lets agents work with GitLab, Forgejo and GitHub merge requests)"
                 )
             );
             return (checks, []);

@@ -112,6 +112,29 @@ public sealed class ScmCliTests : IDisposable
         add.Output.Should().NotContain(Secret);
     }
 
+    [Fact]
+    public async Task GithubIsAnAcceptedType()
+    {
+        var add = await RunAsync(
+            "",
+            "scm",
+            "add",
+            "hub",
+            "--type",
+            "github",
+            "--url",
+            "https://github.com",
+            "--token-env",
+            "GH_TOKEN"
+        );
+
+        add.Code.Should().Be(0, add.Error);
+        add.Output.Should().Contain("GitHub");
+        (await RunAsync("", "scm", "set", "hub", "--type", "github", "--url", "https://ghe.example.com"))
+            .Code.Should()
+            .Be(0);
+    }
+
     [Theory]
     [InlineData(new[] { "scm", "add", "x", "--type", "gitlab", "--url", "https://h" }, "token is required")]
     [InlineData(
@@ -134,7 +157,7 @@ public sealed class ScmCliTests : IDisposable
     [Fact]
     public async Task UnknownTypesAndMissingOptionsAreParseErrors()
     {
-        (await RunAsync("", "scm", "add", "x", "--type", "github", "--url", "https://h", "--token-env", "V"))
+        (await RunAsync("", "scm", "add", "x", "--type", "bitbucket", "--url", "https://h", "--token-env", "V"))
             .Code.Should()
             .Be(2);
         (await RunAsync("", "scm", "add", "x", "--url", "https://h", "--token-env", "V")).Code.Should().Be(2);

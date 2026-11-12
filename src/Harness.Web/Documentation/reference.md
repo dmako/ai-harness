@@ -57,7 +57,7 @@ uninstall` alone lets you pick what to remove.
 | `harness proposals` | Knowledge agents proposed: list, show, approve, reject. |
 | `harness projects` | Every repository on this machine that uses harness (`forget <id>` drops one from the list). |
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
-| `harness scm` | This machine's SCM connections (GitLab, Forgejo): `list`, `add`, `set`, `remove`, `test` (see SCM connections). |
+| `harness scm` | This machine's SCM connections (GitLab, Forgejo, GitHub): `list`, `add`, `set`, `remove`, `test` (see SCM connections). |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
 | `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
@@ -347,7 +347,8 @@ workspace's architecture, shared code and version differences.
 
 ## SCM connections
 
-harness can talk to GitLab (REST API v4) and Forgejo (REST API v1) servers,
+harness can talk to GitLab (REST API v4), Forgejo (REST API v1) and GitHub
+(github.com or Enterprise Server, REST API) servers,
 authenticated with an access token only. Connections are set up once per
 machine and serve every project on it, with `harness scm` or in harness ui
 under Machine › SCM connections, where Test connection checks the server's
@@ -357,15 +358,16 @@ token rejected, not permitted, wrong server type) with its fix.
 | Command | What it does |
 |---|---|
 | `harness scm list [--json]` | Name, type, URL and token source of each SCM; tokens only masked (`****abcd`). |
-| `harness scm add <name> --type gitlab\|forgejo --url <url> --token-stdin` | Adds an SCM; the token is read from the first line of standard input. `--token-env <VAR>` reads it from that environment variable on every call instead of storing it; `--token <t>` works but can leave the token in your shell history. |
+| `harness scm add <name> --type gitlab\|forgejo\|github --url <url> --token-stdin` | Adds an SCM; the token is read from the first line of standard input. `--token-env <VAR>` reads it from that environment variable on every call instead of storing it; `--token <t>` works but can leave the token in your shell history. |
 | `harness scm set <name> [--type] [--url] [--token-stdin\|--token\|--token-env] [--rename <new>]` | Changes an SCM; a new token or variable replaces the old one. |
 | `harness scm remove <name>` | Removes an SCM. |
 | `harness scm test [<name>] [--json]` | Tests one SCM, or all of them side by side: the server's version and the token's user, or what failed and how to fix it. Exits 1 when a test fails. |
 
 Names are 1-64 letters, digits, `-`, `_` or `.` and unique ignoring case;
 the URL is the server's base address (`https://gitlab.example.com`, or
-`https://host/gitlab` for an instance under a path). The type is always given
-explicitly.
+`https://host/gitlab` for an instance under a path; `https://github.com` for
+GitHub, whose API harness calls at `api.github.com`, or an Enterprise Server's
+address, under its `/api/v3`). The type is always given explicitly.
 
 They are stored in `scm.toml` beside the global `config.toml`, one table per
 SCM:
@@ -385,7 +387,7 @@ Tokens never appear in harness's output, logs or telemetry.
 Each project finds its SCM from its git remotes: `origin` first, then the
 other remotes, the first whose URL (after `insteadOf` rewrites) is on a
 configured SCM's host and below its base URL. The rest of the URL's path is
-the project (`group/sub/repo` on GitLab, `owner/repo` on Forgejo). Worktrees
+the project (`group/sub/repo` on GitLab, `owner/repo` on Forgejo and GitHub). Worktrees
 use their repository's remotes. `harness status` shows the result (an `SCM`
 line; `scm` in `--json`), as does the agents' `project_overview`. When the
 remotes do not say, set it in the project's `.harness/config.toml`:
@@ -404,7 +406,7 @@ and whether the token reaches that project. No SCM configured is only noted.
 
 Agents work with the project's merge requests through these MCP tools. Each
 acts on the current project's SCM and project; `merge_request_id` is the number
-the SCM shows (GitLab `!7` is 7, Forgejo pull request `#7` is 7).
+the SCM shows (GitLab `!7` is 7, Forgejo or GitHub pull request `#7` is 7).
 
 | Tool | Arguments (default) | Does |
 |---|---|---|

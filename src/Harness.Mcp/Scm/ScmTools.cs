@@ -5,7 +5,7 @@ using Harness.Scm;
 namespace Harness.Mcp.Scm;
 
 /// <summary>
-/// The scm_ tools: the current project's merge requests on its SCM (GitLab, Forgejo), read and reviewed through
+/// The scm_ tools: the current project's merge requests on its SCM (GitLab, Forgejo, GitHub), read and reviewed through
 /// Harness.Scm's providers. A failure becomes a tool error that names its kind and the fix, never the token.
 /// </summary>
 public static class ScmTools
@@ -110,7 +110,7 @@ public static class ScmTools
     }
 
     private const string NoScm =
-        "No SCM is configured on this machine. Ask the user to add one: 'harness scm add <name> --type gitlab|forgejo "
+        "No SCM is configured on this machine. Ask the user to add one: 'harness scm add <name> --type gitlab|forgejo|github "
         + "--url <url> --token-stdin', or in harness ui under Machine › SCM connections.";
 
     private static async Task<object> OnProjectAsync(

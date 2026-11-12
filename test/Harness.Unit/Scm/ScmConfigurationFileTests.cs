@@ -61,7 +61,7 @@ public sealed class ScmConfigurationFileTests : IDisposable
     [Theory]
     [InlineData("-bad", "gitlab", "https://h", Secret, null, "name")]
     [InlineData("has space", "gitlab", "https://h", Secret, null, "name")]
-    [InlineData("ok", "github", "https://h", Secret, null, "Unknown SCM type 'github'")]
+    [InlineData("ok", "bitbucket", "https://h", Secret, null, "Unknown SCM type 'bitbucket'")]
     [InlineData("ok", "gitlab", "gitlab.example.com", Secret, null, "http")]
     [InlineData("ok", "gitlab", "https://h?x=1", Secret, null, "base address")]
     [InlineData("ok", "gitlab", "https://h", null, null, "token is required")]
@@ -82,6 +82,17 @@ public sealed class ScmConfigurationFileTests : IDisposable
         var failure = await add.Should().ThrowAsync<ScmConfigurationException>();
         failure.Which.Message.Should().Contain(reason).And.NotContain(Secret);
         File.Exists(FilePath).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GithubEntriesAreStoredWithTheirType()
+    {
+        await Store().AddAsync(new ScmEntryInput("hub", "GitHub", "https://github.com/", Secret, null), Token);
+
+        (await File.ReadAllTextAsync(FilePath, Token)).Should().Contain("type = \"github\"");
+        var entry = Store().Find("hub")!;
+        entry.Endpoint.Kind.Should().Be(ScmKind.Github);
+        entry.Endpoint.BaseUrl.AbsoluteUri.Should().Be("https://github.com/");
     }
 
     [Fact]

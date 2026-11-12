@@ -13,7 +13,7 @@ remain directories inside these assemblies rather than separate projects.
 | [Web](web.md) | HTTP boundary, embedded frontend and documentation | Core |
 | [Cli](cli.md) | Composition, command tree, setup, UI service adapters | Core, Infrastructure, Providers, Mcp, Web, Scm and its providers |
 | [Scm](scm.md) | SCM contracts, models and remote URL matching | None |
-| [Scm.Gitlab, Scm.Forgejo](scm.md) | GitLab API v4 and Forgejo API v1 providers | Scm |
+| [Scm.Gitlab, Scm.Forgejo, Scm.Github](scm.md) | GitLab API v4, Forgejo API v1 and GitHub REST API providers | Scm |
 | [Graphify](graphify.md) | Standalone compiler-provider adapter | Core, Infrastructure, Providers |
 | [Agents](agents.md) | Agent host: runs Claude Code and Codex turns for a task | Core, Infrastructure |
 | [Collect](telemetry.md) | Optional developer report collector | Infrastructure, Web |
@@ -44,7 +44,7 @@ flowchart TD
     Share --> Web
     Share --> Infrastructure
     Cli --> Scm
-    Cli --> ScmProviders[Scm.Gitlab / Scm.Forgejo]
+    Cli --> ScmProviders[Scm.Gitlab / Scm.Forgejo / Scm.Github]
     Mcp --> Scm
     ScmProviders --> Scm
     Infrastructure --> Scm

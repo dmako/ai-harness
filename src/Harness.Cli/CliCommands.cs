@@ -720,7 +720,7 @@ internal static class CliCommands
     private static void AddScm(RootCommand root, Dictionary<string, Command> groups, IServiceProvider services)
     {
         var scm = Group(root, groups, "scm");
-        scm.Description = "Manage this machine's SCM connections (GitLab, Forgejo)";
+        scm.Description = "Manage this machine's SCM connections (GitLab, Forgejo, GitHub)";
         Add(
             scm,
             "list",

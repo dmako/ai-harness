@@ -76,6 +76,7 @@ public sealed class ScmContractTests
     [InlineData("gitlab", ScmKind.Gitlab, "gitlab")]
     [InlineData(" GitLab ", ScmKind.Gitlab, "gitlab")]
     [InlineData("forgejo", ScmKind.Forgejo, "forgejo")]
+    [InlineData("GitHub", ScmKind.Github, "github")]
     public void KindsParseCaseInsensitively(string text, ScmKind kind, string name)
     {
         ScmKinds.TryParse(text, out var parsed).Should().BeTrue();
@@ -86,7 +87,7 @@ public sealed class ScmContractTests
     [Fact]
     public void UnknownKindsAndEnumNamesAreRejected()
     {
-        ScmKinds.TryParse("github", out _).Should().BeFalse();
+        ScmKinds.TryParse("bitbucket", out _).Should().BeFalse();
         ScmNames.TryParseState("open", out var state).Should().BeTrue();
         state.Should().Be(MergeRequestState.Opened);
         ScmNames.TryParseState("draft", out _).Should().BeFalse();

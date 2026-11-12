@@ -1,5 +1,5 @@
 {
-  "description": "List the project's merge requests (GitLab merge requests, Forgejo pull requests), most recently updated first. Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "description": "List the project's merge requests (GitLab merge requests, Forgejo and GitHub pull requests), most recently updated first. Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
   "inputSchema": {
     "type": "object",
     "properties": {

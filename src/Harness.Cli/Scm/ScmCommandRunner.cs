@@ -53,7 +53,7 @@ internal sealed class ScmCommandRunner(
         if (entries.Count is 0)
         {
             await output.WriteLineAsync(
-                "No SCM configured. Add one: harness scm add <name> --type gitlab|forgejo --url <url> --token-stdin",
+                "No SCM configured. Add one: harness scm add <name> --type gitlab|forgejo|github --url <url> --token-stdin",
                 CancellationToken.None
             );
             return 0;
@@ -134,7 +134,7 @@ internal sealed class ScmCommandRunner(
         if (entries.Count is 0)
         {
             await output.WriteLineAsync(
-                "No SCM configured. Add one: harness scm add <name> --type gitlab|forgejo --url <url> --token-stdin",
+                "No SCM configured. Add one: harness scm add <name> --type gitlab|forgejo|github --url <url> --token-stdin",
                 CancellationToken.None
             );
             return 0;

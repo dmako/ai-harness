@@ -129,6 +129,31 @@ public sealed class ScmDoctorTests : IDisposable
     }
 
     [Fact]
+    public async Task AGithubProjectIsCheckedThroughTheGithubApi()
+    {
+        Repo("git@github.com:owner/repo.git");
+        await Store.AddAsync(new("hub", "github", "https://github.com", Good, null), Token);
+        using var server = new FakeScmServer();
+        server
+            .Json("GET", "/meta", """{"verifiable_password_authentication":true}""")
+            .Json("GET", "/user", """{"id":1,"login":"reviewer"}""")
+            .Json("GET", "/repos/owner/repo", """{"id":7,"full_name":"owner/repo","name":"repo","private":true}""");
+
+        var checks = await DoctorAsync(server);
+
+        checks["scm:hub"]
+            .Should()
+            .Be(("ok", "GitHub https://github.com: version github.com, signed in as reviewer", null));
+        checks["scm project"].Level.Should().Be("ok");
+        checks["scm project"].Detail.Should().Be("hub (github) owner/repo from remote origin: reachable (owner/repo)");
+        server.Requests.Should().AllSatisfy(request => request.Uri.Host.Should().Be("api.github.com"));
+        server.Requests.Should().AllSatisfy(request => request.Headers["Authorization"].Should().Be("Bearer " + Good));
+        var test = await RunAsync(server, "scm", "test");
+        test.Code.Should().Be(0, test.Error);
+        test.Output.Should().Contain("[ok  ] scm:hub");
+    }
+
+    [Fact]
     public async Task FailedConnectionsMissingTokensAndUnreachableProjectsSayWhatToFix()
     {
         Repo("https://gitlab.example.com/group/other.git");

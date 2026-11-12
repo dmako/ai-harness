@@ -83,6 +83,16 @@ internal sealed class FakeScmServer : HttpMessageHandler
         }
 
         var key = request.Method.Method + " " + request.RequestUri!.AbsolutePath;
+        // a route registered as "METHOD /path|media/type" answers requests that ask for that non-JSON media type
+        // (GitHub serves a pull request's diff from the pull request's own URL)
+        var accept = request
+            .Headers.Accept.Select(type => type.MediaType)
+            .FirstOrDefault(type => type is not null and not "application/json");
+        if (accept is not null && _registered.ContainsKey(key + "|" + accept))
+        {
+            key += "|" + accept;
+        }
+
         FakeResponse answer;
         if (
             _registered.GetValueOrDefault(key) is 1

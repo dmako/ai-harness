@@ -102,9 +102,9 @@ internal static class ScmBindings
         var type = new Option<string>("--type")
         {
             Required = required,
-            Description = "The server type: gitlab or forgejo",
+            Description = "The server type: gitlab, forgejo or github",
         };
-        type.AcceptOnlyFromAmong("gitlab", "forgejo");
+        type.AcceptOnlyFromAmong("gitlab", "forgejo", "github");
         var url = new Option<string>("--url")
         {
             Required = required,

@@ -1,11 +1,11 @@
 {
-  "description": "Comment on one line of a merge request's diff: a changed line, or a context line shown with it. The line must be in the diff (scm_get_merge_request_diff). Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "description": "Comment on one line of a merge request's diff: a changed line, or a context line shown with it. The line must be in the diff (scm_get_merge_request_diff). Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
   "inputSchema": {
     "type": "object",
     "properties": {
       "merge_request_id": {
         "type": "integer",
-        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo pull request #index)"
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo or GitHub pull request #number)"
       },
       "comment": {
         "type": "string",

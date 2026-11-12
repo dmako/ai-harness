@@ -259,10 +259,11 @@ telemetry if you turn it on.
   (`harness workspace`): workspace-level knowledge applies to all members,
   and searches can span them.
 
-## Merge requests on GitLab and Forgejo
+## Merge requests on GitLab, Forgejo and GitHub
 
 harness lets agents read and review the merge requests of a project hosted on
-GitLab (REST API v4) or Forgejo (REST API v1, also Gitea): list them, read the
+GitLab (REST API v4), Forgejo (REST API v1, also Gitea) or GitHub (github.com
+or GitHub Enterprise Server; there they are pull requests): list them, read the
 details, diff and comments, comment on the whole request or on one changed
 line, change the title or description, and approve.
 
@@ -272,7 +273,11 @@ line, change the title or description, and approve.
   (`read_api` is enough for reading, but not for comments or approvals);
 - Forgejo: an access token with repository read and write (comments, reviews,
   edits), user read (for the connection test) and issue write (general
-  comments live on the pull request's issue).
+  comments live on the pull request's issue);
+- GitHub: a fine-grained personal access token with Pull requests read and
+  write (Contents and Metadata read come with it), or a classic token with the
+  `repo` scope. Its URL is `https://github.com`, or your Enterprise Server's
+  address (harness calls its `/api/v3`).
 
 ```
 harness scm add work --type gitlab --url https://gitlab.example.com --token-stdin

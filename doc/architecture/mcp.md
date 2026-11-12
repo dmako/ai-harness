@@ -38,7 +38,7 @@ suggested work and knowledge are represented as pending proposals.
 (Harness.Scm: the project's SCM resolution, the machine's SCM connections and
 the providers the CLI composes). Each acts on the current project's SCM and
 project as its git remotes (or `[scm]`) name them; a merge request is its
-project-scoped number (GitLab iid, Forgejo index).
+project-scoped number (GitLab iid, Forgejo index, GitHub pull request number).
 
 | Tool | Does |
 | --- | --- |

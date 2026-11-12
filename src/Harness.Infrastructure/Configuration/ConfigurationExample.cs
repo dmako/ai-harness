@@ -56,7 +56,7 @@ public static partial class ConfigurationExample
             "this project's SCM when its git remotes do not match one ('harness scm' configures them)",
             [
                 new("name", "\"work\"", "an SCM from 'harness scm list'"),
-                new("project", "\"group/sub/repo\"", "its path on that SCM (owner/repo on Forgejo)"),
+                new("project", "\"group/sub/repo\"", "its path on that SCM (owner/repo on Forgejo and GitHub)"),
                 new("remote", "\"origin\"", "match only this remote"),
             ]
         ),

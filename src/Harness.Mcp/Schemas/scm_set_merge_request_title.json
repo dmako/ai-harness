@@ -1,11 +1,11 @@
 {
-  "description": "Change a merge request's title. Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "description": "Change a merge request's title. Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
   "inputSchema": {
     "type": "object",
     "properties": {
       "merge_request_id": {
         "type": "integer",
-        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo pull request #index)"
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo or GitHub pull request #number)"
       },
       "title": {
         "type": "string",

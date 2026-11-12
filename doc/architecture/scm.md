@@ -1,7 +1,7 @@
 # SCM integration
 
 Source: [`src/Harness.Scm`](../../src/Harness.Scm).
-Harness.Scm is a provider-neutral library for SCM servers (GitLab, Forgejo):
+Harness.Scm is a provider-neutral library for SCM servers (GitLab, Forgejo, GitHub):
 the contracts that providers implement, the shared models and errors, and the
 matcher that maps a repository's git remote URL to a configured SCM. It has no
 project references, so any harness assembly allowed to reference it can use SCM
@@ -12,6 +12,7 @@ features without pulling in storage, MCP or the web stack.
 | Harness.Scm | Contracts, models, errors, remote URL parsing and matching | None |
 | Harness.Scm.Gitlab | GitLab REST API v4 provider | Harness.Scm |
 | Harness.Scm.Forgejo | Forgejo REST API v1 provider | Harness.Scm |
+| Harness.Scm.Github | GitHub REST API provider (github.com, Enterprise Server) | Harness.Scm |
 
 Mcp may reference Harness.Scm (its tools take the contracts), Infrastructure
 implements its configuration store (so Agents, through Infrastructure, sees it
@@ -22,17 +23,19 @@ harness's assemblies.
 flowchart TD
     Gitlab[Harness.Scm.Gitlab] --> Scm[Harness.Scm]
     Forgejo[Harness.Scm.Forgejo] --> Scm
+    Github[Harness.Scm.Github] --> Scm
     Mcp --> Scm
     Infrastructure --> Scm
     Cli --> Gitlab
     Cli --> Forgejo
+    Cli --> Github
     Cli --> Scm
 ```
 
 ## Contracts
 
 `IScmProvider` is one SCM implementation, keyed by `ScmKind` (`gitlab`,
-`forgejo`). `Connect(ScmConnection)` returns an `IScmClient` bound to one
+`forgejo`, `github`). `Connect(ScmConnection)` returns an `IScmClient` bound to one
 server and token. `ScmProviderRegistry` holds the providers and connects
 through the one of a connection's kind. A client offers:
 
@@ -44,8 +47,8 @@ through the one of a connection's kind. A client offers:
   side), the diff within a byte budget, title, description and approval.
 
 A project is named by the full path the API uses (`group/sub/repo` on GitLab,
-`owner/repo` on Forgejo); a merge request by its project-scoped number (GitLab
-iid, Forgejo pull request index). Models (`ScmProject`, `MergeRequest`,
+`owner/repo` on Forgejo and GitHub); a merge request by its project-scoped
+number (GitLab iid, Forgejo pull request index, GitHub pull request number). Models (`ScmProject`, `MergeRequest`,
 `ScmComment` with an optional `ScmDiffPosition`, `ScmFileDiff`,
 `ScmMergeRequestDiff`, `ScmApproval`) are plain records; a provider maps its
 server's JSON into them with source-generated System.Text.Json metadata, so the
@@ -83,7 +86,7 @@ local paths and `file://` are not remotes.
    http(s) remote's path; an ssh remote may include it or not, as GitLab's SSH
    clone URLs leave the relative URL root out;
 4. the rest of the path is the project: at least `namespace/repo` on GitLab
-   (nested groups allowed), exactly `owner/repo` on Forgejo;
+   (nested groups allowed), exactly `owner/repo` on Forgejo and GitHub;
 5. of the SCMs that match, the one with the longest base path wins; equally
    long matches are reported as ambiguous instead of guessed.
 
@@ -116,13 +119,19 @@ history, and output shows tokens only masked.
 
 ## Shared HTTP plumbing
 
-`ScmHttpClient` (Harness.Scm) is what both providers call through: relative
+`ScmHttpClient` (Harness.Scm) is what every provider calls through: relative
 API paths against the connection's base URL (so instances under a sub-path
-work), the provider's token header on each request, a per-request timeout
+work) or the API root a provider names (GitHub's `api.github.com`), the
+provider's token header on each request, an Accept media type a call may ask
+for instead of JSON (GitHub's diff), a per-request timeout
 (`ScmLimits.Timeout`, reported as `unreachable`), caller cancellation passed
-through as `OperationCanceledException`, one retry after HTTP 429 when the
-server's `Retry-After` is within `ScmLimits.MaxRetryWait`, and paging that
-follows full pages (and GitLab's `X-Next-Page`) up to `ScmLimits.MaxPages`.
+through as `OperationCanceledException`, one retry after a rate limit when the
+server's `Retry-After` (or GitHub's `x-ratelimit-reset`) is within
+`ScmLimits.MaxRetryWait`, and paging that follows full pages (and GitLab's
+`X-Next-Page` or the `Link` header's `rel="next"`) up to `ScmLimits.MaxPages`.
+A rate limit is HTTP 429, or a 403 with `Retry-After` or
+`x-ratelimit-remaining: 0` (GitHub's primary and secondary limits); it fails as
+`rate_limited`, not `forbidden`.
 JSON is read with each provider's source-generated `JsonSerializerContext`;
 an answer that is not the expected JSON (an HTML login page, a proxy) is
 `wrong_server`. A failed status becomes an `ScmException` naming the method,
@@ -199,6 +208,55 @@ Where it differs from GitLab:
 - **Drafts**: a pull request is a draft when the server says so or its title
   starts with `WIP:` or `[WIP]`.
 
+## GitHub
+
+`GithubProvider` (`src/Harness.Scm.Github`) speaks the REST API (version
+`2022-11-28`, sent as `X-GitHub-Api-Version`) with the token in
+`Authorization: Bearer <t>`. The configured URL is the web address remotes use;
+`GithubProvider.ApiRoot` maps it to the API: `https://github.com` to
+`https://api.github.com`, a GitHub Enterprise Cloud `<name>.ghe.com` to
+`api.<name>.ghe.com`, anything else (Enterprise Server) to `<url>/api/v3`.
+A project is `owner/repo`; a merge request is a pull request, addressed by its
+number.
+
+| Operation | GitHub call |
+| --- | --- |
+| Test connection | `GET /meta` (an answer without GitHub's metadata, or a 404, is `wrong_server`), then `GET /user` |
+| Projects | `GET /user/repos?visibility=all&affiliation=owner,collaborator,organization_member`; with a search `GET /search/repositories?q=<search> in:name`; both paged by `per_page`/`page` and `Link` |
+| Merge requests | `GET /repos/{o}/{r}/pulls?state=open\|closed&sort=updated`, paged |
+| Details | `GET .../pulls/{n}` and `.../pulls/{n}/reviews` |
+| Comments | `GET .../issues/{n}/comments`, review bodies from `.../reviews`, and `GET .../pulls/{n}/comments` (every review comment), all paged |
+| General comment | `POST .../issues/{n}/comments` |
+| Diff comment | `POST .../pulls/{n}/comments` with `commit_id` (the head SHA), `path`, `line` and `side` (`RIGHT` new, `LEFT` old); a file or line outside the diff is refused before posting |
+| Diff | `GET .../pulls/{n}` with `Accept: application/vnd.github.diff`, split per file |
+| Title, description | `PATCH .../pulls/{n}` |
+| Approve | `POST .../pulls/{n}/reviews` with event `APPROVE` on the head commit |
+
+Where it differs:
+
+- **States**: like Forgejo, only open and closed; a closed pull request with
+  `merged_at` is `merged`.
+- **Visibility**: the repository's `visibility` (`public`, `private`,
+  `internal` on Enterprise), else its `private` flag. Projects are filtered by
+  it after they are read. A search goes through GitHub's repository search, so
+  it can also find public repositories the user is not a member of.
+- **Version**: github.com has none to report (the test says `github.com`);
+  Enterprise Server reports its `installed_version`.
+- **Approvals**: no approval rules API, so `Approved` stays unknown (null);
+  `ApprovedBy` lists the users whose latest approving, change-requesting or
+  dismissed review is an approval.
+- **Comments**: a review's body is a general comment (id `review-<id>`,
+  prefixed with its state). A review comment sits at `line` on its `side`;
+  once outdated, `line` is gone and its `original_line` is kept. Replies share
+  the first comment's id (`in_reply_to_id`) as their thread. There are no
+  system notes.
+- **Diffs**: GitHub refuses the diff of very large pull requests (HTTP 406,
+  reported as `server`); otherwise the patch is cut at 20 MiB before the
+  caller's byte budget applies.
+- **Rate limits**: answered with 403 or 429 (see Shared HTTP plumbing); an
+  exhausted hourly limit names a reset too far away to wait for, so it fails
+  at once as `rate_limited`.
+
 ## A project's SCM
 
 `ScmProjectResolver` (Infrastructure) tells which configured SCM and project a
@@ -256,6 +314,6 @@ inject a fake server through `ScmHttpOptions`.
 The `scm_` tools (see [mcp](mcp.md)) reach SCMs through `IScmSession` (Harness.Scm):
 the project's resolution, the machine's `IScmConfiguration` for tokens and the
 `ScmProviderRegistry`. `HarnessStateSession` implements it; `harness mcp` gives it
-the GitLab and Forgejo providers, so Mcp needs neither Infrastructure nor the
+the GitLab, Forgejo and GitHub providers, so Mcp needs neither Infrastructure nor the
 providers. The generated agent instructions (`AgentGuidance`) tell agents how to
 review a merge request with them.

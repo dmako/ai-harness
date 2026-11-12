@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Scm/Harness.Scm.csproj" />
+    <InternalsVisibleTo Include="Harness.Unit" />
+  </ItemGroup>
+</Project>

@@ -13,6 +13,7 @@
     <Project Path="src/Harness.Scm/Harness.Scm.csproj" />
     <Project Path="src/Harness.Scm.Gitlab/Harness.Scm.Gitlab.csproj" />
     <Project Path="src/Harness.Scm.Forgejo/Harness.Scm.Forgejo.csproj" />
+    <Project Path="src/Harness.Scm.Github/Harness.Scm.Github.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Harness.Unit/Harness.Unit.csproj" />

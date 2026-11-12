@@ -84,11 +84,11 @@ public static class ScmErrors
             ScmErrorKind.Unauthorized =>
                 "The token was rejected: it may be wrong, expired or revoked. Create a new token and update it with 'harness scm set <name> --token-stdin'.",
             ScmErrorKind.Forbidden =>
-                "The token lacks permission: give it the 'api' scope (GitLab) or repository and issue write access (Forgejo), or use an account with access to the project.",
+                "The token lacks permission: give it the 'api' scope (GitLab), repository and issue write access (Forgejo) or pull request write access (GitHub), or use an account with access to the project.",
             ScmErrorKind.NotFound =>
                 "Not found: check the project path and number, and that the token's user can see the project.",
             ScmErrorKind.WrongServer =>
-                "The URL does not answer like the configured SCM type: check the type (gitlab or forgejo) and that the URL is the server's base address.",
+                "The URL does not answer like the configured SCM type: check the type (gitlab, forgejo or github) and that the URL is the server's base address.",
             ScmErrorKind.Invalid =>
                 "The server refused the request's content; check the arguments (for a diff comment, the line must be part of the merge request's diff).",
             ScmErrorKind.RateLimited => "The server is rate limiting requests; try again later.",

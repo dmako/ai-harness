@@ -10,18 +10,22 @@ public enum ScmKind
 
     /// <summary>Forgejo (and Gitea-compatible servers), REST API v1.</summary>
     Forgejo,
+
+    /// <summary>GitHub (github.com or GitHub Enterprise Server), REST API v3.</summary>
+    Github,
 }
 
 /// <summary>The lower-case names of <see cref="ScmKind" /> used in configuration, CLI and JSON.</summary>
 public static class ScmKinds
 {
-    public static IReadOnlyList<string> Names { get; } = ["gitlab", "forgejo"];
+    public static IReadOnlyList<string> Names { get; } = ["gitlab", "forgejo", "github"];
 
     public static string Name(ScmKind kind) =>
         kind switch
         {
             ScmKind.Gitlab => "gitlab",
             ScmKind.Forgejo => "forgejo",
+            ScmKind.Github => "github",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown SCM kind."),
         };
 
@@ -30,6 +34,7 @@ public static class ScmKinds
         {
             ScmKind.Gitlab => "GitLab",
             ScmKind.Forgejo => "Forgejo",
+            ScmKind.Github => "GitHub",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown SCM kind."),
         };
 
@@ -39,6 +44,7 @@ public static class ScmKinds
         {
             "GITLAB" => ScmKind.Gitlab,
             "FORGEJO" => ScmKind.Forgejo,
+            "GITHUB" => ScmKind.Github,
             _ => null,
         };
         return kind is not null;

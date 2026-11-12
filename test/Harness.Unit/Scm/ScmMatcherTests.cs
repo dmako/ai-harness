@@ -80,6 +80,37 @@ public sealed class ScmMatcherTests
         ScmMatcher.Match([Forgejo], "https://git.example.org/repo").Status.Should().Be(ScmMatchStatus.NoMatch);
     }
 
+    [Theory]
+    [InlineData("https://github.com/owner/repo.git")]
+    [InlineData("https://github.com/owner/repo")]
+    [InlineData("ssh://git@github.com/owner/repo.git")]
+    [InlineData("git@github.com:owner/repo.git")]
+    [InlineData("git@GitHub.com:owner/repo")]
+    public void GithubRemotesMatchAsOwnerAndRepository(string address)
+    {
+        var github = Endpoint("github", ScmKind.Github, "https://github.com");
+
+        var result = ScmMatcher.Match([GitlabCom, Forgejo, github], address);
+
+        result.Status.Should().Be(ScmMatchStatus.Matched);
+        result.Match!.Endpoint.Should().Be(github);
+        result.Match.Project.Should().Be("owner/repo");
+        ScmMatcher.Match([github], "https://github.com/owner/repo/tree").Status.Should().Be(ScmMatchStatus.NoMatch);
+    }
+
+    [Fact]
+    public void GithubEnterpriseHostsMatchByTheirConfiguredBaseUrl()
+    {
+        var enterprise = Endpoint("ghe", ScmKind.Github, "https://ghe.example.com");
+        var dotCom = Endpoint("github", ScmKind.Github, "https://github.com");
+
+        ScmMatcher
+            .Match([dotCom, enterprise], "git@ghe.example.com:team/service.git")
+            .Match!.Endpoint.Should()
+            .Be(enterprise);
+        ScmMatcher.Match([enterprise], "https://github.com/team/service").Status.Should().Be(ScmMatchStatus.NoMatch);
+    }
+
     [Fact]
     public void InstancesUnderASubPathMatchHttpRemotesOnlyBelowItAndStripIt()
     {

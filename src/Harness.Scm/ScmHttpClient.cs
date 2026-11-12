@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -22,11 +23,16 @@ public sealed class ScmHttpClient : IDisposable
     private readonly Action<HttpRequestHeaders> _authenticate;
 
     /// <param name="authenticate">Adds the token header to each request (PRIVATE-TOKEN, Authorization).</param>
+    /// <param name="apiRoot">
+    /// The URL relative API paths resolve against, ending in a slash; the connection's base URL when null (GitHub's API
+    /// lives on its own host, api.github.com).
+    /// </param>
     public ScmHttpClient(
         ScmConnection connection,
         HttpMessageHandler handler,
         ScmLimits limits,
-        Action<HttpRequestHeaders> authenticate
+        Action<HttpRequestHeaders> authenticate,
+        Uri? apiRoot = null
     )
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -37,7 +43,7 @@ public sealed class ScmHttpClient : IDisposable
         _authenticate = authenticate;
         _http = new HttpClient(handler, disposeHandler: false)
         {
-            BaseAddress = connection.ApiRoot,
+            BaseAddress = apiRoot ?? connection.ApiRoot,
             Timeout = Timeout.InfiniteTimeSpan,
         };
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -70,9 +76,14 @@ public sealed class ScmHttpClient : IDisposable
         );
     }
 
-    public async Task<string> GetTextAsync(string path, CancellationToken cancellationToken)
+    public Task<string> GetTextAsync(string path, CancellationToken cancellationToken) =>
+        GetTextAsync(path, null, cancellationToken);
+
+    /// <param name="accept">The media type asked for instead of JSON (GitHub's <c>application/vnd.github.diff</c>).</param>
+    public async Task<string> GetTextAsync(string path, string? accept, CancellationToken cancellationToken)
     {
-        using var response = await SendAsync(HttpMethod.Get, path, null, cancellationToken).ConfigureAwait(false);
+        using var response = await SendAsync(HttpMethod.Get, path, null, cancellationToken, accept)
+            .ConfigureAwait(false);
         return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -91,8 +102,8 @@ public sealed class ScmHttpClient : IDisposable
     }
 
     /// <summary>
-    /// Every page of a list, following pages while a full page came back (and the server's X-Next-Page, when it sends
-    /// one, names a next page), at most <see cref="ScmLimits.MaxPages" /> pages.
+    /// Every page of a list, following pages while a full page came back (and the server's X-Next-Page or Link header,
+    /// when it sends one, names a next page), at most <see cref="ScmLimits.MaxPages" /> pages.
     /// </summary>
     /// <param name="path">The list's path for a 1-based page number and the page size.</param>
     public Task<List<T>> GetPagesAsync<T>(
@@ -120,7 +131,7 @@ public sealed class ScmHttpClient : IDisposable
             var values = items(envelope);
             all.AddRange(values ?? []);
             var next = headers.TryGetValues("X-Next-Page", out var nextValues) ? nextValues.FirstOrDefault() : null;
-            if ((values?.Count ?? 0) < Limits.PageSize || next is { Length: 0 })
+            if ((values?.Count ?? 0) < Limits.PageSize || next is { Length: 0 } || LinkWithoutNext(headers))
             {
                 break;
             }
@@ -129,11 +140,22 @@ public sealed class ScmHttpClient : IDisposable
         return all;
     }
 
+    /// <summary>
+    /// True when the answer has an RFC 8288 Link header (GitHub's paging) that names no <c>rel="next"</c> page: the
+    /// last page, even when it is full.
+    /// </summary>
+    private static bool LinkWithoutNext(HttpResponseHeaders headers) =>
+        headers.TryGetValues("Link", out var links)
+        && !links
+            .SelectMany(link => link.Split(','))
+            .Any(link => link.Contains("rel=\"next\"", StringComparison.OrdinalIgnoreCase));
+
     private async Task<HttpResponseMessage> SendAsync(
         HttpMethod method,
         string path,
         string? json,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        string? accept = null
     )
     {
         var retried = false;
@@ -141,6 +163,12 @@ public sealed class ScmHttpClient : IDisposable
         {
             using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
             _authenticate(request.Headers);
+            if (accept is not null)
+            {
+                // a request's own Accept wins over the client's default JSON one
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+            }
+
             if (json is not null)
             {
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -155,7 +183,7 @@ public sealed class ScmHttpClient : IDisposable
             using (response)
             {
                 var wait = RetryWait(response);
-                if (response.StatusCode is HttpStatusCode.TooManyRequests && !retried && wait <= Limits.MaxRetryWait)
+                if (RateLimited(response) && !retried && wait <= Limits.MaxRetryWait)
                 {
                     retried = true;
                     await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
@@ -202,8 +230,27 @@ public sealed class ScmHttpClient : IDisposable
         {
             { Delta: { } delta } => delta,
             { Date: { } date } => date - DateTimeOffset.UtcNow,
+            _ when Header(response, "x-ratelimit-reset") is { } reset
+                    && long.TryParse(reset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epoch) =>
+                DateTimeOffset.FromUnixTimeSeconds(epoch) - DateTimeOffset.UtcNow,
             _ => TimeSpan.FromSeconds(1),
         };
+
+    /// <summary>
+    /// HTTP 429, or a 403 that is a rate limit rather than a permission failure: GitHub answers its primary limit
+    /// with x-ratelimit-remaining 0 and its secondary limits with Retry-After.
+    /// </summary>
+    private static bool RateLimited(HttpResponseMessage response) =>
+        response.StatusCode switch
+        {
+            HttpStatusCode.TooManyRequests => true,
+            HttpStatusCode.Forbidden => response.Headers.RetryAfter is not null
+                || Header(response, "x-ratelimit-remaining") is "0",
+            _ => false,
+        };
+
+    private static string? Header(HttpResponseMessage response, string name) =>
+        response.Headers.TryGetValues(name, out var values) ? values.FirstOrDefault()?.Trim() : null;
 
     private async Task<ScmException> FailureAsync(
         HttpMethod method,
@@ -226,7 +273,11 @@ public sealed class ScmHttpClient : IDisposable
         var message =
             $"{method} {PathOnly(path)}: HTTP {status} {response.ReasonPhrase}"
             + (detail.Length > 0 ? ": " + ScmErrors.Redact(detail, Connection.Token) : "");
-        return new ScmException(ScmErrors.FromStatus(response.StatusCode), message, response.StatusCode);
+        return new ScmException(
+            RateLimited(response) ? ScmErrorKind.RateLimited : ScmErrors.FromStatus(response.StatusCode),
+            message,
+            response.StatusCode
+        );
     }
 
     private async Task<T> ReadAsync<T>(

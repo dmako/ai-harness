@@ -2142,7 +2142,7 @@ async function renderMachine(main) {
       h("div", { class: "setrow" }, h("div", {}, h("b", {}, "Open projects on"), h("p", { class: "muted small" }, "The view a project opens on from the sidebar.")),
         seg("Default project view", PROJECT_VIEWS, defaultView(), (v) => store.set("projectView", v))))),
     section("Board", "Kept on this machine: how a project's Board starts until it is set there.", boardDefaults()),
-    section("SCM connections", "GitLab and Forgejo servers whose merge requests agents can work with. Kept on this machine in scm.toml, readable only by you; a token goes in but never comes back to this page.", scmConnections()),
+    section("SCM connections", "GitLab, Forgejo and GitHub servers whose merge requests agents can work with. Kept on this machine in scm.toml, readable only by you; a token goes in but never comes back to this page.", scmConnections()),
     section("Developer telemetry", "Anonymous, aggregated numbers for the harness developer: how well harness serves agents. Never code, paths, queries or names.", tel),
     section("C# sessions (graphify-csharp)", "Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone.",
       graphifySessions(null)),
@@ -2175,7 +2175,7 @@ function boardDefaults() {
 // scmConnections lists this machine's SCM connections (scm.toml) with add,
 // edit, remove and a connection test; tokens are only ever shown masked
 // (from the C# rewrite: TASK-0126).
-const SCM_TYPES = { gitlab: "GitLab", forgejo: "Forgejo" };
+const SCM_TYPES = { gitlab: "GitLab", forgejo: "Forgejo", github: "GitHub" };
 const SCM_FAILURES = { unreachable: "Unreachable", tls: "TLS failed", unauthorized: "Token rejected", forbidden: "Not permitted",
   not_found: "Not found", wrong_server: "Wrong server type", invalid: "Refused", rate_limited: "Rate limited", server: "Server error" };
 function scmTestLine(t) {
@@ -2218,7 +2218,7 @@ function scmConnections() {
   const draw = (r) => fill(box,
     (r.scm || []).length
       ? h("ul", { class: "scmlist card" }, r.scm.map(row))
-      : emptyState("inbox", "No SCM yet", "Add a GitLab or Forgejo server with an access token to let agents read and review its merge requests."),
+      : emptyState("inbox", "No SCM yet", "Add a GitLab, Forgejo or GitHub server with an access token to let agents read and review its merge requests."),
     h("div", { class: "scmfoot" }, add, r.file && h("span", { class: "muted small" }, "Stored in ", h("code", { title: r.file }, r.file))));
   load();
   return box;
@@ -2226,7 +2226,7 @@ function scmConnections() {
 // scmForm adds an SCM, or edits one (an empty token keeps the stored one);
 // its test checks the values as typed, before they are saved.
 function scmForm(entry, reload) {
-  const dlg = dialog({ title: entry ? `Edit SCM ${entry.name}` : "Add an SCM", sub: "GitLab (API v4) or Forgejo (API v1), authenticated with an access token." });
+  const dlg = dialog({ title: entry ? `Edit SCM ${entry.name}` : "Add an SCM", sub: "GitLab (API v4), Forgejo (API v1) or GitHub (REST API), authenticated with an access token." });
   const name = h("input", { type: "text", value: entry ? entry.name : "", autocomplete: "off", spellcheck: "false", "aria-label": "Name" });
   const type = h("select", { "aria-label": "Type" },
     !entry && h("option", { value: "", selected: true, disabled: true }, "Choose a type"),
@@ -2252,8 +2252,8 @@ function scmForm(entry, reload) {
   dlg.set(null, [
     field("Name", name, "How projects and the CLI refer to it: letters, digits, '-', '_' or '.'."),
     field("Type", type),
-    field("URL", url, "The server's base address; an instance under a path keeps it (https://host/gitlab)."),
-    field("Token", token, entry ? "Leave empty to keep the stored token." : "A personal or project access token with API access (GitLab: api)."),
+    field("URL", url, "The server's base address; an instance under a path keeps it (https://host/gitlab). GitHub: https://github.com or the Enterprise Server's address."),
+    field("Token", token, entry ? "Leave empty to keep the stored token." : "A personal or project access token with API access (GitLab: api; GitHub: pull requests read and write)."),
     result, err,
   ], [h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Cancel"), test, save]);
 }

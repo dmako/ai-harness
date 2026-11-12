@@ -10,7 +10,7 @@ public sealed partial class HarnessStateSession : IScmSession
     public IScmConfiguration ScmConfiguration =>
         ScmConfigurationFile.ForGlobal(globalConfigurationPath ?? ConfigurationPaths.GlobalPath());
 
-    /// <summary>The SCM providers, supplied by the host (the CLI composes GitLab and Forgejo).</summary>
+    /// <summary>The SCM providers, supplied by the host (the CLI composes GitLab, Forgejo and GitHub).</summary>
     public ScmProviderRegistry? ScmProviders { get; init; }
 
     /// <summary>

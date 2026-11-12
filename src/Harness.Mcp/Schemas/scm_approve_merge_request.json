@@ -1,11 +1,11 @@
 {
-  "description": "Approve a merge request as the token's user (GitLab approval, Forgejo approving review). Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "description": "Approve a merge request as the token's user (GitLab approval, Forgejo or GitHub approving review). Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
   "inputSchema": {
     "type": "object",
     "properties": {
       "merge_request_id": {
         "type": "integer",
-        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo pull request #index)"
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo or GitHub pull request #number)"
       }
     },
     "required": [

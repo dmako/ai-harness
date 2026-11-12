@@ -1,7 +1,7 @@
 namespace Harness.Scm;
 
 /// <summary>A remote matched to a configured SCM, with the API's identifier of the project.</summary>
-/// <param name="Project">The project's full path: group/sub/repo (GitLab) or owner/repo (Forgejo).</param>
+/// <param name="Project">The project's full path: group/sub/repo (GitLab) or owner/repo (Forgejo, GitHub).</param>
 public sealed record ScmMatch(ScmEndpoint Endpoint, string Project, ScmRemoteUrl Remote);
 
 public enum ScmMatchStatus
@@ -24,7 +24,7 @@ public sealed record ScmMatchResult(
 /// for http(s) remotes the port must match too, while ssh and git remotes may use any port and user. The SCM's base
 /// path (an instance under https://host/gitlab) must prefix an http(s) remote's path; an ssh remote may include it or
 /// not. Of the matching SCMs the one with the longest base path wins; equally long ones are ambiguous. The rest of
-/// the path is the project: at least namespace/repo on GitLab, exactly owner/repo on Forgejo.
+/// the path is the project: at least namespace/repo on GitLab, exactly owner/repo on Forgejo and GitHub.
 /// </summary>
 public static class ScmMatcher
 {
@@ -113,7 +113,7 @@ public static class ScmMatcher
         var valid = endpoint.Kind switch
         {
             ScmKind.Gitlab => rest.Count >= 2,
-            ScmKind.Forgejo => rest.Count == 2,
+            ScmKind.Forgejo or ScmKind.Github => rest.Count == 2,
             _ => false,
         };
         if (!valid)

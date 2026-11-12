@@ -59,7 +59,7 @@
             },
             "path": {
               "type": "string",
-              "description": "group/sub/repo (GitLab) or owner/repo (Forgejo)"
+              "description": "group/sub/repo (GitLab) or owner/repo (Forgejo, GitHub)"
             },
             "name": {
               "type": "string"
