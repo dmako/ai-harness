@@ -90,6 +90,25 @@ local paths and `file://` are not remotes.
 5. of the SCMs that match, the one with the longest base path wins; equally
    long matches are reported as ambiguous instead of guessed.
 
+An SCM may also have aliases (`ScmEndpoint.Aliases`, parsed by `ScmAlias`):
+other host names or base URLs under which its server is reached, for
+repositories cloned through an alias FQDN, a proxy path or an SSH host alias
+from `~/.ssh/config` while the connection's `url` is the canonical API address.
+Aliases only match remotes; API calls always go to the `url`. Each alias is
+scored like the URL, and the SCM takes its best score:
+
+- a host name alone (`ssh-alias`, `git-alias.example.com`) matches that host
+  over every protocol and port, with the URL's base path, as in rules 2-3;
+- an `https://` or `http://` base URL matches like the URL does, its own path
+  standing for the URL's base path (`https://proxy.example.com/scm` serves
+  `https://proxy.example.com/scm/group/repo` as project `group/repo`);
+- an `ssh://[user@]host[:port][/prefix]` base URL matches only ssh and git
+  remotes, on its port when it names one, and its path prefix is required.
+
+Aliases are normalised (lower-case host and scheme, no default port, no user,
+no trailing slash). An alias that two SCMs share makes the remote ambiguous
+like any other equal match, so it is never chosen silently.
+
 A result without a match carries the reason (the remote's host and path and the
 SCMs configured), so callers can tell the user what to change.
 
@@ -99,11 +118,19 @@ SCM connections are machine-wide: `IScmConfiguration` (in Harness.Scm) lists,
 finds, adds, updates and removes them, and `ScmConfigurationFile`
 (Infrastructure, `src/Harness.Infrastructure/Scm`) implements it over
 `scm.toml` beside the global `config.toml`, one `[scm.<name>]` table per SCM
-with `type`, `url` and `token_protected` (the token encrypted) or `token_env`.
+with `type`, `url`, optional `aliases` (an array of strings) and
+`token_protected` (the token encrypted) or `token_env`. A file without
+`aliases` reads as before.
 `ScmEntryRules` validates
 names (1-64 letters, digits, `-`, `_`, `.`; unique ignoring case), types,
-base URLs, tokens and variable names, and failures throw
-`ScmConfigurationException`.
+base URLs, aliases (each a host name or an http(s)/ssh base URL without query,
+fragment or web password, none twice and none the SCM's own URL or its URL's
+host), tokens and variable names, and failures throw
+`ScmConfigurationException`. Aliases are checked on every add, update (against
+the URL as changed) and read; `UpdateAliasesAsync(name, edit)` changes them under
+the file lock for `harness scm alias add|set|remove` (`ScmAliasEdits`), and
+`ScmEntryChange.Aliases` replaces them all (harness ui). A rename keeps them
+and removing the SCM removes them.
 
 Entries come back as `ScmEntry`: endpoint, token source and the token masked,
 plus whether a stored token is still unencrypted (`PlainText`) or cannot be
@@ -359,7 +386,11 @@ text) show the resolution once an SCM is configured.
 
 Machine › SCM connections lists, adds, edits, removes and tests the machine's
 SCMs through `/api/scm` (see [web](web.md)); the last test of each saved SCM
-is kept while harness ui runs. `ScmProviders` (Cli) holds the provider registry
+is kept while harness ui runs. Each row lists the SCM's aliases, and the add/edit
+dialog edits them as a list of rows (add, change, delete); the dialog sends
+them as `aliases` (an array) to `POST /api/scm` and `/api/scm/{name}/edit`,
+where the store validates them like the CLI, and a refusal is shown in the
+dialog. `ScmProviders` (Cli) holds the provider registry
 and the connection test the UI, `harness scm test` and doctor share, with a
 15 s request timeout so a dead server does not hold a page.
 

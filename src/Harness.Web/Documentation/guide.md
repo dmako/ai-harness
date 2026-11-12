@@ -288,6 +288,11 @@ on every call instead of storing it). The type is always given. `harness scm
 list` shows the connections with tokens masked, `harness scm set` changes one
 and `harness scm remove` drops it. harness ui has the same under Machine › SCM
 connections, where the token is a password field that is never shown again.
+If your repositories are cloned from another name for the same server (an alias
+host name, a proxy path, an SSH host alias from `~/.ssh/config`), add it as an
+alias so their remotes still find the connection: `harness scm alias add work
+ssh-alias` (or `https://git-alias.example.com`), or in the SCM's dialog in
+harness ui. Aliases only match remotes; harness always calls the URL.
 Both store them in `scm.toml` beside the global `config.toml`, written so that
 only you can read it, with each stored token encrypted by keys in `scm-keys/`
 next to it: keep the two together in backups and on other machines (see the

@@ -185,4 +185,88 @@ public sealed class ScmCliTests : IDisposable
         var verbs = await RunAsync("", "__complete", "bash", "scm", "");
         verbs.Output.Should().Contain("list").And.Contain("add").And.Contain("set").And.Contain("remove");
     }
+
+    private async Task AddWorkAsync()
+    {
+        var add = await RunAsync(
+            Secret + "\n",
+            "scm",
+            "add",
+            "work",
+            "--type",
+            "gitlab",
+            "--url",
+            "https://gitlab.example.com",
+            "--token-stdin"
+        );
+        add.Code.Should().Be(0, add.Error);
+    }
+
+    [Fact]
+    public async Task AliasCommandsAddReplaceListAndRemoveNormalisedAliases()
+    {
+        await AddWorkAsync();
+
+        var empty = await RunAsync("", "scm", "alias", "list", "work");
+        empty.Code.Should().Be(0, empty.Error);
+        empty.Output.Should().Contain("SCM work has no alias");
+
+        var add = await RunAsync("", "scm", "alias", "add", "work", "https://Git-Alias.example.com/");
+        add.Code.Should().Be(0, add.Error);
+        add.Output.Should().Contain("Added an alias of SCM work.").And.Contain("https://git-alias.example.com");
+        (await RunAsync("", "scm", "alias", "add", "WORK", "SSH-Alias")).Code.Should().Be(0);
+
+        var list = await RunAsync("", "scm", "alias", "list", "work");
+        list.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Should()
+            .Equal("https://git-alias.example.com", "ssh-alias");
+
+        var set = await RunAsync("", "scm", "alias", "set", "work", "ssh-alias", "ssh://git@ssh-alias:2222");
+        set.Code.Should().Be(0, set.Error);
+        var json = JsonNode.Parse((await RunAsync("", "scm", "alias", "list", "work", "--json")).Output)!;
+        json["aliases"]!
+            .AsArray()
+            .Select(node => node!.GetValue<string>())
+            .Should()
+            .Equal("https://git-alias.example.com", "ssh://ssh-alias:2222");
+
+        var scmList = await RunAsync("", "scm", "list");
+        scmList.Output.Should().Contain("aliases: https://git-alias.example.com, ssh://ssh-alias:2222");
+        scmList.Output.Should().NotContain(Secret);
+        var scmJson = JsonNode.Parse((await RunAsync("", "scm", "list", "--json")).Output)!["scm"]![0]!;
+        scmJson["aliases"]!.AsArray().Should().HaveCount(2);
+
+        var remove = await RunAsync("", "scm", "alias", "remove", "work", "HTTPS://git-alias.example.com");
+        remove.Code.Should().Be(0, remove.Error);
+        (await RunAsync("", "scm", "alias", "list", "work")).Output.Trim().Should().Be("ssh://ssh-alias:2222");
+
+        // a rename keeps them
+        (await RunAsync("", "scm", "set", "work", "--rename", "corp"))
+            .Code.Should()
+            .Be(0);
+        (await RunAsync("", "scm", "alias", "list", "corp")).Output.Trim().Should().Be("ssh://ssh-alias:2222");
+    }
+
+    [Theory]
+    [InlineData(new[] { "list", "nope" }, "No SCM is named 'nope'")]
+    [InlineData(new[] { "add", "nope", "alias-host" }, "No SCM is named 'nope'")]
+    [InlineData(new[] { "add", "work", "ssh-alias" }, "already an alias")]
+    [InlineData(new[] { "add", "work", "https://gitlab.example.com/" }, "own URL")]
+    [InlineData(new[] { "add", "work", "ftp://elsewhere" }, "not an alias URL")]
+    [InlineData(new[] { "add", "work", "https://me:secret-pw@alias.example.com" }, "user name or password")]
+    [InlineData(new[] { "set", "work", "unknown-alias", "other-alias" }, "'unknown-alias' is not an alias")]
+    [InlineData(new[] { "set", "work", "ssh-alias", "gitlab.example.com" }, "own URL host")]
+    [InlineData(new[] { "remove", "work", "unknown-alias" }, "'unknown-alias' is not an alias")]
+    public async Task AliasFailuresGoToStderrWithExitOne(string[] args, string message)
+    {
+        await AddWorkAsync();
+        (await RunAsync("", "scm", "alias", "add", "work", "ssh-alias")).Code.Should().Be(0);
+
+        var result = await RunAsync("", ["scm", "alias", .. args]);
+
+        result.Code.Should().Be(1);
+        result.Error.Should().Contain("harness scm alias " + args[0] + ":").And.Contain(message);
+        result.Error.Should().NotContain("secret-pw").And.NotContain(Secret);
+        (await RunAsync("", "scm", "alias", "list", "work")).Output.Trim().Should().Be("ssh-alias");
+    }
 }

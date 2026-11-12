@@ -20,11 +20,13 @@ public sealed record ScmMatchResult(
 );
 
 /// <summary>
-/// Maps a git remote URL to a configured SCM. An SCM matches when its host equals the remote's (case-insensitive);
-/// for http(s) remotes the port must match too, while ssh and git remotes may use any port and user. The SCM's base
-/// path (an instance under https://host/gitlab) must prefix an http(s) remote's path; an ssh remote may include it or
-/// not. Of the matching SCMs the one with the longest base path wins; equally long ones are ambiguous. The rest of
-/// the path is the project: at least namespace/repo on GitLab, exactly owner/repo on Forgejo and GitHub.
+/// Maps a git remote URL to a configured SCM. An SCM matches when its URL's host equals the remote's
+/// (case-insensitive), or one of its <see cref="ScmAlias" />es serves it; for http(s) remotes the port must match
+/// too, while ssh and git remotes may use any port and user. The SCM's base path (an instance under
+/// https://host/gitlab), or a URL alias's own path, must prefix an http(s) remote's path; an ssh remote may include
+/// it or not. Of the matching SCMs the one with the longest base path wins; equally long ones are ambiguous, an alias
+/// that two SCMs share included. The rest of the path is the project: at least namespace/repo on GitLab, exactly
+/// owner/repo on Forgejo and GitHub.
 /// </summary>
 public static class ScmMatcher
 {
@@ -60,7 +62,7 @@ public static class ScmMatcher
                 [],
                 $"No configured SCM serves {remote.Host}{(remote.IsHttp && remote.Port is not null ? ":" + remote.Port : "")} "
                     + $"with a project path like '{string.Join('/', remote.Path)}' (configured: "
-                    + string.Join(", ", configured.Select(endpoint => $"{endpoint.Name} {endpoint.BaseUrl}"))
+                    + string.Join(", ", configured.Select(Describe))
                     + ")."
             );
         }
@@ -84,34 +86,83 @@ public static class ScmMatcher
         return new ScmMatchResult(ScmMatchStatus.Matched, new ScmMatch(endpoint, project, remote), [endpoint], "");
     }
 
-    /// <summary>The length of the base path that matched, or -1 when the endpoint does not serve the remote.</summary>
+    /// <summary>An SCM as a no-match reason names it: its name and URL, and its aliases if it has any.</summary>
+    private static string Describe(ScmEndpoint endpoint) =>
+        $"{endpoint.Name} {endpoint.BaseUrl}"
+        + (endpoint.Aliases.Count is 0 ? "" : $" (aliases {string.Join(", ", endpoint.Aliases)})");
+
+    /// <summary>
+    /// The length of the base path that matched, through the SCM's URL or the best of its aliases, or -1 when the
+    /// endpoint does not serve the remote.
+    /// </summary>
     private static int Score(ScmEndpoint endpoint, ScmRemoteUrl remote, out string project)
     {
         project = "";
-        if (!string.Equals(endpoint.BaseUrl.Host, remote.Host, StringComparison.OrdinalIgnoreCase))
+        var best = -1;
+        var url = endpoint.BaseUrl;
+        IEnumerable<Base> bases =
+        [
+            new(url.Scheme, url.Host, url.Port, endpoint.BasePath),
+            .. endpoint.Aliases.Select(alias =>
+                alias.IsHost
+                    ? new Base(null, alias.Host, null, endpoint.BasePath)
+                    : new Base(alias.Scheme, alias.Host, alias.Port, alias.Path)
+            ),
+        ];
+        foreach (var candidate in bases)
+        {
+            var score = Score(endpoint.Kind, candidate, remote, out var found);
+            if (score > best)
+            {
+                (best, project) = (score, found);
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Whether one address of an SCM serves the remote. The host must be the remote's. An http(s) remote needs a web
+    /// base on its port and its base path as a prefix; an ssh or git remote may use any port and user (an ssh://
+    /// alias's explicit port aside) and may leave a web base's path out, while an ssh:// alias's path is required. A
+    /// host name alone serves every protocol and port.
+    /// </summary>
+    private static int Score(ScmKind kind, Base candidate, ScmRemoteUrl remote, out string project)
+    {
+        project = "";
+        if (!string.Equals(candidate.Host, remote.Host, StringComparison.OrdinalIgnoreCase))
         {
             return -1;
         }
 
-        if (remote.IsHttp && endpoint.BaseUrl.Port != remote.EffectivePort)
+        var webBase = candidate.Scheme is "http" or "https";
+        var sshBase = candidate.Scheme is "ssh";
+        var reachable = (remote.IsHttp, candidate.Scheme) switch
+        {
+            (_, null) => true,
+            (true, _) => webBase && candidate.EffectivePort == remote.EffectivePort,
+            (false, "ssh") => candidate.Port is null || candidate.Port == remote.EffectivePort,
+            _ => true,
+        };
+        if (!reachable)
         {
             return -1;
         }
 
-        var basePath = endpoint.BasePath;
+        var basePath = candidate.Path;
         var prefixed =
             remote.Path.Count > basePath.Count
             && basePath
                 .Select((segment, index) => (segment, index))
                 .All(pair => string.Equals(pair.segment, remote.Path[pair.index], StringComparison.OrdinalIgnoreCase));
         var skip = prefixed ? basePath.Count : 0;
-        if (!prefixed && remote.IsHttp && basePath.Count > 0)
+        if (!prefixed && basePath.Count > 0 && (remote.IsHttp || sshBase))
         {
             return -1;
         }
 
         var rest = remote.Path.Skip(skip).ToList();
-        var valid = endpoint.Kind switch
+        var valid = kind switch
         {
             ScmKind.Gitlab => rest.Count >= 2,
             ScmKind.Forgejo or ScmKind.Github => rest.Count == 2,
@@ -124,5 +175,20 @@ public static class ScmMatcher
 
         project = string.Join('/', rest);
         return skip;
+    }
+
+    /// <summary>One address an SCM is reached under: its URL, or an alias.</summary>
+    /// <param name="Scheme">http, https or ssh; null for a host name alone.</param>
+    /// <param name="Port">The port; null for the scheme's default (or any, for ssh and a host alone).</param>
+    private sealed record Base(string? Scheme, string Host, int? Port, IReadOnlyList<string> Path)
+    {
+        public int EffectivePort =>
+            Port
+            ?? Scheme switch
+            {
+                "https" => 443,
+                "http" => 80,
+                _ => 22,
+            };
     }
 }

@@ -32,6 +32,40 @@ internal static class ScmBindings
         return result => new ScmNameSettings { Json = result.GetValue(json), Name = result.GetValue(name) ?? "" };
     }
 
+    /// <summary>'harness scm alias add|remove &lt;name&gt; &lt;url&gt;'.</summary>
+    internal static Func<ParseResult, ScmAliasSettings> BindAlias(Command command)
+    {
+        var json = Json(command);
+        var name = Name(command);
+        var alias = AliasArgument(
+            command,
+            "url",
+            "The alias: a host name or a base URL (https://host[/prefix], ssh://host)"
+        );
+        return result => new ScmAliasSettings
+        {
+            Json = result.GetValue(json),
+            Name = result.GetValue(name) ?? "",
+            Alias = result.GetValue(alias) ?? "",
+        };
+    }
+
+    /// <summary>'harness scm alias set &lt;name&gt; &lt;old&gt; &lt;new&gt;'.</summary>
+    internal static Func<ParseResult, ScmAliasSettings> BindAliasSet(Command command)
+    {
+        var json = Json(command);
+        var name = Name(command);
+        var old = AliasArgument(command, "old", "The alias to replace");
+        var replacement = AliasArgument(command, "new", "The alias that replaces it");
+        return result => new ScmAliasSettings
+        {
+            Json = result.GetValue(json),
+            Name = result.GetValue(name) ?? "",
+            Alias = result.GetValue(old) ?? "",
+            Replacement = result.GetValue(replacement) ?? "",
+        };
+    }
+
     internal static Func<ParseResult, ScmTokenSettings> BindAdd(Command command)
     {
         var json = Json(command);
@@ -143,6 +177,13 @@ internal static class ScmBindings
             Arity = ArgumentArity.ExactlyOne,
             Description = "The SCM's name",
         };
+        command.Arguments.Add(argument);
+        return argument;
+    }
+
+    private static Argument<string> AliasArgument(Command command, string name, string description)
+    {
+        var argument = new Argument<string>(name) { Arity = ArgumentArity.ExactlyOne, Description = description };
         command.Arguments.Add(argument);
         return argument;
     }

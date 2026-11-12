@@ -2206,6 +2206,8 @@ function scmConnections() {
       h("div", { class: "scmmain" },
         h("div", { class: "scmname" }, h("b", {}, e.name), h("span", { class: "pill" }, SCM_TYPES[e.type] || e.type)),
         h("code", { class: "scmurl", title: e.url }, e.url),
+        (e.aliases || []).length > 0 && h("div", { class: "scmaliases", "data-scm-aliases": "" },
+          h("span", { class: "muted small" }, "Also cloned from"), e.aliases.map((a) => h("code", { title: a }, a))),
         h("span", { class: "muted small" }, token),
         result),
       h("div", { class: "scmacts" }, test,
@@ -2224,6 +2226,21 @@ function scmConnections() {
   load();
   return box;
 }
+// scmAliasEditor edits an SCM's aliases in its dialog: a row per alias with
+// its own remove button, and one to add a row; the server validates them
+// (from the C# rewrite: TASK-0134).
+function scmAliasEditor(aliases) {
+  const list = h("ul", { class: "scmaliasedit" });
+  const addRow = (value) => {
+    const input = h("input", { type: "text", value, spellcheck: "false", autocomplete: "off", placeholder: "https://git-alias.example.com or ssh-alias", "aria-label": "Alias" });
+    const li = h("li", {}, input, iconButton("trash", "Remove alias", () => { li.remove(); }));
+    list.append(li);
+    return input;
+  };
+  (aliases || []).forEach(addRow);
+  const add = h("button", { type: "button", class: "ghost", onclick: () => addRow("").focus() }, icon("plus"), " Add alias");
+  return { node: h("div", { class: "scmaliasbox" }, list, add), values: () => [...list.querySelectorAll("input")].map((i) => i.value.trim()).filter(Boolean) };
+}
 // scmForm adds an SCM, or edits one (an empty token keeps the stored one);
 // its test checks the values as typed, before they are saved.
 function scmForm(entry, reload) {
@@ -2234,6 +2251,7 @@ function scmForm(entry, reload) {
     Object.entries(SCM_TYPES).map(([v, t]) => h("option", { value: v, selected: entry ? entry.type === v : false }, t)));
   const url = h("input", { type: "url", value: entry ? entry.url : "", placeholder: "https://gitlab.example.com", spellcheck: "false", "aria-label": "URL" });
   const token = h("input", { type: "password", autocomplete: "new-password", placeholder: entry ? "(unchanged)" : "", "aria-label": "Token" });
+  const aliases = scmAliasEditor(entry ? entry.aliases : []);
   const result = h("div", { class: "scmresult" });
   const err = h("p", { class: "error", hidden: true });
   const values = () => ({ name: name.value.trim(), type: type.value, url: url.value.trim(), token: token.value.trim() });
@@ -2246,7 +2264,7 @@ function scmForm(entry, reload) {
   const save = h("button", { type: "button", onclick: async () => {
     save.disabled = true; err.hidden = true;
     try {
-      await post(entry ? `/api/scm/${encodeURIComponent(entry.name)}/edit` : "/api/scm", values());
+      await post(entry ? `/api/scm/${encodeURIComponent(entry.name)}/edit` : "/api/scm", { ...values(), aliases: aliases.values() });
       dlg.close(); toast(entry ? `SCM ${values().name || entry.name} saved` : `SCM ${values().name} added`); reload();
     } catch (e) { err.textContent = e.message; err.hidden = false; save.disabled = false; }
   } }, entry ? "Save" : "Add SCM");
@@ -2255,6 +2273,7 @@ function scmForm(entry, reload) {
     field("Type", type),
     field("URL", url, "The server's base address; an instance under a path keeps it (https://host/gitlab). GitHub: https://github.com or the Enterprise Server's address."),
     field("Token", token, entry ? "Leave empty to keep the stored token." : "A personal or project access token with API access (GitLab: api; GitHub: pull requests read and write)."),
+    field("Aliases", aliases.node, "Other host names or base URLs this server's repositories are cloned from (an alias FQDN, an SSH host alias, https://host/prefix). They only match remotes; API calls use the URL above."),
     result, err,
   ], [h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Cancel"), test, save]);
 }

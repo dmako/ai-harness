@@ -230,4 +230,141 @@ public sealed class ScmConfigurationFileTests : IDisposable
         Store().Inspect().OwnerOnly.Should().BeTrue();
         Directory.GetFiles(_directory, "*.tmp").Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task AliasesAreStoredNormalisedBesideTheOtherFieldsAndKeptByLaterWrites()
+    {
+        var store = Store();
+        var added = await store.AddAsync(
+            new ScmEntryInput(
+                "work",
+                "gitlab",
+                "https://gitlab.example.com",
+                Secret,
+                null,
+                ["https://Git-Alias.example.com/", " SSH-Alias "]
+            ),
+            Token
+        );
+        added.Endpoint.Aliases.Select(alias => alias.Text).Should().Equal("https://git-alias.example.com", "ssh-alias");
+
+        var text = await File.ReadAllTextAsync(FilePath, Token);
+        text.Should()
+            .Contain("aliases = [\"https://git-alias.example.com\", \"ssh-alias\"]")
+            .And.Contain("token_protected")
+            .And.NotContain(Secret);
+
+        // a write that does not touch them keeps them, and a rename takes them along
+        await store.UpdateAsync("work", new ScmEntryChange(Type: "gitlab", Rename: "corp"), Token);
+        var renamed = Store().Find("corp")!;
+        renamed
+            .Endpoint.Aliases.Select(alias => alias.Text)
+            .Should()
+            .Equal("https://git-alias.example.com", "ssh-alias");
+        Store().Resolve("corp").Token.Should().Be(Secret);
+        Store().Resolve("corp").Endpoint.Aliases.Should().HaveCount(2);
+
+        var edited = await store.UpdateAliasesAsync(
+            "CORP",
+            aliases => ScmAliasEdits.Replace(aliases, "SSH-ALIAS", "ssh://git@ssh-alias:2222"),
+            Token
+        );
+        edited
+            .Endpoint.Aliases.Select(alias => alias.Text)
+            .Should()
+            .Equal("https://git-alias.example.com", "ssh://ssh-alias:2222");
+
+        var cleared = await store.UpdateAsync("corp", new ScmEntryChange(Aliases: []), Token);
+        cleared.Endpoint.Aliases.Should().BeEmpty();
+        (await File.ReadAllTextAsync(FilePath, Token)).Should().NotContain("aliases");
+
+        await store.UpdateAsync("corp", new ScmEntryChange(Aliases: ["ssh-alias"]), Token);
+        (await store.RemoveAsync("corp", Token)).Should().BeTrue();
+        (await File.ReadAllTextAsync(FilePath, Token)).Should().NotContain("ssh-alias");
+    }
+
+    [Theory]
+    [InlineData(new[] { "ssh-alias", "SSH-ALIAS" }, "already an alias")]
+    [InlineData(new[] { "https://gitlab.example.com/" }, "own URL")]
+    [InlineData(new[] { "gitlab.example.com" }, "own URL host")]
+    [InlineData(new[] { "ftp://elsewhere" }, "not an alias URL")]
+    public async Task InvalidAliasesAreRefusedAndNothingIsWritten(string[] aliases, string message)
+    {
+        var add = () =>
+            Store()
+                .AddAsync(
+                    new ScmEntryInput("work", "gitlab", "https://gitlab.example.com", Secret, null, aliases),
+                    Token
+                );
+
+        (await add.Should().ThrowAsync<ScmConfigurationException>()).Which.Message.Should().Contain(message);
+        File.Exists(FilePath).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ANewUrlCannotEqualAKeptAliasAndUnknownAliasesAreReported()
+    {
+        var store = Store();
+        await store.AddAsync(
+            new ScmEntryInput(
+                "work",
+                "gitlab",
+                "https://gitlab.example.com",
+                Secret,
+                null,
+                ["https://alias.example.com"]
+            ),
+            Token
+        );
+
+        var retarget = () => store.UpdateAsync("work", new ScmEntryChange(Address: "https://alias.example.com"), Token);
+        (await retarget.Should().ThrowAsync<ScmConfigurationException>()).Which.Message.Should().Contain("own URL");
+
+        var unknown = () => store.UpdateAliasesAsync("work", aliases => ScmAliasEdits.Remove(aliases, "other"), Token);
+        (await unknown.Should().ThrowAsync<ScmConfigurationException>())
+            .Which.Message.Should()
+            .Contain("'other' is not an alias")
+            .And.Contain("https://alias.example.com");
+
+        var missing = () => store.UpdateAliasesAsync("zeta", aliases => ScmAliasEdits.Add(aliases, "x"), Token);
+        await missing.Should().ThrowAsync<ScmConfigurationException>().WithMessage("No SCM is named 'zeta'.");
+    }
+
+    [Fact]
+    public async Task FilesWithoutAliasesReadAsBeforeAndMalformedAliasesAreReported()
+    {
+        await WriteEntryAsync(
+            """
+            token_env = "A_TOKEN"
+            """
+        );
+        Store().Find("a")!.Endpoint.Aliases.Should().BeEmpty();
+
+        await WriteEntryAsync(
+            """
+            aliases = "b"
+            """
+        );
+        Store().Inspect().Error.Should().Contain("'aliases' must be an array of strings");
+
+        await WriteEntryAsync(
+            """
+            aliases = ["ftp://b"]
+            """
+        );
+        Store().Inspect().Error.Should().Contain("[scm.a]").And.Contain("not an alias URL");
+    }
+
+    private Task WriteEntryAsync(string line) =>
+        File.WriteAllTextAsync(
+            FilePath,
+            $"""
+            [scm.a]
+            type = "gitlab"
+            url = "https://a.example.com"
+            {line}
+
+            """,
+            Token
+        );
 }

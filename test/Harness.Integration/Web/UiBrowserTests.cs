@@ -2428,6 +2428,96 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     /// <summary>
+    /// Machine › SCM connections lists a connection's aliases (TASK-0134), and its edit dialog adds, edits and deletes
+    /// them; the server normalises them, and a duplicate is refused with the error shown in the dialog.
+    /// </summary>
+    [Fact]
+    public async Task MachineScmDialogAddsEditsAndDeletesAliases()
+    {
+        const string Secret = "glpat-alias-token-0123456789";
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var file = Path.Combine(fixture.Global, "scm.toml");
+        await new Harness.Infrastructure.Scm.ScmConfigurationFile(file).AddAsync(
+            new Harness.Scm.ScmEntryInput("work", "gitlab", "https://gitlab.example.com", Secret, null, ["ssh-alias"]),
+            Token
+        );
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var root = server.Client.BaseAddress!.ToString().TrimEnd('/');
+                await page.CommandAsync("Page.navigate", new { url = root + "/#/machine" });
+                await page.WaitAsync(
+                    "document.querySelector('.scmrow[data-scm=work] [data-scm-aliases]')?.textContent.includes('ssh-alias')"
+                );
+
+                async Task Click(string scope, string text) =>
+                    await page.EvaluateAsync(
+                        $"[...document.querySelectorAll('{scope} button')].find(b => b.textContent.trim() === '{text}').click()"
+                    );
+                async Task FillAlias(int index, string value) =>
+                    await page.EvaluateAsync(
+                        $"document.querySelectorAll('dialog[open] input[aria-label=Alias]')[{index}].value = '{value}'"
+                    );
+                async Task RemoveAlias(int index) =>
+                    await page.EvaluateAsync(
+                        $"document.querySelectorAll('dialog[open] button[aria-label=\"Remove alias\"]')[{index}].click()"
+                    );
+                const string Aliases =
+                    "[...document.querySelectorAll('dialog[open] input[aria-label=Alias]')].map(i => i.value).join(' ')";
+
+                // edit one alias and add another; the server stores them normalised
+                await page.EvaluateAsync("document.querySelector('button[aria-label=\"Edit SCM work\"]').click()");
+                await page.WaitAsync($"{Aliases} === 'ssh-alias'");
+                await FillAlias(0, "ssh://git@ssh-alias:2222");
+                await Click("dialog[open]", "Add alias");
+                await page.WaitAsync("document.querySelectorAll('dialog[open] input[aria-label=Alias]').length === 2");
+                await FillAlias(1, "https://Git-Alias.example.com/");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync(
+                    "!document.querySelector('dialog[open]') && document.querySelector('.scmrow[data-scm=work] [data-scm-aliases]')?.textContent.includes('https://git-alias.example.com')"
+                );
+                (await ValueAsync(page, "document.querySelector('.scmrow[data-scm=work]').textContent"))
+                    .Should()
+                    .Contain("ssh://ssh-alias:2222")
+                    .And.NotContain(Secret);
+                (await File.ReadAllTextAsync(file, Token))
+                    .Should()
+                    .Contain("aliases = [\"ssh://ssh-alias:2222\", \"https://git-alias.example.com\"]")
+                    .And.Contain("token_protected");
+
+                // a duplicate is refused by the server and shown in the dialog
+                await page.EvaluateAsync("document.querySelector('button[aria-label=\"Edit SCM work\"]').click()");
+                await page.WaitAsync($"{Aliases} === 'ssh://ssh-alias:2222 https://git-alias.example.com'");
+                await Click("dialog[open]", "Add alias");
+                await FillAlias(2, "SSH://ssh-alias:2222/");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync(
+                    "document.querySelector('dialog[open] p.error:not([hidden])')?.textContent.includes('already an alias')"
+                );
+
+                // delete the duplicate and the first alias; the one left is saved
+                await RemoveAlias(2);
+                await RemoveAlias(0);
+                await page.WaitAsync($"{Aliases} === 'https://git-alias.example.com'");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync("!document.querySelector('dialog[open]')");
+                var scm = new Harness.Infrastructure.Scm.ScmConfigurationFile(file);
+                scm.Find("work")!
+                    .Endpoint.Aliases.Select(alias => alias.Text)
+                    .Should()
+                    .Equal("https://git-alias.example.com");
+                scm.Resolve("work").Token.Should().Be(Secret);
+                await page.WaitAsync(
+                    "!document.querySelector('.scmrow[data-scm=work] [data-scm-aliases]')?.textContent.includes('ssh-alias')"
+                );
+            }
+        );
+    }
+
+    /// <summary>
     /// Agents › Tools &amp; providers › Used here shows the project's SCM (TASK-0132): two connections serve its server,
     /// so it asks for a choice; choosing one keeps it on this machine, Test checks the connection and the project, and
     /// the scm_ calls agents made are counted.

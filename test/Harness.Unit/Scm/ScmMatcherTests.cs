@@ -191,4 +191,123 @@ public sealed class ScmMatcherTests
     [InlineData("https://user:pw@host")]
     public void BaseUrlsMustBePlainHttpAddresses(string input) =>
         ScmEndpoint.TryNormalizeUrl(input, out _, out var error).Should().BeFalse(error);
+
+    private static ScmEndpoint Aliased(string name, ScmKind kind, string url, params string[] aliases)
+    {
+        var endpoint = Endpoint(name, kind, url);
+        return endpoint with { Aliases = ScmEntryRules.Aliases(aliases, endpoint.BaseUrl) };
+    }
+
+    [Theory]
+    [InlineData("https://git-alias.example.com/group/sub/repo.git", "group/sub/repo")]
+    [InlineData("git@git-alias.example.com:group/repo.git", "group/repo")]
+    [InlineData("ssh://git@git-alias.example.com:2222/group/repo.git", "group/repo")]
+    [InlineData("git@ssh-alias:group/repo.git", "group/repo")]
+    [InlineData("ssh://ssh-alias/group/repo", "group/repo")]
+    [InlineData("https://ssh-alias/gitlab/group/repo", "group/repo")]
+    [InlineData("https://gitlab.example.com/gitlab/group/repo", "group/repo")]
+    public void RemotesMatchThroughAnAliasWithTheProjectPathTheUrlWouldGive(string address, string project)
+    {
+        var work = Aliased(
+            "work",
+            ScmKind.Gitlab,
+            "https://gitlab.example.com/gitlab",
+            "https://git-alias.example.com",
+            "ssh-alias"
+        );
+
+        var result = ScmMatcher.Match([work, GitlabCom], address);
+
+        result.Status.Should().Be(ScmMatchStatus.Matched, result.Reason);
+        result.Match!.Endpoint.Should().Be(work);
+        result.Match.Project.Should().Be(project);
+    }
+
+    [Theory]
+    [InlineData("https://git-alias.example.com:8443/group/repo")]
+    [InlineData("https://other.example.com/group/repo")]
+    [InlineData("git@other-alias:group/repo.git")]
+    [InlineData("https://gitlab.example.com/group/repo")]
+    public void RemotesThatNoUrlOrAliasServesStayUnmatched(string address)
+    {
+        var work = Aliased(
+            "work",
+            ScmKind.Gitlab,
+            "https://gitlab.example.com/gitlab",
+            "https://git-alias.example.com",
+            "ssh-alias"
+        );
+
+        var result = ScmMatcher.Match([work], address);
+
+        result.Status.Should().Be(ScmMatchStatus.NoMatch);
+        result.Reason.Should().Contain("aliases https://git-alias.example.com, ssh-alias");
+    }
+
+    [Theory]
+    [InlineData("https://proxy.example.com/scm/group/repo.git", ScmMatchStatus.Matched)]
+    [InlineData("https://proxy.example.com/group/repo.git", ScmMatchStatus.NoMatch)]
+    [InlineData("git@proxy.example.com:scm/group/repo.git", ScmMatchStatus.Matched)]
+    [InlineData("git@proxy.example.com:group/repo.git", ScmMatchStatus.Matched)]
+    [InlineData("ssh://git@ssh.example.com:2222/git/group/repo.git", ScmMatchStatus.Matched)]
+    [InlineData("ssh://git@ssh.example.com:2222/group/repo.git", ScmMatchStatus.NoMatch)]
+    [InlineData("ssh://git@ssh.example.com/git/group/repo.git", ScmMatchStatus.NoMatch)]
+    [InlineData("https://ssh.example.com/git/group/repo.git", ScmMatchStatus.NoMatch)]
+    public void AnAliasPathPrefixStandsForTheUrlsBasePath(string address, ScmMatchStatus status)
+    {
+        var forge = Aliased(
+            "forge",
+            ScmKind.Forgejo,
+            "https://git.example.org/forgejo",
+            "https://proxy.example.com/scm/",
+            "ssh://git@ssh.example.com:2222/git"
+        );
+
+        var result = ScmMatcher.Match([forge], address);
+
+        result.Status.Should().Be(status, result.Reason);
+        if (status is ScmMatchStatus.Matched)
+        {
+            result.Match!.Project.Should().Be("group/repo");
+        }
+    }
+
+    [Fact]
+    public void AnAliasThatTwoScmsShareIsAmbiguous()
+    {
+        var one = Aliased("one", ScmKind.Gitlab, "https://gitlab-a.example.com", "shared-alias");
+        var two = Aliased("two", ScmKind.Gitlab, "https://gitlab-b.example.com", "https://shared-alias");
+
+        var result = ScmMatcher.Match([one, two], "git@shared-alias:group/repo.git");
+
+        result.Status.Should().Be(ScmMatchStatus.Ambiguous);
+        result.Candidates.Select(endpoint => endpoint.Name).Should().Equal("one", "two");
+    }
+
+    [Theory]
+    [InlineData(" GIT-Alias.Example.com ", "git-alias.example.com")]
+    [InlineData("https://Git-Alias.example.com/", "https://git-alias.example.com")]
+    [InlineData("https://git-alias.example.com:443/scm/", "https://git-alias.example.com/scm")]
+    [InlineData("http://git-alias:8080", "http://git-alias:8080")]
+    [InlineData("ssh://git@ssh-alias:22/", "ssh://ssh-alias")]
+    [InlineData("ssh://git@ssh-alias:2222/git", "ssh://ssh-alias:2222/git")]
+    [InlineData("git+ssh://ssh-alias", "ssh://ssh-alias")]
+    public void AliasesAreNormalised(string input, string expected)
+    {
+        ScmAlias.TryParse(input, out var alias, out var error).Should().BeTrue(error);
+        alias!.Text.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("ftp://host")]
+    [InlineData("https://host/?x=1")]
+    [InlineData("https://user:secret@host")]
+    [InlineData("git@host:group")]
+    [InlineData("host name")]
+    public void AliasesMustBeHostNamesOrBaseUrls(string input)
+    {
+        ScmAlias.TryParse(input, out _, out var error).Should().BeFalse();
+        error.Should().NotBeEmpty().And.NotContain("secret");
+    }
 }

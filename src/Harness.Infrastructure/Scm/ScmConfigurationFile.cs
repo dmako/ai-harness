@@ -17,7 +17,8 @@ namespace Harness.Infrastructure.Scm;
 
 /// <summary>
 /// The machine's SCM connections in <c>scm.toml</c> beside the global <c>config.toml</c>: one <c>[scm.&lt;name&gt;]</c>
-/// table per SCM with <c>type</c>, <c>url</c> and <c>token_protected</c> (the token encrypted by
+/// table per SCM with <c>type</c>, <c>url</c>, optional <c>aliases</c> (host names or base URLs that only match
+/// remotes, see <see cref="ScmAlias" />) and <c>token_protected</c> (the token encrypted by
 /// <see cref="ScmTokenProtector" />) or <c>token_env</c>. A plain <c>token</c> written before tokens were encrypted is
 /// still read, and encrypted by the next write. Writes hold the machine-file lock, go through an owner-only temporary
 /// file and replace the file atomically, so a wider-permission file is tightened by the next write.
@@ -60,14 +61,11 @@ public sealed class ScmConfigurationFile : IScmConfiguration
     public async Task<ScmEntry> AddAsync(ScmEntryInput input, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var record = new Record(
-            ScmEntryRules.Name(input.Name),
-            ScmEntryRules.Kind(input.Type),
-            ScmEntryRules.BaseUrl(input.Address),
-            null,
-            null,
-            null
-        );
+        var url = ScmEntryRules.BaseUrl(input.Address);
+        var record = new Record(ScmEntryRules.Name(input.Name), ScmEntryRules.Kind(input.Type), url, null, null, null)
+        {
+            Aliases = ScmEntryRules.Aliases(input.Aliases, url),
+        };
         record = (input.Token, input.TokenEnv) switch
         {
             ({ Length: > 0 }, { Length: > 0 }) => throw new ScmConfigurationException(
@@ -141,6 +139,15 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                         record = record with { Url = ScmEntryRules.BaseUrl(address) };
                     }
 
+                    // checked against the URL as changed, so a new URL cannot equal a kept alias either
+                    record = record with
+                    {
+                        Aliases = ScmEntryRules.Aliases(
+                            change.Aliases ?? record.Aliases.Select(alias => alias.Text),
+                            record.Url
+                        ),
+                    };
+
                     if (change.Token is { Length: > 0 } token)
                     {
                         record = record with { Token = ScmEntryRules.Token(token), Protected = null, TokenEnv = null };
@@ -158,6 +165,35 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
                     records[index] = record;
                     updated = record;
+                },
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        return Saved(saved, updated!.Name);
+    }
+
+    public async Task<ScmEntry> UpdateAliasesAsync(
+        string name,
+        Func<IReadOnlyList<ScmAlias>, IEnumerable<string>> edit,
+        CancellationToken cancellationToken
+    )
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+        Record? updated = null;
+        var saved = await UpdateFileAsync(
+                (records, _) =>
+                {
+                    var index = records.FindIndex(entry => Same(entry.Name, name));
+                    if (index < 0)
+                    {
+                        throw new ScmConfigurationException($"No SCM is named '{name}'.");
+                    }
+
+                    var record = records[index];
+                    updated = records[index] = record with
+                    {
+                        Aliases = ScmEntryRules.Aliases(edit(record.Aliases).ToList(), record.Url),
+                    };
                 },
                 cancellationToken
             )
@@ -338,7 +374,8 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             _ => null,
         };
 
-    private static ScmEndpoint Endpoint(Record record) => new(record.Name, record.Kind, record.Url);
+    private static ScmEndpoint Endpoint(Record record) =>
+        new(record.Name, record.Kind, record.Url) { Aliases = record.Aliases };
 
     private List<Record> Load() => LoadAll().Records;
 
@@ -449,16 +486,24 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             table.TryGetValue(key, out var value)
                 ? value as string ?? throw new ScmConfigurationException(Where($"'{key}' must be a string."))
                 : null;
+        IReadOnlyList<string>? Texts(string key) =>
+            table.TryGetValue(key, out var value) switch
+            {
+                false => null,
+                true when value is TomlArray items && items.All(item => item is string) => [.. items.Cast<string>()],
+                true => throw new ScmConfigurationException(Where($"'{key}' must be an array of strings.")),
+            };
         try
         {
             var token = Text("token");
             var encrypted = Text("token_protected");
             var variable = Text("token_env");
             var payload = string.IsNullOrWhiteSpace(encrypted) ? null : encrypted.Trim();
+            var url = ScmEntryRules.BaseUrl(Text("url") ?? throw new ScmConfigurationException("'url' is missing."));
             return new Record(
                 ScmEntryRules.Name(name),
                 ScmEntryRules.Kind(Text("type") ?? throw new ScmConfigurationException("'type' is missing.")),
-                ScmEntryRules.BaseUrl(Text("url") ?? throw new ScmConfigurationException("'url' is missing.")),
+                url,
                 // an encrypted token wins over a plain one left beside it; the next write drops the plain one
                 payload is null
                 && !string.IsNullOrWhiteSpace(token)
@@ -466,7 +511,10 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                     : null,
                 string.IsNullOrWhiteSpace(variable) ? null : ScmEntryRules.Variable(variable.Trim()),
                 payload
-            );
+            )
+            {
+                Aliases = ScmEntryRules.Aliases(Texts("aliases"), url),
+            };
         }
         catch (ScmConfigurationException exception)
             when (!exception.Message.StartsWith(FilePath, StringComparison.Ordinal))
@@ -556,6 +604,14 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             builder.Append(CultureInfo.InvariantCulture, $"\n[scm.{Key(record.Name)}]\n");
             builder.Append(CultureInfo.InvariantCulture, $"type = {Quote(ScmKinds.Name(record.Kind))}\n");
             builder.Append(CultureInfo.InvariantCulture, $"url = {Quote(record.Url.AbsoluteUri.TrimEnd('/'))}\n");
+            if (record.Aliases.Count > 0)
+            {
+                builder.Append(
+                    CultureInfo.InvariantCulture,
+                    $"aliases = [{string.Join(", ", record.Aliases.Select(alias => Quote(alias.Text)))}]\n"
+                );
+            }
+
             if (record.TokenEnv is { } variable)
             {
                 builder.Append(CultureInfo.InvariantCulture, $"token_env = {Quote(variable)}\n");
@@ -695,5 +751,9 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         string? Token,
         string? TokenEnv,
         string? Protected
-    );
+    )
+    {
+        /// <summary>The aliases, validated and normalised.</summary>
+        public IReadOnlyList<ScmAlias> Aliases { get; init; } = [];
+    }
 }

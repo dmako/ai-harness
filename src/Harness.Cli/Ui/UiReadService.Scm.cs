@@ -9,7 +9,7 @@ using Harness.Scm;
 namespace Harness.Cli.Ui;
 
 /// <summary>
-/// Machine › SCM: the machine's SCM connections (scm.toml), their edits and connection tests. Tokens go in but never
+/// Machine › SCM: the machine's SCM connections (scm.toml) with their aliases, their edits and connection tests. Tokens go in but never
 /// come back: entries show them masked, and a test of unsaved values may reuse a saved entry's token by name.
 /// </summary>
 internal sealed partial class UiReadService
@@ -72,7 +72,7 @@ internal sealed partial class UiReadService
 
     private async Task<JsonNode?> AddScmAsync(JsonObject body, CancellationToken token)
     {
-        var fields = new UiWriteBody(body, "name", "type", "url", "token");
+        var fields = new UiWriteBody(body, "name", "type", "url", "token", "aliases");
         var entry = await ScmStore
             .AddAsync(
                 new ScmEntryInput(
@@ -80,7 +80,8 @@ internal sealed partial class UiReadService
                     fields.Text("type"),
                     fields.Text("url"),
                     Empty(fields.Text("token")),
-                    null
+                    null,
+                    Aliases(fields)
                 ),
                 token
             )
@@ -90,7 +91,7 @@ internal sealed partial class UiReadService
 
     private async Task<JsonNode?> EditScmAsync(string name, JsonObject body, CancellationToken token)
     {
-        var fields = new UiWriteBody(body, "name", "type", "url", "token");
+        var fields = new UiWriteBody(body, "name", "type", "url", "token", "aliases");
         var rename = fields.Text("name").Trim();
         var entry = await ScmStore
             .UpdateAsync(
@@ -100,7 +101,8 @@ internal sealed partial class UiReadService
                     Empty(fields.Text("url")),
                     Empty(fields.Text("token")),
                     null,
-                    rename.Length > 0 && !string.Equals(rename, name, StringComparison.Ordinal) ? rename : null
+                    rename.Length > 0 && !string.Equals(rename, name, StringComparison.Ordinal) ? rename : null,
+                    body.ContainsKey("aliases") ? Aliases(fields) : null
                 ),
                 token
             )
@@ -170,6 +172,10 @@ internal sealed partial class UiReadService
 
         return UiJson.Node(new JsonObjectMap { ["test"] = result });
     }
+
+    /// <summary>The form's aliases as typed, blank rows left out; the store validates and normalises them.</summary>
+    private static string[] Aliases(UiWriteBody fields) =>
+        [.. fields.List("aliases").Where(alias => !string.IsNullOrWhiteSpace(alias))];
 
     private static string? Empty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

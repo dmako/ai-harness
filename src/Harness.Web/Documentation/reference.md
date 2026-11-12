@@ -57,7 +57,7 @@ uninstall` alone lets you pick what to remove.
 | `harness proposals` | Knowledge agents proposed: list, show, approve, reject. |
 | `harness projects` | Every repository on this machine that uses harness (`forget <id>` drops one from the list). |
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
-| `harness scm` | This machine's SCM connections (GitLab, Forgejo, GitHub): `list`, `add`, `set`, `remove`, `test` (see SCM connections). |
+| `harness scm` | This machine's SCM connections (GitLab, Forgejo, GitHub): `list`, `add`, `set`, `remove`, `test`, `alias`, `use`, `which` (see SCM connections). |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
 | `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
@@ -357,10 +357,14 @@ token rejected, not permitted, wrong server type) with its fix.
 
 | Command | What it does |
 |---|---|
-| `harness scm list [--json]` | Name, type, URL and token source of each SCM; tokens only masked (`****abcd`). |
+| `harness scm list [--json]` | Name, type, URL, aliases and token source of each SCM; tokens only masked (`****abcd`). |
 | `harness scm add <name> --type gitlab\|forgejo\|github --url <url> --token-stdin` | Adds an SCM; the token is read from the first line of standard input. `--token-env <VAR>` reads it from that environment variable on every call instead of storing it; `--token <t>` works but can leave the token in your shell history. |
 | `harness scm set <name> [--type] [--url] [--token-stdin\|--token\|--token-env] [--rename <new>]` | Changes an SCM; a new token or variable replaces the old one. |
-| `harness scm remove <name>` | Removes an SCM. |
+| `harness scm remove <name>` | Removes an SCM, with its aliases. |
+| `harness scm alias list <name> [--json]` | Lists an SCM's aliases. |
+| `harness scm alias add <name> <url>` | Adds an alias: a host name (`git-alias.example.com`, or an SSH host alias from `~/.ssh/config`) or a base URL (`https://git-alias.example.com[/prefix]`, `ssh://git@ssh-alias[:port]`). |
+| `harness scm alias set <name> <old> <new>` | Replaces an alias in place. |
+| `harness scm alias remove <name> <url>` | Removes an alias. |
 | `harness scm test [<name>] [--json]` | Tests one SCM, or all of them side by side: the server's version and the token's user, or what failed and how to fix it. Exits 1 when a test fails. |
 | `harness scm use <name>\|--auto [--project <dir>] [--json]` | Chooses the SCM this repository uses on this machine (one that serves its remotes), or with `--auto` forgets the choice and detects it from the remotes again. |
 | `harness scm which [--project <dir>] [--json]` | Shows the repository's SCM, project and remote, how it was chosen, and the connections that serve it equally. Exits 1 when no SCM serves it. |
@@ -371,6 +375,20 @@ the URL is the server's base address (`https://gitlab.example.com`, or
 GitHub, whose API harness calls at `api.github.com`, or an Enterprise Server's
 address, under its `/api/v3`). The type is always given explicitly.
 
+Aliases are other names under which the same server is reached, for
+repositories cloned from an alias host name, a proxy path or an SSH host alias
+while the URL stays the canonical API address. They are used only to match a
+repository's remotes to the SCM and work out its project path (an alias's path
+prefix stands for the URL's: with `url = "https://gitlab.example.com/gitlab"`
+and the alias `https://proxy.example.com/scm`, the remote
+`https://proxy.example.com/scm/group/repo` is project `group/repo`); API calls
+always go to the URL. A host name alone matches that host over HTTPS and SSH on
+any port; an `ssh://` alias matches only SSH remotes. Aliases are normalised
+(lower-case host, no default port, no user, no trailing slash), may not repeat
+or equal the SCM's own URL, and a web alias may not hold a password. An alias
+that two SCMs share leaves the project ambiguous until you choose one
+(`harness scm use`). harness ui edits them in the SCM's dialog.
+
 They are stored in `scm.toml` beside the global `config.toml`, one table per
 SCM:
 
@@ -378,6 +396,7 @@ SCM:
 [scm.work]
 type = "gitlab"
 url = "https://gitlab.example.com"
+aliases = ["https://git-alias.example.com", "ssh-alias"] # optional: only match remotes
 token_protected = "CfDJ8..." # the token, encrypted; or: token_env = "WORK_GITLAB_TOKEN"
 ```
 

@@ -34,18 +34,28 @@ public sealed record ScmEntry(
 /// <summary>A new SCM: every field as typed, validated by the store.</summary>
 /// <param name="Address">The server's base URL as typed.</param>
 /// <param name="Token">The token to store; leave null when <paramref name="TokenEnv" /> is given.</param>
-public sealed record ScmEntryInput(string Name, string Type, string Address, string? Token, string? TokenEnv);
+/// <param name="Aliases">Its aliases as typed (<see cref="ScmAlias" />); null or empty for none.</param>
+public sealed record ScmEntryInput(
+    string Name,
+    string Type,
+    string Address,
+    string? Token,
+    string? TokenEnv,
+    IReadOnlyList<string>? Aliases = null
+);
 
 /// <summary>Changes to a configured SCM; null leaves a field as it is.</summary>
 /// <param name="Token">A new stored token; replaces <c>token_env</c>.</param>
 /// <param name="TokenEnv">A new environment variable; replaces the stored token.</param>
 /// <param name="Rename">A new name.</param>
+/// <param name="Aliases">The aliases as typed, replacing the stored ones (empty removes them all).</param>
 public sealed record ScmEntryChange(
     string? Type = null,
     string? Address = null,
     string? Token = null,
     string? TokenEnv = null,
-    string? Rename = null
+    string? Rename = null,
+    IReadOnlyList<string>? Aliases = null
 );
 
 /// <summary>What the machine's SCM file looks like on disk.</summary>
@@ -99,6 +109,16 @@ public interface IScmConfiguration
 
     Task<ScmEntry> UpdateAsync(string name, ScmEntryChange change, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Edits an SCM's aliases under the file's lock: <paramref name="edit" /> gets the stored aliases and returns the
+    /// new ones as typed, which are validated like every other alias (<see cref="ScmEntryRules.Aliases" />).
+    /// </summary>
+    Task<ScmEntry> UpdateAliasesAsync(
+        string name,
+        Func<IReadOnlyList<ScmAlias>, IEnumerable<string>> edit,
+        CancellationToken cancellationToken
+    );
+
     /// <summary>Removes an SCM; false when no SCM has that name.</summary>
     Task<bool> RemoveAsync(string name, CancellationToken cancellationToken);
 
@@ -145,6 +165,41 @@ public static partial class ScmEntryRules
             ? normalized
             : throw new ScmConfigurationException(error);
 
+    /// <summary>One alias, normalised (<see cref="ScmAlias" />).</summary>
+    public static ScmAlias Alias(string? alias) =>
+        ScmAlias.TryParse(alias, out var parsed, out var error) ? parsed : throw new ScmConfigurationException(error);
+
+    /// <summary>
+    /// An SCM's aliases, normalised: each a host name or an http(s)/ssh base URL, none twice and none the SCM's own
+    /// URL (or, for a host name alone, the URL's host).
+    /// </summary>
+    public static IReadOnlyList<ScmAlias> Aliases(IEnumerable<string>? aliases, Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        List<ScmAlias> parsed = [];
+        foreach (var alias in (aliases ?? []).Select(Alias))
+        {
+            if (parsed.Any(other => other.Same(alias)))
+            {
+                throw new ScmConfigurationException($"'{alias}' is already an alias of this SCM.");
+            }
+
+            var own = alias.IsHost
+                ? string.Equals(alias.Host, url.Host, StringComparison.OrdinalIgnoreCase)
+                : string.Equals(alias.Text, url.AbsoluteUri.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+            if (own)
+            {
+                throw new ScmConfigurationException(
+                    $"'{alias}' is the SCM's own URL{(alias.IsHost ? " host" : "")}, not an alias."
+                );
+            }
+
+            parsed.Add(alias);
+        }
+
+        return parsed;
+    }
+
     public static string Name(string? name) =>
         IsValidName(name) ? name! : throw new ScmConfigurationException(NameRule + $" Got '{name}'.");
 
@@ -176,4 +231,43 @@ public static partial class ScmEntryRules
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]{0,127}$", RegexOptions.CultureInvariant)]
     private static partial Regex VariablePattern { get; }
+}
+
+/// <summary>The edits 'harness scm alias' makes to an SCM's aliases, comparing them normalised.</summary>
+public static class ScmAliasEdits
+{
+    /// <summary>The aliases with one more at the end.</summary>
+    public static IEnumerable<string> Add(IReadOnlyList<ScmAlias> aliases, string alias)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+        return [.. aliases.Select(existing => existing.Text), alias];
+    }
+
+    /// <summary>The aliases with <paramref name="old" /> replaced in place; throws when it is not one of them.</summary>
+    public static IEnumerable<string> Replace(IReadOnlyList<ScmAlias> aliases, string old, string alias)
+    {
+        var index = IndexOf(aliases, old);
+        return aliases.Select((existing, at) => at == index ? alias : existing.Text).ToList();
+    }
+
+    /// <summary>The aliases without <paramref name="alias" />; throws when it is not one of them.</summary>
+    public static IEnumerable<string> Remove(IReadOnlyList<ScmAlias> aliases, string alias)
+    {
+        var index = IndexOf(aliases, alias);
+        return aliases.Where((_, at) => at != index).Select(existing => existing.Text).ToList();
+    }
+
+    private static int IndexOf(IReadOnlyList<ScmAlias> aliases, string alias)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+        var wanted = ScmEntryRules.Alias(alias);
+        var index = aliases.ToList().FindIndex(existing => existing.Same(wanted));
+        if (index >= 0)
+        {
+            return index;
+        }
+
+        var known = aliases.Count is 0 ? "none" : string.Join(", ", aliases);
+        throw new ScmConfigurationException($"'{wanted}' is not an alias of this SCM (aliases: {known}).");
+    }
 }

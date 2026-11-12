@@ -1934,6 +1934,13 @@ table.dups { min-width: 45rem; }
 .scmmain { display: grid; gap: 0.25rem; min-width: 0; flex: 1 1 18rem; }
 .scmname { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .scmurl { overflow-wrap: anywhere; }
+.scmaliases { display: flex; align-items: center; gap: 0.25rem 0.5rem; flex-wrap: wrap; min-width: 0; }
+.scmaliases code { overflow-wrap: anywhere; font-size: var(--text-sm); }
+.scmaliasbox { display: grid; gap: 0.5rem; justify-items: start; min-width: 0; }
+.scmaliasedit { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; width: 100%; }
+.scmaliasedit:empty { display: none; }
+.scmaliasedit li { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
+.scmaliasedit input { flex: 1 1 auto; min-width: 0; }
 .scmacts { display: flex; align-items: center; gap: 0.25rem; flex: none; }
 .scmtest { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0; }
 .scmtest.bad { display: grid; gap: 0.25rem; }
