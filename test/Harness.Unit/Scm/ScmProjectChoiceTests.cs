@@ -135,6 +135,30 @@ public sealed class ScmProjectChoiceTests : IDisposable
     }
 
     [Fact]
+    public async Task APathThroughASymbolicLinkNamesTheSameRepository()
+    {
+        // macOS's temporary folders are /var/... links to /private/var/...; GitRepository reports the physical path
+        Repo("git@gitlab.example.com:group/repo.git");
+        await Store.AddAsync(new("work", "gitlab", "https://gitlab.example.com", Secret, null), Token);
+        var link = Path.Combine(_directory, "linked");
+        try
+        {
+            Directory.CreateSymbolicLink(link, Repository);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip("This account cannot create a directory symbolic link: " + exception.Message);
+        }
+
+        await Store.SetChoiceAsync(Path.Combine(link, ".git"), "work", Token);
+
+        Store.ChoiceFor(Path.Combine(Repository, ".git")).Should().Be("work");
+        Store.ChoiceFor(Path.Combine(link, ".git")).Should().Be("work");
+        var resolved = await new ScmProjectResolver(Store, _directory).ResolveAsync(link, null, Token);
+        resolved.Source.Should().Be(ScmChoiceSource.Machine);
+    }
+
+    [Fact]
     public async Task TheResolverAppliesTheRepositorysChoice()
     {
         Repo("git@gitlab.example.com:group/repo.git");

@@ -32,14 +32,21 @@ internal sealed class FakeGitlabServer : IAsyncDisposable
             probe.Stop();
         }
 
-        _listener.Prefixes.Add($"http://localhost:{Port}/");
+        _listener.Prefixes.Add($"http://{Host}:{Port}/");
         _listener.Start();
         _serving = Task.Run(ServeAsync);
     }
 
     internal int Port { get; }
 
-    internal string Url => $"http://localhost:{Port}";
+    /// <summary>
+    /// The host the server listens on: localhost on Windows, where http.sys lets any user listen there; the loopback
+    /// address elsewhere, since the managed HttpListener of Linux and macOS resolves "localhost" again when it closes
+    /// and may pick the other loopback address, failing the close with "Address already in use".
+    /// </summary>
+    internal static string Host => OperatingSystem.IsWindows() ? "localhost" : "127.0.0.1";
+
+    internal string Url => $"http://{Host}:{Port}";
 
     internal ConcurrentQueue<FakeGitlabRequest> Requests { get; } = new();
 
@@ -88,7 +95,15 @@ internal sealed class FakeGitlabServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _listener.Stop();
-        _listener.Close();
+        try
+        {
+            _listener.Close();
+        }
+        catch (HttpListenerException)
+        {
+            // the listener has stopped serving; a failure to release its prefix must not fail the test
+        }
+
         await _serving;
     }
 }

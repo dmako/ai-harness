@@ -5,6 +5,7 @@ using System.Security.Principal;
 using System.Text;
 using Harness.Core.Projects;
 using Harness.Infrastructure.Configuration;
+using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Telemetry;
 using Harness.Infrastructure.Workspaces;
@@ -186,13 +187,13 @@ public sealed class ScmConfigurationFile : IScmConfiguration
     public string? ChoiceFor(string repository)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repository);
-        return LoadAll().Choices.GetValueOrDefault(RepositoryKey(repository));
+        return LoadAll().Choices.GetValueOrDefault(PhysicalKey(repository));
     }
 
     public async Task SetChoiceAsync(string repository, string? name, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repository);
-        var key = RepositoryKey(repository);
+        var key = PhysicalKey(repository);
         await UpdateFileAsync(
                 (records, choices) =>
                 {
@@ -216,9 +217,30 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             .ConfigureAwait(false);
     }
 
-    /// <summary>A repository's key: its common git directory, full path in its on-disk spelling.</summary>
+    /// <summary>A stored repository key as written: a full path without a trailing separator.</summary>
     private static string RepositoryKey(string repository) =>
         Path.TrimEndingDirectorySeparator(Path.GetFullPath(repository));
+
+    /// <summary>
+    /// The key of a repository named by a caller: its common git directory in its physical, on-disk spelling, the way
+    /// <see cref="GitRepository" /> reports it, so a path through a symbolic link (macOS's /var for /private/var, a
+    /// linked checkout) or in another case on Windows names the same repository. A directory that cannot be resolved
+    /// keeps its full path.
+    /// </summary>
+    private static string PhysicalKey(string repository)
+    {
+        var full = RepositoryKey(repository);
+        try
+        {
+            return Directory.Exists(full)
+                ? Path.TrimEndingDirectorySeparator(GitRepository.PhysicalDirectory(full))
+                : full;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return full;
+        }
+    }
 
     public ScmConnection Resolve(string name)
     {
