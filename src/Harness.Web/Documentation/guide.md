@@ -126,7 +126,9 @@ its last call did.
 You can also start Claude Code or Codex on a task from harness ui (a task's
 Agent sessions › Start an agent). It runs beside harness ui in its own
 process, `harness-agents`, and goes on when the page or harness ui closes.
-Its panel follows it live: send it a message, stop the turn it is running,
+Pick its permission mode next to the model: Auto (the default) lets it do
+what it knows to be safe and asks you for the rest; Manual asks for more, and
+the modes marked unsafe ask for nothing. Its panel follows it live: send it a message, stop the turn it is running,
 allow or deny a tool call it asks permission for, close it, and resume it
 later with a new prompt. A session started elsewhere shows the end of its
 transcript, read-only, with the command to resume it in a terminal.

@@ -545,8 +545,18 @@ started detached beside `harness`:
 
 - Claude Code runs with stream-json input and output and asks harness for
   tool permissions (`--permission-prompt-tool stdio`); Codex runs as
-  `codex app-server` with approval policy `untrusted` and sandbox
-  `workspace-write`, so commands it does not know to be safe wait for you.
+  `codex app-server`. Whatever needs your approval waits in the panel for
+  Allow or Deny.
+- The **Permission mode** box decides how much it may do without asking; its
+  choices follow the agent, and Auto is the default for both. Claude Code:
+  Auto (`--permission-mode auto`: what it judges safe runs, the rest asks),
+  Manual (every tool that needs permission asks), Accept edits, Plan (reads
+  and plans only) and Bypass permissions (unsafe: nothing asks). Codex: Auto
+  (approval policy `on-request`, sandbox `workspace-write`: Codex decides when
+  to ask, so the sandbox is what contains it), Manual (`untrusted`: commands
+  it does not know to be safe wait for you), Read only (sandbox `read-only`)
+  and Full access (unsafe: approval policy `never`, no sandbox). A resumed
+  session keeps the mode it started with; the session shows its mode.
 - The client gets `HARNESS_TASK_ID` in its environment and is recorded on the
   task as started by harness.
 - The panel shows its messages, tool calls, approvals and turns live (over

@@ -27,10 +27,13 @@ public static class AgentHost
                                   (--prompt <text> | --prompt-file <file>) [--resume <session>] [--model <model>]
                                   [--db <project database>] [--arg <client argument>]... [--env <name=value>]...
                                   [--command <executable> [--command-arg <argument>]...]
-                                  serve: --key <32 hex digits> --state <dir> [--idle-minutes <n>], prompt optional
+                                  serve: --key <32 hex digits> --state <dir> [--idle-minutes <n>]
+                                         [--permission-mode <mode>], prompt optional
         run: one agent turn for a task; events go to standard output as JSON lines, ending with "outcome";
         a "cancel" line on standard input stops it. Exit code 0 completed, 1 failed, 2 usage, 3 cancelled.
         serve: keeps the session open and takes commands (send, stop, approve, close) on its named pipe.
+        --permission-mode: claude-code auto (default), manual, acceptEdits, plan, bypassPermissions;
+        codex auto (default), manual, read-only, full-access. A resumed session keeps the mode it started with.
         """;
 
     public static async Task<int> RunAsync(
@@ -343,6 +346,7 @@ internal sealed record HostOptions(
                 PromptProblem(parsed.Single)
                 ?? RequiredProblem(parsed.Single, serve)
                 ?? ServeProblem(parsed.Single, serve)
+                ?? ModeProblem(parsed.Single, serve)
             ) is
             { } missing
         )
@@ -408,6 +412,22 @@ internal sealed record HostOptions(
             : null;
     }
 
+    /// <summary>A --permission-mode is for serve, and must be one of the client's modes.</summary>
+    private static string? ModeProblem(Dictionary<string, string> single, bool serve)
+    {
+        if (!single.TryGetValue("--permission-mode", out var mode))
+        {
+            return null;
+        }
+        if (!serve)
+        {
+            return "harness-agents: --permission-mode is for serve";
+        }
+        return AgentPermissionModes.Find(single["--client"], mode) is null
+            ? "harness-agents: " + AgentPermissionModes.Problem(single["--client"], mode)
+            : null;
+    }
+
     private static HostOptions Build(string mode, HostArguments parsed)
     {
         var single = parsed.Single;
@@ -421,6 +441,7 @@ internal sealed record HostOptions(
             new(single["--task"], Path.GetFullPath(single["--cwd"]), single.GetValueOrDefault("--prompt", ""))
             {
                 Model = single.GetValueOrDefault("--model", ""),
+                PermissionMode = single.GetValueOrDefault("--permission-mode", ""),
                 Arguments = parsed.ClientArguments,
                 Environment = parsed.Environment,
             },
@@ -488,7 +509,8 @@ internal sealed record HostOptions(
                 or "--command"
                 or "--key"
                 or "--state"
-                or "--idle-minutes":
+                or "--idle-minutes"
+                or "--permission-mode":
                     Single[name] = value;
                     break;
                 default:

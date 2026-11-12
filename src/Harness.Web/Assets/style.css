@@ -1925,6 +1925,11 @@ table.dups { min-width: 45rem; }
 .startagent { margin-top: 0.625rem; }
 .startagent summary { cursor: pointer; font-size: var(--text-sm); color: var(--ink-2); min-height: 1.5rem; display: flex; align-items: center; }
 .startagent .aform { margin-top: 0.375rem; }
+/* the start dialog's permission mode (TASK-0135): the chosen mode's description
+   under the fields, an unsafe one (no approvals at all) marked in the critical colour */
+.aform .modehint { margin: 0; color: var(--ink-2); }
+.aform .modehint.unsafe { color: var(--ink); border-left: 3px solid var(--critical); padding-left: 0.5rem; }
+.aform .modehint.unsafe b { color: var(--ink); }
 @media (max-width: 40em) { .ae { grid-template-columns: minmax(0, 1fr); gap: 0; } }
 /* Machine › SCM connections (TASK-0126): one row per SCM, its details
    beside its actions, wrapping under them on a narrow screen */

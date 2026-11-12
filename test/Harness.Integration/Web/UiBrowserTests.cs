@@ -2178,6 +2178,69 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task TheStartDialogsPermissionModeFollowsTheAgentAndMarksTheUnsafeModes()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        new TaskStore(database).Create(
+            new TaskDefinition { Id = "UI-0001", Title = "For an agent" },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        const string Mode = "document.querySelector('.startagent select[name=permission_mode]')";
+        const string Ids = "[..." + Mode + ".options].map(o => o.value).join(',')";
+        const string Hint = "document.querySelector('.startagent .modehint')";
+        const string Agent = "document.querySelector('.startagent select[aria-label=Agent]')";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/UI-0001" }
+                );
+                await page.WaitAsync("!!" + Mode + " && " + Mode + ".options.length > 0");
+                await page.EvaluateAsync("document.querySelector('.startagent').open = true");
+                (await ValueAsync(page, Ids)).Should().Be("auto,manual,acceptEdits,plan,bypassPermissions");
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto");
+                (await ValueAsync(page, Mode + ".selectedOptions[0].textContent")).Should().Be("Auto (default)");
+                (await ValueAsync(page, Hint + ".textContent")).Should().StartWith("Actions Claude Code judges safe");
+                (await ValueAsync(page, Mode + ".options[4].textContent"))
+                    .Should()
+                    .Be("⚠ Bypass permissions (unsafe)");
+
+                await page.EvaluateAsync(
+                    Mode + ".value = 'bypassPermissions'; " + Mode + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("True");
+                (await ValueAsync(page, Hint + ".textContent")).Should().StartWith("Unsafe: every tool runs");
+
+                await page.EvaluateAsync(Agent + ".value = 'codex'; " + Agent + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Ids)).Should().Be("auto,manual,read-only,full-access");
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto", "switching the agent resets the mode");
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("False");
+                (await ValueAsync(page, Hint + ".textContent")).Should().Contain("workspace-write sandbox");
+                (await ValueAsync(page, Mode + ".options[3].textContent")).Should().Be("⚠ Full access (unsafe)");
+                (await ValueAsync(page, Mode + ".options[3].title")).Should().StartWith("Unsafe: no sandbox");
+
+                await page.EvaluateAsync(
+                    Mode + ".value = 'full-access'; " + Mode + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("True");
+                await page.EvaluateAsync(
+                    Agent + ".value = 'claude-code'; " + Agent + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto");
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("False");
+                (await ValueAsync(page, Mode + ".options.length")).Should().Be("5");
+            }
+        );
+    }
+
+    [Fact]
     public async Task TaskIsDeletedFromItsRowAfterTheDialogSaysWhatGoes()
     {
         var executable = Browser();
@@ -2824,6 +2887,10 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 await page.WaitAsync(
                     "document.querySelectorAll('.agentpanel').length === 3 && document.querySelectorAll('.ae-approval button').length === 2"
                 );
+                // the live session names its permission mode, by the label the server gives it (TASK-0135)
+                (await ValueAsync(page, "document.querySelector('.agentpanel .agenthead').textContent"))
+                    .Should()
+                    .Contain("Auto mode");
 
                 // the checks do report: a control too small to hit
                 await page.EvaluateAsync(
@@ -2858,6 +2925,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 ["client"] = "claude-code",
                 ["task_id"] = "UI-0001",
                 ["session_id"] = "33333333-live-session",
+                ["permission_mode"] = "auto",
                 ["pid"] = Environment.ProcessId,
                 ["status"] = "running",
                 ["started_at"] = "2026-11-08T10:00:00.000Z",

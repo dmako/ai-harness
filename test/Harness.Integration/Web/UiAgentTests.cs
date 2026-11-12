@@ -40,7 +40,12 @@ public sealed class UiAgentTests
                 await Write(
                     server.Client,
                     project + "/tasks/TASK-0001/agents",
-                    new() { ["client"] = "claude-code", ["prompt"] = "first" }
+                    new()
+                    {
+                        ["client"] = "claude-code",
+                        ["prompt"] = "first",
+                        ["mode"] = "acceptEdits",
+                    }
                 )
             )["key"]!.GetValue<string>();
             AgentHostFiles.IsKey(key).Should().BeTrue();
@@ -68,6 +73,12 @@ public sealed class UiAgentTests
             (host["key"]!.GetValue<string>(), host["alive"]!.GetValue<bool>(), host["client"]!.GetValue<string>())
                 .Should()
                 .Be((key, true, "claude-code"));
+            // the mode chosen travelled to the host and its client (TASK-0135)
+            host["permission_mode"]!.GetValue<string>().Should().Be("acceptEdits");
+            (await File.ReadAllTextAsync(Path.Combine(calls, "calls.jsonl"), Token))
+                .Should()
+                .Contain("\"--permission-mode\",\"acceptEdits\"");
+            sessions["permission_modes"]!["codex"]!.AsArray().Should().HaveCount(4);
             var session = sessions["sessions"]!.AsArray().Single()!;
             (session["origin"]!.GetValue<string>(), session["session_id"]!.GetValue<string>())
                 .Should()
@@ -90,6 +101,40 @@ public sealed class UiAgentTests
                 new() { ["text"] = "hello?" }
             );
             refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        }
+        finally
+        {
+            TestDirectory.Delete(calls);
+        }
+    }
+
+    [Fact]
+    public async Task AnUnknownPermissionModeIsRefusedAndStartsNoAgent()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        Tasks(fixture);
+        var calls = Directory.CreateTempSubdirectory("harness-ui-agent-").FullName;
+        try
+        {
+            await using var server = await UiFixture.StartAsync(fixture, environment: Environment(calls));
+            var id = (await Read(server.Client, "/api/projects"))["projects"]![0]!["id"]!.GetValue<string>();
+            using var refused = await Post(
+                server.Client,
+                "/api/projects/" + id + "/tasks/TASK-0001/agents",
+                new()
+                {
+                    ["client"] = "codex",
+                    ["prompt"] = "first",
+                    ["mode"] = "bypassPermissions",
+                }
+            );
+            refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            JsonNode
+                .Parse(await refused.Content.ReadAsStringAsync(Token))!["error"]!.GetValue<string>()
+                .Should()
+                .Be("unknown permission mode 'bypassPermissions' for codex; choose one of auto, manual, read-only, full-access");
+            AgentHostFiles.States(AgentHostFiles.Directory(fixture.DatabasePath)).Should().BeEmpty();
+            File.Exists(Path.Combine(calls, "calls.jsonl")).Should().BeFalse();
         }
         finally
         {

@@ -7,7 +7,8 @@ namespace Harness.ProviderWorker;
 /// Scripted interactive clients for the agent host's tests: Claude Code with stream-json input
 /// (--input-format stream-json, --permission-prompt-tool stdio) and `codex app-server` (JSON-RPC). A turn's text
 /// decides what happens: "approve" asks for a tool permission and answers by the decision, "slow" works until it is
-/// interrupted, "exit" ends the process, anything else is echoed. Each start is logged to calls.jsonl.
+/// interrupted, "exit" ends the process, anything else is echoed. Each start is logged to calls.jsonl, and codex's
+/// thread/start and thread/resume settings to threads.jsonl.
 /// </summary>
 internal static class InteractiveAgentWorker
 {
@@ -174,6 +175,19 @@ internal static class InteractiveAgentWorker
             ["message"] = new JsonObject { ["model"] = "claude-fake-1", ["content"] = new JsonArray(block) },
         };
 
+    private static Task LogThreadAsync(JsonObject message) =>
+        File.AppendAllTextAsync(
+            Path.Combine(
+                Environment.GetEnvironmentVariable("HARNESS_FAKE_AGENT_DIR") ?? Path.GetTempPath(),
+                "threads.jsonl"
+            ),
+            new JsonObject
+            {
+                ["method"] = (string?)message["method"],
+                ["params"] = message["params"]?.DeepClone(),
+            }.ToJsonString() + "\n"
+        );
+
     private static async Task<int> CodexAsync()
     {
         var thread = "";
@@ -188,6 +202,7 @@ internal static class InteractiveAgentWorker
                     await Respond(id, new JsonObject { ["userAgent"] = "fake" });
                     break;
                 case "thread/start":
+                    await LogThreadAsync(message);
                     thread = Guid.NewGuid().ToString();
                     await Respond(
                         id,
@@ -199,6 +214,7 @@ internal static class InteractiveAgentWorker
                     );
                     break;
                 case "thread/resume":
+                    await LogThreadAsync(message);
                     thread = (string?)message["params"]?["threadId"] ?? "";
                     await Respond(
                         id,

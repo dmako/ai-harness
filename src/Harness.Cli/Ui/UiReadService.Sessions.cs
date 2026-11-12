@@ -72,6 +72,8 @@ internal sealed partial class UiReadService
             ["sessions"] = worked.Select(TaskViews.Session),
             // the agent hosts started for the task from harness ui, live or ended (TASK-0116)
             ["hosts"] = agents?.Hosts(project, id) ?? [],
+            // what the start dialog offers per client (TASK-0135)
+            ["permission_modes"] = UiAgents.PermissionModes(),
             ["totals"] = totals,
             ["price_basis"] = "API-equivalent",
         };

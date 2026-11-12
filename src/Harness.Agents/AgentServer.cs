@@ -40,10 +40,12 @@ internal sealed class AgentServer : IAsyncDisposable
 
     private AgentServer(HostOptions options, Action<string> error)
     {
+        AgentHostFiles.Prepare(options.State);
+        // before this host's own state is written, so a resumed session finds the mode it was started with
+        options = options with { Start = options.Start with { PermissionMode = PermissionMode(options) } };
         _options = options;
         _error = error;
         _database = options.Database.Length > 0 ? HarnessDatabase.OpenExisting(options.Database) : null;
-        AgentHostFiles.Prepare(options.State);
         _log = new StreamWriter(
             new FileStream(
                 AgentHostFiles.LogPath(options.State, options.Key),
@@ -61,12 +63,41 @@ internal sealed class AgentServer : IAsyncDisposable
             ["session_id"] = options.Resume,
             ["cwd"] = options.Start.WorkingDirectory,
             ["model"] = options.Start.Model,
+            ["permission_mode"] = options.Start.PermissionMode,
             ["pid"] = Environment.ProcessId,
             ["status"] = AgentHostFiles.Starting,
             ["started_at"] = AgentHostFiles.Now(),
             ["updated_at"] = AgentHostFiles.Now(),
         };
         WriteState();
+    }
+
+    /// <summary>
+    /// The session's permission mode: the one given; for a resumed session the one its newest earlier host recorded;
+    /// otherwise the client's default.
+    /// </summary>
+    private static string PermissionMode(HostOptions options)
+    {
+        if (options.Start.PermissionMode.Length > 0)
+        {
+            return options.Start.PermissionMode;
+        }
+        if (options.Resume.Length > 0)
+        {
+            foreach (var state in AgentHostFiles.States(options.State))
+            {
+                if (
+                    AgentHostFiles.Text(state, "client") == options.Client
+                    && AgentHostFiles.Text(state, "session_id") == options.Resume
+                    && AgentPermissionModes.Find(options.Client, AgentHostFiles.Text(state, "permission_mode")) is
+                    { } earlier
+                )
+                {
+                    return earlier.Id;
+                }
+            }
+        }
+        return AgentPermissionModes.Default(options.Client).Id;
     }
 
     public static async Task<int> ServeAsync(

@@ -73,16 +73,34 @@ public static class AgentHostFiles
         File.Move(pending, path, overwrite: true);
     }
 
+    /// <summary>
+    /// A host's state, or null when it has none. On Windows a read that meets the host replacing the file fails for a
+    /// moment (sharing violation, access denied), so a failed read is tried again a few times.
+    /// </summary>
     public static JsonObject? ReadState(string directory, string key)
     {
-        try
+        var path = StatePath(directory, key);
+        const int Attempts = 4;
+        for (var attempt = 1; attempt <= Attempts; attempt++)
         {
-            return JsonNode.Parse(File.ReadAllText(StatePath(directory, key))) as JsonObject;
+            try
+            {
+                return JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
+            }
+            catch (Exception exception)
+                when (exception is IOException or JsonException or UnauthorizedAccessException)
+            {
+                if (!File.Exists(path) && !File.Exists(path + ".tmp"))
+                {
+                    return null;
+                }
+            }
+            if (attempt < Attempts)
+            {
+                Thread.Sleep(25);
+            }
         }
-        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
-        {
-            return null;
-        }
+        return null;
     }
 
     /// <summary>Every host state in a project's agents folder, the newest first.</summary>

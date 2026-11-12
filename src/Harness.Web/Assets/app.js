@@ -5646,6 +5646,8 @@ function auditBlock(x) {
 // harness ui, and their panel follows them live and steers them (Send, Stop, Allow/Deny, Close; Resume once ended).
 // Sessions started elsewhere show the end of their transcript, read-only, and how to resume them in a terminal.
 const AGENT_CLIENTS = { "claude-code": "Claude Code", codex: "Codex" };
+// the permission modes each agent offers, as the server last sent them (from the C# rewrite, TASK-0135)
+let agentModes = {};
 function sessionsBlock(x) {
   const out = h("div", { class: "tblock" }, h("h4", {}, "Agent sessions"), h("p", { class: "empty" }, "Loading…"));
   const pid = route().id;
@@ -5656,6 +5658,7 @@ function sessionsBlock(x) {
     const wall = res.claimed_at && res.completed_at ? Date.parse(res.completed_at) - Date.parse(res.claimed_at) : 0;
     // a session's newest host; hosts still opening their session have no session row yet
     const hostOf = (s) => hosts.find((o) => o.client === s.client && o.session_id === s.session_id);
+    agentModes = res.permission_modes || agentModes;
     const pending = hosts.filter((o) => o.alive && !sessions.some((s) => s.client === o.client && s.session_id === o.session_id));
     fill(out, h("h4", {}, "Agent sessions ", sessions.length > 0 && h("span", { class: "count" }, String(sessions.length))),
       sessions.length > 0 && h("p", { class: "usage" },
@@ -5687,33 +5690,62 @@ function sessionItem(pid, x, s, host, reload) {
     h("span", { class: "muted", title: `first seen ${s.started_at}, last seen ${s.ended_at}` },
       `${s.origin === "harness" ? "started by harness" : "seen by hooks"} · first ${ago(s.started_at)} · last ${ago(s.ended_at)}`),
     h("div", { class: "evidence" },
-      s.model && `${s.model} · `, usageLine(s), s.active_ms > 0 && ` · active ${durationText(s.active_ms)}`));
+      s.model && `${s.model} · `, host && host.permission_mode && `${modeLabel(s.client, host.permission_mode)} mode · `,
+      usageLine(s), s.active_ms > 0 && ` · active ${durationText(s.active_ms)}`));
   if (host && host.alive) li.append(agentPanel(pid, host, reload));
   else if (s.origin === "harness") li.append(endedAgent(pid, x, s, host, reload));
   else li.append(transcriptTail(pid, x, s));
   return li;
 }
 
-// startAgentForm starts Claude Code or Codex on the task in a new agent host, with a first prompt.
+// modeLabel (from the C# rewrite) names a session's permission mode by the label the server gives it.
+function modeLabel(client, id) {
+  return (agentModes[client] || []).find((m) => m.id === id)?.label || id;
+}
+
+// startAgentForm starts Claude Code or Codex on the task in a new agent host, with a first prompt. The permission
+// mode's choices come from the server per agent, the agent's default preselected (from the C# rewrite, TASK-0135).
 function startAgentForm(pid, x, reload) {
+  const modes = agentModes;
   const client = h("select", { "aria-label": "Agent" }, Object.entries(AGENT_CLIENTS).map(([k, v]) => h("option", { value: k }, v)));
   const prompt = h("textarea", { rows: 3, "aria-label": "First prompt" });
   prompt.value = `Work on task ${x.id}: claim it with harness (task_claim), then do it.`;
   const model = h("input", { type: "text", placeholder: "default model", "aria-label": "Model (optional)" });
+  const mode = h("select", { name: "permission_mode", "aria-label": "Permission mode" });
+  const about = h("p", { class: "modehint small", "aria-live": "polite" });
+  const describe = () => {
+    const m = (modes[client.value] || []).find((o) => o.id === mode.value);
+    about.className = `modehint small${m && m.unsafe ? " unsafe" : ""}`;
+    fill(about, m ? [m.unsafe && h("b", {}, "Unsafe: "), m.description.replace(/^Unsafe: /, "")] : "");
+  };
+  const options = () => {
+    const list = modes[client.value] || [];
+    fill(mode, list.map((m) => h("option", { value: m.id, title: m.description, class: m.unsafe ? "unsafe" : null },
+      m.unsafe ? `⚠ ${m.label} (unsafe)` : m.default ? `${m.label} (default)` : m.label)));
+    mode.value = (list.find((m) => m.default) || list[0] || {}).id || "";
+    mode.disabled = list.length === 0;
+    describe();
+  };
+  client.addEventListener("change", options);
+  mode.addEventListener("change", describe);
+  options();
   const err = h("p", { class: "error", hidden: true });
   const go = h("button", { type: "button", onclick: async () => {
     go.disabled = true; err.hidden = true;
     try {
-      await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`), { client: client.value, prompt: prompt.value, model: model.value.trim() });
+      await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`),
+        { client: client.value, prompt: prompt.value, model: model.value.trim(), mode: mode.value });
       toast(`${AGENT_CLIENTS[client.value]} started on ${x.id}`);
       reload();
     } catch (e) { err.textContent = e.message; err.hidden = false; go.disabled = false; }
   } }, "Start");
   return h("details", { class: "startagent" }, h("summary", {}, "Start an agent on this task"),
     h("div", { class: "aform" },
-      h("div", { class: "frow" }, h("label", {}, "Agent", client), h("label", {}, "Model", model)),
+      h("div", { class: "frow" }, h("label", {}, "Agent", client), h("label", {}, "Model", model),
+        h("label", {}, "Permission mode", mode)),
+      about,
       h("label", {}, "Prompt", prompt),
-      h("p", { class: "hint muted small" }, "It runs in its own process beside harness ui and goes on when this page or harness ui closes. Tool calls that need permission wait here for Allow or Deny."),
+      h("p", { class: "hint muted small" }, "It runs in its own process beside harness ui and goes on when this page or harness ui closes. Tool calls the permission mode does not allow wait here for Allow or Deny."),
       err, h("div", {}, go)));
 }
 
@@ -5779,7 +5811,8 @@ function agentPanel(pid, host, reload) {
     if (!live.connected && !document.hidden) poll();
   }, 3000);
   return h("div", { class: "agentpanel" },
-    h("div", { class: "agenthead" }, status, " ", h("span", { class: "muted small" }, `agent host ${host.key.slice(0, 8)}`)),
+    h("div", { class: "agenthead" }, status, " ", h("span", { class: "muted small" }, `agent host ${host.key.slice(0, 8)}`,
+      host.permission_mode && ` · ${modeLabel(host.client, host.permission_mode)} mode`)),
     log, err,
     h("div", { class: "agentsend" }, text, h("div", { class: "agentbtns" }, send, stop, close)));
 }

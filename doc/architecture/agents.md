@@ -65,13 +65,35 @@ and steer it.
 
 | | Claude Code | Codex |
 |---|---|---|
-| Process | `claude -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio` with `--session-id` or `--resume` | `codex app-server` (JSON-RPC): `initialize`, `thread/start` or `thread/resume` (approval policy `untrusted`, sandbox `workspace-write`) |
+| Process | `claude -p --input-format stream-json --output-format stream-json --verbose --permission-prompt-tool stdio`, the permission mode's flag, and `--session-id` or `--resume` | `codex app-server` (JSON-RPC): `initialize`, `thread/start` or `thread/resume` with the permission mode's approval policy and sandbox |
 | A turn | a `user` message on standard input; ends at `result` | `turn/start`; ends at `turn/completed` |
 | Stop | `control_request` `interrupt` (the turn ends `error_during_execution`) | `turn/interrupt` (the turn ends `interrupted`) |
 | Approval | `control_request` `can_use_tool`, answered by `control_response` allow (with the input) or deny | `item/commandExecution/requestApproval` and `item/fileChange/requestApproval`, answered `{decision: accept \| decline}` |
 
-`on-request`, Codex's default, let Codex run a command outside the working tree without asking on Windows. A session
-a person supervises asks first instead (`untrusted`).
+**Permission modes** (TASK-0135). `--permission-mode <id>` (serve only) picks how much the agent may do without
+asking. `Harness.Core.Agents.AgentPermissionModes` describes each client's modes (id, label, one-line description,
+default, unsafe) and the client settings they stand for; harness ui's start dialog is filled from it. Without the
+option a session starts in Auto, the default of both clients; a resumed session (`--resume`) keeps the mode its
+newest earlier host recorded in its state file. An unknown mode is a usage error and starts nothing.
+
+| Client | Mode (id) | Client settings |
+|---|---|---|
+| Claude Code | Auto (`auto`, default) | `--permission-mode auto`: what Claude Code judges safe runs, the rest asks through the stdio permission prompt |
+| | Manual (`manual`) | no `--permission-mode`: every tool that needs permission asks |
+| | Accept edits (`acceptEdits`) | `--permission-mode acceptEdits` |
+| | Plan (`plan`) | `--permission-mode plan`: reads and plans, changes nothing |
+| | Bypass permissions (`bypassPermissions`, unsafe) | `--permission-mode bypassPermissions`: nothing asks |
+| Codex | Auto (`auto`, default) | approval policy `on-request`, sandbox `workspace-write` |
+| | Manual (`manual`) | `untrusted`, `workspace-write`: asks before any command not known to be safe |
+| | Read only (`read-only`) | `on-request`, `read-only` |
+| | Full access (`full-access`, unsafe) | `never`, `danger-full-access`: nothing asks, nothing is contained |
+
+The ids follow Claude Code 2.1.318's `--permission-mode` choices (it also has `dontAsk`, which denies what is not
+pre-approved and is not offered) and codex app-server 0.167.1's `AskForApproval` and `SandboxMode`
+(`codex app-server generate-json-schema`). Under `on-request` Codex decides itself when to ask, and on Windows it ran a
+command outside the working tree without asking: Codex's Auto relies on the `workspace-write` sandbox, and Manual
+(`untrusted`) is the mode to choose when every command should be seen first. Approvals still come as `approval`
+events in every mode that asks.
 
 **The pipe.** `harness-agent-<key>` on Windows; on Linux and macOS `ha-<first 16 digits of the key>`, because .NET makes it a Unix socket at `$TMPDIR/CoreFxPipe_<name>` and macOS limits socket paths to 104 bytes. `PipeOptions.CurrentUserOnly`, 64 KiB buffers.
 - Without a buffer, a write on Windows waits until the reader takes it, and a reader that stopped reading held the
@@ -83,7 +105,8 @@ a person supervises asks first instead (`untrusted`).
   does not always return on Windows, so the pipe is closed rather than its read cancelled.
 
 **Files.** Beside the project database, in `agents/` (which holds its own `.gitignore` of `*`):
-- `<key>.json`: the state (client, task, session id, pid, status `starting|idle|running|closed|failed`);
+- `<key>.json`: the state (client, task, session id, model, permission mode, pid, status
+  `starting|idle|running|closed|failed`);
 - `<key>.jsonl`: every event, numbered (`seq`);
 - `<key>.err`: the host's standard error.
 
@@ -107,7 +130,11 @@ a person supervises asks first instead (`untrusted`).
 - Events reach the page as `event: agent` on `/api/events` (`{project, key, events}`, drained at each live tick).
   Without the stream, the open panel polls `GET /api/projects/{id}/agents/{key}/log?after=<seq>`.
 - Writes:
-  - `POST …/tasks/{tid}/agents` (client, prompt, model, resume);
+  - `POST …/tasks/{tid}/agents` (client, prompt, model, resume, mode: a permission mode id; empty for the default,
+    or for a resumed session the mode it started with; an unknown one is refused with 400);
   - `POST …/agents/{key}/send|stop|approve|close`.
+- `GET …/tasks/{tid}/sessions` carries `permission_modes` ({client: [{id, label, description, default, unsafe}]})
+  for the start dialog's Permission mode box, which follows the chosen agent, preselects its default and marks the
+  unsafe modes; each host carries its `permission_mode`, shown in its session and live panel.
 - A session started elsewhere is read from the end of its transcript:
   `GET …/tasks/{tid}/sessions/{client}/{sid}/tail`.

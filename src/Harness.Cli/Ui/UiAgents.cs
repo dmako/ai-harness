@@ -35,19 +35,27 @@ internal sealed class UiAgents : IAsyncDisposable
     private readonly ConcurrentDictionary<string, Host> _hosts = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _stopping = new();
 
-    /// <summary>Starts a host for a task; returns its key at once, while the host opens the client's session.</summary>
+    /// <summary>
+    /// Starts a host for a task; returns its key at once, while the host opens the client's session. An empty
+    /// permission mode is the client's default, or for a resumed session the mode it was started with.
+    /// </summary>
     public async Task<string> StartAsync(
         JsonObject project,
         string taskId,
         string client,
         string prompt,
         string model,
-        string resume
+        string resume,
+        string mode = ""
     )
     {
         if (client is not (AgentClients.Claude or AgentClients.Codex))
         {
             throw new UiRequestException(400, "client must be claude-code or codex");
+        }
+        if (mode.Length > 0 && AgentPermissionModes.Find(client, mode) is null)
+        {
+            throw new UiRequestException(400, AgentPermissionModes.Problem(client, mode));
         }
         if (resume.Length is 0 && prompt.Trim().Length is 0)
         {
@@ -85,6 +93,10 @@ internal sealed class UiAgents : IAsyncDisposable
         {
             arguments.AddRange(["--resume", resume]);
         }
+        if (mode.Length > 0)
+        {
+            arguments.AddRange(["--permission-mode", mode]);
+        }
         // HARNESS_CLAUDE_COMMAND / HARNESS_CODEX_COMMAND: a client that is not on PATH as claude or codex
         var variable = client is AgentClients.Codex ? "HARNESS_CODEX_COMMAND" : "HARNESS_CLAUDE_COMMAND";
         if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } command)
@@ -119,6 +131,7 @@ internal sealed class UiAgents : IAsyncDisposable
                     ["client"] = AgentHostFiles.Text(state, "client"),
                     ["session_id"] = AgentHostFiles.Text(state, "session_id"),
                     ["model"] = AgentHostFiles.Text(state, "model"),
+                    ["permission_mode"] = AgentHostFiles.Text(state, "permission_mode"),
                     ["status"] = alive ? AgentHostFiles.Text(state, "status") : Ended(state),
                     ["alive"] = alive,
                     ["started_at"] = AgentHostFiles.Text(state, "started_at"),
@@ -127,6 +140,36 @@ internal sealed class UiAgents : IAsyncDisposable
             );
         }
         return hosts;
+    }
+
+    /// <summary>
+    /// The permission modes of each client for the start dialog: {client: [{id, label, description, default,
+    /// unsafe}]}, in the order to show them.
+    /// </summary>
+    public static JsonObject PermissionModes()
+    {
+        var modes = new JsonObject();
+        foreach (var client in AgentPermissionModes.Clients)
+        {
+            modes[client] = new JsonArray(
+                [
+                    .. AgentPermissionModes
+                        .For(client)
+                        .Select(m =>
+                            (JsonNode?)
+                                new JsonObject
+                                {
+                                    ["id"] = m.Id,
+                                    ["label"] = m.Label,
+                                    ["description"] = m.Description,
+                                    ["default"] = m.IsDefault,
+                                    ["unsafe"] = m.Unsafe,
+                                }
+                        ),
+                ]
+            );
+        }
+        return modes;
     }
 
     /// <summary>A host's events after <paramref name="after"/>, with its status and whether it still runs.</summary>

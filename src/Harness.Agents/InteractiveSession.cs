@@ -291,6 +291,8 @@ internal sealed class ClaudeSession : InteractiveSession
         Action<JsonObject> emit
     )
     {
+        // an unknown mode throws before any process starts
+        var mode = AgentPermissionModes.Resolve(AgentClients.Claude, start.PermissionMode);
         var sessionId = resume.Length > 0 ? resume : Guid.NewGuid().ToString();
         List<string> arguments =
         [
@@ -303,6 +305,7 @@ internal sealed class ClaudeSession : InteractiveSession
             "--verbose",
             "--permission-prompt-tool",
             "stdio",
+            .. mode.ClaudeArguments,
             resume.Length > 0 ? "--resume" : "--session-id",
             sessionId,
         ];

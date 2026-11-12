@@ -10,8 +10,9 @@ namespace Harness.Agents;
 /// <summary>
 /// Codex through `codex app-server` (JSON-RPC over standard input and output): initialize, then thread/start or
 /// thread/resume; each turn is turn/start, stopped with turn/interrupt. Command and file-change approvals come as
-/// requests from the server and are answered accept or decline. The thread asks before any command Codex does not
-/// know to be safe (approval policy untrusted, sandbox workspace-write): under on-request it may run one without asking.
+/// requests from the server and are answered accept or decline. The thread's approval policy and sandbox come from the
+/// session's permission mode (<see cref="AgentPermissionModes"/>): Manual (untrusted) asks before any command Codex
+/// does not know to be safe, Auto (on-request) may run one without asking and relies on the workspace-write sandbox.
 /// </summary>
 internal sealed class CodexSession : InteractiveSession
 {
@@ -20,6 +21,7 @@ internal sealed class CodexSession : InteractiveSession
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonObject>> _calls = new();
     private readonly ConcurrentDictionary<string, JsonNode> _pending = new(StringComparer.Ordinal);
     private readonly AgentStart _start;
+    private readonly AgentPermissionMode _mode;
     private readonly string _resume;
     private long _next;
     private string _turn = "";
@@ -27,10 +29,17 @@ internal sealed class CodexSession : InteractiveSession
     private TokenCounts _before = TokenCounts.Zero;
     private string _lastError = "";
 
-    private CodexSession(IProviderProcess process, Action<JsonObject> emit, AgentStart start, string resume)
+    private CodexSession(
+        IProviderProcess process,
+        Action<JsonObject> emit,
+        AgentStart start,
+        AgentPermissionMode mode,
+        string resume
+    )
         : base(process, emit)
     {
         _start = start;
+        _mode = mode;
         _resume = resume;
         Model = start.Model;
     }
@@ -45,6 +54,8 @@ internal sealed class CodexSession : InteractiveSession
         Action<JsonObject> emit
     )
     {
+        // an unknown mode throws before any process starts
+        var mode = AgentPermissionModes.Resolve(AgentClients.Codex, start.PermissionMode);
         var process = processes.Start(
             new ProviderProcessOptions(command.Executable, [.. command.Prefix, "app-server", .. start.Arguments])
             {
@@ -52,7 +63,7 @@ internal sealed class CodexSession : InteractiveSession
                 Environment = AgentEnvironment.For(start),
             }
         );
-        return new CodexSession(process, emit, start, resume);
+        return new CodexSession(process, emit, start, mode, resume);
     }
 
     protected override async Task HandshakeAsync(CancellationToken cancellationToken)
@@ -69,8 +80,8 @@ internal sealed class CodexSession : InteractiveSession
         var settings = new JsonObject
         {
             ["cwd"] = _start.WorkingDirectory,
-            ["approvalPolicy"] = "untrusted",
-            ["sandbox"] = "workspace-write",
+            ["approvalPolicy"] = _mode.ApprovalPolicy,
+            ["sandbox"] = _mode.Sandbox,
         };
         if (_start.Model.Length > 0)
         {

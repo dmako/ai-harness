@@ -175,6 +175,141 @@ public sealed class AgentServerTests : IDisposable
         await ProviderFixture.GoneAsync(ClientPid());
     }
 
+    [Theory]
+    [InlineData("", "--permission-mode auto")]
+    [InlineData("auto", "--permission-mode auto")]
+    [InlineData("manual", "")]
+    [InlineData("acceptEdits", "--permission-mode acceptEdits")]
+    [InlineData("plan", "--permission-mode plan")]
+    [InlineData("bypassPermissions", "--permission-mode bypassPermissions")]
+    public async Task ClaudeIsStartedWithThePermissionModesFlags(string mode, string flags)
+    {
+        await using var host = await Host.StartAsync(this, "claude", "", "hello", Mode(mode));
+        await host.WaitAsync(e => Is(e, "turn"));
+        var args = Calls()[0]["args"]!.AsArray().Select(a => (string)a!).ToList();
+        args.Should().ContainInOrder("--permission-prompt-tool", "stdio");
+        if (flags.Length > 0)
+        {
+            args.Should().ContainInOrder(flags.Split(' ')).And.ContainSingle(a => a == "--permission-mode");
+        }
+        else
+        {
+            args.Should().NotContain("--permission-mode");
+        }
+        Text(AgentHostFiles.ReadState(State, host.Key)!, "permission_mode").Should().Be(mode is "" ? "auto" : mode);
+        await host.Pipe.SendAsync(new JsonObject { ["op"] = "close" }, Token);
+        await host.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token);
+    }
+
+    [Theory]
+    [InlineData("", "on-request", "workspace-write")]
+    [InlineData("auto", "on-request", "workspace-write")]
+    [InlineData("manual", "untrusted", "workspace-write")]
+    [InlineData("read-only", "on-request", "read-only")]
+    [InlineData("full-access", "never", "danger-full-access")]
+    public async Task CodexOpensItsThreadWithThePermissionModesSettings(string mode, string approval, string sandbox)
+    {
+        await using var host = await Host.StartAsync(this, "codex", "", "hello", Mode(mode));
+        await host.WaitAsync(e => Is(e, "turn"));
+        var thread = Threads().Should().ContainSingle().Subject;
+        (Text(thread, "method"), thread["params"]!["approvalPolicy"]!.GetValue<string>())
+            .Should()
+            .Be(("thread/start", approval));
+        thread["params"]!["sandbox"]!.GetValue<string>().Should().Be(sandbox);
+        Text(AgentHostFiles.ReadState(State, host.Key)!, "permission_mode").Should().Be(mode is "" ? "auto" : mode);
+        await host.Pipe.SendAsync(new JsonObject { ["op"] = "close" }, Token);
+        await host.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token);
+    }
+
+    [Theory]
+    [InlineData("claude", "read-only")]
+    [InlineData("codex", "plan")]
+    [InlineData("codex", "Auto")]
+    public async Task AnUnknownPermissionModeIsAUsageErrorAndStartsNoSession(string client, string mode)
+    {
+        using var error = new StringWriter();
+        var exit = await AgentHost.RunAsync(
+            [
+                "serve",
+                "--client",
+                client is "claude" ? AgentClients.Claude : AgentClients.Codex,
+                "--task",
+                "TASK-0001",
+                "--cwd",
+                _root,
+                "--key",
+                AgentHostFiles.NewKey(),
+                "--state",
+                State,
+                "--permission-mode",
+                mode,
+            ],
+            TextReader.Null,
+            TextWriter.Null,
+            error,
+            Token
+        );
+        exit.Should().Be(AgentHost.Usage);
+        error.ToString().Should().Contain("unknown permission mode '" + mode + "'").And.Contain("choose one of auto");
+        File.Exists(Path.Combine(_root, "calls.jsonl")).Should().BeFalse();
+        Directory.Exists(State).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    public async Task AResumedSessionKeepsItsPermissionModeUnlessANewOneIsGiven(string client)
+    {
+        var (first, later) = client is "claude" ? ("plan", "acceptEdits") : ("manual", "full-access");
+        string session;
+        await using (var host = await Host.StartAsync(this, client, "", "hello", Mode(first)))
+        {
+            await host.WaitAsync(e => Is(e, "turn"));
+            session = Text(host.Events.First(e => Is(e, "session") && Text(e, "session_id").Length > 0), "session_id");
+            await host.Pipe.SendAsync(new JsonObject { ["op"] = "close" }, Token);
+            await host.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        }
+
+        string Resumed(string key) => Text(AgentHostFiles.ReadState(State, key)!, "permission_mode");
+        foreach (var (given, expected) in new[] { ("", first), (later, later) })
+        {
+            await using var host = await Host.StartAsync(
+                this,
+                client,
+                "",
+                "go on",
+                ["--resume", session, .. Mode(given)]
+            );
+            await host.WaitAsync(e => Is(e, "turn"));
+            Resumed(host.Key).Should().Be(expected);
+            await host.Pipe.SendAsync(new JsonObject { ["op"] = "close" }, Token);
+            await host.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        }
+        if (client is "claude")
+        {
+            Calls()
+                .Select(c => string.Join(' ', c["args"]!.AsArray().Select(a => (string)a!)))
+                .Should()
+                .SatisfyRespectively(
+                    c => c.Should().Contain("--permission-mode plan"),
+                    c => c.Should().Contain("--permission-mode plan --resume " + session),
+                    c => c.Should().Contain("--permission-mode acceptEdits --resume " + session)
+                );
+        }
+        else
+        {
+            Threads()
+                .Select(t => (Text(t, "method"), t["params"]!["approvalPolicy"]!.GetValue<string>()))
+                .Should()
+                .Equal(("thread/start", "untrusted"), ("thread/resume", "untrusted"), ("thread/resume", "never"));
+        }
+    }
+
+    private static string[] Mode(string mode) => mode.Length > 0 ? ["--permission-mode", mode] : [];
+
+    private List<JsonObject> Threads() =>
+        File.ReadAllLines(Path.Combine(_root, "threads.jsonl")).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+
     private static JsonObject Command(string op, string text) => new() { ["op"] = op, ["text"] = text };
 
     private static bool Is(JsonObject item, string name) => Text(item, "event") == name;
