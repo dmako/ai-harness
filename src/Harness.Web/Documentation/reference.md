@@ -376,13 +376,33 @@ SCM:
 [scm.work]
 type = "gitlab"
 url = "https://gitlab.example.com"
-token = "glpat-..."        # or: token_env = "WORK_GITLAB_TOKEN"
+token_protected = "CfDJ8..." # the token, encrypted; or: token_env = "WORK_GITLAB_TOKEN"
 ```
 
-The file holds tokens, so harness writes it readable only by you (an
-owner-only ACL on Windows, mode 600 elsewhere) through a locked, atomic
-replace; a file you widened yourself is tightened again on the next change.
-Tokens never appear in harness's output, logs or telemetry.
+Stored tokens are encrypted (ASP.NET Core Data Protection) with keys kept in
+`scm-keys/` beside `scm.toml`. harness creates that folder readable only by
+you (an owner-only ACL on Windows, where the keys are also protected with your
+Windows account; mode 700 elsewhere) and writes `scm.toml` readable only by you
+through a locked, atomic replace; a file or folder you widened yourself is
+tightened again on the next change. Tokens never appear in harness's output,
+logs or telemetry.
+
+- **Upgrading**: a `token = "..."` saved by an older harness keeps working and
+  is shown as unencrypted (`harness scm list`, `harness doctor`); the next
+  change with `harness scm` or in harness ui saves every stored token
+  encrypted.
+- **Backups and other machines**: `scm.toml` and `scm-keys/` belong together.
+  Back them up, move them and, in a container, mount them on the same volume
+  together. Without its keys a token cannot be decrypted (on Windows, not by
+  another account either): `harness doctor` says so, and you store it again
+  with `harness scm set <name> --token-stdin`.
+- **What it protects**: a copy of `scm.toml` on its own (a backup, a synced
+  dotfiles folder, a file attached to a support request) no longer reveals your
+  tokens. It does not protect against programs running as you, coding agents
+  included, which can decrypt them just as harness does, nor, on Linux and
+  macOS, against anyone who can read your whole configuration folder. To keep a
+  token out of harness's files altogether, use `token_env` with your own secret
+  manager.
 
 Each project finds its SCM from its git remotes: `origin` first, then the
 other remotes, the first whose URL (after `insteadOf` rewrites) is on a

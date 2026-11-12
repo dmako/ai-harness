@@ -16,12 +16,16 @@ public enum ScmTokenSource
 /// <param name="TokenEnv">The environment variable holding the token, for <see cref="ScmTokenSource.Environment" />.</param>
 /// <param name="MaskedToken">The stored token masked, or the environment variable's value masked; empty when unset.</param>
 /// <param name="TokenAvailable">Whether a call could authenticate now (a stored token, or the variable is set).</param>
+/// <param name="PlainText">A stored token kept unencrypted (written before tokens were encrypted); the next write encrypts it.</param>
+/// <param name="TokenError">Why the stored token cannot be used (it cannot be decrypted), with the fix; null when it can.</param>
 public sealed record ScmEntry(
     ScmEndpoint Endpoint,
     ScmTokenSource TokenSource,
     string? TokenEnv,
     string MaskedToken,
-    bool TokenAvailable
+    bool TokenAvailable,
+    bool PlainText = false,
+    string? TokenError = null
 )
 {
     public string Name => Endpoint.Name;
@@ -48,7 +52,20 @@ public sealed record ScmEntryChange(
 /// <param name="Exists">Whether the file exists.</param>
 /// <param name="Error">Why the file cannot be read, or empty.</param>
 /// <param name="OwnerOnly">Whether only the current user can read it; null when it does not exist or cannot be told.</param>
-public sealed record ScmFileState(string Path, bool Exists, string Error, bool? OwnerOnly, string PermissionDetail);
+/// <param name="KeyPath">The folder holding the keys stored tokens are encrypted with.</param>
+/// <param name="KeysExist">Whether that folder exists.</param>
+/// <param name="KeysOwnerOnly">Whether only the current user can access it; null when it does not exist or cannot be told.</param>
+public sealed record ScmFileState(
+    string Path,
+    bool Exists,
+    string Error,
+    bool? OwnerOnly,
+    string PermissionDetail,
+    string KeyPath = "",
+    bool KeysExist = false,
+    bool? KeysOwnerOnly = null,
+    string KeysPermissionDetail = ""
+);
 
 /// <summary>A configuration request the store refused: an invalid field, a duplicate or unknown name, an unreadable file.</summary>
 public sealed class ScmConfigurationException : Exception

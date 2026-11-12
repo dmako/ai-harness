@@ -99,19 +99,65 @@ SCM connections are machine-wide: `IScmConfiguration` (in Harness.Scm) lists,
 finds, adds, updates and removes them, and `ScmConfigurationFile`
 (Infrastructure, `src/Harness.Infrastructure/Scm`) implements it over
 `scm.toml` beside the global `config.toml`, one `[scm.<name>]` table per SCM
-with `type`, `url` and `token` or `token_env`. `ScmEntryRules` validates
+with `type`, `url` and `token_protected` (the token encrypted) or `token_env`.
+`ScmEntryRules` validates
 names (1-64 letters, digits, `-`, `_`, `.`; unique ignoring case), types,
 base URLs, tokens and variable names, and failures throw
 `ScmConfigurationException`.
 
-Entries come back as `ScmEntry`: endpoint, token source and the token masked.
-Only `Resolve(name)` returns an `ScmConnection` with the token, read from the
-file or from the named environment variable at that moment. Writes take the
+Entries come back as `ScmEntry`: endpoint, token source and the token masked,
+plus whether a stored token is still unencrypted (`PlainText`) or cannot be
+decrypted (`TokenError`, with the fix). Only `Resolve(name)` returns an
+`ScmConnection` with the token, decrypted from the file or read from the named
+environment variable at that moment; a token that cannot be decrypted throws
+`ScmConfigurationException` naming the SCM and `harness scm set <name>
+--token-stdin`. Writes take the
 machine-file lock (`scm.toml.lock`), write a temporary file restricted to the
 owner before any token is in it (an owner-only, non-inherited ACL on Windows,
 mode 600 elsewhere), and replace the file atomically, so a file whose
 permissions were widened is tightened by the next write. `Inspect()` reports
-whether the file exists, parses and is owner-only, for doctor.
+whether the file exists, parses and is owner-only, and the same for the key
+folder, for doctor.
+
+### Token encryption
+
+`ScmTokenProtector` (Infrastructure) encrypts stored tokens with ASP.NET Core
+Data Protection (`DataProtectionProvider.Create`, package
+`Microsoft.AspNetCore.DataProtection.Extensions`): authenticated encryption
+(AES-256-CBC with HMAC-SHA256) under a key ring in `scm-keys/` beside
+`scm.toml`, with the application name fixed to `harness` and the purpose
+`Harness.Scm.Token.v1`, so payloads do not depend on where harness is installed.
+The same code and format serve Windows, Linux, macOS and containers, with no
+keyring daemon.
+
+- **Key folder**: created owner-only (an owner-only, non-inherited ACL inherited
+  by the key files on Windows; mode 700 elsewhere, key files 600). On Windows
+  the keys are themselves protected with DPAPI (`ProtectKeysWithDpapi`); on
+  Linux and macOS the key files hold the master key in plain text, guarded only
+  by their permissions.
+- **Who makes keys**: only writes, which hold `scm.toml.lock`, may create or
+  rotate a key (Data Protection rolls keys every 90 days; expired keys still
+  decrypt). Every write also tightens a key folder others could open. Reads
+  (`List`, `Find`, `Resolve`, the `scm_` tools, doctor, harness ui) run with
+  `DisableAutomaticKeyGeneration` and never create the folder, so harness
+  processes started side by side do not each add a key.
+- **Migration**: a plain `token` written before encryption is still read (and
+  reported as unencrypted); the next write of the file (any `harness scm add`,
+  `set` or `remove`, or a change in harness ui) saves every stored token as
+  `token_protected`. Tokens are never written in plain text.
+- **What it protects against**: a copy of `scm.toml` on its own (a backup, a
+  synced dotfiles folder, a support bundle) no longer reveals the tokens; on
+  Windows neither does the key folder outside the user's account. It does not
+  protect against processes running as the same user (agents, MCP servers,
+  malware can decrypt as harness does), nor, on Linux and macOS, against anyone
+  who can read the whole configuration folder (root, an unencrypted disk).
+- **Losing keys**: without the key folder the tokens cannot be decrypted;
+  `scm.toml` and `scm-keys/` must be backed up, moved and mounted (in a
+  container, on the same volume) together. A token that cannot be decrypted is
+  stored again with `harness scm set <name> --token-stdin`.
+
+Native AOT: Data Protection publishes without trim or AOT warnings; only the
+`harness` executable decrypts tokens, so the other executables trim it away.
 
 `harness scm list|add|set|remove` (`src/Harness.Cli/Scm`) drives the store;
 `--token-stdin` reads the token from standard input so it stays out of shell
@@ -300,7 +346,10 @@ and the connection test the UI, `harness scm test` and doctor share, with a
 
 `ScmDoctor` (Cli) turns SCM state into doctor's `HealthCheck`s: `scm` (scm.toml
 readable, else a failure; owner-only, else a warning with the fix; nothing
-configured is `info`), `scm:<name>` per SCM (its token present, its connection
+configured is `info`), `scm keys` when a token is stored in the file (a token
+still unencrypted warns; a missing key folder fails; a key folder others can
+open warns; each with its fix), `scm:<name>` per SCM (its token present and
+decryptable, its connection
 test passing, else the failure kind and hint) and `scm project` (the
 resolution, and for a match one `GetProjectAsync` with that SCM's token;
 unmatched remotes warn with the reason, no remote is `info`). SCMs are tested

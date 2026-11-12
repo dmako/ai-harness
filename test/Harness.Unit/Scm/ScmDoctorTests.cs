@@ -129,6 +129,40 @@ public sealed class ScmDoctorTests : IDisposable
     }
 
     [Fact]
+    public async Task StoredTokensAreCheckedForEncryptionAndTheirKeyFolder()
+    {
+        Repo("git@gitlab.example.com:group/repo.git");
+        Directory.CreateDirectory(Global);
+        var file = Path.Combine(Global, "scm.toml");
+        await File.WriteAllTextAsync(
+            file,
+            $"[scm.work]\ntype = \"gitlab\"\nurl = \"https://gitlab.example.com\"\ntoken = \"{Good}\"\n",
+            Token
+        );
+        using var server = Gitlab();
+
+        var plain = await DoctorAsync(server);
+        plain["scm keys"].Level.Should().Be("warn");
+        plain["scm keys"].Detail.Should().Contain("unencrypted").And.Contain("work");
+        plain["scm keys"].Fix.Should().Contain("harness scm set work --token-stdin");
+        plain["scm:work"].Level.Should().Be("ok");
+
+        await Store.UpdateAsync("work", new ScmEntryChange(Type: "gitlab"), Token);
+        var encrypted = await DoctorAsync(server);
+        encrypted["scm keys"].Level.Should().Be("ok");
+        encrypted["scm keys"].Detail.Should().Contain("encrypted");
+        (await File.ReadAllTextAsync(file, Token)).Should().NotContain(Good);
+
+        Directory.Delete(Path.Combine(Global, "scm-keys"), true);
+        var lost = await DoctorAsync(server);
+        lost["scm keys"].Level.Should().Be("fail");
+        lost["scm keys"].Detail.Should().Contain("missing");
+        lost["scm:work"].Level.Should().Be("fail");
+        lost["scm:work"].Detail.Should().Contain("cannot be decrypted");
+        lost["scm:work"].Fix.Should().Contain("harness scm set work --token-stdin");
+    }
+
+    [Fact]
     public async Task AGithubProjectIsCheckedThroughTheGithubApi()
     {
         Repo("git@github.com:owner/repo.git");

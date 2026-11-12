@@ -38,7 +38,7 @@ public sealed class ScmConfigurationFileTests : IDisposable
             .Contain("[scm.work]")
             .And.Contain("type = \"gitlab\"")
             .And.Contain("url = \"https://gitlab.example.com\"");
-        text.Should().Contain($"token = \"{Secret}\"");
+        text.Should().Contain("token_protected = \"").And.NotContain(Secret).And.NotContain("token = ");
 
         var fresh = Store();
         fresh.List().Should().ContainSingle().Which.Should().BeEquivalentTo(added);
@@ -149,7 +149,9 @@ public sealed class ScmConfigurationFileTests : IDisposable
         (await File.ReadAllTextAsync(FilePath, Token))
             .Should()
             .NotContain("token_env")
-            .And.Contain("new-token-abcdefgh");
+            .And.Contain("token_protected")
+            .And.NotContain("new-token-abcdefgh");
+        Store().Resolve("alpha").Token.Should().Be("new-token-abcdefgh");
 
         Store().List().Select(entry => entry.Name).Should().Equal("alpha", "b");
         var missing = () => store.UpdateAsync("zeta", new ScmEntryChange(Type: "gitlab"), Token);

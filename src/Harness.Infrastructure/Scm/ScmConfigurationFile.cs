@@ -15,9 +15,10 @@ namespace Harness.Infrastructure.Scm;
 
 /// <summary>
 /// The machine's SCM connections in <c>scm.toml</c> beside the global <c>config.toml</c>: one <c>[scm.&lt;name&gt;]</c>
-/// table per SCM with <c>type</c>, <c>url</c> and <c>token</c> or <c>token_env</c>. Writes hold the machine-file lock,
-/// go through an owner-only temporary file and replace the file atomically, so the token never sits in a file others
-/// can read and a wider-permission file is tightened by the next write.
+/// table per SCM with <c>type</c>, <c>url</c> and <c>token_protected</c> (the token encrypted by
+/// <see cref="ScmTokenProtector" />) or <c>token_env</c>. A plain <c>token</c> written before tokens were encrypted is
+/// still read, and encrypted by the next write. Writes hold the machine-file lock, go through an owner-only temporary
+/// file and replace the file atomically, so a wider-permission file is tightened by the next write.
 /// </summary>
 public sealed class ScmConfigurationFile : IScmConfiguration
 {
@@ -31,9 +32,13 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         FilePath = Path.GetFullPath(filePath);
         _environment = environment ?? Environment.GetEnvironmentVariable;
+        Protector = ScmTokenProtector.ForFile(FilePath);
     }
 
     public string FilePath { get; }
+
+    /// <summary>Encrypts and decrypts the stored tokens, with its key folder beside the file.</summary>
+    public ScmTokenProtector Protector { get; }
 
     /// <summary>The store beside a global configuration file (<c>&lt;dir&gt;/config.toml</c>).</summary>
     public static ScmConfigurationFile ForGlobal(string globalConfigurationPath) =>
@@ -58,6 +63,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             ScmEntryRules.Kind(input.Type),
             ScmEntryRules.BaseUrl(input.Address),
             null,
+            null,
             null
         );
         record = (input.Token, input.TokenEnv) switch
@@ -71,7 +77,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                 "A token is required: give it with --token-stdin (or --token), or name an environment variable with --token-env."
             ),
         };
-        await UpdateFileAsync(
+        var saved = await UpdateFileAsync(
                 records =>
                 {
                     if (records.Any(entry => Same(entry.Name, record.Name)))
@@ -84,7 +90,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                 cancellationToken
             )
             .ConfigureAwait(false);
-        return View(record);
+        return Saved(saved, record.Name);
     }
 
     public async Task<ScmEntry> UpdateAsync(string name, ScmEntryChange change, CancellationToken cancellationToken)
@@ -96,7 +102,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         }
 
         Record? updated = null;
-        await UpdateFileAsync(
+        var saved = await UpdateFileAsync(
                 records =>
                 {
                     var index = records.FindIndex(entry => Same(entry.Name, name));
@@ -129,12 +135,17 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
                     if (change.Token is { Length: > 0 } token)
                     {
-                        record = record with { Token = ScmEntryRules.Token(token), TokenEnv = null };
+                        record = record with { Token = ScmEntryRules.Token(token), Protected = null, TokenEnv = null };
                     }
 
                     if (change.TokenEnv is { Length: > 0 } variable)
                     {
-                        record = record with { Token = null, TokenEnv = ScmEntryRules.Variable(variable) };
+                        record = record with
+                        {
+                            Token = null,
+                            Protected = null,
+                            TokenEnv = ScmEntryRules.Variable(variable),
+                        };
                     }
 
                     records[index] = record;
@@ -143,7 +154,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                 cancellationToken
             )
             .ConfigureAwait(false);
-        return View(updated!);
+        return Saved(saved, updated!.Name);
     }
 
     public async Task<bool> RemoveAsync(string name, CancellationToken cancellationToken)
@@ -162,7 +173,7 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         var record =
             Load().FirstOrDefault(entry => Same(entry.Name, name))
             ?? throw new ScmConfigurationException($"No SCM is named '{name}'.");
-        var token = Token(record);
+        var token = Token(record); // throws, naming the fix, when a stored token cannot be decrypted
         if (token is { Length: > 0 })
         {
             return new ScmConnection(Endpoint(record), token);
@@ -176,9 +187,20 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
     public ScmFileState Inspect()
     {
+        var (keysExist, keysOwnerOnly, keysDetail) = Protector.Inspect();
         if (!File.Exists(FilePath))
         {
-            return new ScmFileState(FilePath, false, "", null, "");
+            return new ScmFileState(
+                FilePath,
+                false,
+                "",
+                null,
+                "",
+                Protector.KeyDirectory,
+                keysExist,
+                keysOwnerOnly,
+                keysDetail
+            );
         }
 
         var error = "";
@@ -192,7 +214,17 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         }
 
         var (ownerOnly, detail) = Permissions(FilePath);
-        return new ScmFileState(FilePath, true, error, ownerOnly, detail);
+        return new ScmFileState(
+            FilePath,
+            true,
+            error,
+            ownerOnly,
+            detail,
+            Protector.KeyDirectory,
+            keysExist,
+            keysOwnerOnly,
+            keysDetail
+        );
     }
 
     private static bool Same(string left, string right) =>
@@ -200,18 +232,37 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
     private ScmEntry View(Record record)
     {
-        var token = Token(record);
+        string? token;
+        string? error = null;
+        try
+        {
+            token = Token(record);
+        }
+        catch (ScmConfigurationException exception)
+        {
+            (token, error) = (null, exception.Message);
+        }
+
         return new ScmEntry(
             Endpoint(record),
             record.TokenEnv is null ? ScmTokenSource.Stored : ScmTokenSource.Environment,
             record.TokenEnv,
             ScmTokens.Mask(token),
-            token is { Length: > 0 }
+            token is { Length: > 0 },
+            record is { TokenEnv: null, Protected: null, Token: not null },
+            error
         );
     }
 
+    /// <summary>The token a call would use: the variable's value, the plain token, or the stored one decrypted.</summary>
     private string? Token(Record record) =>
-        record.TokenEnv is { } variable ? _environment(variable)?.Trim() : record.Token;
+        record switch
+        {
+            { TokenEnv: { } variable } => _environment(variable)?.Trim(),
+            { Token: { } plain } => plain,
+            { Protected: { } payload } => Protector.Unprotect(payload, record.Name),
+            _ => null,
+        };
 
     private static ScmEndpoint Endpoint(Record record) => new(record.Name, record.Kind, record.Url);
 
@@ -289,13 +340,20 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         try
         {
             var token = Text("token");
+            var encrypted = Text("token_protected");
             var variable = Text("token_env");
+            var payload = string.IsNullOrWhiteSpace(encrypted) ? null : encrypted.Trim();
             return new Record(
                 ScmEntryRules.Name(name),
                 ScmEntryRules.Kind(Text("type") ?? throw new ScmConfigurationException("'type' is missing.")),
                 ScmEntryRules.BaseUrl(Text("url") ?? throw new ScmConfigurationException("'url' is missing.")),
-                string.IsNullOrWhiteSpace(token) ? null : token.Trim(),
-                string.IsNullOrWhiteSpace(variable) ? null : ScmEntryRules.Variable(variable.Trim())
+                // an encrypted token wins over a plain one left beside it; the next write drops the plain one
+                payload is null
+                && !string.IsNullOrWhiteSpace(token)
+                    ? token.Trim()
+                    : null,
+                string.IsNullOrWhiteSpace(variable) ? null : ScmEntryRules.Variable(variable.Trim()),
+                payload
             );
         }
         catch (ScmConfigurationException exception)
@@ -307,7 +365,8 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
     private static string FirstLine(string text) => text.Split('\n', 2)[0].Trim();
 
-    private async Task UpdateFileAsync(Action<List<Record>> edit, CancellationToken cancellationToken)
+    /// <summary>Applies an edit under the lock and writes the file; returns the records as saved (tokens encrypted).</summary>
+    private async Task<List<Record>> UpdateFileAsync(Action<List<Record>> edit, CancellationToken cancellationToken)
     {
         StorageFiles.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         await using var lease = await AtomicMachineFile
@@ -315,6 +374,21 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             .ConfigureAwait(false);
         var records = Load();
         edit(records);
+        // every stored token leaves this method encrypted, the ones read in plain text included; under the lock, so
+        // only one process at a time may create the first key. A write also tightens a key folder others could open.
+        if (records.Any(record => record.TokenEnv is null && (record.Token ?? record.Protected) is not null))
+        {
+            Protector.EnsureKeyDirectory();
+        }
+
+        for (var index = 0; index < records.Count; index++)
+        {
+            if (records[index] is { TokenEnv: null, Protected: null, Token: { } plain })
+            {
+                records[index] = records[index] with { Protected = Protector.Protect(plain) };
+            }
+        }
+
         var temporary = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
@@ -344,14 +418,20 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         {
             File.Delete(temporary);
         }
+
+        return records;
     }
+
+    /// <summary>A record as saved: encrypted, with its plain token still in hand, so showing it decrypts nothing.</summary>
+    private ScmEntry Saved(List<Record> records, string name) => View(records.First(entry => Same(entry.Name, name)));
 
     internal static string Render(IEnumerable<Record> records)
     {
         var builder = new StringBuilder();
         builder.Append(
             "# harness SCM connections, written by 'harness scm' and harness ui.\n"
-                + "# It holds access tokens: keep it private (readable only by you) and out of repositories.\n"
+                + "# Tokens are encrypted with the keys in scm-keys/ beside this file: back up and move both together.\n"
+                + "# Keep it private (readable only by you) and out of repositories.\n"
         );
         foreach (var record in records)
         {
@@ -362,9 +442,15 @@ public sealed class ScmConfigurationFile : IScmConfiguration
             {
                 builder.Append(CultureInfo.InvariantCulture, $"token_env = {Quote(variable)}\n");
             }
-            else if (record.Token is { } token)
+            else if (record.Protected is { } payload)
             {
-                builder.Append(CultureInfo.InvariantCulture, $"token = {Quote(token)}\n");
+                builder.Append(CultureInfo.InvariantCulture, $"token_protected = {Quote(payload)}\n");
+            }
+            else if (record.Token is not null)
+            {
+                throw new InvalidOperationException(
+                    $"SCM '{record.Name}': a token must be encrypted before it is written."
+                );
             }
         }
 
@@ -398,8 +484,8 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         return builder.Append('"').ToString();
     }
 
-    /// <summary>Whether only the current user may read the file, and what else may when not.</summary>
-    internal static (bool? OwnerOnly, string Detail) Permissions(string path)
+    /// <summary>Whether only the current user may read the file (or folder), and what else may when not.</summary>
+    internal static (bool? OwnerOnly, string Detail) Permissions(string path, bool directory = false)
     {
         try
         {
@@ -413,12 +499,13 @@ public sealed class ScmConfigurationFile : IScmConfiguration
                     | UnixFileMode.OtherRead
                     | UnixFileMode.OtherWrite
                     | UnixFileMode.OtherExecute;
+                var want = directory ? "700" : "600";
                 return (mode & Others) is 0
                     ? (true, "")
-                    : (false, $"mode {Convert.ToString((int)mode, 8)} lets group or others access it (want 600)");
+                    : (false, $"mode {Convert.ToString((int)mode, 8)} lets group or others access it (want {want})");
             }
 
-            var others = OtherWindowsAccounts(path);
+            var others = OtherWindowsAccounts(path, directory);
             return others.Count is 0 ? (true, "") : (false, "also readable by " + string.Join(", ", others));
         }
         catch (Exception exception)
@@ -435,16 +522,16 @@ public sealed class ScmConfigurationFile : IScmConfiguration
 
     /// <summary>The accounts other than the current user that the file's ACL allows any access.</summary>
     [SupportedOSPlatform("windows")]
-    private static List<string> OtherWindowsAccounts(string path)
+    private static List<string> OtherWindowsAccounts(string path, bool directory)
     {
         using var identity = WindowsIdentity.GetCurrent();
         var user = identity.User;
         List<string> others = [];
+        FileSystemSecurity security = directory
+            ? new DirectoryInfo(path).GetAccessControl()
+            : new FileInfo(path).GetAccessControl();
         foreach (
-            var rule in new FileInfo(path)
-                .GetAccessControl()
-                .GetAccessRules(true, true, typeof(SecurityIdentifier))
-                .OfType<FileSystemAccessRule>()
+            var rule in security.GetAccessRules(true, true, typeof(SecurityIdentifier)).OfType<FileSystemAccessRule>()
         )
         {
             if (rule.AccessControlType is AccessControlType.Allow && rule.IdentityReference != user)
@@ -469,5 +556,14 @@ public sealed class ScmConfigurationFile : IScmConfiguration
         }
     }
 
-    internal sealed record Record(string Name, ScmKind Kind, Uri Url, string? Token, string? TokenEnv);
+    /// <param name="Token">The token in plain text: just entered, or read from a file written before encryption.</param>
+    /// <param name="Protected">The token as stored, encrypted by <see cref="ScmTokenProtector" />.</param>
+    internal sealed record Record(
+        string Name,
+        ScmKind Kind,
+        Uri Url,
+        string? Token,
+        string? TokenEnv,
+        string? Protected
+    );
 }

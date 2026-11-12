@@ -2348,7 +2348,11 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 await page.WaitAsync(
                     "!document.querySelector('dialog[open]') && !!document.querySelector('.scmrow[data-scm=work]')"
                 );
-                (await File.ReadAllTextAsync(file, Token)).Should().Contain(Good);
+                // stored encrypted: the token itself never reaches the file
+                (await File.ReadAllTextAsync(file, Token))
+                    .Should()
+                    .Contain("token_protected")
+                    .And.NotContain(Good);
                 (await ValueAsync(page, "document.querySelector('.scmrow[data-scm=work]').textContent"))
                     .Should()
                     .Contain("GitLab")

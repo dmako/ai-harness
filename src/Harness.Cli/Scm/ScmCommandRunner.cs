@@ -267,7 +267,8 @@ internal sealed class ScmCommandRunner(
         {
             ScmTokenSource.Environment => $"token from ${entry.TokenEnv}"
                 + (entry.TokenAvailable ? $" ({entry.MaskedToken})" : " (not set)"),
-            _ => "token " + entry.MaskedToken,
+            _ when entry.TokenError is not null => "token cannot be decrypted",
+            _ => "token " + entry.MaskedToken + (entry.PlainText ? " (unencrypted)" : ""),
         };
 
     internal static JsonObjectMap Wire(ScmEntry entry) =>
@@ -280,5 +281,7 @@ internal sealed class ScmCommandRunner(
             ["token_env"] = entry.TokenEnv,
             ["token"] = entry.MaskedToken,
             ["token_available"] = entry.TokenAvailable,
+            ["token_encrypted"] = entry.TokenSource is ScmTokenSource.Stored ? !entry.PlainText : null,
+            ["token_error"] = entry.TokenError,
         };
 }

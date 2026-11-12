@@ -2200,7 +2200,8 @@ function scmConnections() {
       catch (err) { fill(result, h("p", { class: "error" }, err.message)); }
       test.disabled = false;
     } }, "Test connection");
-    const token = e.token_source === "env" ? `token from $${e.token_env}${e.token_available ? ` (${e.token})` : " (not set)"}` : `token ${e.token}`;
+    const token = e.token_source === "env" ? `token from $${e.token_env}${e.token_available ? ` (${e.token})` : " (not set)"}`
+      : e.token_error ? "token cannot be decrypted: store it again" : `token ${e.token}${e.token_encrypted === false ? " (unencrypted)" : ""}`;
     return h("li", { class: "scmrow", "data-scm": e.name },
       h("div", { class: "scmmain" },
         h("div", { class: "scmname" }, h("b", {}, e.name), h("span", { class: "pill" }, SCM_TYPES[e.type] || e.type)),

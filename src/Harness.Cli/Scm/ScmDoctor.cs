@@ -123,10 +123,62 @@ internal static class ScmDoctor
                 )
                 : new HealthCheck("scm", "ok", $"{entries.Count} SCM(s) in {file.Path}")
         );
+        if (KeysCheck(file, entries) is { } keys)
+        {
+            checks.Add(keys);
+        }
 
         var outcomes = await TestAllAsync(store, entries, handler, cancellationToken).ConfigureAwait(false);
         checks.AddRange(outcomes.Select(Check));
         return (checks, outcomes);
+    }
+
+    /// <summary>
+    /// The stored tokens' encryption: tokens still in plain text, and the key folder they are encrypted with (missing,
+    /// or open to others). Null when no SCM stores its token in the file.
+    /// </summary>
+    internal static HealthCheck? KeysCheck(ScmFileState file, IReadOnlyList<ScmEntry> entries)
+    {
+        var stored = entries.Where(entry => entry.TokenSource is ScmTokenSource.Stored).ToList();
+        if (stored.Count is 0)
+        {
+            return null;
+        }
+
+        var plain = stored.Where(entry => entry.PlainText).Select(entry => entry.Name).ToList();
+        if (plain.Count > 0)
+        {
+            return new HealthCheck(
+                "scm keys",
+                "warn",
+                $"{plain.Count} token(s) stored unencrypted in {file.Path} ({string.Join(", ", plain)})",
+                $"encrypt them: any change with 'harness scm' re-saves every stored token encrypted, e.g. 'harness scm set {plain[0]} --token-stdin'"
+            );
+        }
+
+        if (!file.KeysExist)
+        {
+            return new HealthCheck(
+                "scm keys",
+                "fail",
+                $"the stored tokens are encrypted, but their key folder {file.KeyPath} is missing",
+                "restore scm-keys from the backup it was taken with scm.toml, or store each token again with 'harness scm set <name> --token-stdin'"
+            );
+        }
+
+        var chmod = OperatingSystem.IsWindows() ? "" : $", or run 'chmod 700 {file.KeyPath}'";
+        return file.KeysOwnerOnly is false
+            ? new HealthCheck(
+                "scm keys",
+                "warn",
+                $"{file.KeyPath} holds the keys the tokens are encrypted with and is {file.KeysPermissionDetail}",
+                "make it accessible only to you: any 'harness scm' change tightens it" + chmod
+            )
+            : new HealthCheck(
+                "scm keys",
+                "ok",
+                $"{stored.Count} stored token(s) encrypted with the keys in {file.KeyPath}"
+            );
     }
 
     internal static HealthCheck Check(ScmTestOutcome outcome)

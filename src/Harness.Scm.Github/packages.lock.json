@@ -14,6 +14,12 @@
         "resolved": "11.0.100",
         "contentHash": "7oXelnecJ8xdGGoXtkoLZGHV07z07BDLjidGcaU3MwUGiTVDZWCGnJYdFqiN7aKVjTGzC5sxhaAnmxkj296+7Q=="
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "gK2aq4XvChj5kvozpPHrkfKkr7zc5Z4xoTrJb4GPZzDEPMlCk0TX632bwY3LsWcX2UVcVRQBBGzsBGC2lq6YhA=="
+      },
       "SonarAnalyzer.CSharp": {
         "type": "Direct",
         "requested": "[10.35.0.4138, )",

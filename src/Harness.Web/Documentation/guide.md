@@ -289,7 +289,9 @@ list` shows the connections with tokens masked, `harness scm set` changes one
 and `harness scm remove` drops it. harness ui has the same under Machine › SCM
 connections, where the token is a password field that is never shown again.
 Both store them in `scm.toml` beside the global `config.toml`, written so that
-only you can read it.
+only you can read it, with each stored token encrypted by keys in `scm-keys/`
+next to it: keep the two together in backups and on other machines (see the
+reference's SCM connections for what the encryption does and does not protect).
 
 **Check it.** `harness scm test` (or Test connection in harness ui) shows the
 server's version and the token's user, or what failed: unreachable, TLS,

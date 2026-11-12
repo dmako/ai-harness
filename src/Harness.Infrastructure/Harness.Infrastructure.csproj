@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
     <ProjectReference Include="../Harness.Scm/Harness.Scm.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Extensions" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Tomlyn" />
     <PackageReference Include="YamlDotNet" />

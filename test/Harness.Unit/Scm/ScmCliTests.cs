@@ -53,7 +53,10 @@ public sealed class ScmCliTests : IDisposable
         );
         add.Code.Should().Be(0, add.Error);
         add.Output.Should().Contain("Added SCM work (GitLab, https://gitlab.example.com), token ****6789.");
-        (await File.ReadAllTextAsync(Path.Combine(_directory, "scm.toml"), Token)).Should().Contain(Secret);
+        (await File.ReadAllTextAsync(Path.Combine(_directory, "scm.toml"), Token))
+            .Should()
+            .Contain("token_protected")
+            .And.NotContain(Secret);
 
         var list = await RunAsync("", "scm", "list");
         list.Output.Should().MatchRegex(@"work\s+gitlab\s+https://gitlab\.example\.com\s+token \*\*\*\*6789");
