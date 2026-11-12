@@ -250,3 +250,12 @@ in parallel through `ScmProviders` with its 15 s timeout; `doctor --all` tests
 them once and adds each project's `scm project` check. `harness scm test` runs
 the same tests for one SCM or all of them and exits 1 when one fails. Tests
 inject a fake server through `ScmHttpOptions`.
+
+## MCP tools
+
+The `scm_` tools (see [mcp](mcp.md)) reach SCMs through `IScmSession` (Harness.Scm):
+the project's resolution, the machine's `IScmConfiguration` for tokens and the
+`ScmProviderRegistry`. `HarnessStateSession` implements it; `harness mcp` gives it
+the GitLab and Forgejo providers, so Mcp needs neither Infrastructure nor the
+providers. The generated agent instructions (`AgentGuidance`) tell agents how to
+review a merge request with them.

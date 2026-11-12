@@ -402,6 +402,28 @@ you, that each SCM has its token and answers its connection test (all tested
 at once, 15 s at most each), and which SCM and project this repository is on
 and whether the token reaches that project. No SCM configured is only noted.
 
+Agents work with the project's merge requests through these MCP tools. Each
+acts on the current project's SCM and project; `merge_request_id` is the number
+the SCM shows (GitLab `!7` is 7, Forgejo pull request `#7` is 7).
+
+| Tool | Arguments (default) | Does |
+|---|---|---|
+| `scm_get_projects` | `search`, `visibility` (`private`; or `internal`, `public`), `scm` (the project's) | projects the token's user can access |
+| `scm_list_merge_requests` | `state` (`opened`; or `merged`, `closed`) | the project's merge requests, latest first |
+| `scm_get_merge_request_details` | `merge_request_id` | description, branches, SHAs, approvals, reviewers, labels |
+| `scm_get_merge_request_comments` | `merge_request_id` | general and diff-line comments, oldest first |
+| `scm_add_merge_request_comment` | `merge_request_id`, `comment` | a general comment |
+| `scm_add_merge_request_diff_comment` | `merge_request_id`, `comment`, `file_path`, `line_number`, `line_type` (`new`; or `old` for a removed line) | a comment on one diff line |
+| `scm_get_merge_request_diff` | `merge_request_id` | the changes per file, at most 60 KB, cut files marked truncated |
+| `scm_set_merge_request_title` | `merge_request_id`, `title` | renames the merge request |
+| `scm_set_merge_request_description` | `merge_request_id`, `description` | replaces its description |
+| `scm_approve_merge_request` | `merge_request_id` | approves it as the token's user |
+
+A tool that cannot reach the SCM says why and what to do: no SCM configured
+(`harness scm add`), no remote matching one (`[scm]` above, `harness doctor`),
+or the server's answer (`unauthorized`, `forbidden`, `not_found`, `invalid`
+for a line outside the diff, `rate_limited`) with its fix.
+
 ## Tasks
 
 Tasks come from a backlog file (`docs/backlog.yaml` by default):
