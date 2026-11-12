@@ -1,0 +1,107 @@
+{
+  "description": "List the SCM projects the token's user can access, to check access or find a project's path. Uses the current project's SCM, else the only one configured, else the one named by scm.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "search": {
+        "type": "string",
+        "description": "filter by name"
+      },
+      "visibility": {
+        "type": "string",
+        "description": "private (default), internal or public"
+      },
+      "scm": {
+        "type": "string",
+        "description": "a configured SCM's name ('harness scm list'); default: the project's"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "scm_get_projects",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "visibility": {
+        "type": "string"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "projects": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string",
+              "description": "group/sub/repo (GitLab) or owner/repo (Forgejo)"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "visibility": {
+              "type": "string"
+            },
+            "web_url": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "default_branch": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "path",
+            "name",
+            "visibility"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "scm",
+      "visibility",
+      "count",
+      "projects"
+    ],
+    "additionalProperties": false
+  }
+}

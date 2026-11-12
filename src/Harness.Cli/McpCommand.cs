@@ -67,6 +67,9 @@ internal sealed class McpCommand(
         var session = new HarnessStateSession(location, lifecycle.Registry, runtime, lifecycle.GlobalConfigurationPath)
         {
             ContextObserver = calls,
+            ScmProviders = Harness.Cli.Scm.ScmProviders.Registry(
+                (services.GetService(typeof(Harness.Cli.Scm.ScmHttpOptions)) as Harness.Cli.Scm.ScmHttpOptions)?.Handler
+            ),
         };
         await using var workspace = new WorkspaceTools(
             session,

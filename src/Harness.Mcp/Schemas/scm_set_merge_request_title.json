@@ -1,0 +1,88 @@
+{
+  "description": "Change a merge request's title. Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo pull request #index)"
+      },
+      "title": {
+        "type": "string",
+        "description": "the new title"
+      }
+    },
+    "required": [
+      "merge_request_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_set_merge_request_title",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer"
+      },
+      "merge_request": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "web_url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id",
+      "merge_request"
+    ],
+    "additionalProperties": false
+  }
+}

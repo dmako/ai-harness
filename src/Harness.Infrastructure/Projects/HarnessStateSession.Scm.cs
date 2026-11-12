@@ -4,11 +4,14 @@ using Harness.Scm;
 
 namespace Harness.Infrastructure.Projects;
 
-public sealed partial class HarnessStateSession : IScmProjectContext
+public sealed partial class HarnessStateSession : IScmSession
 {
     /// <summary>The machine's SCM connections (scm.toml beside the global configuration).</summary>
     public IScmConfiguration ScmConfiguration =>
         ScmConfigurationFile.ForGlobal(globalConfigurationPath ?? ConfigurationPaths.GlobalPath());
+
+    /// <summary>The SCM providers, supplied by the host (the CLI composes GitLab and Forgejo).</summary>
+    public ScmProviderRegistry? ScmProviders { get; init; }
 
     /// <summary>
     /// This project's SCM from its own repository's remotes (a worktree or workspace member resolves against its

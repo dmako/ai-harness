@@ -1,0 +1,147 @@
+{
+  "description": "List a merge request's comments oldest first: general comments, comments on diff lines (with their position) and server notes (system). Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo pull request #index)"
+      }
+    },
+    "required": [
+      "merge_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_get_merge_request_comments",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "comments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "description": "general, or diff for a comment on a diff line"
+            },
+            "body": {
+              "type": "string"
+            },
+            "author": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "created_at": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "system": {
+              "type": "boolean",
+              "description": "a server-generated note (pushed commits, status changes)"
+            },
+            "thread_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "web_url": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "position": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "file_path": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "old_path": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "new_line": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "old_line": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "body",
+            "system"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id",
+      "count",
+      "comments"
+    ],
+    "additionalProperties": false
+  }
+}

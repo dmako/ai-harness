@@ -1,0 +1,112 @@
+{
+  "description": "List the project's merge requests (GitLab merge requests, Forgejo pull requests), most recently updated first. Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "description": "opened (default), merged or closed"
+      }
+    },
+    "additionalProperties": false
+  },
+  "name": "scm_list_merge_requests",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "state": {
+        "type": "string"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "merge_requests": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "the merge request's number in the project (pass it as merge_request_id)"
+            },
+            "title": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "description": "opened, merged or closed"
+            },
+            "author": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "source_branch": {
+              "type": "string"
+            },
+            "target_branch": {
+              "type": "string"
+            },
+            "draft": {
+              "type": "boolean"
+            },
+            "updated_at": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "web_url": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "state",
+            "source_branch",
+            "target_branch"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "state",
+      "count",
+      "merge_requests"
+    ],
+    "additionalProperties": false
+  }
+}

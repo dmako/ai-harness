@@ -267,6 +267,7 @@ public static class HarnessMcpServer
             "change_coupling" => CouplingAsync(call, tools.Coupling),
             "get_context" => ContextAsync(call, tools.Context),
             _ when ProviderTools.Handles(call.Name) => ProvidersAsync(call, tools.Providers),
+            _ when Harness.Mcp.Scm.ScmTools.Handles(call.Name) => ScmAsync(call),
             _ when call.Name.StartsWith("task_", StringComparison.Ordinal) => TasksAsync(call),
             _ => MemoryAsync(call),
         };
@@ -306,6 +307,16 @@ public static class HarnessMcpServer
                     scm: call.Session as Harness.Scm.IScmProjectContext
                 )
             ).CallAsync(call.Name, call.Arguments, call.Token)
+        );
+
+    private static async Task<CallToolResult> ScmAsync(ToolCall call) =>
+        Success(
+            await Harness.Mcp.Scm.ScmTools.CallAsync(
+                call.Name,
+                call.Arguments,
+                call.Session as Harness.Scm.IScmSession,
+                call.Token
+            )
         );
 
     private static async Task<CallToolResult> TasksAsync(ToolCall call) =>

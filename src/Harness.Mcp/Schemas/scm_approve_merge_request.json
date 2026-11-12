@@ -1,0 +1,72 @@
+{
+  "description": "Approve a merge request as the token's user (GitLab approval, Forgejo approving review). Acts on the current project's merge requests on its SCM (GitLab or Forgejo, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the merge request's number in this project, as the SCM shows it (GitLab !iid, Forgejo pull request #index)"
+      }
+    },
+    "required": [
+      "merge_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_approve_merge_request",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer"
+      },
+      "approved": {
+        "type": [
+          "null",
+          "boolean"
+        ],
+        "description": "whether the approval rules are now met; null when the SCM does not say"
+      },
+      "approved_by": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id"
+    ],
+    "additionalProperties": false
+  }
+}
