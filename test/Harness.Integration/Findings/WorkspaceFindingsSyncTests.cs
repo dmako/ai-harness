@@ -23,7 +23,12 @@ public sealed class WorkspaceFindingsSyncTests
         {
             repo.Write(
                 "App.csproj",
-                "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"
+                """
+                <Project>
+                  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+                  <ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" /></ItemGroup>
+                </Project>
+                """
             );
             repo.Write("appsettings.json", """{"ConnectionStrings":{"Main":"Server=db;Database=shared"}}""");
             repo.Write("Program.cs", "[ServiceContract]\ninterface IShared {}\nclass SharedDbContext : DbContext {}");

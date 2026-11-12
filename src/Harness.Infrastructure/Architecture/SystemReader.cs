@@ -37,15 +37,17 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
     [GeneratedRegex(@"\bclass\s+\w+", EcosystemReader.RxOptions, 1000)]
     private static partial Regex ClassWord { get; }
 
-    // a class that may be a DbContext: its name ends with Context, on the line that says class (as ClassWord)
-    [GeneratedRegex(@"\bclass\s+\w*Context\b", EcosystemReader.RxOptions, 1000)]
+    // a class that may be a DbContext or a step of one's base chain: its name ends with Context, or it derives from
+    // a type whose name ends with DbContext or ObjectContext (on the line that says class, as ClassWord)
+    [GeneratedRegex(
+        @"\bclass\s+(?:\w*Context\b|\w+[^{;:]*:\s*(?:global::)?[\w.]*(?:DbContext|ObjectContext)\b)",
+        EcosystemReader.RxOptions,
+        1000
+    )]
     private static partial Regex ContextClass { get; }
 
     [GeneratedRegex(@"^\s*service\s+(\w+)\s*\{", EcosystemReader.RxOptions, 1000)]
     private static partial Regex Proto { get; }
-
-    [GeneratedRegex(@"(?:^|\.)\w*(?:DbContext|Context)\b", EcosystemReader.RxOptions, 1000)]
-    private static partial Regex ContextBase { get; }
 
     [GeneratedRegex(
         @"^(?:Base|Migration|Migrated|Runtime|Design|Pooled)|(?:Base|Migration|Migrated|Runtime|Design|Pooled)$",
@@ -91,6 +93,10 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         _links.Clear();
         _databases.Clear();
         _contracts.Clear();
+        _classes.Clear();
+        _contexts.Clear();
+        _entityFramework.Clear();
+        _projects.Clear();
         foreach (var member in members)
         {
             var ecosystem = new EcosystemReader(member.Repository);
@@ -249,6 +255,8 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
             }
         }
 
+        ReadDatabases();
+
         foreach (var name in declarations.Keys.Order(StringComparer.Ordinal))
         {
             AddContract(name, usage);
@@ -378,13 +386,16 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         );
     }
 
-    /// <summary>Whether a file's scan can find anything: a contract's name, or a class that may be a DbContext.</summary>
+    /// <summary>
+    /// Whether a file's scan can find anything: a contract's name, or a class that may be a DbContext or a step of
+    /// one's base chain.
+    /// </summary>
     private static bool Mentions(string text, ContractUsage usage) =>
         text.AsSpan().IndexOfAny(usage.Mentioned) >= 0 || ContextClass.IsMatch(text);
 
     /// <summary>
-    /// A class declaration registers its DbContext and the contracts it implements, and only its
-    /// constructor parameters count as uses; any other non-interface text counts whole.
+    /// A class declaration registers its first base type (for the DbContext check) and the contracts it
+    /// implements, and only its constructor parameters count as uses; any other non-interface text counts whole.
     /// </summary>
     private void ContractUses(SystemMember member, string file, int line, string declaration, ContractUsage usage)
     {
@@ -392,7 +403,7 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         var usedText = declaration;
         if (match.Success)
         {
-            DbContext(member, file, line, match.Groups[1].Value, match.Groups[2].Value, declaration);
+            DeclareClass(member, file, line, match.Groups[1].Value, match.Groups[2].Value, declaration);
             foreach (var baseType in match.Groups[2].Value.Split(','))
             {
                 var name = baseType.Trim().Split(new char[] { '<', ' ' }, StringSplitOptions.None)[0];
@@ -457,13 +468,8 @@ public sealed partial class SystemReader(IReadOnlyList<SystemMember> members)
         );
     }
 
-    private void DbContext(SystemMember member, string file, int line, string name, string bases, string declaration)
+    private void DbContext(SystemMember member, string file, int line, string name, string declaration)
     {
-        if (!name.EndsWith("Context", StringComparison.Ordinal) || !ContextBase.IsMatch(bases.Split(',')[0].Trim()))
-        {
-            return;
-        }
-
         var logical = name[..^7];
         if (logical.EndsWith("Db", StringComparison.Ordinal))
         {
