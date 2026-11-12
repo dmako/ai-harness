@@ -254,6 +254,12 @@
       "harness.scm": {
         "type": "Project"
       },
+      "harness.scm.forgejo": {
+        "type": "Project",
+        "dependencies": {
+          "Harness.Scm": "[0.10.0-localbuild, )"
+        }
+      },
       "harness.scm.gitlab": {
         "type": "Project",
         "dependencies": {

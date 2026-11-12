@@ -95,19 +95,30 @@ public sealed class ScmHttpClient : IDisposable
     /// one, names a next page), at most <see cref="ScmLimits.MaxPages" /> pages.
     /// </summary>
     /// <param name="path">The list's path for a 1-based page number and the page size.</param>
-    public async Task<List<T>> GetPagesAsync<T>(
+    public Task<List<T>> GetPagesAsync<T>(
         Func<int, int, string> path,
         JsonTypeInfo<List<T>> type,
+        CancellationToken cancellationToken
+    ) => GetPagesAsync(path, type, page => page, cancellationToken);
+
+    /// <summary>Every page of a list each page wraps in an envelope (Forgejo's <c>{"ok":…,"data":[…]}</c>).</summary>
+    /// <param name="items">The page's items inside its envelope.</param>
+    public async Task<List<T>> GetPagesAsync<TPage, T>(
+        Func<int, int, string> path,
+        JsonTypeInfo<TPage> type,
+        Func<TPage, IReadOnlyList<T>?> items,
         CancellationToken cancellationToken
     )
     {
         ArgumentNullException.ThrowIfNull(path);
-        List<T> items = [];
+        ArgumentNullException.ThrowIfNull(items);
+        List<T> all = [];
         for (var page = 1; page <= Limits.MaxPages; page++)
         {
-            var (values, headers) = await GetAsync(path(page, Limits.PageSize), type, cancellationToken)
+            var (envelope, headers) = await GetAsync(path(page, Limits.PageSize), type, cancellationToken)
                 .ConfigureAwait(false);
-            items.AddRange(values ?? []);
+            var values = items(envelope);
+            all.AddRange(values ?? []);
             var next = headers.TryGetValues("X-Next-Page", out var nextValues) ? nextValues.FirstOrDefault() : null;
             if ((values?.Count ?? 0) < Limits.PageSize || next is { Length: 0 })
             {
@@ -115,7 +126,7 @@ public sealed class ScmHttpClient : IDisposable
             }
         }
 
-        return items;
+        return all;
     }
 
     private async Task<HttpResponseMessage> SendAsync(

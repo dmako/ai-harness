@@ -8,6 +8,7 @@
     <ProjectReference Include="../../src/Harness.Cli/Harness.Cli.csproj" />
     <ProjectReference Include="../../src/Harness.Scm/Harness.Scm.csproj" />
     <ProjectReference Include="../../src/Harness.Scm.Gitlab/Harness.Scm.Gitlab.csproj" />
+    <ProjectReference Include="../../src/Harness.Scm.Forgejo/Harness.Scm.Forgejo.csproj" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="AwesomeAssertions" />
   </ItemGroup>

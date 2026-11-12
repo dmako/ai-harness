@@ -177,7 +177,8 @@ public sealed class GitlabProviderTests
     {
         var full = """[{"id":1,"path_with_namespace":"g/a"},{"id":2,"path_with_namespace":"g/b"}]""";
         using var server = new FakeScmServer();
-        server.Json("GET", Api + "/projects", full, new() { ["X-Next-Page"] = "9" });
+        var page = new FakeResponse(HttpStatusCode.OK, full, Headers: new() { ["X-Next-Page"] = "9" });
+        server.On("GET", Api + "/projects", page, page, page, page);
         using var client = Connect(server);
 
         (await client.ListProjectsAsync(null, ScmVisibility.Private, Token)).Should().HaveCount(6);

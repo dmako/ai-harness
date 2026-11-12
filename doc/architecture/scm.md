@@ -157,3 +157,44 @@ path (`api/v4/projects/group%2Fsub%2Frepo`), a merge request by its iid.
 | Diff | `GET .../diffs` (GitLab 15.7+), else `GET .../changes`; `too_large` files are marked truncated |
 | Title, description | `PUT .../merge_requests/:iid` |
 | Approve | `POST .../approve` |
+
+## Forgejo
+
+`ForgejoProvider` (`src/Harness.Scm.Forgejo`) speaks REST API v1 (also served
+by Gitea) with the token in `Authorization: token <t>`. A project is
+`owner/repo`; a merge request is a pull request, addressed by its index.
+
+| Operation | Forgejo call |
+| --- | --- |
+| Test connection | `GET /version` (a missing API is `wrong_server`, which is what a GitLab URL answers), then `GET /user` |
+| Projects | `GET /repos/search?q=&private=true`, paged by `page`/`limit`; without a search also `GET /user/repos`, merged by id |
+| Merge requests | `GET /repos/{o}/{r}/pulls?state=open\|closed`, paged |
+| Details | `GET .../pulls/{i}` and `.../pulls/{i}/reviews` |
+| Comments | `GET .../issues/{i}/comments`, review bodies, and `GET .../pulls/{i}/reviews/{id}/comments` for reviews with inline comments |
+| General comment | `POST .../issues/{i}/comments` |
+| Diff comment | `POST .../pulls/{i}/reviews` with event `COMMENT`, the head commit and one comment with `path` and `new_position` or `old_position` |
+| Diff | `GET .../pulls/{i}.diff`, split per file |
+| Title, description | `PATCH .../pulls/{i}` |
+| Approve | `POST .../pulls/{i}/reviews` with event `APPROVED` on the head commit |
+
+Where it differs from GitLab:
+
+- **States**: Forgejo knows only open and closed. `merged` asks for closed
+  pull requests and keeps those with `merged: true`; `closed` keeps the others.
+- **Visibility**: a repository is private, or public; one of a `limited`
+  (signed-in users only) owner has `internal: true`, which harness reports as
+  `internal`. The API cannot filter by it, so projects are filtered after
+  they are read.
+- **Approvals**: Forgejo has no approval rules API, so `Approved` stays unknown
+  (null); `ApprovedBy` lists the users whose latest approving or
+  change-requesting review approves and is neither dismissed nor stale (made
+  stale by later commits). Approving creates such a review.
+- **Comments**: a review's body is listed as a general comment (id
+  `review-<id>`, prefixed with its state); its inline comments are diff
+  comments, with the review as their thread. `position` is a line of the new
+  file and `original_position` one of the old file. There are no system notes.
+- **Diffs**: read from the `.diff` patch, so binary, renamed, added and deleted
+  files are recognised from its headers; the patch is cut at 20 MiB before the
+  caller's byte budget applies.
+- **Drafts**: a pull request is a draft when the server says so or its title
+  starts with `WIP:` or `[WIP]`.

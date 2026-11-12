@@ -28,6 +28,7 @@ internal sealed class FakeScmServer : HttpMessageHandler
 {
     private readonly Dictionary<string, Queue<FakeResponse>> _routes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FakeResponse> _last = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _registered = new(StringComparer.Ordinal);
 
     public List<FakeRequest> Requests { get; } = [];
 
@@ -46,8 +47,15 @@ internal sealed class FakeScmServer : HttpMessageHandler
             queue.Enqueue(response);
         }
 
+        _registered[key] = _registered.GetValueOrDefault(key) + responses.Length;
         return this;
     }
+
+    private static bool LaterPage(Uri uri) =>
+        uri
+            .Query.TrimStart('?')
+            .Split('&')
+            .Any(pair => pair.StartsWith("page=", StringComparison.Ordinal) && pair != "page=1");
 
     public FakeScmServer Json(string method, string path, string json, Dictionary<string, string>? headers = null) =>
         On(method, path, new FakeResponse(HttpStatusCode.OK, json, Headers: headers));
@@ -76,7 +84,21 @@ internal sealed class FakeScmServer : HttpMessageHandler
 
         var key = request.Method.Method + " " + request.RequestUri!.AbsolutePath;
         FakeResponse answer;
-        if (_routes.TryGetValue(key, out var queue) && queue.Count > 0)
+        if (
+            _registered.GetValueOrDefault(key) is 1
+            && LaterPage(request.RequestUri)
+            && _last.TryGetValue(key, out var only)
+        )
+        {
+            // one canned list stands for the whole list: like a real server, later pages are empty
+            answer = only with
+            {
+                Body = only.Body.TrimStart().StartsWith("{", StringComparison.Ordinal)
+                    ? """{"ok":true,"data":[]}"""
+                    : "[]",
+            };
+        }
+        else if (_routes.TryGetValue(key, out var queue) && queue.Count > 0)
         {
             answer = queue.Dequeue();
             _last[key] = answer;
