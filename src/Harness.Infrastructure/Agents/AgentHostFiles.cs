@@ -57,7 +57,14 @@ public static class AgentHostFiles
         {
             File.WriteAllText(
                 ignore,
-                "# Managed by harness: agent hosts' state and logs stay local.\n*\n",
+                """
+                # Managed by harness: agent hosts' state and logs stay local.
+                *.db
+                *.db-wal
+                *.db-shm
+                *.db.findings-inputs
+
+                """,
                 new UTF8Encoding(false)
             );
         }
