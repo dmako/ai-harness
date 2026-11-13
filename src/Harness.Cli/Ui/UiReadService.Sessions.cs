@@ -67,11 +67,13 @@ internal sealed partial class UiReadService
         {
             totals["cost_usd"] = worked.Sum(s => s.CostUsd ?? 0);
         }
+        // the agent hosts started for the task from harness ui, live or ended (TASK-0116)
+        var hosts = agents?.Hosts(project, id) ?? [];
+        MarkUnlistedModels(hosts);
         JsonObjectMap output = new()
         {
             ["sessions"] = worked.Select(TaskViews.Session),
-            // the agent hosts started for the task from harness ui, live or ended (TASK-0116)
-            ["hosts"] = agents?.Hosts(project, id) ?? [],
+            ["hosts"] = hosts,
             // what the start dialog offers per client (TASK-0135)
             ["permission_modes"] = UiAgents.PermissionModes(),
             ["totals"] = totals,

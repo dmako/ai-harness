@@ -305,6 +305,89 @@ public sealed class AgentServerTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    public async Task ASessionsHandshakeRefreshesItsClientsModelCatalogWithoutWaitingForIt(string client)
+    {
+        var path = Path.Combine(_root, "global", AgentModelStore.FileName);
+        var name = client is "claude" ? AgentClients.Claude : AgentClients.Codex;
+        var store = new AgentModelStore(path);
+        await store.SeenAsync(name, [("model-from-a-transcript", DateTimeOffset.UtcNow)], Token);
+        await using (var host = await Host.StartAsync(this, client, "", "hello", ["--models", path]))
+        {
+            await host.WaitAsync(e => Is(e, "turn"));
+            var catalog = await CatalogAsync(store, name, c => c.RefreshedAt is not null);
+            catalog.Source.Should().Be(AgentModelSources.Session);
+            if (client is "claude")
+            {
+                catalog
+                    .Models.Select(m => (m.Id, m.Label, m.IsDefault))
+                    .Should()
+                    .StartWith([("fake", "Fake 1", true), ("claude-fake-2", "Fake 2", false)]);
+                catalog.Version.Should().Be("0.0.1-fake");
+            }
+            else
+            {
+                // both pages of model/list, the hidden model kept but marked
+                catalog
+                    .Models.Select(m => (m.Id, m.IsDefault, m.Hidden))
+                    .Should()
+                    .StartWith([
+                        ("gpt-fake", true, false),
+                        ("gpt-fake-old", false, true),
+                        ("gpt-fake-mini", false, false),
+                    ]);
+                catalog.Version.Should().Be("0.0.2-fake");
+            }
+            catalog.Models[^1].Should().Match<AgentModel>(m => m.Id == "model-from-a-transcript" && m.Source == "seen");
+            await host.Pipe.SendAsync(new JsonObject { ["op"] = "close" }, Token);
+            await host.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        }
+        // the model asked for is kept beside the one the client names, so harness ui can tell an unlisted one
+        var state = AgentHostFiles.States(State).Should().ContainSingle().Subject;
+        Text(state, "requested_model").Should().BeEmpty();
+
+        var (refreshed, count) = (store.Read(name).RefreshedAt, store.Read(name).Models.Count);
+        await using (
+            var failing = await Host.StartAsync(
+                this,
+                client,
+                "",
+                "hello",
+                ["--models", path, "--model", "my-own-model", "--env", "HARNESS_FAKE_AGENT_MODELS=error"]
+            )
+        )
+        {
+            await failing.WaitAsync(e => Is(e, "turn"));
+            var kept = await CatalogAsync(store, name, c => c.Error.Length > 0);
+            kept.Error.Should().Contain("fake agent: no models");
+            (kept.RefreshedAt, kept.Models.Count).Should().Be((refreshed, count), "a failed refresh keeps the catalog");
+            Text(AgentHostFiles.ReadState(State, failing.Key)!, "requested_model").Should().Be("my-own-model");
+            await failing.Pipe.SendAsync(new JsonObject { ["op"] = "close" }, Token);
+            await failing.Exit.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        }
+    }
+
+    private static async Task<AgentModelCatalog> CatalogAsync(
+        AgentModelStore store,
+        string client,
+        Func<AgentModelCatalog, bool> ready
+    )
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (true)
+        {
+            var catalog = store.Read(client);
+            if (ready(catalog))
+            {
+                return catalog;
+            }
+            await Task.Delay(50, timeout.Token);
+        }
+    }
+
     private static string[] Mode(string mode) => mode.Length > 0 ? ["--permission-mode", mode] : [];
 
     private List<JsonObject> Threads() =>

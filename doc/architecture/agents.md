@@ -95,6 +95,46 @@ command outside the working tree without asking: Codex's Auto relies on the `wor
 (`untrusted`) is the mode to choose when every command should be seen first. Approvals still come as `approval`
 events in every mode that asks.
 
+**Model catalog** (TASK-0142). harness keeps, per client, the models it can offer in the start dialog: a
+machine-wide `agent-models.json` beside the global configuration (`Harness.Infrastructure.Agents.AgentModelStore`,
+written through the machine file's lock and atomic replace, like `ui.json`), so every project and browser shares it.
+`{version, clients: {<client>: {refreshed_at, source, cli_version, error, failed_at, models: [{id, label,
+description, default, hidden, resolved, upgrade, source, last_seen}]}}}`. The data and the merging live in
+`Harness.Core.Agents` (`AgentModel`, `AgentModelCatalog`, `AgentModelCatalogs`, `AgentModelProtocol`).
+
+Sources, checked against the installed CLIs (recorded answers in `AgentModelCatalogTests`):
+
+| Client | Source | What it gives |
+|---|---|---|
+| Codex | app-server `model/list` (codex-cli 0.167.1, `codex app-server generate-json-schema`: `ModelListParams` {cursor, limit, includeHidden}, `ModelListResponse` {data, nextCursor}) | per model `id`, `model` (the id a thread takes), `displayName`, `description`, `isDefault`, `hidden`, `upgrade`/`upgradeInfo`; harness reads up to 10 pages, hidden models are kept but not offered |
+| Claude Code | the stream-json control request `initialize` (Claude Code 2.1.318; what the Agent SDK's `supportedModels()` reads) | `models: [{value, resolvedModel, displayName, description, …}]` and `claude_code_version`; `value` is what `--model` takes, `default` names the model the CLI defaults to (that alias becomes the catalog's default; the full id is added when no alias names it) |
+| Claude Code, older | an initialize answer without `models` | the documented aliases `sonnet`, `opus`, `haiku` (source `alias`); nothing is guessed beyond them |
+| both | the transcripts (`agent_usage`, read by `TranscriptReader`) | models a session used that the list does not name, as `seen` entries (not `<synthetic>`) |
+
+Refresh:
+- **A session's handshake.** `harness-agents serve --models <file>` (harness ui passes the file beside the global
+  configuration) refreshes its client's catalog with no extra process: Claude's session sends `initialize` before its
+  first turn and reads the `control_response` with everything else; Codex's sends `model/list` right after
+  `initialized`, beside `thread/start`. Neither waits for the answer; source `session`.
+- **A probe.** When the start dialog opens, `GET /api/projects/{id}/agent-models` (with `X-Harness-UI`) starts a
+  background probe for each client whose catalog is empty or older than 24 h (`AgentModelCatalog.MaxAge`), at most
+  one per client at a time and not again within 5 minutes of a failure: `claude -p --input-format stream-json
+  --output-format stream-json --verbose --no-session-persistence` gets `initialize`, `codex app-server` gets
+  `initialize`, `initialized` and `model/list`; the process runs in the global configuration's folder through
+  `IProviderProcessFactory` and its whole tree is killed once it answers or after 30 s (`AgentModelProbe`). The
+  endpoint answers at once with what the file holds and `refreshing: true`; the dialog asks again every 3 s while it
+  is open. `HARNESS_AGENT_MODELS_OFFLINE=1` (set by the tests) turns probes off. Source `probe`.
+- **Transcripts.** The endpoint first adds the project's `agent_usage` models as `seen`. This is how sessions harness
+  did not start count: an MCP client's `initialize` (`clientInfo`) names the client and its version, never its models.
+- A refresh replaces the client's own entries in the order it gave them and keeps the `seen` ones it does not name;
+  a failed (or empty) refresh records `error` and `failed_at` and keeps the models and `refreshed_at`.
+
+The endpoint answers `{clients: {<client>: {models (hidden left out), default: {id, label} | null, refreshed_at,
+age_seconds, stale, refreshing, error, failed_at, source, cli_version}}, max_age_hours}`. `POST …/agents` still
+takes any model id. The host keeps the id asked for as `requested_model` in its state; `GET …/tasks/{tid}/sessions`
+marks a host whose id the client's (non-empty) catalog does not name with `model_unlisted`, and the session view says
+so.
+
 **The pipe.** `harness-agent-<key>` on Windows; on Linux and macOS `ha-<first 16 digits of the key>`, because .NET makes it a Unix socket at `$TMPDIR/CoreFxPipe_<name>` and macOS limits socket paths to 104 bytes. `PipeOptions.CurrentUserOnly`, 64 KiB buffers.
 - Without a buffer, a write on Windows waits until the reader takes it, and a reader that stopped reading held the
   host open.
@@ -105,7 +145,7 @@ events in every mode that asks.
   does not always return on Windows, so the pipe is closed rather than its read cancelled.
 
 **Files.** Beside the project database, in `agents/` (which holds its own `.gitignore` of `*`):
-- `<key>.json`: the state (client, task, session id, model, permission mode, pid, status
+- `<key>.json`: the state (client, task, session id, model, the model asked for, permission mode, pid, status
   `starting|idle|running|closed|failed`);
 - `<key>.jsonl`: every event, numbered (`seq`);
 - `<key>.err`: the host's standard error.
@@ -136,5 +176,9 @@ events in every mode that asks.
 - `GET …/tasks/{tid}/sessions` carries `permission_modes` ({client: [{id, label, description, default, unsafe}]})
   for the start dialog's Permission mode box, which follows the chosen agent, preselects its default and marks the
   unsafe modes; each host carries its `permission_mode`, shown in its session and live panel.
+- `GET …/agent-models` fills the start dialog's Model box (see Model catalog): Default first (named by the
+  catalog's default when known), the catalog's models by label with the id in the tooltip (`seen` ones marked), then
+  Other…, which shows a field for any id. Switching the agent reloads the list and resets it to Default; a refresh in
+  progress or a failed one is a quiet note under the box.
 - A session started elsewhere is read from the end of its transcript:
   `GET …/tasks/{tid}/sessions/{client}/{sid}/tail`.

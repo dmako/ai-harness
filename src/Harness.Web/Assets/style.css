@@ -1930,6 +1930,12 @@ table.dups { min-width: 45rem; }
 .aform .modehint { margin: 0; color: var(--ink-2); }
 .aform .modehint.unsafe { color: var(--ink); border-left: 3px solid var(--critical); padding-left: 0.5rem; }
 .aform .modehint.unsafe b { color: var(--ink); }
+/* the start dialog's model picker (TASK-0142): the list, the id field Other…
+   reveals under it, and a quiet note while the list is updated or failed to be */
+.aform .modelpick { display: grid; gap: 0.25rem; align-content: start; min-width: 0; }
+.aform .modelpick .modelnote:empty { display: none; }
+.aform .modelpick .modelnote { overflow-wrap: anywhere; }
+.unlisted { color: var(--ink-2); border-bottom: 1px dotted var(--warning); }
 @media (max-width: 40em) { .ae { grid-template-columns: minmax(0, 1fr); gap: 0; } }
 /* Machine › SCM connections (TASK-0126): one row per SCM, its details
    beside its actions, wrapping under them on a narrow screen */

@@ -26,7 +26,9 @@ internal sealed class UiCommand(
         // one view cache for the process: the read services are made per request
         using var views = new ViewCache(lifecycle);
         // the agent hosts this harness ui started or found: they outlive it
-        await using var agents = new UiAgents();
+        await using var agents = new UiAgents(
+            Harness.Infrastructure.Agents.AgentModelStore.PathFor(lifecycle.GlobalConfigurationPath)
+        );
         await using var app = UiHost.Create(
             settings.Address,
             _ => new UiReadService(lifecycle, catalog, sessions, views, agents),

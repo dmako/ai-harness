@@ -741,6 +741,23 @@ started detached beside `harness`:
   tool permissions (`--permission-prompt-tool stdio`); Codex runs as
   `codex app-server`. Whatever needs your approval waits in the panel for
   Allow or Deny.
+- The **Model** box lists the agent's models from harness's model catalog:
+  Default (the agent's own default, named when known), then the models by
+  name (the id in the tooltip), then Other… for any id; the start accepts
+  any id, and the session marks one the list does not name. The catalog is
+  one file per machine, `agent-models.json` beside the global configuration
+  (every project and browser shares it). It is filled from what the agents
+  report: Codex's app-server `model/list` and Claude Code's answer to the
+  stream-json `initialize` request (its documented aliases sonnet, opus and
+  haiku if a version gives no list), plus the models the agents'
+  transcripts recorded (marked seen). Every session started from harness ui
+  refreshes its agent's list from its own handshake; opening the dialog
+  refreshes a list that is empty or older than 24 hours with a short probe
+  of the CLI in the background (no session, no turn, at most 30 s), and the
+  dialog shows the list it has meanwhile. A failed refresh keeps the last
+  list and says so quietly under the box. Sessions started elsewhere add
+  only the models their transcripts record: an MCP client does not tell
+  harness its models.
 - The **Permission mode** box decides how much it may do without asking; its
   choices follow the agent, and Auto is the default for both. Claude Code:
   Auto (`--permission-mode auto`: what it judges safe runs, the rest asks),

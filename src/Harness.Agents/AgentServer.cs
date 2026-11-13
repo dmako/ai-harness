@@ -37,6 +37,7 @@ internal sealed class AgentServer : IAsyncDisposable
     private long _sequence;
     private DateTimeOffset _lastActivity = DateTimeOffset.UtcNow;
     private string _recorded = "";
+    private readonly List<Task> _catalogWrites = [];
 
     private AgentServer(HostOptions options, Action<string> error)
     {
@@ -66,6 +67,8 @@ internal sealed class AgentServer : IAsyncDisposable
             ["session_id"] = options.Resume,
             ["cwd"] = options.Start.WorkingDirectory,
             ["model"] = options.Start.Model,
+            // the model asked for, kept when the client names the one it runs (TASK-0142)
+            ["requested_model"] = options.Start.Model,
             ["permission_mode"] = options.Start.PermissionMode,
             ["pid"] = Environment.ProcessId,
             ["status"] = AgentHostFiles.Starting,
@@ -125,6 +128,7 @@ internal sealed class AgentServer : IAsyncDisposable
                 _options.Client is AgentClients.Codex
                     ? CodexSession.Start(processes, command, _options.Start, _options.Resume, Emit)
                     : ClaudeSession.Start(processes, command, _options.Start, _options.Resume, Emit);
+            Catalog(_session);
             await _session.OpenAsync(token);
         }
         catch (Exception exception) when (Startup(exception))
@@ -163,6 +167,53 @@ internal sealed class AgentServer : IAsyncDisposable
         Emit(new() { ["event"] = "status", ["status"] = status });
         await accept.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         return status is AgentHostFiles.Closed ? AgentHost.Completed : AgentHost.Failed;
+    }
+
+    /// <summary>
+    /// With --models, the client's handshake refreshes its model catalog (TASK-0142); a failure is recorded with
+    /// the catalog left as it was. The writes are awaited before the host ends.
+    /// </summary>
+    private void Catalog(InteractiveSession session)
+    {
+        if (_options.Models.Length is 0)
+        {
+            return;
+        }
+        var store = new AgentModelStore(_options.Models);
+        var client = _options.Client;
+        session.ModelsReported = report =>
+            Write(() =>
+                store.RefreshedAsync(
+                    client,
+                    report,
+                    AgentModelSources.Session,
+                    DateTimeOffset.UtcNow,
+                    CancellationToken.None
+                )
+            );
+        session.ModelsFailed = problem =>
+            Write(() => store.FailedAsync(client, problem, DateTimeOffset.UtcNow, CancellationToken.None));
+
+        void Write(Func<Task<bool>> update)
+        {
+            var write = Task.Run(() => UpdateCatalogAsync(update), CancellationToken.None);
+            lock (_catalogWrites)
+            {
+                _catalogWrites.Add(write);
+            }
+        }
+    }
+
+    private async Task UpdateCatalogAsync(Func<Task<bool>> update)
+    {
+        try
+        {
+            await update();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _error("harness-agents: could not update the model catalog: " + exception.Message);
+        }
     }
 
     private static bool Startup(Exception exception) =>
@@ -497,6 +548,14 @@ internal sealed class AgentServer : IAsyncDisposable
         {
             await _session.DisposeAsync();
         }
+        Task[] writes;
+        lock (_catalogWrites)
+        {
+            writes = [.. _catalogWrites];
+        }
+        await Task.WhenAll(writes)
+            .WaitAsync(TimeSpan.FromSeconds(15), CancellationToken.None)
+            .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         lock (_gate)
         {
             _log.Dispose();

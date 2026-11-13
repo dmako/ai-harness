@@ -5734,6 +5734,8 @@ function auditBlock(x) {
 const AGENT_CLIENTS = { "claude-code": "Claude Code", codex: "Codex" };
 // the permission modes each agent offers, as the server last sent them (from the C# rewrite, TASK-0135)
 let agentModes = {};
+// each agent's model catalog, as the server last sent it (from the C# rewrite, TASK-0142)
+let agentModels = {};
 function sessionsBlock(x) {
   const out = h("div", { class: "tblock" }, h("h4", {}, "Agent sessions"), h("p", { class: "empty" }, "Loading…"));
   const pid = route().id;
@@ -5758,6 +5760,7 @@ function sessionsBlock(x) {
         pending.map((o) => h("li", {},
           h("span", { class: "ev" }, AGENT_CLIENTS[o.client] || o.client), " ",
           h("span", { class: "muted" }, `started from here ${ago(o.started_at)} · opening the session…`),
+          unlistedModel(o),
           agentPanel(pid, o, load))),
         sessions.map((s) => sessionItem(pid, x, s, hostOf(s), load))),
       startAgentForm(pid, x, load));
@@ -5776,12 +5779,20 @@ function sessionItem(pid, x, s, host, reload) {
     h("span", { class: "muted", title: `first seen ${s.started_at}, last seen ${s.ended_at}` },
       `${s.origin === "harness" ? "started by harness" : "seen by hooks"} · first ${ago(s.started_at)} · last ${ago(s.ended_at)}`),
     h("div", { class: "evidence" },
-      s.model && `${s.model} · `, host && host.permission_mode && `${modeLabel(s.client, host.permission_mode)} mode · `,
+      s.model && `${s.model} · `, host && unlistedModel(host), host && host.model_unlisted && " · ",
+      host && host.permission_mode && `${modeLabel(s.client, host.permission_mode)} mode · `,
       usageLine(s), s.active_ms > 0 && ` · active ${durationText(s.active_ms)}`));
   if (host && host.alive) li.append(agentPanel(pid, host, reload));
   else if (s.origin === "harness") li.append(endedAgent(pid, x, s, host, reload));
   else li.append(transcriptTail(pid, x, s));
   return li;
+}
+
+// unlistedModel (from the C# rewrite, TASK-0142) marks a session started with a model id its agent's model list
+// does not name: allowed, as any id is, but said.
+function unlistedModel(host) {
+  return host.model_unlisted ? h("span", { class: "unlisted", title: "Started with a model id the agent's model list does not name; the agent decides whether it takes it." },
+    `asked for ${host.requested_model} (not in the model list)`) : null;
 }
 
 // modeLabel (from the C# rewrite) names a session's permission mode by the label the server gives it.
@@ -5791,12 +5802,44 @@ function modeLabel(client, id) {
 
 // startAgentForm starts Claude Code or Codex on the task in a new agent host, with a first prompt. The permission
 // mode's choices come from the server per agent, the agent's default preselected (from the C# rewrite, TASK-0135).
+// The model is picked from the agent's model catalog (from the C# rewrite, TASK-0142): Default (the agent's own,
+// named when known), the catalog's models, and Other… for any id; opening the form asks for the catalog, which the
+// server refreshes in the background while the form shows what it has.
 function startAgentForm(pid, x, reload) {
   const modes = agentModes;
   const client = h("select", { "aria-label": "Agent" }, Object.entries(AGENT_CLIENTS).map(([k, v]) => h("option", { value: k }, v)));
   const prompt = h("textarea", { rows: 3, "aria-label": "First prompt" });
   prompt.value = `Work on task ${x.id}: claim it with harness (task_claim), then do it.`;
-  const model = h("input", { type: "text", placeholder: "default model", "aria-label": "Model (optional)" });
+  const OTHER = " other"; // a model id has no space
+  const model = h("select", { name: "model", "aria-label": "Model" });
+  const otherModel = h("input", { type: "text", name: "model_other", placeholder: "model id", "aria-label": "Model id", hidden: true });
+  const modelNote = h("span", { class: "modelnote muted small", "aria-live": "polite" });
+  const models = (keep) => {
+    const cat = (agentModels.clients || {})[client.value] || {};
+    const was = model.value;
+    const def = cat.default;
+    fill(model,
+      h("option", { value: "", title: def ? def.id : "the agent's own default" }, def ? `Default (${def.label})` : "Default"),
+      (cat.models || []).map((m) => h("option", { value: m.id, title: m.description ? `${m.id} · ${m.description}` : m.id },
+        m.source === "seen" ? `${m.label} (seen)` : m.label)),
+      h("option", { value: OTHER }, "Other…"));
+    model.value = keep && [...model.options].some((o) => o.value === was) ? was : "";
+    otherModel.hidden = model.value !== OTHER;
+    modelNote.title = cat.error ? `${cat.error}${cat.failed_at ? ` (${cat.failed_at})` : ""}` : cat.refreshed_at ? `updated ${cat.refreshed_at}` : "";
+    fill(modelNote, cat.refreshing ? "Updating the model list…" : cat.error ? "The model list could not be updated." : "");
+  };
+  let asking = 0;
+  const loadModels = () => {
+    const ask = ++asking;
+    api(projectAPI({ id: pid }, "agent-models"), { "X-Harness-UI": "1" }).then((res) => {
+      if (ask !== asking) return;
+      agentModels = res;
+      models(true);
+      // the server probes an agent in the background: ask again until it is done, while the form is open
+      const busy = Object.values(res.clients || {}).some((c) => c.refreshing);
+      if (busy && form.open && ask < 40) setTimeout(() => { if (ask === asking && form.open && form.isConnected) loadModels(); }, 3000);
+    }).catch(() => { if (ask === asking) fill(modelNote, "The model list is not available."); });
+  };
   const mode = h("select", { name: "permission_mode", "aria-label": "Permission mode" });
   const about = h("p", { class: "modehint small", "aria-live": "polite" });
   const describe = () => {
@@ -5813,26 +5856,35 @@ function startAgentForm(pid, x, reload) {
     describe();
   };
   client.addEventListener("change", options);
+  client.addEventListener("change", () => models(false));
+  model.addEventListener("change", () => {
+    otherModel.hidden = model.value !== OTHER;
+    if (!otherModel.hidden) otherModel.focus();
+  });
   mode.addEventListener("change", describe);
   options();
+  models(false);
   const err = h("p", { class: "error", hidden: true });
   const go = h("button", { type: "button", onclick: async () => {
     go.disabled = true; err.hidden = true;
     try {
       await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`),
-        { client: client.value, prompt: prompt.value, model: model.value.trim(), mode: mode.value });
+        { client: client.value, prompt: prompt.value, model: model.value === OTHER ? otherModel.value.trim() : model.value, mode: mode.value });
       toast(`${AGENT_CLIENTS[client.value]} started on ${x.id}`);
       reload();
     } catch (e) { err.textContent = e.message; err.hidden = false; go.disabled = false; }
   } }, "Start");
-  return h("details", { class: "startagent" }, h("summary", {}, "Start an agent on this task"),
+  const form = h("details", { class: "startagent", ontoggle: () => { if (form.open) loadModels(); } },
+    h("summary", {}, "Start an agent on this task"),
     h("div", { class: "aform" },
-      h("div", { class: "frow" }, h("label", {}, "Agent", client), h("label", {}, "Model", model),
+      h("div", { class: "frow" }, h("label", {}, "Agent", client),
+        h("div", { class: "modelpick" }, h("label", {}, "Model", model), otherModel, modelNote),
         h("label", {}, "Permission mode", mode)),
       about,
       h("label", {}, "Prompt", prompt),
       h("p", { class: "hint muted small" }, "It runs in its own process beside harness ui and goes on when this page or harness ui closes. Tool calls the permission mode does not allow wait here for Allow or Deny."),
       err, h("div", {}, go)));
+  return form;
 }
 
 // agentPanels: the open panels by host key, fed by the live stream's "agent" events or, offline, by polling.

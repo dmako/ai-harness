@@ -28,12 +28,15 @@ public static class AgentHost
                                   [--db <project database>] [--arg <client argument>]... [--env <name=value>]...
                                   [--command <executable> [--command-arg <argument>]...]
                                   serve: --key <32 hex digits> --state <dir> [--idle-minutes <n>]
-                                         [--permission-mode <mode>], prompt optional
+                                         [--permission-mode <mode>] [--models <agent-models.json>],
+                                         prompt optional
         run: one agent turn for a task; events go to standard output as JSON lines, ending with "outcome";
         a "cancel" line on standard input stops it. Exit code 0 completed, 1 failed, 2 usage, 3 cancelled.
         serve: keeps the session open and takes commands (send, stop, approve, close) on its named pipe.
         --permission-mode: claude-code auto (default), manual, acceptEdits, plan, bypassPermissions;
         codex auto (default), manual, read-only, full-access. A resumed session keeps the mode it started with.
+        --models: the model catalog the client's handshake refreshes (harness ui passes the one beside the global
+        configuration).
         """;
 
     public static async Task<int> RunAsync(
@@ -322,6 +325,9 @@ internal sealed record HostOptions(
     /// <summary>serve: how long a session may sit idle before the host closes it.</summary>
     public TimeSpan Idle { get; init; } = TimeSpan.FromMinutes(60);
 
+    /// <summary>serve: the model catalog file (agent-models.json) the client's handshake refreshes; empty for none.</summary>
+    public string Models { get; init; } = "";
+
     /// <summary>
     /// The --prompt-file, read by the host before the run: parsing never opens it, so a file that cannot be read is a
     /// failed run, not a usage error.
@@ -457,6 +463,7 @@ internal sealed record HostOptions(
             State = state.Length > 0 ? Path.GetFullPath(state) : "",
             Idle = TimeSpan.FromMinutes(idle),
             PromptFile = single.GetValueOrDefault("--prompt-file", ""),
+            Models = single.GetValueOrDefault("--models", "") is { Length: > 0 } models ? Path.GetFullPath(models) : "",
         };
     }
 
@@ -510,7 +517,8 @@ internal sealed record HostOptions(
                 or "--key"
                 or "--state"
                 or "--idle-minutes"
-                or "--permission-mode":
+                or "--permission-mode"
+                or "--models":
                     Single[name] = value;
                     break;
                 default:

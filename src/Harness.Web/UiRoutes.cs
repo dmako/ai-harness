@@ -65,6 +65,7 @@ public static class UiRoutes
         "/api/projects/{id}/tasks/{tid}/sessions",
         "/api/projects/{id}/tasks/{tid}/sessions/{client}/{sid}/tail",
         "/api/projects/{id}/agents/{key}/log",
+        "/api/projects/{id}/agent-models",
         "/api/projects/{id}/health",
         "/api/projects/{id}/architecture",
         "/api/projects/{id}/coupling",

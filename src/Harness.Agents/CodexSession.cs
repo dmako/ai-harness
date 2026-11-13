@@ -68,7 +68,7 @@ internal sealed class CodexSession : InteractiveSession
 
     protected override async Task HandshakeAsync(CancellationToken cancellationToken)
     {
-        await CallAsync(
+        var initialized = await CallAsync(
             "initialize",
             new JsonObject
             {
@@ -77,6 +77,8 @@ internal sealed class CodexSession : InteractiveSession
             cancellationToken
         );
         await WriteAsync(new() { ["jsonrpc"] = "2.0", ["method"] = "initialized" }, cancellationToken);
+        // beside the thread's opening: the session never waits for the model list
+        _ = ListModelsAsync(AgentModelProtocol.CodexVersion(initialized), cancellationToken);
         var settings = new JsonObject
         {
             ["cwd"] = _start.WorkingDirectory,
@@ -101,6 +103,47 @@ internal sealed class CodexSession : InteractiveSession
         EmitEvent(
             new AgentEvent(AgentEventKind.Session, DateTimeOffset.UtcNow) { SessionId = SessionId, Model = Model }
         );
+    }
+
+    /// <summary>model/list, page by page, for the model catalog (TASK-0142).</summary>
+    private async Task ListModelsAsync(string version, CancellationToken cancellationToken)
+    {
+        if (ModelsReported is null && ModelsFailed is null)
+        {
+            return;
+        }
+        try
+        {
+            List<AgentModel> models = [];
+            var cursor = "";
+            for (var page = 0; page < AgentModelProtocol.CodexPages; page++)
+            {
+                var (found, next) = AgentModelProtocol.Codex(
+                    await CallAsync("model/list", AgentModelProtocol.CodexListParams(cursor), cancellationToken)
+                );
+                models.AddRange(found);
+                if (next.Length is 0)
+                {
+                    break;
+                }
+                cursor = next;
+            }
+            ModelsReported?.Invoke(new(models) { Version = version });
+        }
+        catch (Exception exception)
+            when (exception
+                    is InvalidOperationException
+                        or TimeoutException
+                        or IOException
+                        or OperationCanceledException
+                        or ObjectDisposedException
+            )
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                ModelsFailed?.Invoke(exception.Message);
+            }
+        }
     }
 
     protected override async Task StartTurnAsync(string text, CancellationToken cancellationToken)

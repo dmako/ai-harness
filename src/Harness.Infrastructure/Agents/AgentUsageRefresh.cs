@@ -89,6 +89,33 @@ public static class AgentUsageRefresh
             token
         );
 
+    /// <summary>
+    /// The models the project's transcripts recorded, per client, each with when it was last used (TASK-0142): the
+    /// model catalog's 'seen' entries.
+    /// </summary>
+    public static IReadOnlyList<(string Client, string Model, DateTimeOffset LastUsed)> UsedModels(
+        HarnessDatabase database,
+        CancellationToken token = default
+    ) =>
+        database.ReadTransaction(
+            (c, t) =>
+            {
+                using var command = Command(
+                    c,
+                    t,
+                    "SELECT client,model,MAX(last_at) FROM agent_usage WHERE model<>'' GROUP BY client,model"
+                );
+                using var reader = command.ExecuteReader();
+                List<(string, string, DateTimeOffset)> models = [];
+                while (reader.Read())
+                {
+                    models.Add((reader.GetString(0), reader.GetString(1), Parse(reader.GetString(2))));
+                }
+                return models;
+            },
+            token
+        );
+
     /// <summary>The session's transcript files: those read before and those found now (the subagents' too).</summary>
     internal static IReadOnlyList<string> Paths(HarnessDatabase database, TranscriptRoots roots, Session session)
     {

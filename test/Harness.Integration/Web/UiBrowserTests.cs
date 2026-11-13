@@ -2242,6 +2242,96 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task TheStartDialogsModelPickerOffersDefaultTheCatalogAndOtherAndFollowsTheAgent()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        new TaskStore(database).Create(
+            new TaskDefinition { Id = "UI-0001", Title = "For an agent" },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        // the catalogs are current, so harness ui only reads them; Codex's last refresh failed
+        var store = new AgentModelStore(Path.Combine(fixture.Global, AgentModelStore.FileName));
+        await store.RefreshedAsync(
+            "claude-code",
+            new([
+                new("opus", "Opus 5.5")
+                {
+                    IsDefault = true,
+                    Resolved = "claude-opus-5-5",
+                    Description = "complex work",
+                },
+                new("sonnet", "Sonnet 5.5"),
+            ]),
+            "probe",
+            DateTimeOffset.UtcNow,
+            Token
+        );
+        await store.SeenAsync("claude-code", [("claude-sonnet-4-6", DateTimeOffset.UtcNow)], Token);
+        await store.RefreshedAsync(
+            "codex",
+            new([new("gpt-fake", "GPT Fake"), new("gpt-hidden", "Hidden") { Hidden = true }]),
+            "session",
+            DateTimeOffset.UtcNow,
+            Token
+        );
+        await store.FailedAsync("codex", "codex did not tell its models within 30 s", DateTimeOffset.UtcNow, Token);
+        const string Model = "document.querySelector('.startagent select[name=model]')";
+        const string Labels = "[..." + Model + ".options].map(o => o.textContent).join('|')";
+        const string Other = "document.querySelector('.startagent input[name=model_other]')";
+        const string Note = "document.querySelector('.startagent .modelnote')";
+        const string Agent = "document.querySelector('.startagent select[aria-label=Agent]')";
+        const string Mode = "document.querySelector('.startagent select[name=permission_mode]')";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/UI-0001" }
+                );
+                await page.WaitAsync("!!" + Model);
+                // before the dialog opens it knows no catalog: Default and Other… only
+                (await ValueAsync(page, Labels))
+                    .Should()
+                    .Be("Default|Other…");
+                await page.EvaluateAsync("document.querySelector('.startagent').open = true");
+                await page.WaitAsync(Model + ".options.length > 2");
+                (await ValueAsync(page, Labels))
+                    .Should()
+                    .Be("Default (Opus 5.5)|Opus 5.5|Sonnet 5.5|claude-sonnet-4-6 (seen)|Other…");
+                (await ValueAsync(page, Model + ".value")).Should().Be("");
+                (await ValueAsync(page, Model + ".options[0].title")).Should().Be("opus");
+                (await ValueAsync(page, Model + ".options[1].title")).Should().Be("opus · complex work");
+                (await ValueAsync(page, Other + ".hidden")).Should().Be("True");
+                (await ValueAsync(page, Note + ".textContent")).Should().BeEmpty();
+
+                await page.EvaluateAsync(Model + ".value = ' other'; " + Model + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Other + ".hidden")).Should().Be("False", "Other… reveals the id field");
+                await page.EvaluateAsync(Model + ".value = 'sonnet'; " + Model + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Other + ".hidden")).Should().Be("True");
+
+                await page.EvaluateAsync(Agent + ".value = 'codex'; " + Agent + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Labels)).Should().Be("Default|GPT Fake|Other…", "hidden models are left out");
+                (await ValueAsync(page, Model + ".value")).Should().Be("", "switching the agent resets to Default");
+                (await ValueAsync(page, Note + ".textContent")).Should().Be("The model list could not be updated.");
+                (await ValueAsync(page, Note + ".title")).Should().StartWith("codex did not tell its models");
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto", "the permission mode picker still works");
+
+                await page.EvaluateAsync(
+                    Agent + ".value = 'claude-code'; " + Agent + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Model + ".options[0].textContent")).Should().Be("Default (Opus 5.5)");
+                (await ValueAsync(page, Note + ".textContent")).Should().BeEmpty();
+            }
+        );
+    }
+
+    [Fact]
     public async Task TaskIsDeletedFromItsRowAfterTheDialogSaysWhatGoes()
     {
         var executable = Browser();
