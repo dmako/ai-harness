@@ -506,13 +506,40 @@ change, and `--json` gives the result per project. You no longer need to run
 Harness searches the working tree itself whenever ripgrep (`rg`) and `fd`
 are installed: agents get live text and file search with nothing to
 configure, and no separate rg-fd-mcp server is needed. Install them once
-per machine:
+per machine.
 
-| System | Command |
+**Windows** (x64), with winget:
+
+```powershell
+winget install BurntSushi.ripgrep.MSVC
+winget install sharkdp.fd
+```
+
+or with Scoop (`scoop install ripgrep fd`) or Chocolatey
+(`choco install ripgrep fd`). winget puts the commands on `PATH` through
+`%LOCALAPPDATA%\Microsoft\WinGet\Links`, which only new terminals see.
+
+**Linux** (x64 and arm64):
+
+| Distribution | Command |
 |---|---|
-| Windows | `winget install BurntSushi.ripgrep.MSVC sharkdp.fd` (or `scoop install ripgrep fd`) |
 | Debian, Ubuntu | `sudo apt install ripgrep fd-find` (fd is installed as `fdfind`; harness finds it) |
-| macOS | `brew install ripgrep fd` |
+| Fedora, RHEL (EPEL) | `sudo dnf install ripgrep fd-find` |
+| Arch | `sudo pacman -S ripgrep fd` |
+| Alpine | `sudo apk add ripgrep fd` |
+
+**macOS** (Apple silicon), with Homebrew:
+
+```sh
+brew install ripgrep fd
+```
+
+Anywhere with a Rust toolchain, `cargo install ripgrep fd-find` works too.
+Check the install with `rg --version` and `fd --version` (`fdfind
+--version` on Debian and Ubuntu), then run `harness doctor`: its `search`
+line says which tools it found. Harness looks for the tools once per
+process, so restart harness ui and your agent sessions (which start
+`harness mcp`) after installing.
 
 Without fd, file search still works through `rg --files`. Without either,
 `harness doctor`, `harness report` and `provider_status` say so with the

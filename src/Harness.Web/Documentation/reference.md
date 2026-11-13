@@ -332,8 +332,24 @@ and Ubuntu) on `PATH` once per process. With rg but no fd, file search
 lists `rg --files` and keeps the files whose name matches the query
 (ignoring case unless the query has a capital letter, as fd does). With
 neither, the provider is left out, and `harness doctor`, `harness report`
-and `provider_status` name the install command for the system (winget or
-scoop, apt, brew). Optional settings:
+and `provider_status` name the install command for the system.
+
+| Platform | Install |
+|---|---|
+| Windows | `winget install BurntSushi.ripgrep.MSVC` and `winget install sharkdp.fd`; or `scoop install ripgrep fd`; or `choco install ripgrep fd` |
+| Debian, Ubuntu | `sudo apt install ripgrep fd-find` (the command is `fdfind`) |
+| Fedora, RHEL (EPEL) | `sudo dnf install ripgrep fd-find` |
+| Arch | `sudo pacman -S ripgrep fd` |
+| Alpine | `sudo apk add ripgrep fd` |
+| macOS | `brew install ripgrep fd` |
+| any, with Rust | `cargo install ripgrep fd-find` |
+
+A tool installed while harness runs is seen only by processes started
+afterwards (detection is cached per process): restart harness ui and the
+agent sessions. On Windows, winget's links folder
+(`%LOCALAPPDATA%\Microsoft\WinGet\Links`) reaches only new terminals.
+`harness doctor`'s `search` line confirms what was found. Optional
+settings:
 
 ```toml
 [providers.search]

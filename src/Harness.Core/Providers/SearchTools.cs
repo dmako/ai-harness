@@ -145,9 +145,11 @@ public static class SearchTools
         (platform ?? Platform()) switch
         {
             "windows" =>
-                "install ripgrep and fd: winget install BurntSushi.ripgrep.MSVC sharkdp.fd (or scoop install ripgrep fd)",
+                "install ripgrep and fd: winget install BurntSushi.ripgrep.MSVC; winget install sharkdp.fd "
+                + "(or scoop install ripgrep fd), then open a new terminal",
             "macos" => "install ripgrep and fd: brew install ripgrep fd",
             _ => "install ripgrep and fd: sudo apt install ripgrep fd-find (Debian and Ubuntu name fd fdfind), "
+                + "sudo dnf install ripgrep fd-find, sudo pacman -S ripgrep fd, "
                 + "or your distribution's ripgrep and fd packages",
         };
 
