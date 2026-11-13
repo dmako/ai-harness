@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Harness.Core.Serialization;
+using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Projects;
 
 namespace Harness.Cli;
@@ -28,6 +29,11 @@ internal sealed class StatusSettings : InspectSettings
 internal sealed class DoctorSettings : InspectSettings
 {
     public bool All { get; init; }
+
+    /// <summary>The check whose fix to apply ('--fix nuget-config'); empty runs the checks.</summary>
+    public string Fix { get; init; } = "";
+
+    public bool DryRun { get; init; }
 }
 
 internal static class ProjectOutput
@@ -187,6 +193,11 @@ internal sealed class DoctorCommand(
 
     public async Task<int> ExecuteAsync(DoctorSettings settings, CancellationToken cancellationToken)
     {
+        if (settings.Fix.Length > 0)
+        {
+            return await FixAsync(settings, cancellationToken);
+        }
+
         List<object> results = [];
         var failed = false;
         if (settings.All)
@@ -286,6 +297,52 @@ internal sealed class DoctorCommand(
         }
 
         return failed ? 1 : 0;
+    }
+
+    /// <summary>
+    /// 'harness doctor --fix &lt;check&gt;': applies the fix harness can make itself, showing the change (only showing
+    /// it with --dry-run). Today that is nuget-config, which writes the nuget provider's override into the project's
+    /// .harness/config.toml.
+    /// </summary>
+    private async Task<int> FixAsync(DoctorSettings settings, CancellationToken cancellationToken)
+    {
+        if (settings.Fix != NuGetProviderCheck.Name)
+        {
+            await output.WriteLineAsync(
+                $"harness doctor --fix: no fix for '{settings.Fix}' (fixable: {NuGetProviderCheck.Name})",
+                CancellationToken.None
+            );
+            return 2;
+        }
+
+        var fix = await NuGetProviderFix.ApplyAsync(
+            settings.Project,
+            lifecycle.GlobalConfigurationPath,
+            settings.DryRun,
+            lifecycle.NuGetUserFile,
+            cancellationToken
+        );
+        if (settings.Json)
+        {
+            await output.WriteLineAsync(HarnessJson.Serialize(fix, ProjectOutput.JsonOptions), CancellationToken.None);
+            return fix.Ok ? 0 : 1;
+        }
+
+        await output.WriteLineAsync(fix.Message, CancellationToken.None);
+        foreach (var line in fix.Lines)
+        {
+            await output.WriteLineAsync("  " + line, CancellationToken.None);
+        }
+
+        if (fix.Changed)
+        {
+            await output.WriteLineAsync(
+                settings.DryRun ? "Dry run: nothing was changed." : $"Undo: remove that table from {fix.Path}.",
+                CancellationToken.None
+            );
+        }
+
+        return fix.Ok ? 0 : 1;
     }
 
     private async Task WriteChecksAsync(IReadOnlyList<HealthCheck> checks)

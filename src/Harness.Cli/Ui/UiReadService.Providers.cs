@@ -66,6 +66,7 @@ internal sealed partial class UiReadService
                 ["healthy"] = !checks.Any(c => c.Level is "fail"),
                 ["probed"] = probe,
                 ["fixable"] = checks.Where(HarnessFix.Fixable).Select(c => c.Name).ToArray(),
+                ["previewed"] = checks.Where(HarnessFix.Previewed).Select(c => c.Name).ToArray(),
             }
         );
     }
@@ -295,6 +296,8 @@ internal sealed partial class UiReadService
         var metrics = store.Metrics(since);
         var trends = store.Trends(since, DateTimeOffset.UtcNow);
         var languages = ProviderRouting.DetectLanguages(root);
+        // the nuget provider against the repository's nuget.config, with Fix where harness can write the override
+        var nuget = NuGetProviderFix.Check(location.Configuration, location.Root, lifecycle.NuGetUserFile);
         List<JsonObject> providers = [];
         foreach (var (name, configured) in configuration.Providers.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
@@ -361,6 +364,18 @@ internal sealed partial class UiReadService
                 })
                 .ToArray();
             view["capabilities"] = capabilities.Length is 0 ? null : UiJson.Node(capabilities);
+            if (nuget is not null && nuget.Provider == name)
+            {
+                var check = NuGetProviderFix.Health(nuget);
+                view["check"] = new JsonObject
+                {
+                    ["name"] = check.Name,
+                    ["level"] = check.Level,
+                    ["detail"] = check.Detail,
+                    ["fix"] = check.Fix,
+                    ["fixable"] = HarnessFix.Previewed(check),
+                };
+            }
             providers.Add(view);
         }
         return UiJson.Node(

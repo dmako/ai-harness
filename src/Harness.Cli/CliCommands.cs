@@ -40,7 +40,7 @@ internal static class CliCommands
         Add(
             root,
             "doctor",
-            "Check project health without changing it",
+            "Check project health; --fix applies a fix harness can make itself",
             CommandBindings.BindDoctorSettings,
             (settings, token) =>
                 ActivatorUtilities.CreateInstance<Harness.Cli.DoctorCommand>(services).ExecuteAsync(settings, token)

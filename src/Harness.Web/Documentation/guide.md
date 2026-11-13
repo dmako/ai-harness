@@ -517,6 +517,34 @@ Without fd, file search still works through `rg --files`. Without either,
 command above. Searches honour `.gitignore` and `.ignore` as rg and fd do.
 The reference (Providers) has the settings and how to turn it off.
 
+## Projects with their own nuget.config
+
+The nuget provider (`package_api`, NugetMcpServer started with `dnx`) uses
+NuGet's own configuration, so a repository with a `nuget.config` that
+clears nuget.org, maps packages to private feeds or needs credentials can
+stop it from starting or from finding the project's packages. `harness
+doctor` reports that as `nuget-config`, naming the file, with the project
+override that fixes it:
+
+```toml
+# .harness/config.toml
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
+dir = "project"
+```
+
+`--source` makes dnx fetch the server from nuget.org whatever the
+repository's configuration says, and `dir = "project"` starts the server in
+the repository, so it reads the repository's feeds. `harness doctor --fix
+nuget-config` writes it for you (`--dry-run` first shows it), and so does
+Fix on the nuget card in harness ui (Agents › Tools & providers) or in
+Health, after showing the change. The project table replaces the global
+one whole and is undone by removing it. Keep feed credentials in the NuGet
+configuration or in environment variables, never in `config.toml`. The
+reference (Providers › Projects with their own nuget.config) explains what
+dnx and the server do, with more examples.
+
 ## When something seems off
 
 - `harness doctor` checks the installation, the database, the clients'

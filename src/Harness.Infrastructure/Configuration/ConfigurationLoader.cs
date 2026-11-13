@@ -112,6 +112,19 @@ public static class ConfigurationLoader
             .Order(StringComparer.Ordinal)
             .ToArray();
 
+    /// <summary>A built-in pack's own provider table, as a table naming only the pack gets it; null for no pack.</summary>
+    public static ProviderConfiguration? PackDefaults(string pack)
+    {
+        if (!Packs.Contains(pack, StringComparer.Ordinal))
+        {
+            return null;
+        }
+
+        var layer = new JsonObject { ["providers"] = new JsonObject { [pack] = new JsonObject { ["pack"] = pack } } };
+        ExpandPacks(layer);
+        return HarnessJson.Deserialize<HarnessConfiguration>(layer, JsonOptions)!.Providers[pack];
+    }
+
     /// <summary>
     /// The model prices: harness's shipped table (Configuration/Pricing/pricing.toml) with the configuration's
     /// [pricing.&lt;model&gt;] entries over it.

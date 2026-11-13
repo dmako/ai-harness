@@ -3808,6 +3808,23 @@ async function runFix(p, body, btn, after) {
   btn.textContent = label;
 }
 
+// previewFix (from the C# rewrite: TASK-0140) is Fix for a fix that writes
+// a file ('harness doctor --fix …'): the change as the dry run shows it,
+// then written only on Write it; runFix runs it.
+async function previewFix(p, check, btn, after) {
+  btn.disabled = true;
+  let res;
+  try { res = await post(projectAPI(p, "fix"), { check, preview: true }); } catch (e) { toast(e.message, true); btn.disabled = false; return; }
+  btn.disabled = false;
+  if (!res.ok) { toast(res.message || "Failed", true, res.output); return; }
+  const [head, ...lines] = (res.output || "").split(/\r?\n/);
+  const dlg = dialog({ title: "Fix " + check, sub: head, wide: true });
+  const write = h("button", { class: "primary", type: "button", onclick: async (ev) => { await runFix(p, { check }, ev.currentTarget, after); dlg.close(); } }, "Write it");
+  dlg.set(null, [h("pre", { class: "fixdiff mono" }, lines.filter((l) => !/^Dry run/.test(l)).join("\n")),
+    h("p", { class: "muted small" }, "Only this file changes; its other lines and comments stay. To undo, remove the table again.")],
+  [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), write]);
+}
+
 function healthReport(r, p, reload) {
   const checks = r.checks || [];
   const n = (lv) => checks.filter((c) => c.level === lv).length;
@@ -3848,7 +3865,7 @@ function healthReport(r, p, reload) {
         h("div", { class: "chead" }, h("span", { class: "cname" }, c.name, c.level !== "ok" && h("span", { class: "sr" }, ` (${c.level})`)), value && h("span", { class: "cvalue" }, value)),
         lines.filter(Boolean).map((x) => h("div", { class: "cdetail" }, x)), c.fix && h("div", { class: "fix" }, h("b", {}, "Fix: "), c.fix)),
       // what harness can fix itself: the action at the card's right
-      p && (r.fixable || []).includes(c.name) && h("button", { class: "primary fixbtn", type: "button", onclick: (ev) => runFix(p, { check: c.name }, ev.currentTarget, reload) }, icon("chore"), "Fix it"));
+      p && (r.fixable || []).includes(c.name) && h("button", { class: "primary fixbtn", type: "button", onclick: (ev) => (r.previewed || []).includes(c.name) ? previewFix(p, c.name, ev.currentTarget, reload) : runFix(p, { check: c.name }, ev.currentTarget, reload) }, icon("chore"), "Fix it")); // a fix that writes a file shows it first (from the C# rewrite: TASK-0140)
   };
   const bad = checks.filter((c) => c.level !== "ok");
   const stacks = [["Installation", "Agents' clients"], ["Project"], ["Code providers"]];
@@ -4501,6 +4518,11 @@ async function viewProviders(p) {
       caps.length === 0 ? h("p", { class: "empty" }, ps.type === "harness" ? "Declares its capabilities when started; none called yet." : "No capabilities.")
         : [quiet.length > 0 && h("p", { class: "pmeta muted" }, `Not called in ${state.days} days: `, quiet.map((c) => cap(c.capability) + (c.tool ? ` (${c.tool})` : "")).join(", "))],
       caps.some((c) => c.capability === "project.overview") && indexedSection(p, ps.name),
+      // the nuget provider against the repository's nuget.config, with Fix (from the C# rewrite: TASK-0140)
+      ps.check && ps.check.level !== "ok" && h("div", { class: "provcheck callout" },
+        h("div", {}, h("b", {}, `${ps.check.name}: `), ps.check.detail),
+        ps.check.fix && h("div", { class: "fix" }, h("b", {}, "Fix: "), ps.check.fix),
+        ps.check.fixable && h("button", { class: "primary small", type: "button", onclick: (ev) => previewFix(p, ps.check.name, ev.currentTarget, null) }, icon("chore"), "Fix")),
       ps.name === "graphify-csharp" && h("div", { class: "pmeta" }, h("h4", {}, "Warm session"), graphifySessions(p.id)));
   })]));
   if (idle.length) out.append(section("Not used here", "Configured on this machine, but disabled or serving other languages.",

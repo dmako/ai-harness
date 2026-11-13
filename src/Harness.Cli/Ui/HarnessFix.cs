@@ -14,6 +14,7 @@ internal static partial class HarnessFix
 {
     private static readonly HashSet<string> Allowed = new(StringComparer.Ordinal)
     {
+        "doctor",
         "install",
         "instructions",
         "hooks install",
@@ -59,6 +60,13 @@ internal static partial class HarnessFix
 
     internal static bool Fixable(HealthCheck check) =>
         check.Level is not "ok" && check.Fix is { Length: > 0 } fix && Command(fix) is not null;
+
+    /// <summary>
+    /// A fix that changes a file ('harness doctor --fix …'): Fix it first shows the change (the command with
+    /// --dry-run) and writes only once the user confirms it.
+    /// </summary>
+    internal static bool Previewed(HealthCheck check) =>
+        Fixable(check) && Command(check.Fix!) is ["doctor", "--fix", ..];
 
     /// <summary>Runs this binary with the arguments in the project for two minutes at most; what it said.</summary>
     internal static async Task<JsonObject> RunAsync(

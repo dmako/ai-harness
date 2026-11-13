@@ -86,11 +86,25 @@ internal static class CommandBindings
             Description = "Check every project in the machine registry",
         };
         command.Options.Add(allOption);
+        var fixOption = new Option<string>("--fix")
+        {
+            DefaultValueFactory = _ => "",
+            Description = "Apply the fix harness can make for this check (nuget-config) and show the change",
+        };
+        command.Options.Add(fixOption);
+        var dryRunOption = new Option<bool>("--dry-run")
+        {
+            DefaultValueFactory = _ => false,
+            Description = "With --fix: show the change without writing it",
+        };
+        command.Options.Add(dryRunOption);
         return result => new Harness.Cli.DoctorSettings
         {
             Project = result.GetValue(projectOption) ?? "",
             Json = result.GetValue(jsonOption),
             All = result.GetValue(allOption),
+            Fix = result.GetValue(fixOption) ?? "",
+            DryRun = result.GetValue(dryRunOption),
         };
     }
 

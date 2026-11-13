@@ -85,12 +85,13 @@ internal sealed partial class UiReadService
 
     /// <summary>
     /// Health's Fix it: the named check's fix as harness computes it now, run only when it is one of the harness
-    /// commands a fix may run; {"sync": true} syncs a stale index. Answers {ok, message, output}.
+    /// commands a fix may run; {"sync": true} syncs a stale index. {"preview": true} runs a fix that changes a file
+    /// with --dry-run, so the page shows the change before it is written. Answers {ok, message, output}.
     /// </summary>
     private async Task<JsonNode?> FixAsync(JsonObject project, JsonObject body, CancellationToken token)
     {
         RequirePresent(project);
-        var fields = new UiWriteBody(body, "check", "sync");
+        var fields = new UiWriteBody(body, "check", "sync", "preview");
         var root = UiProjectCatalog.Text(project, "root");
         if (fields.Flag("sync"))
         {
@@ -99,8 +100,19 @@ internal sealed partial class UiReadService
 
         var name = fields.Text("check");
         var (_, checks) = await ChecksAsync(project, token);
-        return checks.FirstOrDefault(c => c.Name == name && HarnessFix.Fixable(c)) is { Fix: { } fix }
-            ? await HarnessFix.RunAsync(root, HarnessFix.Command(fix)!, token)
-            : throw new UiRequestException(400, $"no fix to run for {name}: it passes now, or its fix is yours to do");
+        if (checks.FirstOrDefault(c => c.Name == name && HarnessFix.Fixable(c)) is not { Fix: { } fix } check)
+        {
+            throw new UiRequestException(400, $"no fix to run for {name}: it passes now, or its fix is yours to do");
+        }
+
+        var command = HarnessFix.Command(fix)!;
+        if (!fields.Flag("preview"))
+        {
+            return await HarnessFix.RunAsync(root, command, token);
+        }
+
+        return HarnessFix.Previewed(check)
+            ? await HarnessFix.RunAsync(root, [.. command, "--dry-run"], token)
+            : throw new UiRequestException(400, $"the fix for {name} changes no file to show first");
     }
 }

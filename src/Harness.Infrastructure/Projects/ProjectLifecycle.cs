@@ -36,6 +36,9 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         "# Managed by harness: keep local state out of Git.\n*.db\n*.db-wal\n*.db-shm\n";
     public string GlobalConfigurationPath => globalConfigurationPath ?? ConfigurationPaths.GlobalPath();
     public string Version => version;
+
+    /// <summary>The user-level NuGet.Config the nuget-config check reads: null for this system's, empty for none.</summary>
+    public string? NuGetUserFile { get; init; }
     public MachineRegistry Registry =>
         new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigurationPath))!, "projects.json"));
 
@@ -291,7 +294,7 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             ? string.Join(", ", options)
             : string.Join(", ", options.Take(3)) + " and " + (options.Count - 3) + " more";
 
-    private static async Task WriteConfigurationAsync(string path, string content, CancellationToken token)
+    internal static async Task WriteConfigurationAsync(string path, string content, CancellationToken token)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -383,6 +386,10 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         if (configError is null)
         {
             inspection = inspection with { Search = SearchCheck(loaded.Value.Providers) };
+            if (NuGetProviderFix.Check(loaded, root, NuGetUserFile) is { } nuget)
+            {
+                inspection = inspection with { NuGet = NuGetProviderFix.Health(nuget) };
+            }
         }
 
         if (!location.Initialized)

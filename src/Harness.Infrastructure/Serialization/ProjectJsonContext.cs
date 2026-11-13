@@ -43,6 +43,7 @@ namespace Harness.Infrastructure.Serialization;
 [JsonSerializable(typeof(Harness.Infrastructure.Memory.KnowledgeWorkspace))]
 [JsonSerializable(typeof(Harness.Infrastructure.Memory.MemoryPromotion))]
 [JsonSerializable(typeof(Harness.Infrastructure.Projects.HealthCheck))]
+[JsonSerializable(typeof(Harness.Infrastructure.Projects.ConfigurationFix))]
 [JsonSerializable(typeof(Harness.Infrastructure.Projects.InitAction))]
 [JsonSerializable(typeof(Harness.Infrastructure.Projects.ProjectLocation))]
 [JsonSerializable(typeof(Harness.Infrastructure.Storage.Migration))]

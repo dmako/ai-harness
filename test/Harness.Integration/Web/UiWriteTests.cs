@@ -732,6 +732,74 @@ public sealed class UiWriteTests
     }
 
     [Fact]
+    public async Task TheNuGetProviderFixIsShownFirstThenWrittenIntoTheProjectConfig()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        var global = Path.Combine(fixture.Global, "config.toml");
+        var globalText = File.Exists(global) ? await File.ReadAllTextAsync(global, Token) : "";
+        await File.WriteAllTextAsync(
+            global,
+            globalText
+                + """
+
+                [providers.nuget]
+                command = "dnx"
+                args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
+
+                """,
+            Token
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.Root, "nuget.config"),
+            """
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="company" value="https://pkgs.example.com/feed/v3/index.json" />
+              </packageSources>
+            </configuration>
+            """,
+            Token
+        );
+        var config = Path.Combine(fixture.Root, ".harness", "config.toml");
+        var before = File.Exists(config) ? await File.ReadAllTextAsync(config, Token) : "";
+        await using var server = await UiFixture.StartAsync(fixture);
+        var root = $"/api/projects/{ProjectId(fixture)}";
+
+        // Agents › Tools & providers: the nuget card carries the check and offers Fix
+        var providers = await UiTests.ReadAsync(server.Client, root + "/providers");
+        var nuget = providers["providers"]!.AsArray().Single(p => p!["name"]!.GetValue<string>() == "nuget")!;
+        nuget["check"]!["level"]!.GetValue<string>().Should().Be("warn");
+        nuget["check"]!["fixable"]!.GetValue<bool>().Should().BeTrue();
+        var health = await UiTests.ReadAsync(server.Client, root + "/health");
+        health["previewed"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Equal("nuget-config");
+
+        // the change first, nothing written
+        var preview = await PostAsync(server.Client, root + "/fix", """{"check":"nuget-config","preview":true}""");
+        preview["ok"]!.GetValue<bool>().Should().BeTrue(preview.ToJsonString());
+        preview["output"]!
+            .GetValue<string>()
+            .Should()
+            .Contain("+ [providers.nuget]")
+            .And.Contain("+ dir = \"project\"");
+        (File.Exists(config) ? await File.ReadAllTextAsync(config, Token) : "").Should().Be(before);
+
+        // then written, the file's other lines kept; afterwards there is nothing to fix
+        var written = await PostAsync(server.Client, root + "/fix", """{"check":"nuget-config"}""");
+        written["ok"]!.GetValue<bool>().Should().BeTrue(written.ToJsonString());
+        var after = await File.ReadAllTextAsync(config, Token);
+        after.Should().StartWith(before.TrimEnd()).And.Contain("[providers.nuget]").And.Contain("dir = \"project\"");
+        providers = await UiTests.ReadAsync(server.Client, root + "/providers");
+        providers["providers"]!.AsArray().Single(p => p!["name"]!.GetValue<string>() == "nuget")!["check"]!["level"]!
+            .GetValue<string>()
+            .Should()
+            .Be("ok");
+        using var again = Request(server.Client, root + "/fix", """{"check":"nuget-config"}""");
+        using var refused = await server.Client.SendAsync(again, Token);
+        refused.StatusCode.Should().Be(HttpStatusCode.BadRequest, "it passes now");
+    }
+
+    [Fact]
     public async Task TaskIsDeletedFromTheUiUnlessAnotherDependsOnIt()
     {
         using var fixture = await SyncFixture.CreateAsync();

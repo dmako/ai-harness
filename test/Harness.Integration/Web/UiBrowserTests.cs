@@ -2644,6 +2644,70 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     /// <summary>
+    /// The nuget card in Agents › Tools &amp; providers names the repository's nuget.config problem; Fix shows the
+    /// override it would write to .harness/config.toml and writes it only on Write it (TASK-0140).
+    /// </summary>
+    [Fact]
+    public async Task ToolsPageShowsTheNuGetOverrideBeforeWritingIt()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var global = Path.Combine(fixture.Global, "config.toml");
+        var globalText = File.Exists(global) ? await File.ReadAllTextAsync(global, Token) : "";
+        await File.WriteAllTextAsync(
+            global,
+            globalText
+                + "\n[providers.nuget]\ncommand = \"dnx\"\n"
+                + "args = [\"DimonSmart.NugetMcpServer@1.1.10\", \"--yes\", \"--source\", "
+                + "\"https://api.nuget.org/v3/index.json\"]\n",
+            Token
+        );
+        await File.WriteAllTextAsync(Path.Combine(fixture.Root, "App.csproj"), "<Project />", Token);
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.Root, "nuget.config"),
+            "<configuration><packageSources><clear />"
+                + "<add key=\"company\" value=\"https://pkgs.example.com/feed/v3/index.json\" />"
+                + "</packageSources></configuration>",
+            Token
+        );
+        var config = Path.Combine(fixture.Root, ".harness", "config.toml");
+        var before = File.Exists(config) ? await File.ReadAllTextAsync(config, Token) : "";
+        var id = UiWriteTests.ProjectId(fixture);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/agents/tools" }
+                );
+                await page.WaitAsync("!!document.querySelector('.provcheck button')");
+                (await ValueAsync(page, "document.querySelector('.provcheck').textContent"))
+                    .Should()
+                    .Contain("nuget-config")
+                    .And.Contain("company");
+                await page.EvaluateAsync("document.querySelector('.provcheck button').click()");
+                await page.WaitAsync("!!document.querySelector('dialog .fixdiff')");
+                (await ValueAsync(page, "document.querySelector('dialog .fixdiff').textContent"))
+                    .Should()
+                    .Contain("+ [providers.nuget]")
+                    .And.Contain("+ dir = \"project\"");
+                (File.Exists(config) ? await File.ReadAllTextAsync(config, Token) : "").Should().Be(before);
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog button')].find(b => b.textContent.trim() === 'Write it').click()"
+                );
+                await page.WaitAsync("!document.querySelector('dialog') && !document.querySelector('.provcheck')");
+                (await File.ReadAllTextAsync(config, Token))
+                    .Should()
+                    .StartWith(before.TrimEnd())
+                    .And.Contain("[providers.nuget]")
+                    .And.Contain("dir = \"project\"");
+            }
+        );
+    }
+
+    /// <summary>
     /// Every page, at a desktop and a phone width, dark and light, with every fold closed and open, passes the Go
     /// harness's layout and accessibility checks (checks.js: overflow, overlapping or clipped text, squeezed columns,
     /// controls under 24 px, contrast under WCAG AA, sections showing an error) and raises no script error.

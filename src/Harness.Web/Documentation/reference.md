@@ -47,7 +47,7 @@ uninstall` alone lets you pick what to remove.
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
 | `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
-| `harness doctor` | Checks the installation, database, clients, hooks, providers and SCM connections, with a fix for each problem (`--all`: every project on the machine). |
+| `harness doctor` | Checks the installation, database, clients, hooks, providers and SCM connections, with a fix for each problem (`--all`: every project on the machine; `--fix nuget-config`, with `--dry-run` to only show it: writes the nuget provider's project override). |
 | `harness status` | The project, its Git state, database and clients. |
 | `harness sync` | Refreshes the recorded state (branch, HEAD, files, findings). The Git hooks run it for you. |
 | `harness instructions` | Adds the harness guidance for agents to AGENTS.md / CLAUDE.md (`--remove`). |
@@ -183,7 +183,95 @@ says what is missing.
   you use). Packages from a private feed need the feed and its credentials
   in your NuGet configuration (`dotnet nuget update source <name> -u <user>
   -p <token> --store-password-in-clear-text`); harness says plainly when the
-  feed cannot be reached.
+  feed cannot be reached. A repository with its own `nuget.config` may need
+  a project override: see below.
+
+### Projects with their own nuget.config
+
+A `nuget.config` in the repository (or a folder above it) changes where
+packages come from: `<clear/>` drops nuget.org, `packageSourceMapping`
+sends package ids to named feeds only, and private feeds need credentials.
+It affects the nuget provider twice, as measured with the .NET SDK
+11.0.100 and NugetMcpServer 1.1.10:
+
+- **dnx fetching the server.** dnx reads the NuGet configuration of the
+  folder it starts in (that folder and every folder above it, then your
+  user-level `NuGet.Config`). `--source <url>` replaces all of it, package
+  source mapping included, so the documented command line keeps working
+  with `<clear/>` and mapping. Without `--source`, dnx fails when nuget.org
+  is cleared or mapping gives `DimonSmart.NugetMcpServer` no nuget.org
+  source, and when any configured feed does not answer (unless you add
+  `--ignore-failed-sources`). `--add-source <url>` adds a feed, but dnx
+  refuses it while any of those files has package source mapping;
+  `--configfile <file>` reads that one file instead of the folders and the
+  user-level file. Once the exact version is in the global packages folder
+  (`~/.nuget/packages`), dnx starts it without asking any feed, so a broken
+  configuration shows only on a machine (or CI agent) that has not fetched
+  it yet.
+- **The server finding your packages.** NugetMcpServer reads the NuGet
+  configuration of the folder *it* starts in (the machine, user and folder
+  files, as `dotnet restore` does), searches every enabled source in it,
+  ignores package source mapping and falls back to nuget.org when there is
+  none. Without `dir = "project"`, harness starts it in harness's own
+  working folder, which is the repository only when an agent started
+  harness there. dnx keeps the options before `--` for itself; the
+  arguments after `--` go to the server: `--source <url or folder>`
+  (repeatable; these replace the configured sources) and `--nuget-config
+  <file>`. The server also reads `NUGET_SOURCES` and `NUGET_CONFIG` from
+  its environment.
+
+`harness doctor` (and Health, and the nuget card in Agents › Tools &
+providers) checks the provider against the repository's NuGet
+configuration as `nuget-config`. When one of the above would stop it, the
+check names the file and prints the project override that fixes it.
+`harness doctor --fix nuget-config` writes that override into the
+project's `.harness/config.toml` (`--dry-run` only shows it); in harness ui,
+Fix shows the change and writes it when you confirm. The rest of the file,
+comments included, stays as it was, a second run changes nothing, and
+removing the table undoes it.
+
+A project's `[providers.nuget]` table takes precedence over the global
+file's and replaces it whole, so give `command` and `args` again (and any
+other key you set globally, such as `timeout_ms`). Examples:
+
+```toml
+# .harness/config.toml: a private feed beside nuget.org, or <clear/> with
+# package source mapping: dnx takes the server from nuget.org, and the
+# server, started in the project, reads the project's nuget.config
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
+dir = "project"
+```
+
+```toml
+# without package source mapping you may add nuget.org to the project's
+# feeds instead of replacing them (dnx then needs every feed to answer)
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--add-source", "https://api.nuget.org/v3/index.json"]
+dir = "project"
+```
+
+```toml
+# the server reads one NuGet configuration file you name, wherever it starts
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json",
+        "--", "--nuget-config", "C:/src/app/nuget.config"]
+```
+
+Credentials belong in the NuGet configuration, never in `config.toml`
+(which is committed): store them in your user-level `NuGet.Config` with
+`dotnet nuget update source <name> -u <user> -p <token>`, or let the
+repository's `nuget.config` read them from environment variables in its
+`packageSourceCredentials` (`<add key="ClearTextPassword"
+value="%FEED_TOKEN%" />`). Not verified: no authenticated feed was at hand,
+so that the server uses stored credentials is inferred from the NuGet
+libraries it loads its sources with; its 1.1.10 binary sets up no NuGet
+credential service, so a credential provider plugin (such as Azure
+Artifacts') may serve `dotnet restore` but not the server. Prefer stored
+credentials or a token in an environment variable for it.
 
 ### Built-in search
 
