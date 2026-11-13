@@ -51,7 +51,7 @@ public sealed class ShellTests
         Follow(window, "#/p/prj_fixture/overview");
         await Ui.UntilAsync(() => model.Page is ProjectPage { View: "overview" });
         var page = (ProjectPage)model.Page!;
-        page.Body.Should().BeOfType<PlaceholderPage>().Which.Note.Should().Contain("TASK-0151");
+        page.Body.Should().BeOfType<OverviewViewModel>();
         page.Tabs.Select(t => t.Label).Should().Equal("Overview", "Architecture", "Knowledge", "Work", "Board", "Agents", "Health");
         page.Tabs.Single(t => t.View == "knowledge").Badge.Should().Be(1);
         page.Tabs.Single(t => t.View == "work").Badge.Should().Be(2);

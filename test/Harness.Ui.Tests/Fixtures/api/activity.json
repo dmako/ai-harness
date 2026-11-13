@@ -1,0 +1,14 @@
+{
+  "days": 7,
+  "items": [
+    {
+      "at": "2026-11-13T09:00:00Z",
+      "kind": "task",
+      "title": "TASK-0003 claimed: Claimed one",
+      "ref": "TASK-0003",
+      "actor": "claude-code",
+      "project_id": "prj_fixture",
+      "project": "Fixture project"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "tasks": [
+    {
+      "id": "TASK-0001",
+      "title": "Ready one",
+      "status": "ready",
+      "priority": "high",
+      "type": "spike",
+      "blueprint": "BP-009"
+    },
+    {
+      "id": "TASK-0002",
+      "title": "Done one",
+      "status": "done",
+      "priority": "medium",
+      "type": "feature",
+      "blueprint": "BP-008",
+      "completion": {
+        "summary": "imported as done from test",
+        "completed_by": "import",
+        "completed_at": "2026-11-10T09:00:00Z"
+      }
+    },
+    {
+      "id": "TASK-0003",
+      "title": "Claimed one",
+      "status": "claimed",
+      "priority": "medium",
+      "type": "feature",
+      "blueprint": "BP-009",
+      "claim": {
+        "claimant": "claude-code",
+        "claimed_at": "2026-11-13T09:00:00Z",
+        "lease_until": "2026-11-13T09:00:00Z"
+      }
+    }
+  ]
+}

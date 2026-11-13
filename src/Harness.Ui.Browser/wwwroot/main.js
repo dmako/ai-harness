@@ -20,6 +20,12 @@ globalThis.harnessLocation = {
   count: (name) => { globalThis.harnessTimings[name] = (globalThis.harnessTimings[name] || 0) + 1; },
 };
 
+// what BrowserPreferences imports: localStorage, which a private window may refuse
+globalThis.harnessStore = {
+  get: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
+  set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* private window */ } },
+};
+
 const runtime = await dotnet.withDiagnosticTracing(false).create();
 globalThis.harnessTimings.runtimeReady = performance.now();
 

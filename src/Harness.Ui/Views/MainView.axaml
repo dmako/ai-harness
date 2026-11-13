@@ -47,6 +47,9 @@
     <DataTemplate DataType="vm:BoardViewModel">
       <views:BoardView Name="Board" />
     </DataTemplate>
+    <DataTemplate DataType="vm:OverviewViewModel">
+      <views:OverviewView Name="Overview" />
+    </DataTemplate>
     <DataTemplate DataType="vm:HealthViewModel">
       <views:HealthView Name="Health" />
     </DataTemplate>

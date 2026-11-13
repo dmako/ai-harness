@@ -24,4 +24,8 @@ namespace Harness.Ui.Api;
 [JsonSerializable(typeof(HealthReport))]
 [JsonSerializable(typeof(FixRequest))]
 [JsonSerializable(typeof(FixResult))]
+[JsonSerializable(typeof(TaskList))]
+[JsonSerializable(typeof(ProjectReport))]
+[JsonSerializable(typeof(ProjectTrends))]
+[JsonSerializable(typeof(ActivityFeed))]
 internal sealed partial class UiJsonContext : JsonSerializerContext;

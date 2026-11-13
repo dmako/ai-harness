@@ -41,6 +41,7 @@ internal static partial class Program
                 Server = server,
                 Page = new Uri(location.GetLeftPart(UriPartial.Path)),
                 Navigation = BrowserNavigation.Instance,
+                Preferences = new BrowserPreferences(),
                 BoardShown = () => Location.Mark("board"),
                 LiveReloaded = () => Location.Count("liveReloads"),
             },
@@ -103,6 +104,20 @@ internal sealed partial class BrowserNavigation : INavigation
         // the page shown, for tests and measurements (window.harnessTimings.route)
         Location.Shown(route.Href);
     }
+}
+
+/// <summary>The page's preferences in localStorage, under the JavaScript UI's own keys (harness.&lt;key&gt;).</summary>
+internal sealed partial class BrowserPreferences : Harness.Ui.Services.IPreferences
+{
+    public string? Get(string key) => Read("harness." + key);
+
+    public void Set(string key, string value) => Write("harness." + key, value);
+
+    [JSImport("globalThis.harnessStore.get")]
+    private static partial string? Read(string key);
+
+    [JSImport("globalThis.harnessStore.set")]
+    private static partial void Write(string key, string value);
 }
 
 /// <summary>The page's address and history (globalThis.harnessLocation in main.js).</summary>

@@ -1,0 +1,214 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.OverviewView"
+             x:DataType="vm:OverviewViewModel">
+  <!-- a project's Overview (app.js viewOverview): since the last visit; the rings, what is in flight and the
+       proposals waiting; Needs attention, with the recent activity beside it when there is room. The columns are
+       arranged by width in code (OverviewView.axaml.cs). -->
+  <StackPanel>
+    <Border Name="Since" Classes="since" IsVisible="{Binding HasSince}">
+      <DockPanel>
+        <Button Name="SeeActivity" DockPanel.Dock="Right" Classes="link small" Content="see the activity"
+                VerticalAlignment="Center" Margin="12,0,0,0" />
+        <TextBlock Text="{Binding Since}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+
+    <Grid Name="Top" DataContext="{Binding Summary}" x:DataType="vm:OverviewSummary" IsVisible="{Binding HasContent}"
+          ColumnSpacing="12" RowSpacing="12" Margin="0,0,0,4">
+      <Border Name="RingCard" Classes="card" Padding="16,12">
+        <WrapPanel ItemSpacing="20" LineSpacing="12" HorizontalAlignment="Center">
+          <c:Rings Name="Rings" Values="{Binding RingValues}" VerticalAlignment="Center" />
+          <ItemsControl Name="RingLegend" ItemsSource="{Binding Rings}" VerticalAlignment="Center">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:RingRow">
+                <c:AppLink Classes="row" Href="{Binding Href}" AutomationProperties.Name="{Binding AccessibleName}">
+                  <DockPanel>
+                    <c:Swatch DockPanel.Dock="Left" BrushKey="{Binding Brush}" VerticalAlignment="Top" Margin="0,5,8,0" />
+                    <c:Sparkline DockPanel.Dock="Right" Bars="{Binding Bars}" Line="{Binding Line}" BrushKey="{Binding Brush}"
+                                 IsVisible="{Binding HasSpark}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    <StackPanel>
+                      <WrapPanel ItemSpacing="8">
+                        <TextBlock Text="{Binding Label}" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Percent}" />
+                      </WrapPanel>
+                      <WrapPanel>
+                        <TextBlock Classes="muted small" Text="{Binding Text}" />
+                        <TextBlock Classes="delta small" Classes.up="{Binding DeltaUp}" IsVisible="{Binding HasDelta}"
+                                   Text="{Binding Delta, StringFormat=' · {0}'}" />
+                      </WrapPanel>
+                    </StackPanel>
+                  </DockPanel>
+                </c:AppLink>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </WrapPanel>
+      </Border>
+
+      <Border Name="NowCard" Classes="card" Padding="12">
+        <StackPanel Spacing="4">
+          <WrapPanel>
+            <TextBlock Classes="label" Text="{Binding NowLabel}" Margin="0,0,6,0" />
+            <TextBlock Classes="muted small" Text="{Binding NowNote, StringFormat='· {0}'}" VerticalAlignment="Center" />
+          </WrapPanel>
+          <TextBlock Classes="muted small" Classes.okay="{Binding AllDone}" Text="{Binding NowEmpty}" TextWrapping="Wrap"
+                     IsVisible="{Binding HasNowEmpty}" />
+          <ItemsControl Name="Now" ItemsSource="{Binding Now}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:NowRow">
+                <c:AppLink Classes="row" Href="{Binding Href}" AutomationProperties.Name="{Binding AccessibleName}">
+                  <DockPanel>
+                    <Border DockPanel.Dock="Left" Classes="pill" Margin="0,0,6,0" IsVisible="{Binding ShowStatus}"
+                            Classes.st-claimed="{Binding Status, Converter={x:Static c:Converters.Is}, ConverterParameter=claimed}"
+                            Classes.st-in_progress="{Binding Status, Converter={x:Static c:Converters.Is}, ConverterParameter=in_progress}"
+                            Classes.st-review="{Binding Status, Converter={x:Static c:Converters.Is}, ConverterParameter=review}"
+                            Classes.st-done="{Binding Status, Converter={x:Static c:Converters.Is}, ConverterParameter=done}">
+                      <StackPanel Orientation="Horizontal">
+                        <c:Icon Kind="{Binding StatusIcon}" />
+                        <TextBlock Text="{Binding StatusWords}" />
+                      </StackPanel>
+                    </Border>
+                    <TextBlock DockPanel.Dock="Left" Classes="mono small muted" Text="{Binding Id}" VerticalAlignment="Center"
+                               Margin="0,0,6,0" />
+                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  </DockPanel>
+                </c:AppLink>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <c:AppLink Classes="link small" Href="{Binding TasksHref}" Content="All tasks →" IsVisible="{Binding HasMoreTasks}" />
+        </StackPanel>
+      </Border>
+
+      <c:AppLink Name="ProposalsTile" Classes="tilelink" Href="{Binding ProposalsHref}"
+                 AutomationProperties.Name="{Binding Proposals, StringFormat='Proposals to review: {0}'}">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="label" Text="Proposals to review" TextWrapping="Wrap" />
+          <TextBlock Classes="value" Text="{Binding Proposals}" />
+          <TextBlock Classes="muted small" Text="{Binding ProposalsNote}" TextWrapping="Wrap" />
+        </StackPanel>
+      </c:AppLink>
+    </Grid>
+
+    <Grid Name="Columns" ColumnSpacing="24">
+      <StackPanel Name="Main">
+        <views:SectionView DataContext="{Binding Summary}">
+          <views:SectionView.Body>
+            <StackPanel x:DataType="vm:OverviewSummary" Spacing="8">
+              <ItemsControl Name="Attention" ItemsSource="{Binding Attention}" IsVisible="{Binding HasAttention}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:AttentionItem">
+                    <c:AppLink Classes="row" Href="{Binding Href}" AutomationProperties.Name="{Binding AccessibleName}">
+                      <DockPanel>
+                        <c:Icon DockPanel.Dock="Left" Classes="lv" Classes.warn="{Binding IsWarn}"
+                                Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" />
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                      </DockPanel>
+                    </c:AppLink>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Border Name="AllClear" Classes="card" Padding="14,10" IsVisible="{Binding !HasAttention}">
+                <DockPanel>
+                  <c:Icon DockPanel.Dock="Left" Classes="lv" Kind="check" />
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="All clear" />
+                    <TextBlock Classes="muted small" Text="Nothing waits for you in this project." TextWrapping="Wrap" />
+                  </StackPanel>
+                </DockPanel>
+              </Border>
+              <c:AppLink Name="Serving" Classes="link" Href="{Binding AgentsHref}" IsVisible="{Binding HasFindings}">
+                <TextBlock Text="How harness serves your agents, and what to change →" TextWrapping="Wrap" />
+              </c:AppLink>
+            </StackPanel>
+          </views:SectionView.Body>
+        </views:SectionView>
+      </StackPanel>
+
+      <StackPanel Name="Side">
+        <views:SectionView Name="ActivitySection" DataContext="{Binding Activity}">
+          <views:SectionView.Body>
+            <StackPanel x:DataType="vm:ActivityViewModel" Spacing="8">
+              <Border Classes="card" Padding="12,10" IsVisible="{Binding HasItems}">
+                <StackPanel Spacing="6">
+                  <TextBlock Name="WeekSummary" Classes="small" Text="{Binding WeekSummary}" TextWrapping="Wrap" />
+                  <WrapPanel ItemSpacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <c:Swatch BrushKey="Accent" Size="8" VerticalAlignment="Center" />
+                      <TextBlock Classes="muted small" Text="agents' calls" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <c:Swatch BrushKey="Critical" Size="8" VerticalAlignment="Center" />
+                      <TextBlock Classes="muted small" Text="failed" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <c:Swatch BrushKey="CDecision" Size="6" VerticalAlignment="Center" />
+                      <TextBlock Classes="muted small" Text="a task or knowledge change" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <c:DayBars Name="DayBars" Days="{Binding Bars}" AutomationProperties.Name="{Binding WeekName}" />
+                  <ItemsControl ItemsSource="{Binding Week}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:ActivityDay">
+                        <StackPanel>
+                          <c:Dots Count="{Binding Changes}" HorizontalAlignment="Center" Margin="0,0,0,2" />
+                          <TextBlock Classes="muted small" Text="{Binding Label}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+              <Border Name="QuietWeek" Classes="card" Padding="14,10" IsVisible="{Binding Quiet}">
+                <DockPanel>
+                  <c:Icon DockPanel.Dock="Left" Classes="lv" Kind="calm" />
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="A quiet week" />
+                    <TextBlock Classes="muted small" TextWrapping="Wrap"
+                               Text="No agent session, task or knowledge change in the last 7 days." />
+                  </StackPanel>
+                </DockPanel>
+              </Border>
+              <ItemsControl Name="ActivityRows" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:ActivityRow">
+                    <c:AppLink Classes="row" Href="{Binding Href}">
+                      <DockPanel>
+                        <Border DockPanel.Dock="Left" Classes="glyph">
+                          <TextBlock Text="{Binding Glyph}" />
+                        </Border>
+                        <StackPanel Spacing="1">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Classes="muted small" Text="{Binding When}" Margin="8,0,0,0" />
+                            <WrapPanel ItemSpacing="6">
+                              <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}"
+                                      Kind="{Binding LevelIcon}" IsVisible="{Binding HasLevel}" Margin="0,2,0,0" />
+                              <TextBlock Text="{Binding Head}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                              <TextBlock Classes="muted" Text="{Binding HeadMuted}" IsVisible="{Binding HasHeadMuted}" />
+                              <TextBlock Classes="failed" Text="{Binding Failed}" IsVisible="{Binding HasFailed}"
+                                         VerticalAlignment="Center" />
+                            </WrapPanel>
+                          </DockPanel>
+                          <TextBlock Classes="muted small" Text="{Binding Meta}" TextWrapping="Wrap" IsVisible="{Binding HasMeta}" />
+                        </StackPanel>
+                      </DockPanel>
+                    </c:AppLink>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button Name="ShowAll" Classes="ghost small" Content="{Binding MoreLabel}" Command="{Binding ShowAllCommand}"
+                      IsVisible="{Binding HasMore}" />
+            </StackPanel>
+          </views:SectionView.Body>
+        </views:SectionView>
+      </StackPanel>
+    </Grid>
+  </StackPanel>
+</UserControl>

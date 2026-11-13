@@ -53,6 +53,16 @@ public sealed class TaskSummary
     public string Type { get; init; } = "feature";
     public string? Blueprint { get; init; }
     public string? Goal { get; init; }
+    public string? BlockedReason { get; init; }
+    public TaskCompletion? Completion { get; init; }
+}
+
+/// <summary>How a done task was completed.</summary>
+public sealed class TaskCompletion
+{
+    public string? Summary { get; init; }
+    public string? CompletedBy { get; init; }
+    public string? CompletedAt { get; init; }
 }
 
 /// <summary>A blueprint as the Board names it (TaskViews.Blueprint).</summary>

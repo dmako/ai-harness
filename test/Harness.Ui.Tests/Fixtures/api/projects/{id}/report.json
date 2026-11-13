@@ -1,0 +1,58 @@
+{
+  "id": "prj_fixture",
+  "root": "C:\\repos\\fixture",
+  "days": 30,
+  "context": {
+    "calls": 0,
+    "open": 0,
+    "changed": 0,
+    "hits": 0,
+    "hit_rate": 0,
+    "tests": [
+      0,
+      0
+    ],
+    "callee_misses": 0,
+    "by_provider": null,
+    "providers": {},
+    "top_misses": null,
+    "by_language": {},
+    "after_read": {
+      "calls": 0,
+      "linked": 0,
+      "touched": 0,
+      "hits": 0,
+      "hit_rate": 0,
+      "edited": 0,
+      "edit_hits": 0
+    }
+  },
+  "metrics": {
+    "since": "2026-10-14T09:00:00Z",
+    "tools": [],
+    "providers": [],
+    "hooks": {
+      "events": 0,
+      "sessions": 0
+    }
+  },
+  "trends": [],
+  "knowledge": {
+    "current_memories": 0,
+    "proposed": 0,
+    "approved": 0,
+    "rejected": 0,
+    "pending": 0
+  },
+  "knowledge_reads": 0,
+  "knowledge_writes": 0,
+  "findings": [
+    {
+      "level": "info",
+      "audience": "user",
+      "area": "hooks",
+      "message": "no client hook events: read-after-context relevance and provider bypasses are not measured",
+      "action": "harness hooks install --kind claude-code,codex (or run 'harness hooks')"
+    }
+  ]
+}

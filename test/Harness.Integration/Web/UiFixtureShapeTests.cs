@@ -85,7 +85,10 @@ public sealed class UiFixtureShapeTests
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync(Token));
     }
 
-    /// <summary>A project with blueprints (coloured) and a task in several statuses, so lists have items to compare.</summary>
+    /// <summary>
+    /// A project with blueprints (coloured), a task in several statuses and one claimed, so lists and the activity feed
+    /// have items to compare.
+    /// </summary>
     internal static void Seed(SyncFixture fixture)
     {
         using var database = fixture.Database();
@@ -113,10 +116,19 @@ public sealed class UiFixtureShapeTests
                     Blueprint = "BP-008",
                     Status = "done",
                 },
+                new TaskDefinition
+                {
+                    Id = "TASK-0003",
+                    Title = "Claimed one",
+                    Blueprint = "BP-009",
+                    Status = "ready",
+                },
             ],
             "test",
             cancellationToken: Token
         );
+        // a claim, so the activity feed has a line
+        tasks.Claim("TASK-0003", new("claude-code"), cancellationToken: Token);
     }
 
     /// <summary>Every property path of <paramref name="node"/>; array items share their array's path ("columns[].tasks[].id").</summary>

@@ -1,0 +1,184 @@
+{
+  "days": [
+    {
+      "day": "2026-10-15",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-16",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-17",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-18",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-19",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-20",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-21",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-22",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-23",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-24",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-25",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-26",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-27",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-28",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-29",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-30",
+      "answers": 0,
+      "hit_rate": 0,
+      "done": 0
+    },
+    {
+      "day": "2026-10-31",
+      "answers": 2,
+      "hit_rate": 0.4,
+      "done": 0
+    },
+    {
+      "day": "2026-11-01",
+      "answers": 3,
+      "hit_rate": 0.42,
+      "done": 0
+    },
+    {
+      "day": "2026-11-02",
+      "answers": 1,
+      "hit_rate": 0.44,
+      "done": 0
+    },
+    {
+      "day": "2026-11-03",
+      "answers": 2,
+      "hit_rate": 0.46,
+      "done": 0
+    },
+    {
+      "day": "2026-11-04",
+      "answers": 3,
+      "hit_rate": 0.48,
+      "done": 1
+    },
+    {
+      "day": "2026-11-05",
+      "answers": 1,
+      "hit_rate": 0.5,
+      "done": 0
+    },
+    {
+      "day": "2026-11-06",
+      "answers": 2,
+      "hit_rate": 0.52,
+      "done": 0
+    },
+    {
+      "day": "2026-11-07",
+      "answers": 3,
+      "hit_rate": 0.54,
+      "done": 0
+    },
+    {
+      "day": "2026-11-08",
+      "answers": 1,
+      "hit_rate": 0.56,
+      "done": 0
+    },
+    {
+      "day": "2026-11-09",
+      "answers": 2,
+      "hit_rate": 0.58,
+      "done": 1
+    },
+    {
+      "day": "2026-11-10",
+      "answers": 3,
+      "hit_rate": 0.6,
+      "done": 0
+    },
+    {
+      "day": "2026-11-11",
+      "answers": 1,
+      "hit_rate": 0.62,
+      "done": 0
+    },
+    {
+      "day": "2026-11-12",
+      "answers": 2,
+      "hit_rate": 0.64,
+      "done": 0
+    },
+    {
+      "day": "2026-11-13",
+      "answers": 3,
+      "hit_rate": 0.66,
+      "done": 1
+    }
+  ]
+}

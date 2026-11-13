@@ -220,6 +220,7 @@ public sealed partial class ProjectPage : PageViewModel
     public void Update(ProjectInfo project, Route route)
     {
         Project = project;
+        (Body as OverviewViewModel)?.Update(project);
         Tabs.Clear();
         foreach (var tab in TabsOf(project, route.View))
         {
@@ -285,13 +286,18 @@ public sealed partial class ProjectPage : PageViewModel
             _ = health.LoadAsync();
             return health;
         }
+        if (route.View is "overview")
+        {
+            var overview = new OverviewViewModel(_services, Project);
+            overview.Start();
+            return overview;
+        }
         var (label, task) = route.View switch
         {
             "architecture" => ("Architecture", "TASK-0156"),
             "knowledge" => ("Knowledge", "TASK-0153"),
             "work" => ("Work", "TASK-0152"),
-            "agents" => ("Agents", "TASK-0154"),
-            _ => ("Overview", "TASK-0151"),
+            _ => ("Agents", "TASK-0154"),
         };
         return new PlaceholderPage(label, task, _services.Host.Current(route));
     }

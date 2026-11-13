@@ -215,6 +215,19 @@ public sealed class UiHostContext
     /// <summary>The page's history: the address bar in the browser, in memory on the desktop and in tests.</summary>
     public INavigation Navigation { get; init; } = new InMemoryNavigation();
 
+    /// <summary>What this page keeps for its user (the report window, the last visits).</summary>
+    public Services.IPreferences Preferences { get; init; } = new Services.InMemoryPreferences();
+
+    /// <summary>
+    /// The last visit each page started from in this page's life (app.js visitFrom): a live redraw or a return keeps
+    /// the time the visit began from, while the stored one moves on to now.
+    /// </summary>
+    public Dictionary<string, string> Visits { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>The window, in days, of the reports and trends (app.js state.days; the JavaScript UI sets it).</summary>
+    public int Days =>
+        int.TryParse(Preferences.Get("days"), System.Globalization.CultureInfo.InvariantCulture, out var days) && days > 0 ? days : 30;
+
     /// <summary>The new UI's own page (its links open there in a new tab); harness ui serves it at /next/.</summary>
     public Uri? Page { get; init; }
 

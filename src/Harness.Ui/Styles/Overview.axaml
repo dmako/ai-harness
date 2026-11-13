@@ -1,0 +1,99 @@
+<!-- The Overview (style.css .since, .ringcard, .nowcard, .attn, .activity, .astrip): the since-your-last-visit line,
+     the rings and their legend, the Now card's rows, the attention list and the activity lines and strip. Rows that
+     lead somewhere are AppLinks with the row class: the whole row is the link. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <Style Selector="Border.since">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="Margin" Value="0,0,0,12" />
+  </Style>
+
+  <!-- a row that is a link: the whole row, its text in the inks -->
+  <Style Selector="Button.row">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="Padding" Value="6,4" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+
+  <!-- a tile that is a link (the proposals waiting) -->
+  <Style Selector="Button.tilelink">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="Button.tilelink:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.tilelink TextBlock.value">
+    <Setter Property="FontSize" Value="{StaticResource TextXl}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="TextBlock.delta">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.delta.up">
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
+  </Style>
+  <Style Selector="TextBlock.okay">
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
+  </Style>
+
+  <!-- an attention row or activity line: its level's shape coloured, the words in the ink -->
+  <Style Selector="c|Icon.lv">
+    <Setter Property="Size" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Margin" Value="0,2,8,0" />
+  </Style>
+  <Style Selector="c|Icon.lv.warn">
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="c|Icon.lv.problem">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+
+  <Style Selector="Border.glyph">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+  </Style>
+  <Style Selector="Border.glyph TextBlock">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.failed">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+  </Style>
+</Styles>

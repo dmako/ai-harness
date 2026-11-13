@@ -95,6 +95,85 @@ internal static class Fixtures
             ),
         };
 
+    /// <summary>The tasks fixture with <paramref name="more"/> tasks added (id, status, title; a blocked one with a reason).</summary>
+    public static string Tasks(params (string Id, string Status, string Title)[] more)
+    {
+        var list = JsonNode.Parse(Read("api/projects/{id}/tasks.json"))!;
+        var tasks = list["tasks"]!.AsArray();
+        foreach (var (id, status, title) in more)
+        {
+            var task = new JsonObject { ["id"] = id, ["title"] = title, ["status"] = status, ["priority"] = "medium", ["type"] = "feature" };
+            if (status is "blocked")
+            {
+                task["blocked_reason"] = "waits for the server";
+            }
+            tasks.Add(task);
+        }
+        return list.ToJsonString();
+    }
+
+    /// <summary>The report fixture with these findings for the user, and the context scored when <paramref name="scored"/>.</summary>
+    public static string Report(bool scored = false, params (string Level, string Message)[] findings)
+    {
+        var report = JsonNode.Parse(Read("api/projects/{id}/report.json"))!;
+        if (findings.Length > 0)
+        {
+            report["findings"] = new JsonArray(
+                [
+                    .. findings.Select(f =>
+                        (JsonNode)new JsonObject { ["level"] = f.Level, ["audience"] = "user", ["area"] = "providers", ["message"] = f.Message }
+                    ),
+                ]
+            );
+        }
+        if (scored)
+        {
+            var context = report["context"]!;
+            context["calls"] = 40;
+            context["changed"] = 20;
+            context["hits"] = 13;
+            context["hit_rate"] = 0.65;
+            context["after_read"]!["touched"] = 10;
+            context["after_read"]!["hits"] = 7;
+            context["after_read"]!["hit_rate"] = 0.7;
+        }
+        return report.ToJsonString();
+    }
+
+    /// <summary>An activity feed of <paramref name="items"/>, newest first.</summary>
+    public static string Activity(params JsonObject[] items) =>
+        new JsonObject { ["days"] = 7, ["items"] = new JsonArray([.. items.Cast<JsonNode>()]) }.ToJsonString();
+
+    /// <summary>An activity line <paramref name="minutesAgo"/> minutes ago in the fixture project.</summary>
+    public static JsonObject Item(string kind, string title, int minutesAgo, string? detail = null, string? actor = null, string? level = null, string? id = null)
+    {
+        var item = new JsonObject
+        {
+            ["at"] = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo).ToString("O"),
+            ["kind"] = kind,
+            ["title"] = title,
+            ["project_id"] = ProjectId,
+            ["project"] = "Fixture project",
+        };
+        if (detail is not null)
+        {
+            item["detail"] = detail;
+        }
+        if (actor is not null)
+        {
+            item["actor"] = actor;
+        }
+        if (level is not null)
+        {
+            item["level"] = level;
+        }
+        if (id is not null)
+        {
+            item["ref"] = id;
+        }
+        return item;
+    }
+
     public static string Read(string path) => File.ReadAllText(Path.Combine(Folder, path));
 
     private static JsonArray Column(JsonArray columns, string status) =>

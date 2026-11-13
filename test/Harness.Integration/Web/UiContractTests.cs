@@ -53,6 +53,21 @@ public sealed class UiContractTests
         saved.Settings.Sort.Should().Be("id");
         saved.Settings.HideDoneDays.Should().Be(14);
 
+        // the Overview: the tasks, the report and trends over a window, and the activity (the seeded claim)
+        var tasks = (await api.TasksAsync(id, Token)).Tasks;
+        tasks.Select(t => (t.Id, t.Status)).Should().Equal(("TASK-0001", "ready"), ("TASK-0002", "done"), ("TASK-0003", "claimed"));
+        tasks.Single(t => t.Id == "TASK-0002").Completion!.CompletedAt.Should().NotBeNullOrEmpty();
+        var report = await api.ReportAsync(id, 14, Token);
+        report.Days.Should().Be(14);
+        report.Context.AfterRead.Should().NotBeNull();
+        report.Findings.Should().NotBeNull().And.OnlyContain(f => f.Audience == "user");
+        var trends = await api.TrendsAsync(id, 14, Token);
+        trends.Days.Should().HaveCount(14);
+        trends.Days[^1].Done.Should().Be(1, "TASK-0002 was imported as done today");
+        var activity = await api.ActivityAsync(id, 7, 50, Token);
+        activity.Items.Should().ContainSingle(i => i.Kind == "task" && i.Ref == "TASK-0003" && i.ProjectId == id);
+        (await api.ActivityAsync(null, 7, 50, Token)).Items.Should().HaveCount(activity.Items.Count);
+
         // Health: the checks, a probe from harness ui's own page, a fix, and a sync that then shows as a run
         var health = await api.HealthAsync(id, probe: false, Token);
         health.Probed.Should().BeFalse();

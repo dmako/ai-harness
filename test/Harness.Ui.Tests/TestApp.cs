@@ -59,7 +59,8 @@ internal static class Ui
         string? board = null,
         FixtureApi? api = null,
         bool fastLive = false,
-        string? address = null
+        string? address = null,
+        IPreferences? preferences = null
     )
     {
         api ??= new FixtureApi();
@@ -72,7 +73,7 @@ internal static class Ui
         var http = new HttpClient(api) { BaseAddress = Server };
 #pragma warning restore CA2000
 #pragma warning disable CA2000 // disposed by the window's Closed handler
-        var services = Services(http, fastLive, new InMemoryNavigation(address ?? $"#/p/{Fixtures.ProjectId}/board"));
+        var services = Services(http, fastLive, new InMemoryNavigation(address ?? $"#/p/{Fixtures.ProjectId}/board"), preferences);
 #pragma warning restore CA2000
         var model = new MainViewModel(services);
         var window = Show(new MainView { DataContext = model }, width, height);
@@ -94,10 +95,20 @@ internal static class Ui
     /// The page's services over <paramref name="http"/> as a desktop host has them (writes carry the Origin). With
     /// <paramref name="fastLive"/> live updates use test timings: 100 ms quiet, 600 ms gap, 200 ms reconnect.
     /// </summary>
-    public static UiServices Services(HttpClient http, bool fastLive = false, Harness.Ui.Navigation.INavigation? navigation = null)
+    public static UiServices Services(
+        HttpClient http,
+        bool fastLive = false,
+        Harness.Ui.Navigation.INavigation? navigation = null,
+        IPreferences? preferences = null
+    )
     {
         var api = new HarnessApi(http) { Origin = Server.GetLeftPart(UriPartial.Authority) };
-        var host = new UiHostContext { Server = Server, Navigation = navigation ?? new InMemoryNavigation() };
+        var host = new UiHostContext
+        {
+            Server = Server,
+            Navigation = navigation ?? new InMemoryNavigation(),
+            Preferences = preferences ?? new InMemoryPreferences(),
+        };
         if (!fastLive)
         {
             return new UiServices(api, host);
