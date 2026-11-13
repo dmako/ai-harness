@@ -27,11 +27,7 @@ public static class AgentPermissionModes
 
     private static readonly AgentPermissionMode[] ClaudeModes =
     [
-        new(
-            Auto,
-            "Auto",
-            "Actions Claude Code judges safe run without asking; the rest wait here for Allow or Deny."
-        )
+        new(Auto, "Auto", "Actions Claude Code judges safe run without asking; the rest wait here for Allow or Deny.")
         {
             IsDefault = true,
             ClaudeArguments = ["--permission-mode", "auto"],
@@ -91,11 +87,7 @@ public static class AgentPermissionModes
             ApprovalPolicy = "on-request",
             Sandbox = "read-only",
         },
-        new(
-            "full-access",
-            "Full access",
-            "Unsafe: no sandbox and no approvals; commands run with your full access."
-        )
+        new("full-access", "Full access", "Unsafe: no sandbox and no approvals; commands run with your full access.")
         {
             Unsafe = true,
             ApprovalPolicy = "never",

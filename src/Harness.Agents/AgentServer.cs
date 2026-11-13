@@ -42,7 +42,10 @@ internal sealed class AgentServer : IAsyncDisposable
     {
         AgentHostFiles.Prepare(options.State);
         // before this host's own state is written, so a resumed session finds the mode it was started with
-        options = options with { Start = options.Start with { PermissionMode = PermissionMode(options) } };
+        options = options with
+        {
+            Start = options.Start with { PermissionMode = PermissionMode(options) },
+        };
         _options = options;
         _error = error;
         _database = options.Database.Length > 0 ? HarnessDatabase.OpenExisting(options.Database) : null;
@@ -89,8 +92,8 @@ internal sealed class AgentServer : IAsyncDisposable
                 if (
                     AgentHostFiles.Text(state, "client") == options.Client
                     && AgentHostFiles.Text(state, "session_id") == options.Resume
-                    && AgentPermissionModes.Find(options.Client, AgentHostFiles.Text(state, "permission_mode")) is
-                    { } earlier
+                    && AgentPermissionModes.Find(options.Client, AgentHostFiles.Text(state, "permission_mode"))
+                        is { } earlier
                 )
                 {
                     return earlier.Id;

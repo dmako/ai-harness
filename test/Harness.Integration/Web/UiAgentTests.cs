@@ -129,10 +129,12 @@ public sealed class UiAgentTests
                 }
             );
             refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            JsonNode
-                .Parse(await refused.Content.ReadAsStringAsync(Token))!["error"]!.GetValue<string>()
+            JsonNode.Parse(await refused.Content.ReadAsStringAsync(Token))!["error"]!
+                .GetValue<string>()
                 .Should()
-                .Be("unknown permission mode 'bypassPermissions' for codex; choose one of auto, manual, read-only, full-access");
+                .Be(
+                    "unknown permission mode 'bypassPermissions' for codex; choose one of auto, manual, read-only, full-access"
+                );
             AgentHostFiles.States(AgentHostFiles.Directory(fixture.DatabasePath)).Should().BeEmpty();
             File.Exists(Path.Combine(calls, "calls.jsonl")).Should().BeFalse();
         }

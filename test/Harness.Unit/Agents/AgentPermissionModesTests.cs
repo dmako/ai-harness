@@ -66,7 +66,9 @@ public sealed class AgentPermissionModesTests
         unknown
             .Should()
             .Throw<ArgumentException>()
-            .WithMessage("unknown permission mode 'plan' for codex; choose one of auto, manual, read-only, full-access*");
+            .WithMessage(
+                "unknown permission mode 'plan' for codex; choose one of auto, manual, read-only, full-access*"
+            );
         var client = () => AgentPermissionModes.Default("gemini");
         client.Should().Throw<ArgumentException>().WithMessage("unknown agent client gemini*");
     }

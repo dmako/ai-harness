@@ -151,23 +151,21 @@ internal sealed class UiAgents : IAsyncDisposable
         var modes = new JsonObject();
         foreach (var client in AgentPermissionModes.Clients)
         {
-            modes[client] = new JsonArray(
-                [
-                    .. AgentPermissionModes
-                        .For(client)
-                        .Select(m =>
-                            (JsonNode?)
-                                new JsonObject
-                                {
-                                    ["id"] = m.Id,
-                                    ["label"] = m.Label,
-                                    ["description"] = m.Description,
-                                    ["default"] = m.IsDefault,
-                                    ["unsafe"] = m.Unsafe,
-                                }
-                        ),
-                ]
-            );
+            modes[client] = new JsonArray([
+                .. AgentPermissionModes
+                    .For(client)
+                    .Select(m =>
+                        (JsonNode?)
+                            new JsonObject
+                            {
+                                ["id"] = m.Id,
+                                ["label"] = m.Label,
+                                ["description"] = m.Description,
+                                ["default"] = m.IsDefault,
+                                ["unsafe"] = m.Unsafe,
+                            }
+                    ),
+            ]);
         }
         return modes;
     }

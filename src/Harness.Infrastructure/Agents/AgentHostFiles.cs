@@ -87,8 +87,7 @@ public static class AgentHostFiles
             {
                 return JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
             }
-            catch (Exception exception)
-                when (exception is IOException or JsonException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
             {
                 if (!File.Exists(path) && !File.Exists(path + ".tmp"))
                 {

@@ -75,12 +75,15 @@ public sealed class ArchitectureReaderTests
                 new()
                 {
                     ["Data/Data.csproj"] = EntityFrameworkProject,
-                    ["Data/BaseContext.cs"] = "public abstract class BaseContext : Microsoft.EntityFrameworkCore.DbContext {}\n",
+                    ["Data/BaseContext.cs"] =
+                        "public abstract class BaseContext : Microsoft.EntityFrameworkCore.DbContext {}\n",
                     ["Data/AppDbContext.cs"] = "public class AppDbContext(DbContextOptions o) : BaseContext\n{\n}\n",
                     // a base not named *Context, in a file that declares no *Context class
-                    ["Data/EntitiesBase.cs"] = "public abstract class EntitiesBase<T> : IdentityDbContext<T> where T : class {}\n",
+                    ["Data/EntitiesBase.cs"] =
+                        "public abstract class EntitiesBase<T> : IdentityDbContext<T> where T : class {}\n",
                     ["Data/UsersContext.cs"] = "public class UsersContext : EntitiesBase<User> {}\n",
-                    ["Data/LegacyContext.cs"] = "public class LegacyContext : global::System.Data.Objects.ObjectContext {}\n",
+                    ["Data/LegacyContext.cs"] =
+                        "public class LegacyContext : global::System.Data.Objects.ObjectContext {}\n",
                 }
             )
             .Should()
