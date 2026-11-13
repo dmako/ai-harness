@@ -1,4 +1,4 @@
-<!-- Page-wide styles: typography and the shared controls (pickers, header, messages). -->
+<!-- Page-wide styles: the page itself, the header and the live state. Components are in their own files. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Style Selector="UserControl.page">
     <Setter Property="Background" Value="{DynamicResource Page}" />
@@ -17,11 +17,6 @@
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="TextBlock.label">
-    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
   <Style Selector="TextBlock.live">
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
@@ -30,9 +25,5 @@
   <Style Selector="TextBlock.error">
     <Setter Property="Foreground" Value="{DynamicResource Critical}" />
     <Setter Property="TextWrapping" Value="Wrap" />
-  </Style>
-  <Style Selector="ComboBox">
-    <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
-    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
   </Style>
 </Styles>

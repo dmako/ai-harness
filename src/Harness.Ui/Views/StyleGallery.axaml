@@ -1,0 +1,216 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.StyleGallery"
+             Classes="page">
+  <!-- Every design-system component once, as the views use them (TASK-0147). StyleGalleryTests runs the UI checks on
+       it in both themes; a debug host can show it to look at a change. -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="16" MaxWidth="{StaticResource ContentWidth}" HorizontalAlignment="Left">
+      <WrapPanel ItemSpacing="10" LineSpacing="6">
+        <TextBlock Classes="kind" Text="PROJECT" />
+        <TextBlock Classes="h2" Text="Design system" />
+        <Button Classes="icon" ToolTip.Tip="Rename" AutomationProperties.Name="Rename">
+          <c:Icon Kind="edit" />
+        </Button>
+        <Button Classes="copychip" Content="project:ai-harness-cs" AutomationProperties.Name="Copy project:ai-harness-cs" />
+      </WrapPanel>
+      <TextBlock Classes="path" Text="C:\repos\personal\ai-harness-cs" Margin="0,4,0,0" />
+
+      <Border Classes="tabs">
+        <StackPanel Orientation="Horizontal">
+          <ToggleButton Classes="tab" Content="Overview" IsChecked="True" />
+          <ToggleButton Classes="tab" Content="Work" />
+          <ToggleButton Classes="tab" Content="Board" />
+        </StackPanel>
+      </Border>
+      <Border Classes="subnav">
+        <StackPanel Orientation="Horizontal">
+          <ToggleButton Classes="seg" Content="Blueprints" IsChecked="True" />
+          <ToggleButton Classes="seg" Content="Tasks" />
+          <ToggleButton Classes="seg" Content="Inbox" BorderThickness="0" />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Buttons" />
+        <TextBlock Classes="hint" Text="Neutral by default; primary for a form's main action, highlight for the one thing a page asks for, danger for destructive actions, ghost for secondary ones." />
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Button Content="Neutral" />
+          <Button Classes="primary" Content="Primary" />
+          <Button Classes="highlight" Content="Highlight" />
+          <Button Classes="danger">
+            <StackPanel Orientation="Horizontal">
+              <c:Icon Kind="trash" />
+              <TextBlock Text="Delete…" />
+            </StackPanel>
+          </Button>
+          <Button Classes="ghost" Content="Ghost" />
+          <Button Content="Disabled" IsEnabled="False" />
+          <Button Classes="icon" ToolTip.Tip="Refresh" AutomationProperties.Name="Refresh">
+            <c:Icon Kind="refresh" />
+          </Button>
+          <HyperlinkButton Content="A link" NavigateUri="https://example.invalid/" />
+        </WrapPanel>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Pills, badges and chips" />
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <Border Classes="pill st-backlog"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-backlog" /><TextBlock Text="backlog" /></StackPanel></Border>
+          <Border Classes="pill st-ready"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-ready" /><TextBlock Text="ready" /></StackPanel></Border>
+          <Border Classes="pill st-claimed"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-claimed" /><TextBlock Text="claimed" /></StackPanel></Border>
+          <Border Classes="pill st-in_progress"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-in_progress" /><TextBlock Text="in progress" /></StackPanel></Border>
+          <Border Classes="pill st-review"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-review" /><TextBlock Text="review" /></StackPanel></Border>
+          <Border Classes="pill st-done"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-done" /><TextBlock Text="done" /></StackPanel></Border>
+          <Border Classes="pill st-blocked"><StackPanel Orientation="Horizontal"><c:Icon Kind="status-blocked" /><TextBlock Text="blocked" /></StackPanel></Border>
+          <Border Classes="pill lv-ok"><StackPanel Orientation="Horizontal"><c:Icon Kind="st-ok" /><TextBlock Text="ok" /></StackPanel></Border>
+          <Border Classes="pill lv-warn"><StackPanel Orientation="Horizontal"><c:Icon Kind="st-warn" /><TextBlock Text="warn" /></StackPanel></Border>
+          <Border Classes="pill lv-fail"><StackPanel Orientation="Horizontal"><c:Icon Kind="st-fail" /><TextBlock Text="fail" /></StackPanel></Border>
+          <Border Classes="pill lv-info"><StackPanel Orientation="Horizontal"><c:Icon Kind="level-info" /><TextBlock Text="info" /></StackPanel></Border>
+          <Border Classes="badge"><TextBlock Text="12" /></Border>
+        </WrapPanel>
+        <WrapPanel ItemSpacing="8" LineSpacing="8" Margin="0,8,0,0">
+          <ToggleButton Classes="chip" Content="Open" IsChecked="True" />
+          <ToggleButton Classes="chip" Content="Done" />
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <c:Icon Classes="prio p-low" Kind="p-low" /><TextBlock Text="low" />
+            <c:Icon Classes="prio p-medium" Kind="p-medium" /><TextBlock Text="medium" />
+            <c:Icon Classes="prio p-high" Kind="p-high" /><TextBlock Text="high" />
+            <c:Icon Classes="prio p-critical" Kind="p-critical" /><TextBlock Text="critical" />
+          </StackPanel>
+        </WrapPanel>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Cards, insets, empty and error" />
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="A card on the page, with text in every ink:" />
+            <TextBlock Text="Ink 2: secondary text" Foreground="{DynamicResource Ink2}" />
+            <TextBlock Classes="muted" Text="Muted: help and metadata" />
+            <TextBlock Classes="good" Text="Good ink: passed" />
+            <TextBlock Classes="gold" Text="Gold ink: the one thing to do" />
+            <TextBlock Classes="critical" Text="Critical: failed" />
+            <TextBlock Classes="mono small" Text="mono small: TASK-0147" />
+            <Border Classes="inset">
+              <TextBlock Text="An inset inside a card (an expanded row, a form)." TextWrapping="Wrap" />
+            </Border>
+          </StackPanel>
+        </Border>
+        <TextBlock Classes="empty" Text="Nothing here yet." Margin="0,8,0,0" />
+        <Border Classes="error" Margin="0,8,0,0">
+          <StackPanel Orientation="Horizontal">
+            <c:Icon Kind="status-ready" />
+            <TextBlock Text="The project's state cannot be read." />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Table" />
+        <Border Classes="card" Padding="0">
+          <StackPanel>
+            <Border Classes="thead">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="th" Text="Check" />
+                <TextBlock Grid.Column="1" Classes="th" Text="Count" />
+              </Grid>
+            </Border>
+            <Border Classes="trow">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="hooks installed" />
+                <TextBlock Grid.Column="1" Classes="num" Text="4" />
+              </Grid>
+            </Border>
+            <Border Classes="trow selected">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="the open row" />
+                <TextBlock Grid.Column="1" Classes="num" Text="12" />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Form" />
+        <StackPanel Classes="field" MaxWidth="420" HorizontalAlignment="Left">
+          <TextBlock Classes="label" Text="Title" />
+          <TextBox Text="A task's title" AutomationProperties.Name="Title" />
+          <TextBlock Classes="label" Text="Priority" />
+          <ComboBox SelectedIndex="0" AutomationProperties.Name="Priority" HorizontalAlignment="Left">
+            <ComboBoxItem Content="medium" />
+            <ComboBoxItem Content="high" />
+          </ComboBox>
+          <CheckBox Content="Approved outside harness" />
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Toasts" />
+        <StackPanel Spacing="8" HorizontalAlignment="Left">
+          <Border Classes="toast" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal">
+              <Border Classes="tick"><c:Icon Kind="status-done" /></Border>
+              <TextBlock Text="Done" />
+            </StackPanel>
+          </Border>
+          <Border Classes="toast bad" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal">
+              <Border Classes="tick" VerticalAlignment="Top"><c:Icon Kind="close" /></Border>
+              <StackPanel>
+                <TextBlock Text="The write was refused" />
+                <TextBlock Classes="detail" Text="403: writes need the X-Harness-UI: 1 header" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Dialog" />
+        <Border Classes="backdrop" Padding="8" CornerRadius="{StaticResource RadiusLg}">
+          <Border Classes="dialog" HorizontalAlignment="Left" Margin="0">
+            <StackPanel>
+              <Border Classes="dialog-head">
+                <StackPanel>
+                  <TextBlock Classes="title" Text="Delete TASK-0147?" />
+                  <TextBlock Classes="sub" Text="Its history goes with it." />
+                </StackPanel>
+              </Border>
+              <Border Classes="dialog-body">
+                <TextBlock Text="This cannot be undone." TextWrapping="Wrap" />
+              </Border>
+              <Border Classes="dialog-foot">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                  <Button Classes="ghost" Content="Cancel" />
+                  <Button Classes="danger" Content="Delete" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Border>
+        </Border>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Icons" />
+        <ItemsControl Name="Icons">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel ItemSpacing="12" LineSpacing="8" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <c:Icon Kind="{Binding}" />
+                <TextBlock Classes="muted small" Text="{Binding}" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

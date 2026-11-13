@@ -1,0 +1,104 @@
+<!-- Buttons (brand.css): neutral by default; .primary (teal fill) for a form's main action, .highlight (gold) for the
+     one thing a page asks for, .danger for destructive actions, .ghost for secondary ones, .icon for a button that is
+     only its icon (it needs AutomationProperties.Name and a tooltip). Fluent's state colours are replaced so every
+     state keeps the design system's colours. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <Style Selector="Button">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
+    <Setter Property="MinWidth" Value="{StaticResource ControlMin}" />
+    <Setter Property="FontSize" Value="{StaticResource TextMd}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="Button:disabled">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+  <Style Selector="Button c|Icon">
+    <Setter Property="Margin" Value="0,0,6,0" />
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Fill}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnFill}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnFill}" />
+  </Style>
+
+  <Style Selector="Button.highlight">
+    <Setter Property="Background" Value="{DynamicResource Gold}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Gold}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnGold}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.highlight:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.highlight:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GoldHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource GoldHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnGold}" />
+  </Style>
+
+  <Style Selector="Button.danger">
+    <Setter Property="Background" Value="{DynamicResource Critical}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnCritical}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Critical}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnCritical}" />
+  </Style>
+
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Button.icon">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.icon c|Icon">
+    <Setter Property="Margin" Value="0" />
+  </Style>
+  <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.icon:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <Style Selector="HyperlinkButton">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
+    <Setter Property="MinWidth" Value="{StaticResource ControlMin}" />
+  </Style>
+</Styles>

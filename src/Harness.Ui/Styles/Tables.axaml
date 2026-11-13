@@ -1,0 +1,24 @@
+<!-- Tables (brand.css .table): a header row of TextBlock.th, then rows (Border.trow) divided by a line; cells are
+     Grids or panels inside the rows. Numbers line up with tabular figures (TextBlock.num). -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Border.thead">
+    <Setter Property="Padding" Value="14,6" />
+  </Style>
+  <Style Selector="TextBlock.th">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="Border.trow">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+  <Style Selector="Border.trow.selected">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+  <Style Selector="TextBlock.num">
+    <Setter Property="FontFeatures" Value="+tnum" />
+    <Setter Property="TextAlignment" Value="Right" />
+  </Style>
+</Styles>

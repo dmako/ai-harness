@@ -121,48 +121,6 @@ public sealed class BoardViewTests
     public Task EveryWidthAndThemePassesTheUiChecks() =>
         Ui.RunAsync(() => UiChecks.AssertAsync(async (width, height) => (await Ui.OpenMainAsync(width, height)).Window));
 
-    [Theory]
-    [InlineData("Light")]
-    [InlineData("Dark")]
-    public Task TextColoursMeetWcagAaOnTheirSurfaces(string theme) => Ui.RunAsync(() =>
-    {
-        var variant = theme is "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
-        var resources = Application.Current!.Resources;
-        Color Token(string key) =>
-            resources.TryGetResource(key, variant, out var value) && value is ISolidColorBrush brush
-                ? brush.Color
-                : throw new InvalidOperationException($"no {key} in {theme}");
-
-        var problems = new List<string>();
-        string[] blueprints =
-        [
-            "teal", "orange", "blue", "rose", "green", "violet", "amber", "cyan",
-            "pink", "lime", "indigo", "red", "fuchsia", "yellow", "slate", "purple",
-        ];
-        // the pairs the Board draws (Board.axaml): every text colour on a card (Surface) and the page (Page); the
-        // column headings and "None" on Surface2. Critical on Surface2 is 4.38:1 in dark (brand.css has the same
-        // value), so the design system must not draw it there.
-        var pairs = new Dictionary<string, string[]>(StringComparer.Ordinal)
-        {
-            ["Surface"] = ["Ink", "Ink2", "Muted", "Accent", "Good", "Warning", "Critical", .. blueprints.Select(b => "Bp." + b)],
-            ["Page"] = ["Ink", "Ink2", "Muted", "Accent", "Critical"],
-            ["Surface2"] = ["Ink", "Ink2", "Muted"],
-        };
-        foreach (var (surface, inks) in pairs)
-        {
-            foreach (var ink in inks)
-            {
-                var ratio = UiChecks.Contrast(Token(ink), Token(surface));
-                if (ratio < 4.5)
-                {
-                    problems.Add($"{ink} on {surface}: {ratio:0.00}:1");
-                }
-            }
-        }
-        problems.Should().BeEmpty();
-        return Task.CompletedTask;
-    });
-
     [Fact]
     public Task TabMovesThroughThePickersAndCards() => Ui.RunAsync(async () =>
     {

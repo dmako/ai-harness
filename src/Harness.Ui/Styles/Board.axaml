@@ -12,7 +12,7 @@
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
-  <Style Selector="Border.pill">
+  <Style Selector="Border.colpill">
     <Setter Property="Background" Value="{DynamicResource AccentWash}" />
     <Setter Property="CornerRadius" Value="999" />
     <Setter Property="Padding" Value="8,1" />
@@ -51,13 +51,13 @@
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
   <Style Selector="TextBlock.prio.p-low">
-    <Setter Property="Foreground" Value="{DynamicResource Good}" />
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
   </Style>
   <Style Selector="TextBlock.prio.p-medium">
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
   </Style>
   <Style Selector="TextBlock.prio.p-high">
-    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+    <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TextBlock.prio.p-critical">

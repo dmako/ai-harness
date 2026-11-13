@@ -7,12 +7,20 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://Harness.Ui/Styles/Tokens.axaml" />
         <ResourceInclude Source="avares://Harness.Ui/Styles/Blueprints.axaml" />
+        <ResourceInclude Source="avares://Harness.Ui/Styles/Icons.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Harness.Ui/Styles/Base.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Buttons.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Chips.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Sections.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Tables.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Forms.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Navigation.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Feedback.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Board.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/BlueprintFrames.axaml" />
   </Application.Styles>
