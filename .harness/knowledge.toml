@@ -1,0 +1,382 @@
+# Project knowledge shared through Git. harness reads it after every Git change and merges it with
+# each teammate's own knowledge; share or withdraw a memory with harness ui or 'harness memory
+# share/withdraw'. One [[memory]] per shared memory, sorted by id.
+version = 1
+
+[[memory]]
+id = "mem_0131f79170e166e8"
+type = "warning"
+scope = "project"
+content = "Windows named pipes: without explicit buffer sizes a write blocks until the reader reads it, and cancelling a pending pipe read does not always return; close the pipe instead of cancelling its read, and give server pipes buffers (harness-agents uses 64 KiB). Codex under approval policy on-request ran a command outside the working tree without asking on Windows; use untrusted for supervised sessions."
+source_ref = "TASK-0116"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:57:26.690884500Z"
+
+[[memory]]
+id = "mem_019435d92cb1abf1"
+type = "warning"
+scope = "path:src/Harness.Infrastructure/Workspaces"
+content = "WorkspaceEvidenceReader caches member-set results (Duplicates, dependency graph, stack summary) regardless of the member set: never share one reader between different member sets; derive one with For(members)."
+source_ref = "TASK-0108"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:59:16.499381600Z"
+
+[[memory]]
+id = "mem_09c978c936cfaa41"
+type = "goal"
+scope = "project"
+content = "Optimize for Claude Code + Codex workflow first, but keep abstractions for possible other integrations."
+source_ref = "User instruction 2026-10-20: integration workflow priorities"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:36:46.530075800Z"
+
+[[memory]]
+id = "mem_0ad2e7147f961022"
+type = "convention"
+scope = "path:src/Harness.Infrastructure/Git"
+content = "harness starts git only through GitRepository.GitStart/StartGit (git -C root, GIT_* location variables removed, no prompt/pager/optional locks, LC_ALL=C); GitRepository.Started reports every start so tests can count git processes per repository root."
+source_ref = "TASK-0100; commit 5303138"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:35:46.629438400Z"
+
+[[memory]]
+id = "mem_0b231b92ff1d6015"
+type = "convention"
+scope = "path:test"
+content = "Use AwesomeAssertions fluent assertions in C# tests; retain xUnit for test discovery, theory data and skip control flow."
+source_ref = "User request 2026-10-21: test maintainability improvements"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:17.992509800Z"
+
+[[memory]]
+id = "mem_0d7076732736abd6"
+type = "fact"
+scope = "subsystem:telemetry"
+content = "Developer telemetry export is opt-in and runs after sync in a separate process; collection and read-only release sharing are standalone executables. Schema-1 export uses an explicit aggregate field projection and persisted random machine/project pseudonyms."
+source_ref = "TASK-0029; commit 4496897; doc/port/developer-export-and-companions.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:22:55.873800600Z"
+
+[[memory]]
+id = "mem_10defc6490b3fa38"
+type = "decision"
+scope = "path:src/Harness.Infrastructure/Memory"
+content = "A knowledge.toml entry keeps the id its memory had when first shared; locally it stands for the current memory along that memory's supersede chain, so corrections rewrite the entry's statement under the same id."
+source_ref = "TASK-0062"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:39:50.449544300Z"
+
+[[memory]]
+id = "mem_136d64b32c155a1f"
+type = "convention"
+scope = "project"
+content = "Always enclose the bodies of C# if, else, for, while and foreach statements in curly-brace blocks, including when the body is a single statement or one line."
+source_ref = "User instruction 2026-10-21: mandatory C# control-flow braces"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:33:44.677265200Z"
+
+[[memory]]
+id = "mem_1851c88291fbf95e"
+type = "convention"
+scope = "path:src"
+content = "CLI/console output writes (TextWriter.WriteLineAsync/WriteAsync) pass CancellationToken.None explicitly rather than forwarding the command's cancellation: many sit in catch blocks handling OperationCanceledException, where a cancelled argument would make the error message itself throw. CA2016 and Sonar S8949 stay errors for every other API."
+source_ref = "TASK-0118; user decision 2026-11-10"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:36:16.412345100Z"
+
+[[memory]]
+id = "mem_230dab96acf52e73"
+type = "decision"
+scope = "path:src/Harness.Infrastructure/Tasks"
+content = "A task may depend on another registered project's task, written <project>:<task id> (the project by id, folder, parent/folder, short name or parent/short, any case; ambiguous refused). The other task's status is read through ExternalTaskReader from that project's database opened read-only (never migrated), kept in task_external_dependencies (schema 22) and read again after 30 s; only the task id part is upper-cased (TaskWorkflow.NormalizeDependency)."
+source_ref = "TASK-0059; commit f841fbf; Go TASK-0058"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:40:23.395809700Z"
+
+[[memory]]
+id = "mem_2606ce7edd1b7979"
+type = "goal"
+scope = "project"
+content = "Optimize code intelligence for C#/.NET first. TypeScript is occasional front-end work: the value there is a project overview and spotting repetition, not a full analyzer."
+source_ref = "User instruction 2026-10-20: code intelligence priorities"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:37:46.586128700Z"
+
+[[memory]]
+id = "mem_2614a674de01565e"
+type = "fact"
+scope = "project"
+content = "Provider deadline and cancellation behavior is exercised by local .NET worker fixtures; registry waits remain bounded even when adapters ignore cancellation, and caller cancellation is distinct from deadline expiry."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:21:35.499907800Z"
+
+[[memory]]
+id = "mem_2c87422e82ebed2a"
+type = "convention"
+scope = "project"
+content = "You MUST follow all code-formatting and naming conventions defined in the project directory, including the definitions in these files when they exist: .editorconfig, configuration/CodingStyle.editorconfig, and configuration/NamingConvention.editorconfig."
+source_ref = "User instruction 2026-10-20: project formatting and naming conventions"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:41.401451100Z"
+
+[[memory]]
+id = "mem_33098a998e345dc0"
+type = "warning"
+scope = "path:src/Harness.Cli"
+content = "The Native AOT Release profile uses packages.publish.lock.json for compiler/linker dependencies; restore with -p:RuntimeIdentifier=<rid> rather than dotnet restore -r to retain the shared four-RID lock graph."
+source_ref = "TASK-0035; doc/releases.md; doc/native-aot.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:16:51.135209500Z"
+
+[[memory]]
+id = "mem_3fcfdf6586ec0f87"
+type = "warning"
+scope = "project"
+content = "Trimmed Native AOT releases load the packaged SQLite sidecar beside executables and do not use managed bundle extraction. Unix permission probes require native POSIX temporary storage; macOS/ARM64 and Windows console signals require separate native qualification."
+source_ref = "TASK-0035; doc/releases.md; doc/native-aot.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:17:12.177719900Z"
+
+[[memory]]
+id = "mem_483246ff220d172f"
+type = "warning"
+scope = "path:src/Harness.Infrastructure/Processes"
+content = "Provider descendants are contained atomically by Windows kill-on-close jobs and Unix posix_spawn process groups. Unix requires glibc 2.29+ or modern macOS; intentional setsid escapes and abrupt host death require external service/container containment. Windows x64 and Linux x64 are tested; macOS is not executed."
+source_ref = "TASK-0013; doc/port/downstream-mcp.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:19:22.931868900Z"
+
+[[memory]]
+id = "mem_4a051cf7f13648c4"
+type = "warning"
+scope = "path:src/Harness.Infrastructure/Processes"
+content = "Unix provider processes: a pipe end inherited by another child keeps a client's stdin from reaching EOF (the agent runner's clients read the prompt to end of stdin), which hung every AgentRunnerTests on macOS CI. UnixProviderProcess creates pipes with pipe2(O_CLOEXEC) on Linux and spawns with POSIX_SPAWN_CLOEXEC_DEFAULT on macOS (no pipe2 there), as does DetachedProcess; keep both when touching process start. macOS's /var and /tmp are links to /private/..., so compare a child's reported cwd by physical path."
+source_ref = "TASK-0118; CI runs 42900989214, 42907495195, 42911089658; commits 4cb6f99, 80d07e1"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:56:43.018379700Z"
+
+[[memory]]
+id = "mem_5045ea97eb52ee98"
+type = "warning"
+scope = "project"
+content = "BinaryReader/BinaryWriter directly on a Brotli/Deflate stream make one stream call per byte: a 5 MiB cache took 1.4 s to load and was 6x larger; buffer the stream (BufferedStream) or decompress to a byte array first."
+source_ref = "TASK-0105"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:59:51.863470900Z"
+
+[[memory]]
+id = "mem_506a985006d765a7"
+type = "convention"
+scope = "project"
+content = "Use pattern matching and switch expressions wherever possible."
+source_ref = "User instruction 2026-10-20: C# pattern matching and switch expressions convention"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:47.006080200Z"
+
+[[memory]]
+id = "mem_535cdc840f310b16"
+type = "convention"
+scope = "path:src/Harness.Cli"
+content = "Keep command dispatch methods small: switch arms call named command handlers instead of containing command implementation blocks; apply the same refactoring to similar dispatchers."
+source_ref = "User request 2026-10-21: TaskCommandRunner.RunAsync maintainability"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:09.525647900Z"
+
+[[memory]]
+id = "mem_5516581c8f5dcc78"
+type = "decision"
+scope = "project"
+content = "Agents move a claimed task to in_progress when they start changing code and to review while checking acceptance, constraints and validation; harness does not enforce it: task_complete from claimed or in_progress succeeds but records a review_skipped event and says so in its hint."
+source_ref = "TASK-0050"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:41:23.128297600Z"
+
+[[memory]]
+id = "mem_58915da827dc9206"
+type = "convention"
+scope = "project"
+content = "Use a soft 120-character line limit for C# code. Wrap expressions, argument lists and initializers for readability; indivisible literals, URLs and fixture content may exceed the target when wrapping would harm clarity or change their value."
+source_ref = "User instruction 2026-10-22: improve C# readability, add soft 120-character line limit and reformat codebase"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:33:35.497882300Z"
+
+[[memory]]
+id = "mem_5f27c778f44d62c0"
+type = "fact"
+scope = "path:src/Harness.Infrastructure"
+content = "Workspace discovery and Graphify session identity resolve symlinked parent directories through GitRepository.PhysicalDirectory; macOS /var aliases and link targets containing another parent alias must map to the same physical project root."
+source_ref = "User-reported GitHub CI artifacts 2026-10-23; DirectoryAliasTests.ParentDirectoryAliasesPreserveWorkspaceSessionAndWorktreeIdentity; GitRepository.PhysicalDirectory"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:20:31.626855800Z"
+
+[[memory]]
+id = "mem_67ceb557c979422b"
+type = "warning"
+scope = "path:src/Harness.Infrastructure/Storage"
+content = "On Linux, SQLite's busy wait can end below its busy_timeout (CI saw 848 ms for a 1 s budget): the busy handler counts the sleeps it requested, and a signal (.NET suspends threads with them) cuts a sleep short. Timing tests bound waits from above with the fastest attempt and from below with the slowest, well under the budget."
+source_ref = "tests-ubuntu-24.04 CI run 2026-11-06; test/Harness.Integration/Storage/StorageTests.cs"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:58:34.447409600Z"
+
+[[memory]]
+id = "mem_6d66e93d63433fe9"
+type = "warning"
+scope = "path:src/Harness.Providers"
+content = "A provider without dir = \"project\" starts in harness's own working directory (the agent's cwd for the MCP server, wherever 'harness ui' was started for the UI), so tools that read configuration from their cwd, such as NugetMcpServer reading nuget.config, see the repository's settings only by accident; set dir = \"project\" for them."
+source_ref = "TASK-0140 (GenericMcpProvider WorkingDirectory; NugetMcpServer 1.1.10 experiments)"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:55:37.350862500Z"
+
+[[memory]]
+id = "mem_7a67804dd97751e4"
+type = "goal"
+scope = "project"
+content = "Maintain Harness as a standalone C#/.NET application with independent tests, builds and releases, and architecture documentation organized by modules."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:37:30.991798800Z"
+
+[[memory]]
+id = "mem_7c584e10f9eca7d2"
+type = "convention"
+scope = "project"
+content = "Always use `is null` or `is not null` instead of `== null` or `!= null`."
+source_ref = "User instruction 2026-10-20: C# null-check convention"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:53.296116400Z"
+
+[[memory]]
+id = "mem_86b9e5b5c3582772"
+type = "decision"
+scope = "path:src/Harness.Infrastructure/Architecture"
+content = "Change-coupling partners are counted by harness from its own 180-day Git history (renames followed, at least 3 commits together, share = together / the file's commits, as ripwire's co-change); a provider offering arch.change_coupling only adds to a single file's partners."
+source_ref = "TASK-0069"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:39:55.812953700Z"
+
+[[memory]]
+id = "mem_9516fd71f1a2236b"
+type = "convention"
+scope = "path:test"
+content = "Use C# raw string literals for JSON text in test data so JSON is readable without escaped quotes."
+source_ref = "User request 2026-10-21: raw JSON test literals"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:01.455673200Z"
+
+[[memory]]
+id = "mem_9a1effdf4ca49d03"
+type = "decision"
+scope = "path:src/Harness.Infrastructure/Tasks"
+content = "Removing a blueprint with tasks requires moving them (to another blueprint or none) or deleting them; deletion is refused while an agent holds one, and outside dependents lose the dependency with an audit event."
+source_ref = "TASK-0048"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:41:36.561299700Z"
+
+[[memory]]
+id = "mem_9a70d334b6c4e110"
+type = "constraint"
+scope = "project"
+content = "Performance priorities: what agents call through MCP must be fast; actions used repeatedly (every page load, every live update, every sync) are optimized first; harness ui may be a bit slower; rarely used things may be slow as long as the UI stays responsive (each section loads on its own with a loading indicator, nothing waits for the slowest part)."
+source_ref = "User instruction 2026-10-20: performance priorities and responsive UI"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:38:04.667406000Z"
+
+[[memory]]
+id = "mem_a38e4d70cb09c701"
+type = "warning"
+scope = "project"
+content = "Under Native AOT on Linux (and presumably macOS), a named System.Threading.Mutex does not exclude other processes (it does under JIT and on Windows). Use file locks (FileShare.None lock files) for anything that must serialize harness processes."
+source_ref = "TASK-0110; benchmarks/litedb-spike/results/mutex-linux-x64.txt"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:58:08.367857400Z"
+
+[[memory]]
+id = "mem_a54f26d36a56c2c2"
+type = "warning"
+scope = "project"
+content = "One file write raises several FileSystemWatcher events (folder, file, content) and some arrive after a view was already recomputed, so tests counting ViewCache recomputes must wait for the events to settle (ViewCacheTests.SettledAsync) instead of asserting an exact count right after the first recompute."
+source_ref = "macOS CI qualify failure 2026-11-06 (release-osx-arm64); ViewCacheTests, ViewCache.TreeWatch"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:59:00.672148900Z"
+
+[[memory]]
+id = "mem_ab3796824ac237fe"
+type = "warning"
+scope = "path:test"
+content = "GitHub's Windows runners put TEMP under C:\\Users\\RUNNER~1 (an 8.3 short name): tests comparing paths derived from Path.GetTempPath() with discovered repository roots must expect the long, on-disk spelling that GitRepository.PhysicalDirectory returns."
+source_ref = "TASK-0117"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:57:10.481345900Z"
+
+[[memory]]
+id = "mem_ac2cfc09b7bcaf4f"
+type = "constraint"
+scope = "project"
+content = "Git commit messages follow Conventional Commits 1.0.0 (https://www.conventionalcommits.org/en/v1.0.0/): a single one-line message `type(scope)?: description`, scope optional, no body, and no Co-Authored-By or other trailers."
+source_ref = "user request 2026-10-26"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:37:54.035521800Z"
+
+[[memory]]
+id = "mem_adb07ad8d1692dd6"
+type = "fact"
+scope = "path:test/Harness.Compatibility/Clones"
+content = "External comparison drivers and their fixture workarounds are retired; analysis regressions use deterministic synthetic .NET and TypeScript fixtures in the native test suites."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:21:25.241916200Z"
+
+[[memory]]
+id = "mem_b42954bf8bdeefe8"
+type = "warning"
+scope = "path:src/Harness.Mcp/Memory"
+content = "MemoryArguments validates the advertised MCP schema facets, including recursive objects, nullable arrays and anyOf; extend the validator before advertising additional facets."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:17:58.178737400Z"
+
+[[memory]]
+id = "mem_b8f5391540545f5e"
+type = "convention"
+scope = "project"
+content = "Regexes with a constant pattern are [GeneratedRegex] static partial properties (not fields, partial methods or Regex.Match/IsMatch calls); keep `new Regex`/Rx helpers only for patterns built from runtime data."
+source_ref = "task:TASK-0045"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:33:20.301055200Z"
+
+[[memory]]
+id = "mem_cc7a19f3534a27a6"
+type = "decision"
+scope = "project"
+content = "Report findings carry an audience: user (things the user can change: providers, hooks, instructions, knowledge) or developer (how harness gathers and serves). harness report, harness ui and the overview show only LocalReport.ForUser(); the developer's findings, relevance per provider/capability/language and tool latency reach only the opt-in telemetry payload and harness-collect. 'harness metrics' and 'harness context stats' no longer exist."
+source_ref = "TASK-0057; commit 8f8ac17; Go TASK-0053"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:40:59.522120700Z"
+
+[[memory]]
+id = "mem_eacb8418bb353347"
+type = "warning"
+scope = "project"
+content = "On Windows, a reader of an agent host's state file can fail for a moment while the host replaces it (File.Move overwrite), so AgentHostFiles.ReadState retries a few times; without that, harness ui intermittently answered 404 'no agent session' for a live host."
+source_ref = "TASK-0135; AgentHostFiles.ReadState"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:55:06.522497800Z"
+
+[[memory]]
+id = "mem_fe5c72573c884733"
+type = "convention"
+scope = "project"
+content = "Product oriented code belongs to `src` subdirectory structure, any tests to `test` subdirectory structure, benchmarks to `benchmarks` and documentation to `doc`."
+source_ref = "User instruction 2026-10-20: repository directory layout convention"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T16:34:34.980979700Z"
+
+[[memory]]
+id = "mem_ffbfbec0ee522c3a"
+type = "warning"
+scope = "path:src/Harness.Infrastructure/Memory"
+content = "Worktrees of one project share a database: switching between worktrees whose knowledge.toml differ marks entries removed and back again on each refresh."
+source_ref = "TASK-0062"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-13T17:15:53.719271600Z"
