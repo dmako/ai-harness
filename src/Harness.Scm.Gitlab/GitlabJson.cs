@@ -40,7 +40,8 @@ internal sealed record GlMergeRequest(
     List<string>? Labels,
     List<GlUser>? Reviewers,
     string? DetailedMergeStatus,
-    string? MergeStatus
+    string? MergeStatus,
+    List<GlUser>? Assignees = null
 );
 
 internal sealed record GlPosition(string? NewPath, string? OldPath, int? NewLine, int? OldLine);
@@ -91,6 +92,18 @@ internal sealed record GlDiscussionBody(string Body, GlPositionBody Position);
 
 internal sealed record GlUpdateBody(string? Title, string? Description);
 
+internal sealed record GlBranch(string? Name);
+
+/// <summary>A new merge request; assignee and reviewer ids are left out when null.</summary>
+internal sealed record GlCreateBody(
+    string SourceBranch,
+    string TargetBranch,
+    string Title,
+    string? Description,
+    List<long>? AssigneeIds,
+    List<long>? ReviewerIds
+);
+
 /// <summary>Approve, optionally only while the merge request's HEAD is this SHA; null sends an empty object.</summary>
 internal sealed record GlApproveBody(string? Sha);
 
@@ -101,6 +114,9 @@ internal sealed record GlApproveBody(string? Sha);
 )]
 [JsonSerializable(typeof(GlVersion))]
 [JsonSerializable(typeof(GlUser))]
+[JsonSerializable(typeof(List<GlUser>))]
+[JsonSerializable(typeof(GlBranch))]
+[JsonSerializable(typeof(GlCreateBody))]
 [JsonSerializable(typeof(GlProject))]
 [JsonSerializable(typeof(List<GlProject>))]
 [JsonSerializable(typeof(GlMergeRequest))]

@@ -17,7 +17,13 @@ public interface IProviderRegistry
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonElement>?> Structure,
         IReadOnlyList<string> Errors
     )> OverviewAsync(Func<string, bool>? skip = null, CancellationToken cancellationToken = default);
+
+    /// <summary>Providers harness would offer but could not register here (built-in search without rg and fd).</summary>
+    IReadOnlyList<UnavailableProvider> Unavailable() => [];
 }
+
+/// <summary>A provider left out of the registry: why, and how to make it available.</summary>
+public sealed record UnavailableProvider(string Name, string Detail, string? Fix = null);
 
 /// <summary>Context discovery must filter excluded adapters before any handshake or capability read.</summary>
 public interface IContextProviderRegistry : IProviderRegistry

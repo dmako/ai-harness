@@ -22,7 +22,7 @@ internal sealed partial class UiReadService
     /// <summary>Starts an agent on a task (or resumes one of its sessions) in a new agent host.</summary>
     private async Task<JsonNode?> StartAgentAsync(JsonObject project, UiWriteRequest request, CancellationToken token)
     {
-        var body = new UiWriteBody(request.Body, "client", "prompt", "model", "resume");
+        var body = new UiWriteBody(request.Body, "client", "prompt", "model", "resume", "mode");
         string taskId;
         using (var database = Open(project, tasks: true))
         {
@@ -34,7 +34,8 @@ internal sealed partial class UiReadService
             body.Text("client"),
             body.Text("prompt"),
             body.Text("model"),
-            body.Text("resume")
+            body.Text("resume"),
+            body.Text("mode")
         );
         return UiJson.Node(new JsonObjectMap { ["key"] = key });
     }

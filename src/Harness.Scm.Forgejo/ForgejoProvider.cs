@@ -317,6 +317,80 @@ internal sealed class ForgejoClient(ScmConnection connection, HttpMessageHandler
         return new ScmApproval(null, ApprovedBy(reviews));
     }
 
+    public async Task<ScmCreatedMergeRequest> CreateMergeRequestAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        request = ScmMergeRequestCreation.Normalize(request);
+        await KnownUsersAsync(request.Assignees.Concat(request.Reviewers), cancellationToken).ConfigureAwait(false);
+        List<string> warnings = [];
+        FjPull pull;
+        try
+        {
+            pull = await CreatePullAsync(project, request, request.Assignees, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ScmException failure)
+        {
+            var explained = await ScmMergeRequestCreation
+                .ExplainAsync(
+                    failure,
+                    request,
+                    "pull request #",
+                    token => OpenPullAsync(project, request, token),
+                    (branch, token) => BranchExistsAsync(project, branch, token),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+            if (
+                !ReferenceEquals(explained, failure)
+                || request.Assignees.Count is 0
+                || failure.Kind is not ScmErrorKind.Invalid
+            )
+            {
+                throw explained;
+            }
+
+            // Forgejo refuses the whole pull request when an assignee cannot be assigned: open it without them
+            pull = await CreatePullAsync(project, request, [], cancellationToken).ConfigureAwait(false);
+            warnings.Add(ScmMergeRequestCreation.Warning("assignee", request.Assignees, failure.Message));
+        }
+
+        var unassigned = ScmMergeRequestCreation.Missing(
+            warnings.Count > 0 ? [] : request.Assignees,
+            (pull.Assignees ?? []).Select(user => user.Login ?? "")
+        );
+        if (unassigned.Count > 0)
+        {
+            warnings.Add(ScmMergeRequestCreation.Warning("assignee", unassigned, "Forgejo did not assign them."));
+        }
+
+        if (request.Reviewers.Count > 0)
+        {
+            try
+            {
+                await _http
+                    .SendAsync(
+                        HttpMethod.Post,
+                        RequestPath(project, pull.Number) + "/requested_reviewers",
+                        new FjReviewersBody(request.Reviewers.ToList()),
+                        Json.FjReviewersBody,
+                        Json.ListFjReview,
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+                pull = await GetPullAsync(project, pull.Number, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ScmException exception)
+            {
+                warnings.Add(ScmMergeRequestCreation.Warning("reviewer", request.Reviewers, exception.Message));
+            }
+        }
+
+        return new ScmCreatedMergeRequest(Request(pull, null), warnings);
+    }
+
     public void Dispose() => _http.Dispose();
 
     private async Task<MergeRequest> EditAsync(
@@ -338,6 +412,80 @@ internal sealed class ForgejoClient(ScmConnection connection, HttpMessageHandler
                 .ConfigureAwait(false),
             null
         );
+
+    private Task<FjPull> CreatePullAsync(
+        string project,
+        ScmNewMergeRequest request,
+        IReadOnlyList<string> assignees,
+        CancellationToken cancellationToken
+    ) =>
+        _http.SendAsync(
+            HttpMethod.Post,
+            RepoPath(project) + "/pulls",
+            new FjPullCreate(
+                request.SourceBranch,
+                request.TargetBranch,
+                request.Title,
+                request.Description,
+                assignees.Count > 0 ? assignees.ToList() : null
+            ),
+            Json.FjPullCreate,
+            Json.FjPull,
+            cancellationToken
+        );
+
+    /// <summary>Throws naming every username Forgejo does not know (GET /users/{username} answers 404).</summary>
+    private async Task KnownUsersAsync(IEnumerable<string> usernames, CancellationToken cancellationToken)
+    {
+        List<string> unknown = [];
+        foreach (var name in usernames.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await _http
+                    .GetAsync("api/v1/users/" + Uri.EscapeDataString(name), Json.FjUser, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (ScmException exception) when (exception.Kind is ScmErrorKind.NotFound)
+            {
+                unknown.Add(name);
+            }
+        }
+
+        if (unknown.Count > 0)
+        {
+            throw ScmMergeRequestCreation.UnknownUsers(unknown);
+        }
+    }
+
+    private async Task<MergeRequest?> OpenPullAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        (
+            await ListMergeRequestsAsync(project, MergeRequestState.Opened, cancellationToken).ConfigureAwait(false)
+        ).FirstOrDefault(open =>
+            open.SourceBranch == request.SourceBranch && open.TargetBranch == request.TargetBranch
+        );
+
+    private async Task<bool?> BranchExistsAsync(string project, string branch, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _http
+                .GetAsync(RepoPath(project) + "/branches/" + BranchPath(branch), Json.FjBranchInfo, cancellationToken)
+                .ConfigureAwait(false);
+            return true;
+        }
+        catch (ScmException exception) when (exception.Kind is ScmErrorKind.NotFound)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>A branch name in a URL path: each segment escaped, the slashes of feature/x kept.</summary>
+    private static string BranchPath(string branch) => string.Join('/', branch.Split('/').Select(Uri.EscapeDataString));
 
     private async Task<FjPull> GetPullAsync(string project, long number, CancellationToken cancellationToken) =>
         (

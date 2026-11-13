@@ -67,8 +67,7 @@ public sealed partial class CloneExtractor(AnalysisRepository repository, CloneC
     }
 
     /// <summary>The cached entries by path; empty without a cache.</summary>
-    private Dictionary<string, CloneCacheEntry> Cached() =>
-        cache?.Load(repository.Root) ?? new(StringComparer.Ordinal);
+    private Dictionary<string, CloneCacheEntry> Cached() => cache?.Load(repository.Root) ?? new(StringComparer.Ordinal);
 
     /// <summary>
     /// A C# or TypeScript file's entry: the cached one while its hash holds, else lexed; null if skipped.

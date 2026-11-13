@@ -538,10 +538,31 @@ public sealed class ProviderTools(
             Add(worker, "commit", metrics.Commit);
             output["complexity_metrics"] = worker;
         }
+        var unavailable = registry?.Unavailable() ?? [];
+        if (unavailable.Count > 0)
+        {
+            output["unavailable"] = unavailable
+                .Select(provider =>
+                {
+                    var entry = new Dictionary<string, object?>
+                    {
+                        ["name"] = provider.Name,
+                        ["detail"] = provider.Detail,
+                    };
+                    Add(entry, "fix", provider.Fix);
+                    return entry;
+                })
+                .ToArray();
+        }
+
         if (providers.Count is 0)
         {
             output["note"] =
-                "no providers configured; add [providers.codebase-memory] / [providers.rg-fd] to the harness config (see: harness docs providers)";
+                unavailable.Count > 0
+                    ? "no providers available: install rg and fd for the built-in text and file search, and add "
+                        + "[providers.codebase-memory] for symbols to the harness config (see: harness docs providers)"
+                    : "no providers configured; add [providers.codebase-memory] to the harness config for symbols "
+                        + "(see: harness docs providers)";
         }
 
         return output;

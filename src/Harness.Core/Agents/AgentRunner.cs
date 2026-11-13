@@ -11,11 +11,13 @@ public static class AgentClients
 
 /// <summary>
 /// One turn for an agent on a task: the prompt, the folder it works in and what the client should use. Arguments are
-/// passed to the client as they are (a permission mode, a sandbox); Environment is added to the inherited one.
+/// passed to the client as they are; Environment is added to the inherited one. PermissionMode is the id of one of the
+/// client's <see cref="AgentPermissionModes"/> for an interactive session (empty: the client's default).
 /// </summary>
 public sealed record AgentStart(string TaskId, string WorkingDirectory, string Prompt)
 {
     public string Model { get; init; } = "";
+    public string PermissionMode { get; init; } = "";
     public IReadOnlyList<string> Arguments { get; init; } = [];
     public IReadOnlyDictionary<string, string> Environment { get; init; } = new Dictionary<string, string>();
 }

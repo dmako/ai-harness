@@ -268,6 +268,86 @@ internal sealed class GitlabClient(ScmConnection connection, HttpMessageHandler 
         return new ScmApproval(approvals.Approved, ApprovedBy(approvals));
     }
 
+    public async Task<ScmCreatedMergeRequest> CreateMergeRequestAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        request = ScmMergeRequestCreation.Normalize(request);
+        var ids = await UserIdsAsync(request.Assignees.Concat(request.Reviewers), cancellationToken)
+            .ConfigureAwait(false);
+        GlMergeRequest created;
+        try
+        {
+            created = await _http
+                .SendAsync(
+                    HttpMethod.Post,
+                    ProjectPath(project) + "/merge_requests",
+                    new GlCreateBody(
+                        request.SourceBranch,
+                        request.TargetBranch,
+                        request.Title,
+                        request.Description.Length > 0 ? request.Description : null,
+                        request.Assignees.Count > 0 ? request.Assignees.Select(name => ids[name]).ToList() : null,
+                        request.Reviewers.Count > 0 ? request.Reviewers.Select(name => ids[name]).ToList() : null
+                    ),
+                    Json.GlCreateBody,
+                    Json.GlMergeRequest,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+        }
+        catch (ScmException failure)
+        {
+            throw await ScmMergeRequestCreation
+                .ExplainAsync(
+                    failure,
+                    request,
+                    "merge request !",
+                    token => OpenRequestAsync(project, request, token),
+                    (branch, token) => BranchExistsAsync(project, branch, token),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+        }
+
+        // GitLab leaves out, without an error, users it cannot assign or ask for a review
+        List<string> warnings = [];
+        var assignees = ScmMergeRequestCreation.Missing(
+            request.Assignees,
+            (created.Assignees ?? []).Select(user => user.Username ?? "")
+        );
+        if (assignees.Count > 0)
+        {
+            warnings.Add(
+                ScmMergeRequestCreation.Warning(
+                    "assignee",
+                    assignees,
+                    "GitLab did not assign them (they may not be project members, or the GitLab tier allows only one "
+                        + "assignee)."
+                )
+            );
+        }
+
+        var reviewers = ScmMergeRequestCreation.Missing(
+            request.Reviewers,
+            (created.Reviewers ?? []).Select(user => user.Username ?? "")
+        );
+        if (reviewers.Count > 0)
+        {
+            warnings.Add(
+                ScmMergeRequestCreation.Warning(
+                    "reviewer",
+                    reviewers,
+                    "GitLab did not request their review (they may not be project members)."
+                )
+            );
+        }
+
+        return new ScmCreatedMergeRequest(Request(created, null), warnings);
+    }
+
     public void Dispose() => _http.Dispose();
 
     private async Task<MergeRequest> UpdateAsync(
@@ -289,6 +369,74 @@ internal sealed class GitlabClient(ScmConnection connection, HttpMessageHandler 
                 .ConfigureAwait(false),
             null
         );
+
+    /// <summary>The ids of usernames (GET /users?username=); throws naming every username GitLab does not know.</summary>
+    private async Task<Dictionary<string, long>> UserIdsAsync(
+        IEnumerable<string> usernames,
+        CancellationToken cancellationToken
+    )
+    {
+        Dictionary<string, long> ids = new(StringComparer.OrdinalIgnoreCase);
+        List<string> unknown = [];
+        foreach (var name in usernames.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var found = (
+                await _http
+                    .GetAsync("api/v4/users?username=" + Uri.EscapeDataString(name), Json.ListGlUser, cancellationToken)
+                    .ConfigureAwait(false)
+            ).Value;
+            if (
+                found.FirstOrDefault(user => string.Equals(user.Username, name, StringComparison.OrdinalIgnoreCase)) is
+                { } user
+            )
+            {
+                ids[name] = user.Id;
+            }
+            else
+            {
+                unknown.Add(name);
+            }
+        }
+
+        return unknown.Count > 0 ? throw ScmMergeRequestCreation.UnknownUsers(unknown) : ids;
+    }
+
+    private async Task<MergeRequest?> OpenRequestAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var open = await _http
+            .GetAsync(
+                $"{ProjectPath(project)}/merge_requests?state=opened"
+                    + $"&source_branch={Uri.EscapeDataString(request.SourceBranch)}"
+                    + $"&target_branch={Uri.EscapeDataString(request.TargetBranch)}",
+                Json.ListGlMergeRequest,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        return open.Value.FirstOrDefault() is { } found ? Request(found, null) : null;
+    }
+
+    private async Task<bool?> BranchExistsAsync(string project, string branch, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _http
+                .GetAsync(
+                    ProjectPath(project) + "/repository/branches/" + Uri.EscapeDataString(branch),
+                    Json.GlBranch,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+            return true;
+        }
+        catch (ScmException exception) when (exception.Kind is ScmErrorKind.NotFound)
+        {
+            return false;
+        }
+    }
 
     private async Task<GlMergeRequest> GetRawAsync(string project, long number, CancellationToken cancellationToken) =>
         (

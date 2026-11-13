@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Harness.Cli;
@@ -39,7 +40,7 @@ internal static class CliCommands
         Add(
             root,
             "doctor",
-            "Check project health without changing it",
+            "Check project health; --fix applies a fix harness can make itself",
             CommandBindings.BindDoctorSettings,
             (settings, token) =>
                 ActivatorUtilities.CreateInstance<Harness.Cli.DoctorCommand>(services).ExecuteAsync(settings, token)
@@ -775,6 +776,7 @@ internal static class CliCommands
                     .CreateInstance<Harness.Cli.Scm.ScmWhichCommand>(services)
                     .ExecuteAsync(settings, token)
         );
+        AddScmAlias(Group(root, groups, "scm alias"), services);
         Add(
             scm,
             "remove",
@@ -786,6 +788,44 @@ internal static class CliCommands
                     .ExecuteAsync(settings, token)
         );
     }
+
+    /// <summary>'harness scm alias list|add|set|remove': other host names or base URLs that match an SCM's remotes.</summary>
+    private static void AddScmAlias(Command alias, IServiceProvider services)
+    {
+        alias.Description = "Manage an SCM's aliases: other host names or base URLs its repositories are cloned from";
+        Add(
+            alias,
+            "list",
+            "List an SCM's aliases",
+            Harness.Cli.Scm.ScmBindings.BindRemove,
+            (settings, token) => Run<Harness.Cli.Scm.ScmAliasListCommand>(services).ExecuteAsync(settings, token)
+        );
+        Add(
+            alias,
+            "add",
+            "Add an alias: a host name (an SSH host alias too) or a base URL",
+            Harness.Cli.Scm.ScmBindings.BindAlias,
+            (settings, token) => Run<Harness.Cli.Scm.ScmAliasAddCommand>(services).ExecuteAsync(settings, token)
+        );
+        Add(
+            alias,
+            "set",
+            "Replace one of an SCM's aliases",
+            Harness.Cli.Scm.ScmBindings.BindAliasSet,
+            (settings, token) => Run<Harness.Cli.Scm.ScmAliasSetCommand>(services).ExecuteAsync(settings, token)
+        );
+        Add(
+            alias,
+            "remove",
+            "Remove an alias",
+            Harness.Cli.Scm.ScmBindings.BindAlias,
+            (settings, token) => Run<Harness.Cli.Scm.ScmAliasRemoveCommand>(services).ExecuteAsync(settings, token)
+        );
+    }
+
+    private static T Run<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(
+        IServiceProvider services
+    ) => ActivatorUtilities.CreateInstance<T>(services);
 
     private static Command Group(RootCommand root, Dictionary<string, Command> groups, string path)
     {

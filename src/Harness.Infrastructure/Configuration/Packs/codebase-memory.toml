@@ -8,7 +8,7 @@ type = "mcp"
 command = "codebase-memory-mcp"
 freshness = "indexed"
 # Text search answered empty in 95% of calls and never surfaced a changed
-# file (alpha evaluation 2026-10-10); rg-fd and ripwire serve it. The
+# file (alpha evaluation 2026-10-10); the built-in search and ripwire serve it. The
 # mapping stays below for anyone who routes it back with only = [...].
 only = ["code.symbol_search", "project.overview", "arch.duplicates"]
 

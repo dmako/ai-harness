@@ -12,9 +12,9 @@ forgotten and answers agents' questions about the code in one place:
 
 - **Code**: `get_context` answers a task in words with the code that
   matters, its callers and impact, from the providers configured
-  (codebase-memory, graphify for C#, ripwire, rg-fd) merged into one
-  answer. `search_project`, `package_api` and `architecture_findings` drill
-  down.
+  (codebase-memory, graphify for C#, ripwire) and harness's built-in text
+  and file search merged into one answer. `search_project`, `package_api`
+  and `architecture_findings` drill down.
 - **Knowledge**: goals, constraints, decisions, conventions and warnings,
   each a short statement with where it came from. This is the project's
   retrieval ("RAG") of decisions and constraints: `get_context` adds the
@@ -126,7 +126,11 @@ its last call did.
 You can also start Claude Code or Codex on a task from harness ui (a task's
 Agent sessions › Start an agent). It runs beside harness ui in its own
 process, `harness-agents`, and goes on when the page or harness ui closes.
-Its panel follows it live: send it a message, stop the turn it is running,
+Pick its model from the list (Default is the agent's own choice, named
+when harness knows it; Other… takes any model id) and its permission mode
+next to it: Auto (the default) lets it do
+what it knows to be safe and asks you for the rest; Manual asks for more, and
+the modes marked unsafe ask for nothing. Its panel follows it live: send it a message, stop the turn it is running,
 allow or deny a tool call it asks permission for, close it, and resume it
 later with a new prompt. A session started elsewhere shows the end of its
 transcript, read-only, with the command to resume it in a terminal.
@@ -211,7 +215,10 @@ Each project opens on its Overview: rings for the tasks done and how well
 flight or next; and what needs a person, most urgent first. Then:
 
 - **Architecture:** Structure (projects or packages and their smells),
-  Layers, Complexity (every function by cyclomatic complexity, the most
+  Layers (a dashed line is a project only built first, through
+  `ReferenceOutputAssembly=false`; a NuGet package with a newer stable
+  version or a known vulnerability is marked, see Package upgrades and
+  vulnerabilities), Complexity (every function by cyclomatic complexity, the most
   complex named) and Change coupling.
 - **Knowledge:** the memories by type (the team's marked PROJECT, with
   Share with project or Withdraw from project on each card), what applies
@@ -265,19 +272,15 @@ harness lets agents read and review the merge requests of a project hosted on
 GitLab (REST API v4), Forgejo (REST API v1, also Gitea) or GitHub (github.com
 or GitHub Enterprise Server; there they are pull requests): list them, read the
 details, diff and comments, comment on the whole request or on one changed
-line, change the title or description, and approve.
+line, change the title or description, approve, and open new ones.
 
-**Connect a server once per machine.** Only access tokens are supported:
-
-- GitLab: a personal, group or project access token with the `api` scope
-  (`read_api` is enough for reading, but not for comments or approvals);
-- Forgejo: an access token with repository read and write (comments, reviews,
-  edits), user read (for the connection test) and issue write (general
-  comments live on the pull request's issue);
-- GitHub: a fine-grained personal access token with Pull requests read and
-  write (Contents and Metadata read come with it), or a classic token with the
-  `repo` scope. Its URL is `https://github.com`, or your Enterprise Server's
-  address (harness calls its `/api/v3`).
+**Connect a server once per machine.** Only access tokens are supported: a
+GitLab personal, group or project access token, a Forgejo access token, or a
+GitHub fine-grained or classic personal access token. Give it only what the
+agents should do; [Token permissions](#guide-token-permissions) lists the
+scopes and permissions each harness operation needs, per SCM. A GitHub
+connection's URL is `https://github.com`, or your Enterprise Server's address
+(harness calls its `/api/v3`).
 
 ```
 harness scm add work --type gitlab --url https://gitlab.example.com --token-stdin
@@ -288,6 +291,11 @@ on every call instead of storing it). The type is always given. `harness scm
 list` shows the connections with tokens masked, `harness scm set` changes one
 and `harness scm remove` drops it. harness ui has the same under Machine › SCM
 connections, where the token is a password field that is never shown again.
+If your repositories are cloned from another name for the same server (an alias
+host name, a proxy path, an SSH host alias from `~/.ssh/config`), add it as an
+alias so their remotes still find the connection: `harness scm alias add work
+ssh-alias` (or `https://git-alias.example.com`), or in the SCM's dialog in
+harness ui. Aliases only match remotes; harness always calls the URL.
 Both store them in `scm.toml` beside the global `config.toml`, written so that
 only you can read it, with each stored token encrypted by keys in `scm-keys/`
 next to it: keep the two together in backups and on other machines (see the
@@ -338,9 +346,146 @@ its diff (`scm_get_merge_request_diff`) and the discussion so far
 (`scm_get_merge_request_comments`), reads the code around the changes in the
 working tree, then leaves one comment per finding on the line it is about
 (`scm_add_merge_request_diff_comment`) and a summary
-(`scm_add_merge_request_comment`). Agents change a title or description, or
-approve, only when you ask: those act as the token's user. If an agent says
-no SCM matches the project, `harness doctor` tells why.
+(`scm_add_merge_request_comment`). Agents change a title or description,
+approve, or open a merge request only when you ask: those act as the token's
+user. If an agent says no SCM matches the project, `harness doctor` tells why.
+
+**Opening a merge request.** Ask your agent to open one once its branch is
+pushed, for example "open a merge request from this branch into main and ask
+bob to review it". It calls `scm_create_merge_request` with the source and
+target branch, a title and description, and optionally assignees and reviewers
+(usernames as the SCM shows them). harness refuses, without creating anything,
+when a branch is missing, both branches are the same, a username is unknown, or
+an open merge request already merges the same branches (it names that one's
+number and link). If the merge request is created but the SCM refuses an
+assignee or reviewer (no access to the project, say), the agent gets the new
+merge request with a warning naming who was not added and why.
+
+## Token permissions
+
+harness acts as the token's user, so the token decides what agents can do.
+Give it the least that covers what you want them to do: a read-only token lets
+agents read and review privately (they report findings to you), a writing one
+lets them comment, edit, approve and open merge requests. The tables below say
+what each harness operation calls and needs; the token's user also needs the
+role or access in the project that the SCM itself requires for that action.
+They were checked against each provider's documentation in November 2026
+(sources under each table).
+
+The operations: **test** is the connection test (`harness scm test`, harness
+ui, `harness doctor`); **projects** is `scm_get_projects`; **read** is listing
+and reading merge requests, their diffs and comments
+(`scm_list_merge_requests`, `scm_get_merge_request_details`,
+`scm_get_merge_request_diff`, `scm_get_merge_request_comments`, and finding the
+project's SCM project); **comment** is `scm_add_merge_request_comment` and
+`scm_add_merge_request_diff_comment`; **edit** is
+`scm_set_merge_request_title` and `scm_set_merge_request_description`;
+**approve** is `scm_approve_merge_request`; **create** is
+`scm_create_merge_request` with its assignees and reviewers.
+
+**GitLab** (personal, group and project access tokens):
+
+| Operation | Calls | Scope | Role in the project |
+|---|---|---|---|
+| test | `GET /version`, `GET /user` | `read_api` | none |
+| projects | `GET /projects?membership=true` | `read_api` | member |
+| read | `GET /projects/:id/merge_requests`, `…/:iid`, `…/approvals`, `…/diffs` (or `…/changes`), `…/discussions` | `read_api` | Reporter (Guest cannot see the code of a private project) |
+| comment | `POST …/notes`, `POST …/discussions` | `api` | Reporter (Planner and up can comment) |
+| edit | `PUT /projects/:id/merge_requests/:iid` | `api` | Developer (or the merge request's author) |
+| approve | `POST …/approve` | `api` | Developer by default; with approval rules (Premium, Ultimate), an eligible approver |
+| create | `GET /users?username=`, `POST /projects/:id/merge_requests` (`assignee_ids`, `reviewer_ids`); on refusal `GET …/merge_requests?state=opened`, `GET …/repository/branches/:branch` | `api` | Developer (to push the source branch and set assignees and reviewers) |
+
+- `read_api` is read-only: it covers test, projects and read; everything that
+  writes needs `api`, which also grants all other API writes the user may do.
+- A personal access token acts as you with your roles. Group and project
+  access tokens act as a bot user, created with the token, that has the role
+  chosen for the token (pick Reporter for reading, Developer to comment, edit,
+  approve and create); a project token reaches only its project, a group token
+  the group's projects. `read_user` (personal tokens only) covers just the
+  token's user, not the rest of the API: use `read_api` or `api`.
+- On GitLab.com, group and project access tokens need Premium or Ultimate; on
+  GitLab Self-Managed and Dedicated they come with any license.
+- GitLab drops assignees and reviewers it cannot add without an error (users
+  outside the project; on the Free tier only one assignee is kept): harness
+  reports them as warnings.
+
+Sources: [token scopes](https://docs.gitlab.com/security/tokens/access_token_scopes/),
+[project access tokens](https://docs.gitlab.com/user/project/settings/project_access_tokens/),
+[group access tokens](https://docs.gitlab.com/user/group/settings/group_access_tokens/),
+[roles and permissions](https://docs.gitlab.com/user/permissions/),
+[merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/),
+[merge requests API](https://docs.gitlab.com/api/merge_requests/).
+
+**Forgejo** (and Gitea) access tokens: each scope is `read:` (GET only) or
+`write:` (also POST, PATCH and DELETE, and includes read).
+
+| Operation | Calls | Scopes |
+|---|---|---|
+| test | `GET /version`, `GET /user` | `read:user` |
+| projects | `GET /repos/search`, `GET /user/repos` | `read:repository`, `read:user` |
+| read | `GET /repos/{owner}/{repo}/pulls…` (pulls, reviews, review comments, `.diff`), `GET /repos/{owner}/{repo}/issues/{index}/comments` | `read:repository`, `read:issue` |
+| comment | `POST /repos/…/issues/{index}/comments` (general), `POST /repos/…/pulls/{index}/reviews` (diff line) | `write:issue`, `write:repository` |
+| edit | `PATCH /repos/…/pulls/{index}` | `write:repository` |
+| approve | `POST /repos/…/pulls/{index}/reviews` | `write:repository` |
+| create | `GET /users/{username}`, `POST /repos/…/pulls` (`assignees`), `POST /repos/…/pulls/{index}/requested_reviewers`; on refusal `GET /repos/…/pulls`, `GET /repos/…/branches/{branch}` | `write:repository`, `read:user` |
+
+- So a read-only token is `read:user`, `read:repository` and `read:issue`; a
+  full one is `read:user`, `write:repository` and `write:issue`.
+  `read:organization` is not needed: harness reads repositories through the
+  repository routes and requests reviews from users, not teams.
+- The token's user needs read access to the repository to read and comment,
+  and write access to edit others' pull requests, assign, request reviews and
+  open pull requests from the repository's branches. Branch protection decides
+  whose approvals count.
+- Forgejo refuses the whole pull request when an assignee cannot be assigned;
+  harness then opens it without assignees and reports them as a warning.
+
+Source: [Forgejo token scopes](https://forgejo.org/docs/latest/user/token-scope/)
+(Gitea uses the same scopes).
+
+**GitHub fine-grained personal access tokens** (repository permissions; choose
+the repositories, and the organization as resource owner for its
+repositories):
+
+| Operation | Calls | Permissions |
+|---|---|---|
+| test | `GET /meta`, `GET /user` | none |
+| projects | `GET /user/repos`, `GET /search/repositories` | Metadata: read |
+| read | `GET /repos/{owner}/{repo}`, `…/pulls`, `…/pulls/{n}` (also as diff), `…/pulls/{n}/reviews`, `…/pulls/{n}/comments`, `…/issues/{n}/comments` | Metadata: read, Pull requests: read, Contents: read (the diff) |
+| comment | `POST …/issues/{n}/comments` (general), `POST …/pulls/{n}/comments` (diff line) | Pull requests: read and write |
+| edit | `PATCH …/pulls/{n}` | Pull requests: read and write |
+| approve | `POST …/pulls/{n}/reviews` | Pull requests: read and write |
+| create | `GET /users/{username}`, `POST …/pulls`, `POST …/issues/{n}/assignees`, `POST …/pulls/{n}/requested_reviewers`; on refusal `GET …/pulls?head=&base=`, `GET …/branches/{branch}` | Pull requests: read and write, Contents: read; Issues: read and write is an alternative for the assignees |
+
+- Read-only: Metadata, Contents and Pull requests read. To write, raise Pull
+  requests to read and write. Metadata read is always part of a fine-grained
+  token. GitHub accepts Pull requests or Issues permission for the issue
+  routes of a pull request (general comments, assignees).
+- An organization can require approval of fine-grained tokens that reach its
+  repositories: until an owner approves it, the token is pending and reads
+  only public resources (an owner's own token is approved at once). An
+  organization can also block fine-grained tokens; then use a classic token.
+  Outside collaborators of an organization's repositories must use classic
+  tokens.
+- Assignees need the token's user to have push access; GitHub ignores others
+  without an error, and harness reports them as warnings. Reviewers must be
+  collaborators.
+- GitHub Enterprise Server has fine-grained tokens from 3.10 (a beta there);
+  older versions take only classic tokens, and an enterprise or organization
+  may require approval or block them as above.
+
+**GitHub classic personal access tokens:** `repo` for private repositories
+(everything above), or `public_repo` when every repository is public; no
+scope at all reads only public information. A classic token reaches every
+repository its user can; in an organization with SAML single sign-on,
+authorize the token for it.
+
+Sources: [permissions required for fine-grained tokens](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens),
+[managing personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+(and its [Enterprise Server 3.10 version](https://docs.github.com/en/enterprise-server@3.10/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)),
+[assignees API](https://docs.github.com/en/rest/issues/assignees),
+[pull requests API](https://docs.github.com/en/rest/pulls/pulls),
+[OAuth scopes](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps).
 
 ## Updating harness
 
@@ -357,6 +502,117 @@ was not there. A project whose folder is gone is skipped, never forgotten, and
 the summary says how to restore or forget it. `--dry-run` shows what would
 change, and `--json` gives the result per project. You no longer need to run
 `harness init` and `harness sync` in every project by hand.
+
+## Text and file search
+
+Harness searches the working tree itself whenever ripgrep (`rg`) and `fd`
+are installed: agents get live text and file search with nothing to
+configure, and no separate rg-fd-mcp server is needed. Install them once
+per machine.
+
+**Windows** (x64), with winget:
+
+```powershell
+winget install BurntSushi.ripgrep.MSVC
+winget install sharkdp.fd
+```
+
+or with Scoop (`scoop install ripgrep fd`) or Chocolatey
+(`choco install ripgrep fd`). winget puts the commands on `PATH` through
+`%LOCALAPPDATA%\Microsoft\WinGet\Links`, which only new terminals see.
+
+**Linux** (x64 and arm64):
+
+| Distribution | Command |
+|---|---|
+| Debian, Ubuntu | `sudo apt install ripgrep fd-find` (fd is installed as `fdfind`; harness finds it) |
+| Fedora, RHEL (EPEL) | `sudo dnf install ripgrep fd-find` |
+| Arch | `sudo pacman -S ripgrep fd` |
+| Alpine | `sudo apk add ripgrep fd` |
+
+**macOS** (Apple silicon), with Homebrew:
+
+```sh
+brew install ripgrep fd
+```
+
+Anywhere with a Rust toolchain, `cargo install ripgrep fd-find` works too.
+Check the install with `rg --version` and `fd --version` (`fdfind
+--version` on Debian and Ubuntu), then run `harness doctor`: its `search`
+line says which tools it found. Harness looks for the tools once per
+process, so restart harness ui and your agent sessions (which start
+`harness mcp`) after installing.
+
+Without fd, file search still works through `rg --files`. Without either,
+`harness doctor`, `harness report` and `provider_status` say so with the
+command above. Searches honour `.gitignore` and `.ignore` as rg and fd do.
+The reference (Providers) has the settings and how to turn it off.
+
+## Projects with their own nuget.config
+
+The nuget provider (`package_api`, NugetMcpServer started with `dnx`) uses
+NuGet's own configuration, so a repository with a `nuget.config` that
+clears nuget.org, maps packages to private feeds or needs credentials can
+stop it from starting or from finding the project's packages. `harness
+doctor` reports that as `nuget-config`, naming the file, with the project
+override that fixes it:
+
+```toml
+# .harness/config.toml
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
+dir = "project"
+```
+
+`--source` makes dnx fetch the server from nuget.org whatever the
+repository's configuration says, and `dir = "project"` starts the server in
+the repository, so it reads the repository's feeds. `harness doctor --fix
+nuget-config` writes it for you (`--dry-run` first shows it), and so does
+Fix on the nuget card in harness ui (Agents › Tools & providers) or in
+Health, after showing the change. The project table replaces the global
+one whole and is undone by removing it. Keep feed credentials in the NuGet
+configuration or in environment variables, never in `config.toml`. The
+reference (Providers › Projects with their own nuget.config) explains what
+dnx and the server do, with more examples.
+
+## Package upgrades and vulnerabilities
+
+In a .NET repository, Architecture marks each NuGet package a project
+references directly (in the Layers side panel's package list, and in a
+workspace's Version drift table for the members' own packages):
+
+- **ⓘ** (the info colour): a newer stable version is published, e.g.
+  "Newer stable version 9.0.3 available (you use 8.0.1)". Pre-releases are
+  never offered; a package on a pre-release is compared with the stable
+  versions above it.
+- **⚠** (gold for low and moderate, red for high and critical): the version
+  in use falls into a known advisory's range. The tooltip names the
+  severity, the advisory's link, the affected versions and the first fixed
+  version when known.
+
+Both marks can be reached with Tab and read by screen readers. Versions
+managed centrally (`Directory.Packages.props`) count; a version harness
+cannot resolve (`$(Property)`, `1.*`, an open range) gets no mark, and
+transitive packages are not looked at (`dotnet list package --vulnerable
+--include-transitive` covers those).
+
+The data comes from the package sources your NuGet configuration resolves
+to (nuget.config from the repository up, then the user-level NuGet.Config,
+with `<clear/>`, disabled sources and package source mapping), nuget.org
+when nothing else is configured. A private feed is read with the
+credentials of its `packageSourceCredentials` (a `ClearTextPassword` may
+name an environment variable, `%FEED_TOKEN%`; an encrypted `Password` is
+read on Windows only). Answers are cached on this machine for a day, so the
+view draws at once and the marks follow; offline, or when a source cannot
+be read, the view stays as it is with a short note, and `harness doctor`
+reports the source as `package-sources` with how to fix it.
+
+A vulnerable package is also an architecture finding (`vulnerable-package`:
+a warning for low and moderate, a problem for high and critical), with the
+usual marks (by design, review). Turn on `outdated = true` under
+`[architecture.packages]` to get an info finding per outdated package too,
+or `enabled = false` to read no package source at all.
 
 ## When something seems off
 

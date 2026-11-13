@@ -15,6 +15,151 @@ public sealed class ArchitectureReaderTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
+    private const string EntityFrameworkProject = """
+        <Project Sdk="Microsoft.NET.Sdk">
+          <ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" /></ItemGroup>
+        </Project>
+        """;
+
+    private const string PlainProject = """
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+        </Project>
+        """;
+
+    /// <summary>The database nodes a member with the files shows, beside a member that declares a contract.</summary>
+    private static string[] Databases(Dictionary<string, string> files)
+    {
+        using var tree = new ReaderTree(files);
+        using var contracts = new ReaderTree(
+            new() { ["IShared.cs"] = "[ServiceContract]\npublic interface ISharedService {}\n" }
+        );
+        return new SystemReader([
+            new("m", "Member", "member", tree.Repository()),
+            new("k", "Contracts", "contracts", contracts.Repository(), true),
+        ])
+            .Read()
+            .Nodes.Where(node => node.Kind is "database")
+            .Select(node => node.Id)
+            .ToArray();
+    }
+
+    [Fact]
+    public void SerializerAndFrameworkContextsAreNotDatabasesEvenInAnEntityFrameworkProject()
+    {
+        Databases(
+                new()
+                {
+                    ["App/App.csproj"] = EntityFrameworkProject,
+                    ["App/ProjectJsonContext.cs"] =
+                        "[JsonSerializable(typeof(Project))]\ninternal sealed partial class ProjectJsonContext : JsonSerializerContext;\n",
+                    ["App/ConfigurationTomlContext.cs"] =
+                        "internal partial class ConfigurationTomlContext : TomlSerializerContext {}\n",
+                    ["App/Others.cs"] = """
+                    class UiSynchronizationContext : SynchronizationContext {}
+                    class PluginLoadContext : System.Runtime.Loader.AssemblyLoadContext {}
+                    class OrderValidationContext : ValidationContext {}
+                    class FakeHttpContext : HttpContext {}
+                    class RequestContext : FakeHttpContext {}
+                    """,
+                }
+            )
+            .Should()
+            .BeEmpty();
+    }
+
+    [Fact]
+    public void ACustomBaseChainReachingDbContextIsADatabase()
+    {
+        Databases(
+                new()
+                {
+                    ["Data/Data.csproj"] = EntityFrameworkProject,
+                    ["Data/BaseContext.cs"] =
+                        "public abstract class BaseContext : Microsoft.EntityFrameworkCore.DbContext {}\n",
+                    ["Data/AppDbContext.cs"] = "public class AppDbContext(DbContextOptions o) : BaseContext\n{\n}\n",
+                    // a base not named *Context, in a file that declares no *Context class
+                    ["Data/EntitiesBase.cs"] =
+                        "public abstract class EntitiesBase<T> : IdentityDbContext<T> where T : class {}\n",
+                    ["Data/UsersContext.cs"] = "public class UsersContext : EntitiesBase<User> {}\n",
+                    ["Data/LegacyContext.cs"] =
+                        "public class LegacyContext : global::System.Data.Objects.ObjectContext {}\n",
+                }
+            )
+            .Should()
+            .BeEquivalentTo("db:m:app", "db:m:users", "db:m:legacy", "db:m:main");
+    }
+
+    [Fact]
+    public void AContextBaseWithoutEntityFrameworkInTheProjectIsNotADatabase()
+    {
+        Databases(
+                new()
+                {
+                    ["Lib/Lib.csproj"] = PlainProject,
+                    ["Lib/WorkflowContext.cs"] = "public class WorkflowContext : ExecutionContext {}\n",
+                    ["Lib/StepContext.cs"] = "public class StepContext : WorkflowContext {}\n",
+                }
+            )
+            .Should()
+            .BeEmpty();
+    }
+
+    [Fact]
+    public void ADbContextIsADatabaseOnlyWhenItsProjectReferencesEntityFramework()
+    {
+        Databases(
+                new()
+                {
+                    ["Plain/Plain.csproj"] = PlainProject,
+                    ["Plain/PlainDbContext.cs"] = "public class PlainDbContext : DbContext {}\n",
+                    ["Loose/LooseDbContext.cs"] = "public class LooseDbContext : DbContext {}\n",
+                    // EF through central package management in Directory.Build.props
+                    ["Directory.Packages.props"] =
+                        "<Project><ItemGroup><PackageVersion Include=\"Npgsql.EntityFrameworkCore.PostgreSQL\" Version=\"10.0.0\" /></ItemGroup></Project>\n",
+                    ["Central/Directory.Build.props"] =
+                        "<Project><ItemGroup><PackageReference Include=\"Npgsql.EntityFrameworkCore.PostgreSQL\" /></ItemGroup></Project>\n",
+                    ["Central/Central.csproj"] = PlainProject,
+                    ["Central/Data/CentralDbContext.cs"] = "public class CentralDbContext : DbContext {}\n",
+                    // EF through a project reference
+                    ["Web/Web.csproj"] =
+                        "<Project><ItemGroup><ProjectReference Include=\"..\\Central\\Central.csproj\" /></ItemGroup></Project>\n",
+                    ["Web/WebDbContext.cs"] = "public class WebDbContext : DbContext {}\n",
+                    // EF6 through packages.config
+                    ["Legacy/Legacy.csproj"] = PlainProject,
+                    ["Legacy/packages.config"] =
+                        "<packages><package id=\"EntityFramework\" version=\"6.5.1\" /></packages>\n",
+                    ["Legacy/LegacyDbContext.cs"] = "public class LegacyDbContext : DbContext {}\n",
+                }
+            )
+            .Should()
+            .BeEquivalentTo("db:m:central", "db:m:web", "db:m:legacy");
+    }
+
+    [Fact]
+    public void BaseTypeAndProjectReferenceCyclesEndWithoutADatabase()
+    {
+        Databases(
+                new()
+                {
+                    ["App/App.csproj"] = EntityFrameworkProject,
+                    ["App/Cycle.cs"] = """
+                    class FirstContext : SecondContext {}
+                    class SecondContext : ThirdContext {}
+                    class ThirdContext : FirstContext {}
+                    class SelfContext : SelfContext {}
+                    """,
+                    ["A/A.csproj"] =
+                        "<Project><ItemGroup><ProjectReference Include=\"../B/B.csproj\" /></ItemGroup></Project>\n",
+                    ["B/B.csproj"] =
+                        "<Project><ItemGroup><ProjectReference Include=\"../A/A.csproj\" /></ItemGroup></Project>\n",
+                    ["A/LoopDbContext.cs"] = "public class LoopDbContext : DbContext {}\n",
+                }
+            )
+            .Should()
+            .BeEmpty();
+    }
+
     [Theory]
     [InlineData("dotnet", false, "")]
     [InlineData("dotnet", true, "")]
@@ -71,6 +216,7 @@ public sealed class ArchitectureReaderTests
                   "Keycloak": { "BaseUrl": "https://login.example.invalid" }
                 }
                 """,
+                ["Orders.DAL/Orders.DAL.csproj"] = EntityFrameworkProject,
                 ["Orders.DAL/OrdersDbContext.cs"] =
                     "public class OrdersDbContext(\n DbContextOptions options,\n TenantContext tenant) : DbContext\n{\n}\n",
                 ["Orders.DAL/OrdersMigrationDbContext.cs"] =
@@ -158,6 +304,7 @@ public sealed class ArchitectureReaderTests
                 ["Billing.WebApi/BillingGrpcService.cs"] =
                     "public sealed class BillingGrpcService(\n    ILogger log,\n    IClock clock)\n    : IBillingGrpcService\n{\n}\n",
                 // a DbContext whose header names no contract
+                ["Shop.DAL/Shop.DAL.csproj"] = EntityFrameworkProject,
                 ["Shop.DAL/ShopDbContext.cs"] =
                     "public class ShopDbContext(\n    DbContextOptions options)\n    : DbContext\n{\n}\n",
                 // a longer name containing the contract's: no use

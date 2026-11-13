@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Harness.Core.Agents;
 using Harness.Core.Web;
 using Harness.Infrastructure.Agents;
+using Harness.Infrastructure.Processes;
 
 namespace Harness.Cli.Ui;
 
@@ -10,9 +11,11 @@ namespace Harness.Cli.Ui;
 /// The agent hosts harness ui started or found (TASK-0116): it starts them detached (harness-agents serve), keeps a
 /// connection to each live one's pipe, and holds their events, numbered by the host, for the page: the whole log on
 /// request and, through <see cref="Drain"/>, what is new for the live stream. A host outlives harness ui; a new
-/// harness ui finds it again by its state file and reconnects, getting its events from the start.
+/// harness ui finds it again by its state file and reconnects, getting its events from the start. Each host it starts
+/// refreshes the model catalog (<paramref name="models"/>, agent-models.json) from its client's handshake, and it runs
+/// the catalog's background probes (TASK-0142).
 /// </summary>
-internal sealed class UiAgents : IAsyncDisposable
+internal sealed class UiAgents(string models = "") : IAsyncDisposable
 {
     private static readonly TimeSpan Connect = TimeSpan.FromSeconds(5);
 
@@ -33,21 +36,44 @@ internal sealed class UiAgents : IAsyncDisposable
     }
 
     private readonly ConcurrentDictionary<string, Host> _hosts = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Task> _probes = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _stopping = new();
 
-    /// <summary>Starts a host for a task; returns its key at once, while the host opens the client's session.</summary>
+    /// <summary>HARNESS_AGENT_MODELS_OFFLINE=1: the catalog is never probed, only read (the tests set it).</summary>
+    public static bool ModelsOffline => Environment.GetEnvironmentVariable("HARNESS_AGENT_MODELS_OFFLINE") is "1";
+
+    /// <summary>The client's executable: HARNESS_CLAUDE_COMMAND / HARNESS_CODEX_COMMAND, else claude or codex.</summary>
+    private static string Command(string client)
+    {
+        var variable = client is AgentClients.Codex ? "HARNESS_CODEX_COMMAND" : "HARNESS_CLAUDE_COMMAND";
+        if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } command)
+        {
+            return command;
+        }
+        return client is AgentClients.Codex ? "codex" : "claude";
+    }
+
+    /// <summary>
+    /// Starts a host for a task; returns its key at once, while the host opens the client's session. An empty
+    /// permission mode is the client's default, or for a resumed session the mode it was started with.
+    /// </summary>
     public async Task<string> StartAsync(
         JsonObject project,
         string taskId,
         string client,
         string prompt,
         string model,
-        string resume
+        string resume,
+        string mode = ""
     )
     {
         if (client is not (AgentClients.Claude or AgentClients.Codex))
         {
             throw new UiRequestException(400, "client must be claude-code or codex");
+        }
+        if (mode.Length > 0 && AgentPermissionModes.Find(client, mode) is null)
+        {
+            throw new UiRequestException(400, AgentPermissionModes.Problem(client, mode));
         }
         if (resume.Length is 0 && prompt.Trim().Length is 0)
         {
@@ -85,6 +111,14 @@ internal sealed class UiAgents : IAsyncDisposable
         {
             arguments.AddRange(["--resume", resume]);
         }
+        if (mode.Length > 0)
+        {
+            arguments.AddRange(["--permission-mode", mode]);
+        }
+        if (models.Length > 0)
+        {
+            arguments.AddRange(["--models", models]);
+        }
         // HARNESS_CLAUDE_COMMAND / HARNESS_CODEX_COMMAND: a client that is not on PATH as claude or codex
         var variable = client is AgentClients.Codex ? "HARNESS_CODEX_COMMAND" : "HARNESS_CLAUDE_COMMAND";
         if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } command)
@@ -119,6 +153,8 @@ internal sealed class UiAgents : IAsyncDisposable
                     ["client"] = AgentHostFiles.Text(state, "client"),
                     ["session_id"] = AgentHostFiles.Text(state, "session_id"),
                     ["model"] = AgentHostFiles.Text(state, "model"),
+                    ["requested_model"] = AgentHostFiles.Text(state, "requested_model"),
+                    ["permission_mode"] = AgentHostFiles.Text(state, "permission_mode"),
                     ["status"] = alive ? AgentHostFiles.Text(state, "status") : Ended(state),
                     ["alive"] = alive,
                     ["started_at"] = AgentHostFiles.Text(state, "started_at"),
@@ -127,6 +163,96 @@ internal sealed class UiAgents : IAsyncDisposable
             );
         }
         return hosts;
+    }
+
+    /// <summary>
+    /// The permission modes of each client for the start dialog: {client: [{id, label, description, default,
+    /// unsafe}]}, in the order to show them.
+    /// </summary>
+    public static JsonObject PermissionModes()
+    {
+        var modes = new JsonObject();
+        foreach (var client in AgentPermissionModes.Clients)
+        {
+            modes[client] = new JsonArray([
+                .. AgentPermissionModes
+                    .For(client)
+                    .Select(m =>
+                        (JsonNode?)
+                            new JsonObject
+                            {
+                                ["id"] = m.Id,
+                                ["label"] = m.Label,
+                                ["description"] = m.Description,
+                                ["default"] = m.IsDefault,
+                                ["unsafe"] = m.Unsafe,
+                            }
+                    ),
+            ]);
+        }
+        return modes;
+    }
+
+    /// <summary>A probe of the client's models is running.</summary>
+    public bool RefreshingModels(string client) => _probes.TryGetValue(client, out var probe) && !probe.IsCompleted;
+
+    /// <summary>
+    /// Starts a background probe of the client's models unless one runs; it records its answer, or its failure, in
+    /// the catalog. Never waits for the probe.
+    /// </summary>
+    public void RefreshModels(string client, AgentModelStore store, string workingDirectory)
+    {
+        lock (_probes)
+        {
+            if (RefreshingModels(client) || _stopping.IsCancellationRequested)
+            {
+                return;
+            }
+            _probes[client] = Task.Run(() => ProbeAsync(client, store, workingDirectory), CancellationToken.None);
+        }
+    }
+
+    private async Task ProbeAsync(string client, AgentModelStore store, string workingDirectory)
+    {
+        var token = _stopping.Token;
+        try
+        {
+            AgentModelReport report;
+            try
+            {
+                report = await AgentModelProbe.ProbeAsync(
+                    new ProviderProcessFactory(),
+                    client,
+                    Command(client),
+                    [],
+                    workingDirectory,
+                    AgentModelProbe.Timeout,
+                    token
+                );
+            }
+            catch (Exception exception)
+                when (exception
+                        is InvalidOperationException
+                            or TimeoutException
+                            or IOException
+                            or UnauthorizedAccessException
+                            or System.ComponentModel.Win32Exception
+                    && !token.IsCancellationRequested
+                )
+            {
+                await store.FailedAsync(client, exception.Message, DateTimeOffset.UtcNow, token);
+                return;
+            }
+            await store.RefreshedAsync(client, report, AgentModelSources.Probe, DateTimeOffset.UtcNow, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // harness ui is stopping.
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // The catalog stays as it was; the next dialog tries again.
+        }
     }
 
     /// <summary>A host's events after <paramref name="after"/>, with its status and whether it still runs.</summary>
@@ -336,6 +462,9 @@ internal sealed class UiAgents : IAsyncDisposable
             }
             await reading.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
+        await Task.WhenAll(_probes.Values)
+            .WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None)
+            .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         _stopping.Dispose();
     }
 }

@@ -8,7 +8,7 @@ using Harness.Scm;
 namespace Harness.Cli.Scm;
 
 /// <summary>
-/// 'harness scm list|add|set|remove': the machine's SCM connections in scm.toml. Tokens are shown only masked, and
+/// 'harness scm list|add|set|remove' (aliases: ScmCommandRunner.Alias.cs): the machine's SCM connections in scm.toml. Tokens are shown only masked, and
 /// failures name the field at fault, never the token.
 /// </summary>
 internal sealed partial class ScmCommandRunner(
@@ -146,6 +146,13 @@ internal sealed partial class ScmCommandRunner(
                 $"{entry.Name, -16} {ScmKinds.Name(entry.Endpoint.Kind), -8} {entry.Endpoint.BaseUrl.AbsoluteUri.TrimEnd('/')}  {TokenText(entry)}",
                 CancellationToken.None
             );
+            if (entry.Endpoint.Aliases.Count > 0)
+            {
+                await output.WriteLineAsync(
+                    $"{"", -16} aliases: {string.Join(", ", AliasTexts(entry))}",
+                    CancellationToken.None
+                );
+            }
         }
 
         return 0;
@@ -277,6 +284,7 @@ internal sealed partial class ScmCommandRunner(
             ["name"] = entry.Name,
             ["type"] = ScmKinds.Name(entry.Endpoint.Kind),
             ["url"] = entry.Endpoint.BaseUrl.AbsoluteUri.TrimEnd('/'),
+            ["aliases"] = AliasTexts(entry),
             ["token_source"] = entry.TokenSource is ScmTokenSource.Environment ? "env" : "stored",
             ["token_env"] = entry.TokenEnv,
             ["token"] = entry.MaskedToken,

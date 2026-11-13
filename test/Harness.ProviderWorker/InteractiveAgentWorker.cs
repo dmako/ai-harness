@@ -7,7 +7,10 @@ namespace Harness.ProviderWorker;
 /// Scripted interactive clients for the agent host's tests: Claude Code with stream-json input
 /// (--input-format stream-json, --permission-prompt-tool stdio) and `codex app-server` (JSON-RPC). A turn's text
 /// decides what happens: "approve" asks for a tool permission and answers by the decision, "slow" works until it is
-/// interrupted, "exit" ends the process, anything else is echoed. Each start is logged to calls.jsonl.
+/// interrupted, "exit" ends the process, anything else is echoed. Each start is logged to calls.jsonl, and codex's
+/// thread/start and thread/resume settings to threads.jsonl. Both tell their models (TASK-0142): Claude in its answer
+/// to the initialize control request, Codex in two pages of model/list; HARNESS_FAKE_AGENT_MODELS=error makes them
+/// answer with an error instead.
 /// </summary>
 internal static class InteractiveAgentWorker
 {
@@ -74,6 +77,14 @@ internal static class InteractiveAgentWorker
         var requests = 0;
         while (await ReadAsync() is { } message)
         {
+            if (
+                (string?)message["type"] is "control_request"
+                && (string?)message["request"]?["subtype"] is "initialize"
+            )
+            {
+                await Write(ClaudeModels(message["request_id"]?.DeepClone()));
+                continue;
+            }
             if ((string?)message["type"] is not "user")
             {
                 continue;
@@ -166,6 +177,78 @@ internal static class InteractiveAgentWorker
         return 0;
     }
 
+    private static bool ModelsFail => Environment.GetEnvironmentVariable("HARNESS_FAKE_AGENT_MODELS") is "error";
+
+    /// <summary>Claude's answer to initialize: its models, "default" naming the model it resolves to.</summary>
+    private static JsonObject ClaudeModels(JsonNode? id)
+    {
+        if (ModelsFail)
+        {
+            return new()
+            {
+                ["type"] = "control_response",
+                ["response"] = new JsonObject
+                {
+                    ["subtype"] = "error",
+                    ["request_id"] = id,
+                    ["error"] = "fake agent: no models",
+                },
+            };
+        }
+        static JsonObject Model(string value, string resolved, string label) =>
+            new()
+            {
+                ["value"] = value,
+                ["resolvedModel"] = resolved,
+                ["displayName"] = label,
+                ["description"] = label + " · for tests",
+            };
+        return new()
+        {
+            ["type"] = "control_response",
+            ["response"] = new JsonObject
+            {
+                ["subtype"] = "success",
+                ["request_id"] = id,
+                ["response"] = new JsonObject
+                {
+                    ["models"] = new JsonArray(
+                        Model("default", "claude-fake-1", "Default (recommended)"),
+                        Model("fake", "claude-fake-1", "Fake 1"),
+                        Model("claude-fake-2", "claude-fake-2", "Fake 2")
+                    ),
+                    ["claude_code_version"] = "0.0.1-fake",
+                },
+            },
+        };
+    }
+
+    /// <summary>Codex's model/list: two pages, the second after the cursor the first gives, one model hidden.</summary>
+    private static JsonObject CodexModels(JsonObject message)
+    {
+        static JsonObject Model(string id, string label, bool isDefault, bool hidden = false) =>
+            new()
+            {
+                ["id"] = id,
+                ["model"] = id,
+                ["displayName"] = label,
+                ["description"] = label + " for tests",
+                ["hidden"] = hidden,
+                ["isDefault"] = isDefault,
+                ["upgrade"] = null,
+            };
+        return (string?)message["params"]?["cursor"] is "page-2"
+            ? new JsonObject { ["data"] = new JsonArray(Model("gpt-fake-mini", "GPT Fake Mini", false)) }
+            : new JsonObject
+            {
+                ["data"] = new JsonArray(
+                    Model("gpt-fake", "GPT Fake", true),
+                    Model("gpt-fake-old", "GPT Fake Old", false, hidden: true)
+                ),
+                ["nextCursor"] = "page-2",
+            };
+    }
+
     private static JsonObject Assistant(string session, JsonObject block) =>
         new()
         {
@@ -173,6 +256,19 @@ internal static class InteractiveAgentWorker
             ["session_id"] = session,
             ["message"] = new JsonObject { ["model"] = "claude-fake-1", ["content"] = new JsonArray(block) },
         };
+
+    private static Task LogThreadAsync(JsonObject message) =>
+        File.AppendAllTextAsync(
+            Path.Combine(
+                Environment.GetEnvironmentVariable("HARNESS_FAKE_AGENT_DIR") ?? Path.GetTempPath(),
+                "threads.jsonl"
+            ),
+            new JsonObject
+            {
+                ["method"] = (string?)message["method"],
+                ["params"] = message["params"]?.DeepClone(),
+            }.ToJsonString() + "\n"
+        );
 
     private static async Task<int> CodexAsync()
     {
@@ -185,9 +281,23 @@ internal static class InteractiveAgentWorker
             switch ((string?)message["method"])
             {
                 case "initialize":
-                    await Respond(id, new JsonObject { ["userAgent"] = "fake" });
+                    await Respond(id, new JsonObject { ["userAgent"] = "fake/0.0.2-fake (tests)" });
+                    break;
+                case "model/list" when ModelsFail:
+                    await Write(
+                        new()
+                        {
+                            ["jsonrpc"] = "2.0",
+                            ["id"] = id,
+                            ["error"] = new JsonObject { ["code"] = -32603, ["message"] = "fake agent: no models" },
+                        }
+                    );
+                    break;
+                case "model/list":
+                    await Respond(id, CodexModels(message));
                     break;
                 case "thread/start":
+                    await LogThreadAsync(message);
                     thread = Guid.NewGuid().ToString();
                     await Respond(
                         id,
@@ -199,6 +309,7 @@ internal static class InteractiveAgentWorker
                     );
                     break;
                 case "thread/resume":
+                    await LogThreadAsync(message);
                     thread = (string?)message["params"]?["threadId"] ?? "";
                     await Respond(
                         id,
@@ -285,7 +396,7 @@ internal static class InteractiveAgentWorker
                     },
                 }
             );
-            var answer = await ReadAsync();
+            var answer = await ReadCodexAsync();
             var decision = (string?)answer?["result"]?["decision"];
             await Item("agentMessage", decision is "accept" ? "accepted" : "declined");
             return "completed";
@@ -293,7 +404,7 @@ internal static class InteractiveAgentWorker
         if (text.Contains("slow", StringComparison.Ordinal))
         {
             await Item("agentMessage", "working");
-            while (await ReadAsync() is { } message)
+            while (await ReadCodexAsync() is { } message)
             {
                 if ((string?)message["method"] is "turn/interrupt")
                 {
@@ -305,6 +416,21 @@ internal static class InteractiveAgentWorker
         await Item("commandExecution", "dotnet test");
         await Item("agentMessage", "echo: " + text);
         return "completed";
+    }
+
+    /// <summary>The next message during a turn; a model/list call that comes meanwhile is answered on the way.</summary>
+    private static async Task<JsonObject?> ReadCodexAsync()
+    {
+        while (await ReadAsync() is { } message)
+        {
+            if ((string?)message["method"] is "model/list")
+            {
+                await Respond(message["id"]?.DeepClone(), CodexModels(message));
+                continue;
+            }
+            return message;
+        }
+        return null;
     }
 
     private static Task Item(string type, string text) =>

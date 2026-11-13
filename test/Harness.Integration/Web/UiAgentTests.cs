@@ -40,7 +40,12 @@ public sealed class UiAgentTests
                 await Write(
                     server.Client,
                     project + "/tasks/TASK-0001/agents",
-                    new() { ["client"] = "claude-code", ["prompt"] = "first" }
+                    new()
+                    {
+                        ["client"] = "claude-code",
+                        ["prompt"] = "first",
+                        ["mode"] = "acceptEdits",
+                    }
                 )
             )["key"]!.GetValue<string>();
             AgentHostFiles.IsKey(key).Should().BeTrue();
@@ -68,6 +73,12 @@ public sealed class UiAgentTests
             (host["key"]!.GetValue<string>(), host["alive"]!.GetValue<bool>(), host["client"]!.GetValue<string>())
                 .Should()
                 .Be((key, true, "claude-code"));
+            // the mode chosen travelled to the host and its client (TASK-0135)
+            host["permission_mode"]!.GetValue<string>().Should().Be("acceptEdits");
+            (await File.ReadAllTextAsync(Path.Combine(calls, "calls.jsonl"), Token))
+                .Should()
+                .Contain("\"--permission-mode\",\"acceptEdits\"");
+            sessions["permission_modes"]!["codex"]!.AsArray().Should().HaveCount(4);
             var session = sessions["sessions"]!.AsArray().Single()!;
             (session["origin"]!.GetValue<string>(), session["session_id"]!.GetValue<string>())
                 .Should()
@@ -90,6 +101,42 @@ public sealed class UiAgentTests
                 new() { ["text"] = "hello?" }
             );
             refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        }
+        finally
+        {
+            TestDirectory.Delete(calls);
+        }
+    }
+
+    [Fact]
+    public async Task AnUnknownPermissionModeIsRefusedAndStartsNoAgent()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        Tasks(fixture);
+        var calls = Directory.CreateTempSubdirectory("harness-ui-agent-").FullName;
+        try
+        {
+            await using var server = await UiFixture.StartAsync(fixture, environment: Environment(calls));
+            var id = (await Read(server.Client, "/api/projects"))["projects"]![0]!["id"]!.GetValue<string>();
+            using var refused = await Post(
+                server.Client,
+                "/api/projects/" + id + "/tasks/TASK-0001/agents",
+                new()
+                {
+                    ["client"] = "codex",
+                    ["prompt"] = "first",
+                    ["mode"] = "bypassPermissions",
+                }
+            );
+            refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            JsonNode.Parse(await refused.Content.ReadAsStringAsync(Token))!["error"]!
+                .GetValue<string>()
+                .Should()
+                .Be(
+                    "unknown permission mode 'bypassPermissions' for codex; choose one of auto, manual, read-only, full-access"
+                );
+            AgentHostFiles.States(AgentHostFiles.Directory(fixture.DatabasePath)).Should().BeEmpty();
+            File.Exists(Path.Combine(calls, "calls.jsonl")).Should().BeFalse();
         }
         finally
         {
@@ -148,6 +195,139 @@ public sealed class UiAgentTests
         missing.StatusCode.Should().Be(HttpStatusCode.NotFound);
         using var unknown = await server.Client.GetAsync(project + "/agents/" + new string('a', 32) + "/log", Token);
         unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task TheModelCatalogIsProbedInTheBackgroundAddsTranscriptModelsAndMarksAnUnlistedModel()
+    {
+        using var fixture = await SyncFixture.CreateAsync();
+        Tasks(fixture);
+        const string Session = "6f1e2d3c-0000-4000-8000-000000000002";
+        var transcript = Path.Combine(fixture.DirectoryRoot, "claude", "projects", "repo", Session + ".jsonl");
+        Directory.CreateDirectory(Path.GetDirectoryName(transcript)!);
+        await File.WriteAllTextAsync(
+            transcript,
+            $$$"""{"type":"assistant","sessionId":"{{{Session}}}","timestamp":"2026-11-08T10:00:05Z","message":{"id":"m1","model":"claude-sonnet-4-6","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":3,"output_tokens":4} } }"""
+                + "\n",
+            new UTF8Encoding(false),
+            Token
+        );
+        using (var database = HarnessDatabase.Open(fixture.DatabasePath, cancellationToken: Token))
+        {
+            new TaskStore(database).RecordSession(
+                "claude-code",
+                Session,
+                "TASK-0001",
+                HookTaskActions.Claim,
+                DateTimeOffset.Parse("2026-11-08T10:00:01Z", System.Globalization.CultureInfo.InvariantCulture),
+                Token
+            );
+        }
+        // Codex's catalog is current, so only Claude's (empty) one is probed
+        var store = new AgentModelStore(Path.Combine(fixture.Global, AgentModelStore.FileName));
+        await store.RefreshedAsync(
+            "codex",
+            new([new("gpt-fake", "GPT Fake") { IsDefault = true }]),
+            "probe",
+            DateTimeOffset.UtcNow,
+            Token
+        );
+        var calls = Directory.CreateTempSubdirectory("harness-ui-agent-").FullName;
+        try
+        {
+            var environment = Environment(calls);
+            environment["HARNESS_AGENT_MODELS_OFFLINE"] = "";
+            await using var server = await UiFixture.StartAsync(fixture, environment: environment);
+            var id = (await Read(server.Client, "/api/projects"))["projects"]![0]!["id"]!.GetValue<string>();
+            var project = "/api/projects/" + id;
+            // reading the task's sessions brings the usage, and so the transcript's model, up to date
+            await Read(server.Client, project + "/tasks/TASK-0001/sessions");
+
+            // a read without the harness ui header starts no probe
+            var plain = await Read(server.Client, project + "/agent-models");
+            var claude = plain["clients"]!["claude-code"]!;
+            (claude["refreshing"]!.GetValue<bool>(), claude["stale"]!.GetValue<bool>()).Should().Be((false, true));
+            claude["models"]!.AsArray().Select(m => (string)m!["id"]!).Should().Equal("claude-sonnet-4-6");
+            claude["models"]![0]!["source"]!.GetValue<string>().Should().Be("seen");
+            plain["clients"]!["codex"]!["default"]!["label"]!.GetValue<string>().Should().Be("GPT Fake");
+            plain["clients"]!["codex"]!["stale"]!.GetValue<bool>().Should().BeFalse();
+            File.Exists(Path.Combine(calls, "calls.jsonl")).Should().BeFalse();
+
+            // the dialog's read starts it, answers at once and is asked again until it is done
+            var first = await Trusted(server.Client, project + "/agent-models");
+            first["clients"]!["codex"]!["refreshing"]!.GetValue<bool>().Should().BeFalse();
+            JsonNode probed;
+            using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(Token))
+            {
+                timeout.CancelAfter(TimeSpan.FromSeconds(45));
+                while (true)
+                {
+                    probed = (await Trusted(server.Client, project + "/agent-models"))["clients"]!["claude-code"]!;
+                    if (
+                        !probed["refreshing"]!.GetValue<bool>()
+                        && probed["refreshed_at"]!.GetValue<string>().Length > 0
+                    )
+                    {
+                        break;
+                    }
+                    await Task.Delay(200, timeout.Token);
+                }
+            }
+            probed["error"]!.GetValue<string>().Should().BeEmpty();
+            probed["source"]!.GetValue<string>().Should().Be("probe");
+            probed["default"]!["label"]!.GetValue<string>().Should().Be("Fake 1");
+            probed["models"]!
+                .AsArray()
+                .Select(m => ((string)m!["id"]!, (string)m["source"]!))
+                .Should()
+                .Equal(("fake", "probe"), ("claude-fake-2", "probe"), ("claude-sonnet-4-6", "seen"));
+            probed["age_seconds"]!.GetValue<long>().Should().BeLessThan(60);
+            // the probe saved no session and ran no turn
+            var call = JsonNode.Parse((await File.ReadAllLinesAsync(Path.Combine(calls, "calls.jsonl"), Token))[0])!;
+            call["args"]!.AsArray().Select(a => (string)a!).Should().Contain("--no-session-persistence");
+
+            // any model id starts; one the catalog does not name is marked in the session view
+            var key = (
+                await Write(
+                    server.Client,
+                    project + "/tasks/TASK-0001/agents",
+                    new()
+                    {
+                        ["client"] = "claude-code",
+                        ["prompt"] = "first",
+                        ["model"] = "my-own-model",
+                    }
+                )
+            )["key"]!.GetValue<string>();
+            await LogAsync(server.Client, project, key, e => Is(e, "turn"));
+            var host = (await Read(server.Client, project + "/tasks/TASK-0001/sessions"))["hosts"]!.AsArray().Single()!;
+            (host["requested_model"]!.GetValue<string>(), host["model_unlisted"]!.GetValue<bool>())
+                .Should()
+                .Be(("my-own-model", true));
+            (await File.ReadAllTextAsync(Path.Combine(calls, "calls.jsonl"), Token))
+                .Should()
+                .Contain("\"--model\",\"my-own-model\"");
+            // the session's handshake refreshed the catalog in turn
+            await ProviderFixture.EventuallyAsync(
+                () => store.Read("claude-code").Source is "session",
+                TimeSpan.FromSeconds(15)
+            );
+            await Write(server.Client, project + "/agents/" + key + "/close", []);
+            await LogAsync(server.Client, project, key, e => Is(e, "status") && Text(e, "status") == "closed");
+        }
+        finally
+        {
+            TestDirectory.Delete(calls);
+        }
+    }
+
+    private static async Task<JsonObject> Trusted(HttpClient client, string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add("X-Harness-UI", "1");
+        using var response = await client.SendAsync(request, Token);
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(Token))!.AsObject();
     }
 
     private static void Tasks(SyncFixture fixture)

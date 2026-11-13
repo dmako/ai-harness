@@ -481,7 +481,7 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
         {
             ["query"] = request.Query,
             ["query_name"] = McpMapping.LastSegment(request.Query),
-            ["query_regex"] = QuoteMeta(request.Query),
+            ["query_regex"] = McpMapping.QuoteMeta(request.Query),
             ["limit"] = limit.ToString(CultureInfo.InvariantCulture),
             ["limit_more"] = ((long)limit + 1).ToString(CultureInfo.InvariantCulture),
             ["path"] = request.Path,
@@ -706,15 +706,6 @@ public class GenericMcpProvider : IProvider, IVersionedProvider
                 RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
                 TimeSpan.FromSeconds(1)
             );
-
-    private static string QuoteMeta(string text) =>
-        string.Concat(
-            text.Select(character =>
-                "\\.+*?()|[]{}^$".Contains(character, StringComparison.Ordinal)
-                    ? "\\" + character
-                    : character.ToString()
-            )
-        );
 
     private static string Canonical(string path)
     {

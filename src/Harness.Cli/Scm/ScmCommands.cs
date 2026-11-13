@@ -24,6 +24,16 @@ internal sealed class ScmSetSettings : ScmTokenSettings
     public string Rename { get; init; } = "";
 }
 
+/// <summary>'harness scm alias add|set|remove': an SCM, the alias to change or remove, and the new alias.</summary>
+internal sealed class ScmAliasSettings : ScmNameSettings
+{
+    /// <summary>The alias to add or remove, or (for set) the one to replace.</summary>
+    public string Alias { get; init; } = "";
+
+    /// <summary>The alias that replaces <see cref="Alias" /> (set only).</summary>
+    public string Replacement { get; init; } = "";
+}
+
 internal class ScmProjectSettings : ScmSettings
 {
     /// <summary>A directory inside the repository.</summary>
@@ -73,6 +83,29 @@ internal sealed class ScmRemoveCommand(ScmCommandRunner runner)
 {
     public Task<int> ExecuteAsync(ScmNameSettings settings, CancellationToken cancellationToken) =>
         runner.RemoveAsync(settings, cancellationToken);
+}
+
+internal sealed class ScmAliasListCommand(ScmCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(ScmNameSettings settings, CancellationToken _) => runner.AliasListAsync(settings);
+}
+
+internal sealed class ScmAliasAddCommand(ScmCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(ScmAliasSettings settings, CancellationToken cancellationToken) =>
+        runner.AliasAddAsync(settings, cancellationToken);
+}
+
+internal sealed class ScmAliasSetCommand(ScmCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(ScmAliasSettings settings, CancellationToken cancellationToken) =>
+        runner.AliasSetAsync(settings, cancellationToken);
+}
+
+internal sealed class ScmAliasRemoveCommand(ScmCommandRunner runner)
+{
+    public Task<int> ExecuteAsync(ScmAliasSettings settings, CancellationToken cancellationToken) =>
+        runner.AliasRemoveAsync(settings, cancellationToken);
 }
 
 internal sealed class ScmUseCommand(ScmCommandRunner runner)

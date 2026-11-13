@@ -2,5 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../Harness.Core/Harness.Core.csproj" />
     <PackageReference Include="ModelContextProtocol.Core" />
+    <InternalsVisibleTo Include="Harness.Unit" />
+    <InternalsVisibleTo Include="Harness.Integration" />
   </ItemGroup>
 </Project>

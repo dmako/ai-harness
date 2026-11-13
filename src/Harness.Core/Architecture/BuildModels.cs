@@ -37,6 +37,17 @@ public record BuildUnit
     [JsonPropertyName("ref_at"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, string>? ReferenceLocations { get; set; }
 
+    /// <summary>
+    /// Build-order-only references (MSBuild ReferenceOutputAssembly=false): built before this unit, not used as
+    /// code, so they stay out of References and of layers, cycles and the layering rules.
+    /// </summary>
+    [JsonPropertyName("build_order"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? BuildOrder { get; set; }
+
+    /// <summary>References a static read cannot resolve: the expression as evaluated, with where it is declared.</summary>
+    [JsonPropertyName("unresolved_refs"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? UnresolvedReferences { get; set; }
+
     [JsonPropertyName("packages")]
     public List<BuildPackage> Packages { get; } = [];
 

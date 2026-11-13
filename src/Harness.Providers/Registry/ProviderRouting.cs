@@ -34,7 +34,7 @@ public static class ProviderRouting
         var languages = detectedLanguages ?? DetectLanguages(root);
         foreach (var entry in entries.OrderBy(entry => entry.Name, StringComparer.Ordinal))
         {
-            if (!entry.Enabled || light && !entry.Context || entry.Type is not ("mcp" or "harness"))
+            if (!entry.Enabled || light && !entry.Context || entry.Type is not ("mcp" or "harness" or "builtin"))
             {
                 continue;
             }

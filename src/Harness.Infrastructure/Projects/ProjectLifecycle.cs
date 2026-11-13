@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Harness.Core.Projects;
+using Harness.Core.Providers;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Storage;
@@ -35,6 +36,9 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         "# Managed by harness: keep local state out of Git.\n*.db\n*.db-wal\n*.db-shm\n";
     public string GlobalConfigurationPath => globalConfigurationPath ?? ConfigurationPaths.GlobalPath();
     public string Version => version;
+
+    /// <summary>The user-level NuGet.Config the nuget-config check reads: null for this system's, empty for none.</summary>
+    public string? NuGetUserFile { get; init; }
     public MachineRegistry Registry =>
         new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigurationPath))!, "projects.json"));
 
@@ -290,7 +294,7 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             ? string.Join(", ", options)
             : string.Join(", ", options.Take(3)) + " and " + (options.Count - 3) + " more";
 
-    private static async Task WriteConfigurationAsync(string path, string content, CancellationToken token)
+    internal static async Task WriteConfigurationAsync(string path, string content, CancellationToken token)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -379,6 +383,15 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             inspection = inspection with { Knowledge = await KnowledgeCheckAsync(repository, cancellationToken) };
         }
 
+        if (configError is null)
+        {
+            inspection = inspection with { Search = SearchCheck(loaded.Value.Providers) };
+            if (NuGetProviderFix.Check(loaded, root, NuGetUserFile) is { } nuget)
+            {
+                inspection = inspection with { NuGet = NuGetProviderFix.Health(nuget) };
+            }
+        }
+
         if (!location.Initialized)
         {
             return inspection;
@@ -432,6 +445,24 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         }
 
         return inspection;
+    }
+
+    /// <summary>
+    /// The built-in search as doctor reports it: missing rg and fd is a warning with the install command; a
+    /// [providers.rg-fd] entry that keeps it off is fine, with a note that the entry can go when rg and fd are found.
+    /// </summary>
+    public static HealthCheck SearchCheck(
+        IReadOnlyDictionary<string, ProviderConfiguration> providers,
+        SearchToolset? tools = null
+    )
+    {
+        var status = SearchTools.Status(providers, tools);
+        return new(
+            SearchTools.ProviderName,
+            status.State is SearchTools.Missing ? "warn" : "ok",
+            status.State is SearchTools.Active ? "built-in text and file search: " + status.Detail : status.Detail,
+            status.Fix
+        );
     }
 
     /// <summary>Sharing knowledge needs Git to carry .harness/knowledge.toml; a rule ignoring it keeps it local.</summary>

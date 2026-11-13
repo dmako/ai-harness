@@ -26,8 +26,8 @@ public sealed partial class FindingSets
     /// Everything the project findings are computed from (TASK-0109), as one fingerprint: harness's build; the global
     /// and project configuration (thresholds, rules, providers); this repository's and its workspace members' HEAD
     /// and changed or untracked paths with size and modification time (members' builds decide which published code
-    /// is unused); the file hashes sync recorded; the constraints, decisions and conventions of the project, its
-    /// workspaces and the user (boundary rules and knowledge drift); the exact .NET metrics run for HEAD; and the
+    /// is unused); the file hashes sync recorded; when the NuGet package cache last changed; the constraints,
+    /// decisions and conventions of the project, its workspaces and the user (boundary rules and knowledge drift); the exact .NET metrics run for HEAD; and the
     /// configured providers' executables. Providers are not asked: their answers change only with their index,
     /// which a sync refreshes after a change (a refreshing sync never keeps the findings), their configuration or
     /// their executable. Null when an input cannot be read: the findings are then computed.
@@ -80,6 +80,10 @@ public sealed partial class FindingSets
                 text.Append('\n');
             }
 
+            // the cached package metadata the vulnerable-package findings read (TASK-0141)
+            text.Append("packages ");
+            text.Append(Architecture.PackageFeeds.PackageMetadataCache.For(globalConfigurationPath).Stamp())
+                .Append('\n');
             Providers(text);
             return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())));
         }

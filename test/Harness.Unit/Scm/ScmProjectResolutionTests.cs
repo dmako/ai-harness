@@ -291,4 +291,51 @@ public sealed class ScmProjectResolutionTests : IDisposable
             load.Should().Throw<InvalidDataException>().WithMessage($"*{error}*");
         }
     }
+
+    [Fact]
+    public void AutoDetectionTheMachineChoiceAndTheConfiguredNameAllMatchThroughAliases()
+    {
+        var aliased = Work with { Aliases = ScmEntryRules.Aliases(["ssh-alias"], Work.BaseUrl) };
+        ScmRemote[] remotes = [new("origin", "git@ssh-alias:group/sub/repo.git")];
+
+        foreach (var configured in new ScmProjectOverride?[] { null, new(Choice: "work"), new(Name: "work") })
+        {
+            var result = ScmProjectMatcher.Resolve([aliased, Forge], remotes, configured);
+
+            result.Status.Should().Be(ScmResolutionStatus.Matched, result.Reason);
+            result.Match!.Endpoint.Name.Should().Be("work");
+            result.Match.Project.Should().Be("group/sub/repo");
+        }
+
+        // without the alias the same remote serves no SCM, and a machine choice of it is invalid
+        ScmProjectMatcher.Resolve([Work, Forge], remotes).Status.Should().Be(ScmResolutionStatus.NoMatch);
+        ScmProjectMatcher
+            .Resolve([Work, Forge], remotes, new ScmProjectOverride(Choice: "work"))
+            .Status.Should()
+            .Be(ScmResolutionStatus.Invalid);
+    }
+
+    [Fact]
+    public void AnAliasThatTwoScmsShareIsReportedAsAmbiguousNotChosen()
+    {
+        var one = Work with { Aliases = ScmEntryRules.Aliases(["shared-alias"], Work.BaseUrl) };
+        var two = Endpoint("other", ScmKind.Gitlab, "https://gitlab.other.example.com") with
+        {
+            Aliases = ScmEntryRules.Aliases(["https://shared-alias"], new Uri("https://gitlab.other.example.com")),
+        };
+
+        var result = ScmProjectMatcher.Resolve([one, two], [new ScmRemote("origin", "git@shared-alias:group/repo")]);
+
+        result.Status.Should().Be(ScmResolutionStatus.Ambiguous);
+        result.Candidates.Select(endpoint => endpoint.Name).Should().Equal("work", "other");
+        result.Reason.Should().Contain("work").And.Contain("other");
+
+        var chosen = ScmProjectMatcher.Resolve(
+            [one, two],
+            [new ScmRemote("origin", "git@shared-alias:group/repo")],
+            new ScmProjectOverride(Choice: "other")
+        );
+        chosen.Status.Should().Be(ScmResolutionStatus.Matched);
+        chosen.Match!.Endpoint.Name.Should().Be("other");
+    }
 }

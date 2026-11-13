@@ -141,6 +141,14 @@ public static class ScmTools
             return Answer(connection.Endpoint, body);
         }
 
+        if (name is "scm_create_merge_request")
+        {
+            return Answer(
+                connection.Endpoint,
+                await CreateAsync(client, project, args, body, token).ConfigureAwait(false)
+            );
+        }
+
         var number = args.Number("merge_request_id");
         body["merge_request_id"] = number;
         switch (name)
@@ -213,6 +221,33 @@ public static class ScmTools
         }
 
         return Answer(connection.Endpoint, body);
+    }
+
+    /// <summary>Opens a merge request; what could not be done once it existed comes back as warnings.</summary>
+    private static async Task<Dictionary<string, object?>> CreateAsync(
+        IScmClient client,
+        string project,
+        Arguments args,
+        Dictionary<string, object?> body,
+        CancellationToken token
+    )
+    {
+        // checked here too, so a request into its own branch is refused before any call
+        var request = ScmMergeRequestCreation.Normalize(
+            new ScmNewMergeRequest(
+                args.Required("from"),
+                args.Required("to"),
+                args.Required("title"),
+                args.Text("description"),
+                args.Names("assignees"),
+                args.Names("reviewers")
+            )
+        );
+        var created = await client.CreateMergeRequestAsync(project, request, token).ConfigureAwait(false);
+        body["merge_request_id"] = created.MergeRequest.Number;
+        body["merge_request"] = Request(created.MergeRequest);
+        body["warnings"] = created.Warnings;
+        return body;
     }
 
     private static string Unresolved(ScmResolution resolution) =>
@@ -354,6 +389,26 @@ public static class ScmTools
         {
             var text = Text(name);
             return text.Trim().Length > 0 ? text : throw new ArgumentException($"{name} must not be empty");
+        }
+
+        /// <summary>A list of usernames; empty when not given.</summary>
+        public List<string> Names(string name)
+        {
+            if (values is null || !values.TryGetValue(name, out var value) || value.ValueKind is JsonValueKind.Null)
+            {
+                return [];
+            }
+
+            return value.ValueKind is JsonValueKind.Array
+                ? value
+                    .EnumerateArray()
+                    .Select(item =>
+                        item.ValueKind is JsonValueKind.String
+                            ? item.GetString() ?? ""
+                            : throw new ArgumentException($"{name} must be a list of usernames")
+                    )
+                    .ToList()
+                : throw new ArgumentException($"{name} must be a list of usernames");
         }
 
         public long Number(string name)

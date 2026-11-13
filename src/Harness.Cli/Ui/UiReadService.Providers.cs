@@ -36,7 +36,8 @@ internal sealed partial class UiReadService
             await using var providers = ConfiguredProviders.Build(
                 inspection.Location.Configuration.Value.Providers,
                 inspection.Location.Root,
-                new ProviderProcessFactory()
+                new ProviderProcessFactory(),
+                builtInSearch: true
             );
             foreach (var provider in providers.Providers())
             {
@@ -65,6 +66,7 @@ internal sealed partial class UiReadService
                 ["healthy"] = !checks.Any(c => c.Level is "fail"),
                 ["probed"] = probe,
                 ["fixable"] = checks.Where(HarnessFix.Fixable).Select(c => c.Name).ToArray(),
+                ["previewed"] = checks.Where(HarnessFix.Previewed).Select(c => c.Name).ToArray(),
             }
         );
     }
@@ -78,7 +80,11 @@ internal sealed partial class UiReadService
         var inspection = await lifecycle.InspectAsync(UiProjectCatalog.Text(project, "root"), token);
         var checks = inspection.Checks(lifecycle.Version).ToList();
         checks.AddRange(ClientChecks(inspection.Location.Root));
-        foreach (var (name, provider) in inspection.Location.Configuration.Value.Providers)
+        foreach (
+            var (name, provider) in inspection.Location.Configuration.Value.Providers.Where(pair =>
+                pair.Value.Type is not SearchTools.ProviderType
+            )
+        )
         {
             checks.Add(
                 new(name, "ok", provider.IsEnabled() ? "configured: " + provider.Command + " (not probed)" : "disabled")
@@ -290,6 +296,8 @@ internal sealed partial class UiReadService
         var metrics = store.Metrics(since);
         var trends = store.Trends(since, DateTimeOffset.UtcNow);
         var languages = ProviderRouting.DetectLanguages(root);
+        // the nuget provider against the repository's nuget.config, with Fix where harness can write the override
+        var nuget = NuGetProviderFix.Check(location.Configuration, location.Root, lifecycle.NuGetUserFile);
         List<JsonObject> providers = [];
         foreach (var (name, configured) in configuration.Providers.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
@@ -356,6 +364,18 @@ internal sealed partial class UiReadService
                 })
                 .ToArray();
             view["capabilities"] = capabilities.Length is 0 ? null : UiJson.Node(capabilities);
+            if (nuget is not null && nuget.Provider == name)
+            {
+                var check = NuGetProviderFix.Health(nuget);
+                view["check"] = new JsonObject
+                {
+                    ["name"] = check.Name,
+                    ["level"] = check.Level,
+                    ["detail"] = check.Detail,
+                    ["fix"] = check.Fix,
+                    ["fixable"] = HarnessFix.Previewed(check),
+                };
+            }
             providers.Add(view);
         }
         return UiJson.Node(

@@ -2206,6 +2206,8 @@ function scmConnections() {
       h("div", { class: "scmmain" },
         h("div", { class: "scmname" }, h("b", {}, e.name), h("span", { class: "pill" }, SCM_TYPES[e.type] || e.type)),
         h("code", { class: "scmurl", title: e.url }, e.url),
+        (e.aliases || []).length > 0 && h("div", { class: "scmaliases", "data-scm-aliases": "" },
+          h("span", { class: "muted small" }, "Also cloned from"), e.aliases.map((a) => h("code", { title: a }, a))),
         h("span", { class: "muted small" }, token),
         result),
       h("div", { class: "scmacts" }, test,
@@ -2224,6 +2226,21 @@ function scmConnections() {
   load();
   return box;
 }
+// scmAliasEditor edits an SCM's aliases in its dialog: a row per alias with
+// its own remove button, and one to add a row; the server validates them
+// (from the C# rewrite: TASK-0134).
+function scmAliasEditor(aliases) {
+  const list = h("ul", { class: "scmaliasedit" });
+  const addRow = (value) => {
+    const input = h("input", { type: "text", value, spellcheck: "false", autocomplete: "off", placeholder: "https://git-alias.example.com or ssh-alias", "aria-label": "Alias" });
+    const li = h("li", {}, input, iconButton("trash", "Remove alias", () => { li.remove(); }));
+    list.append(li);
+    return input;
+  };
+  (aliases || []).forEach(addRow);
+  const add = h("button", { type: "button", class: "ghost", onclick: () => addRow("").focus() }, icon("plus"), " Add alias");
+  return { node: h("div", { class: "scmaliasbox" }, list, add), values: () => [...list.querySelectorAll("input")].map((i) => i.value.trim()).filter(Boolean) };
+}
 // scmForm adds an SCM, or edits one (an empty token keeps the stored one);
 // its test checks the values as typed, before they are saved.
 function scmForm(entry, reload) {
@@ -2234,6 +2251,7 @@ function scmForm(entry, reload) {
     Object.entries(SCM_TYPES).map(([v, t]) => h("option", { value: v, selected: entry ? entry.type === v : false }, t)));
   const url = h("input", { type: "url", value: entry ? entry.url : "", placeholder: "https://gitlab.example.com", spellcheck: "false", "aria-label": "URL" });
   const token = h("input", { type: "password", autocomplete: "new-password", placeholder: entry ? "(unchanged)" : "", "aria-label": "Token" });
+  const aliases = scmAliasEditor(entry ? entry.aliases : []);
   const result = h("div", { class: "scmresult" });
   const err = h("p", { class: "error", hidden: true });
   const values = () => ({ name: name.value.trim(), type: type.value, url: url.value.trim(), token: token.value.trim() });
@@ -2246,7 +2264,7 @@ function scmForm(entry, reload) {
   const save = h("button", { type: "button", onclick: async () => {
     save.disabled = true; err.hidden = true;
     try {
-      await post(entry ? `/api/scm/${encodeURIComponent(entry.name)}/edit` : "/api/scm", values());
+      await post(entry ? `/api/scm/${encodeURIComponent(entry.name)}/edit` : "/api/scm", { ...values(), aliases: aliases.values() });
       dlg.close(); toast(entry ? `SCM ${values().name || entry.name} saved` : `SCM ${values().name} added`); reload();
     } catch (e) { err.textContent = e.message; err.hidden = false; save.disabled = false; }
   } }, entry ? "Save" : "Add SCM");
@@ -2255,6 +2273,7 @@ function scmForm(entry, reload) {
     field("Type", type),
     field("URL", url, "The server's base address; an instance under a path keeps it (https://host/gitlab). GitHub: https://github.com or the Enterprise Server's address."),
     field("Token", token, entry ? "Leave empty to keep the stored token." : "A personal or project access token with API access (GitLab: api; GitHub: pull requests read and write)."),
+    field("Aliases", aliases.node, "Other host names or base URLs this server's repositories are cloned from (an alias FQDN, an SSH host alias, https://host/prefix). They only match remotes; API calls use the URL above."),
     result, err,
   ], [h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Cancel"), test, save]);
 }
@@ -2857,6 +2876,7 @@ function versionsTable(w, d) {
   }
   let last = "";
   const rows = [];
+  const slots = [];
   for (const r of merged) {
     if (r.kind !== last) {
       last = r.kind;
@@ -2872,12 +2892,22 @@ function versionsTable(w, d) {
         const vs = r.versions[id];
         if (!vs) return h("td", { class: "muted", title: "not used" }, "—");
         const behind = vs.some((v) => cmpVer(v, r.published || top) < 0);
-        return h("td", { class: "mono" + (behind ? " vdiff" : "") }, vs.join(", "), behind && h("span", { class: "sr" }, " (behind)"));
+        // the NuGet marks of a member's own packages, when they arrive (from the C# rewrite: TASK-0141)
+        const slot = r.kind === "core" ? h("span", { class: "pkslot" }) : null;
+        if (slot) slots.push({ id, names: r.names, vs, slot });
+        return h("td", { class: "mono" + (behind ? " vdiff" : "") }, vs.join(", "), behind && h("span", { class: "sr" }, " (behind)"), slot);
       }),
       h("td", { class: "mono" }, r.published || (r.kind === "core" ? h("span", { class: "muted" }, "—") : ""),
         r.published && all.some((v) => cmpVer(v, r.published) > 0) && h("span", { class: "flag info", title: "A member uses a newer version than the owner's files declare: the declaration may be stale (CI may set the version)." }, " stale?"))));
   }
-  return section("Versions across the workspace", "What each member is built on, compared. Highlighted: a member on an older version than another, or than the one its owner declares now.",
+  // each member's marks from its own package sources (from the C# rewrite: TASK-0141)
+  for (const id of new Set(slots.map((x) => x.id))) {
+    const mine = slots.filter((x) => x.id === id);
+    packageMarks(id, mine.flatMap((x) => x.names.flatMap((name) => x.vs.map((version) => ({ name, version }))))).then((m) => {
+      for (const x of mine) fill(x.slot, x.names.flatMap((name) => x.vs.map((v) => pkgMarks(pkgInfo(m, name, v), v, x.names.length > 1 ? name : null))));
+    });
+  }
+  return section("Versions across the workspace", "What each member is built on, compared. Highlighted: a member on an older version than another, or than the one its owner declares now; ⓘ a newer stable version on its package source, ⚠ a known vulnerability.",
     h("div", { class: "card versions" }, h("table", {},
       h("thead", {}, h("tr", {}, h("th", {}, ""), ids.map((id) => h("th", {}, name(id))), h("th", {}, "declared by its owner"))),
       h("tbody", {}, rows))));
@@ -2903,6 +2933,39 @@ function builtOnSection(b) {
             h("td", { class: "mono" }, u.declared || h("span", { class: "muted" }, "—"),
               behind && h("span", { class: "flag warn" }, " behind"), ahead && h("span", { class: "flag info" }, " used is newer: is this declaration stale?")));
         })))));
+}
+
+// --- NuGet package marks (from the C# rewrite: TASK-0141) ---
+// packageMarks asks which NuGet packages have a newer stable version or a
+// known vulnerability once a view is drawn: the answer comes from the
+// project's package sources (cached on disk for a day), so the view never
+// waits for it. It resolves to { packages: { "name@version": … }, notes }.
+function packageMarks(projectId, list) {
+  const q = [...new Set(list.filter((x) => x.name && x.version && !x.unresolved).map((x) => `${x.name}@${x.version}`))];
+  if (!q.length) return Promise.resolve({ packages: {}, notes: [] });
+  return api(`/api/projects/${encodeURIComponent(projectId)}/packages?packages=${encodeURIComponent(q.join(","))}`)
+    .catch(() => ({ packages: {}, notes: [] }));
+}
+// pkgInfo: a package's answer at the version in use ([1.2.3] is 1.2.3).
+const pkgInfo = (marks, name, version) => marks && version
+  ? (marks.packages || {})[`${name}@${String(version).replace(/^\[([^,\]]+)\]$/, "$1").trim()}`.toLowerCase()] : null;
+// pkgMarks: an info mark for a newer stable version and a warning sign for
+// known vulnerabilities (gold for low and moderate, red for high and
+// critical), each focusable, its explanation its title and label.
+function pkgMarks(info, version, name) {
+  if (!info) return null;
+  const who = name ? `${name}: ` : "";
+  const marks = [];
+  if (info.latest) {
+    const t = `${who}Newer stable version ${info.latest} available (you use ${version || info.version})`;
+    marks.push(h("span", { class: "pkmark pkup", tabindex: "0", role: "img", title: t, "aria-label": t }, "ⓘ"));
+  }
+  const vs = info.vulnerabilities || [];
+  if (vs.length) {
+    const t = who + vs.map((v) => `Known ${v.severity} vulnerability in ${info.version}: ${v.url} (affects ${v.versions})${v.fixed ? `; fixed in ${v.fixed}` : ""}`).join("\n");
+    marks.push(h("span", { class: `pkmark pkvuln sev-${vs[0].severity}`, tabindex: "0", role: "img", title: t, "aria-label": t }, "⚠"));
+  }
+  return marks;
 }
 
 // cmpVer orders versions part by part ("1.4.0-alpha.29" < "1.4.0-alpha.42").
@@ -3428,7 +3491,9 @@ async function viewArchitecture(p, sec) {
     const lines = [];
     const focus = sel || hover;
     for (const x of all) {
-      for (const r of x.references) {
+      // build-order-only references (ReferenceOutputAssembly=false) as
+      // dashed lines (from the C# rewrite: TASK-0137)
+      for (const [r, build] of x.references.map((r) => [r, false]).concat((x.build_order || []).map((r) => [r, true]))) {
         const from = nodes[x.path], to = nodes[r];
         if (!from || !to) continue;
         const hot = focus && (x.path === focus || r === focus);
@@ -3441,23 +3506,25 @@ async function viewArchitecture(p, sec) {
         const ya = down ? y1 : fa.top - box.top, yb = down ? y2 : ta.bottom - box.top;
         const m = (ya + yb) / 2;
         lines.push(sv("path", { d: `M${x1},${ya} C${x1},${m} ${x2},${m} ${x2},${yb}`,
-          class: "aline" + (hot ? (x.path === focus ? " out" : " in") : "") }));
+          class: "aline" + (hot ? (x.path === focus ? " out" : " in") : "") + (build ? " build" : "") }));
       }
     }
     fill(svg, sv("defs", {}, ["", " out", " in"].map((c) => sv("marker", { id: "ah" + c.trim(), viewBox: "0 0 8 8", refX: "7", refY: "4", markerWidth: "7", markerHeight: "7", orient: "auto" },
-      sv("path", { d: "M0,0 L8,4 L0,8 z", class: "ahead" + c })))), lines.map((l) => { l.setAttribute("marker-end", `url(#ah${l.getAttribute("class").replace("aline", "").trim()})`); return l; }));
+      sv("path", { d: "M0,0 L8,4 L0,8 z", class: "ahead" + c })))), lines.map((l) => { l.setAttribute("marker-end", `url(#ah${l.getAttribute("class").replace("aline", "").replace("build", "").trim()})`); return l; }));
   }
   function select(path) {
     sel = path;
     const x = path && byPath[path];
+    // what it builds first, and what builds it first, count as related (from the C# rewrite: TASK-0137)
+    const outs = x ? x.references.concat(x.build_order || []) : [], ins = x ? x.referenced_by.concat(x.build_order_by || []) : [];
     for (const [k, el] of Object.entries(nodes)) {
       el.classList.toggle("sel", k === path);
-      el.classList.toggle("rel-out", !!x && x.references.includes(k));
-      el.classList.toggle("rel-in", !!x && x.referenced_by.includes(k));
-      el.classList.toggle("dim", !!x && k !== path && !x.references.includes(k) && !x.referenced_by.includes(k));
+      el.classList.toggle("rel-out", outs.includes(k));
+      el.classList.toggle("rel-in", ins.includes(k));
+      el.classList.toggle("dim", !!x && k !== path && !outs.includes(k) && !ins.includes(k));
     }
     draw();
-    if (!x) return fill(side, h("p", { class: "hint" }, `${big ? `Point at a ${noun} to see its lines; select` : "Select"} a ${noun} to see what it ${ts ? "imports" : "references"}, what ${ts ? "imports" : "references"} it, its packages and who uses it. Lines point from a ${noun} to the ${nouns} it ${ts ? "imports" : "references"}.`));
+    if (!x) return fill(side, h("p", { class: "hint" }, `${big ? `Point at a ${noun} to see its lines; select` : "Select"} a ${noun} to see what it ${ts ? "imports" : "references"}, what ${ts ? "imports" : "references"} it, its packages and who uses it. Lines point from a ${noun} to the ${nouns} it ${ts ? "imports" : "references"}${all.some((u) => u.build_order) ? "; a dashed one to a project it only builds first" : ""}.`));
     const list = (paths) => paths.length ? h("ul", {}, paths.map((q) => h("li", {}, h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); select(q); } }, byPath[q] ? short(byPath[q]) : q)))) : h("p", { class: "muted small" }, "none");
     const us = users[x.package] || [];
     const byMember = {};
@@ -3468,14 +3535,26 @@ async function viewArchitecture(p, sec) {
       x.package && h("p", { class: "small" }, "publishes ", h("code", {}, x.package)),
       h("h5", {}, ts ? "Imports" : "References"), list(x.references),
       h("h5", {}, ts ? "Imported by" : "Referenced by"), list(x.referenced_by),
+      // build-order-only references apart (from the C# rewrite: TASK-0137)
+      x.build_order && [h("h5", {}, "Builds before"), h("p", { class: "muted small" }, "Built first, not referenced as code (ReferenceOutputAssembly=false); dashed lines."), list(x.build_order)],
+      x.build_order_by && [h("h5", {}, "Built before"), list(x.build_order_by)],
       x.package && [h("h5", {}, "Used in the workspace"),
         us.length ? h("ul", {}, Object.entries(byMember).map(([m, ps]) => h("li", {}, h("b", {}, m), h("div", { class: "muted small" }, ps.join(", ")))))
           : h("p", { class: "muted small" }, s.workspaces ? "by no other member" : "not in a workspace")],
       h("h5", {}, `${a.language === "go" ? "Modules" : a.language === "typescript" ? "npm packages" : "Packages"} (${x.packages.length})`),
-      x.packages.length ? h("ul", { class: "pkgs" }, x.packages.map((q) => h("li", {}, q.name, q.version && h("span", { class: "muted" }, " " + q.version)))) : h("p", { class: "muted small" }, "none"),
+      // with the NuGet marks once they arrive (from the C# rewrite: TASK-0141)
+      x.packages.length ? h("ul", { class: "pkgs" }, x.packages.map((q) => h("li", {}, q.name, q.version && h("span", { class: "muted" }, " " + q.version),
+        !q.unresolved && pkgMarks(pkgInfo(marks, q.name, q.version), q.version)))) : h("p", { class: "muted small" }, "none"),
+      x.packages.length > 0 && marks && (marks.notes || []).length > 0 && h("p", { class: "muted small pknote" }, marks.notes.join("; ")),
       a.language === "dotnet" && x.solutions.length === 0 && h("p", { class: "flag warn" }, "in no solution"));
   }
   select(null);
+  // NuGet marks for the side panel's packages, when they arrive; the view
+  // is drawn without them (from the C# rewrite: TASK-0141)
+  let marks = null;
+  if (a.language === "dotnet") {
+    packageMarks(p.id, all.flatMap((x) => x.packages || [])).then((m) => { marks = m; if (sel && side.isConnected) select(sel); });
+  }
   const layout = h("div", { class: "deplayout archlayout" }, h("div", { class: "depwrap archwrap" }, map), side);
   requestAnimationFrame(draw);
   if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(map);
@@ -3532,6 +3611,7 @@ function depMatrix(all, short, ts) {
     fill(side, h("h4", {}, short(x)), h("p", { class: "muted small" }, `${group(x)} · ${x.kind}`),
       h("h5", {}, ts ? "Imports" : "References"), nameList((x.references || []).filter((r) => idx[r] != null)),
       h("h5", {}, `${verbed[0].toUpperCase() + verbed.slice(1)} by`), nameList((x.referenced_by || []).filter((r) => idx[r] != null)),
+      x.build_order && [h("h5", {}, "Builds before"), nameList(x.build_order.filter((r) => idx[r] != null))], // (from the C# rewrite: TASK-0137)
       h("button", { class: "ghost small", type: "button", onclick: () => { lit([i], false); picked = null; intro(); } }, "Back"));
   }
   // the pairs, counted once
@@ -3544,6 +3624,9 @@ function depMatrix(all, short, ts) {
     edges++;
     if (wrong) back++;
   }));
+  // build-order-only references as hollow dashed marks, never against the
+  // layers (from the C# rewrite: TASK-0137)
+  xs.forEach((x, i) => (x.build_order || []).forEach((r) => { if (idx[r] != null) pairs.push([i, idx[r], false, true]); }));
   // draw lays the grid out at cell size C
   const holder = h("div", { class: "mxscroll" });
   function draw() {
@@ -3565,10 +3648,10 @@ function depMatrix(all, short, ts) {
       }
     }
     labels = xs.map((x, i) => sv("text", { x: L - 8, y: T + i * C + C / 2 + 4, "text-anchor": "end", class: "mxlabel" + (isTest(x) ? " test" : "") + (i === picked ? " on" : ""), onclick: () => pick(i) }, short(x)));
-    const cells = pairs.map(([i, j, wrong]) => { const x = xs[i]; return sv("rect", { x: L + j * C + 2, y: T + i * C + 2, width: C - 4, height: C - 4, rx: 3, class: "mxdot" + (wrong ? " back" : ""),
-      onmouseenter: () => { lit([i, j], true); if (picked == null) fill(side, h("h4", {}, short(x)), h("p", { class: "small" }, `${verb} `, h("b", {}, short(xs[j]))), wrong && h("p", { class: "flag warn small" }, "a lower layer reaching up")); },
+    const cells = pairs.map(([i, j, wrong, build]) => { const x = xs[i]; return sv("rect", { x: L + j * C + 2, y: T + i * C + 2, width: C - 4, height: C - 4, rx: 3, class: "mxdot" + (wrong ? " back" : "") + (build ? " build" : ""),
+      onmouseenter: () => { lit([i, j], true); if (picked == null) fill(side, h("h4", {}, short(x)), h("p", { class: "small" }, build ? "builds first " : `${verb} `, h("b", {}, short(xs[j]))), wrong && h("p", { class: "flag warn small" }, "a lower layer reaching up")); },
       onmouseleave: () => { lit([i, j], false); if (picked != null) lit([picked], true); else intro(); } },
-      sv("title", {}, `${short(x)} ${verb} ${short(xs[j])}`)); });
+      sv("title", {}, `${short(x)} ${build ? "builds first" : verb} ${short(xs[j])}`)); });
     // as wide as its card, never wider: the cells are sized to fit it
     fill(holder, sv("svg", { viewBox: `0 0 ${W} ${H}`, style: `width: min(100%, ${W}px)`, class: "depmx", role: "img", "aria-label": `${n} packages; ${back} imports against the layers` },
       bands, heads,
@@ -3778,6 +3861,23 @@ async function runFix(p, body, btn, after) {
   btn.textContent = label;
 }
 
+// previewFix (from the C# rewrite: TASK-0140) is Fix for a fix that writes
+// a file ('harness doctor --fix …'): the change as the dry run shows it,
+// then written only on Write it; runFix runs it.
+async function previewFix(p, check, btn, after) {
+  btn.disabled = true;
+  let res;
+  try { res = await post(projectAPI(p, "fix"), { check, preview: true }); } catch (e) { toast(e.message, true); btn.disabled = false; return; }
+  btn.disabled = false;
+  if (!res.ok) { toast(res.message || "Failed", true, res.output); return; }
+  const [head, ...lines] = (res.output || "").split(/\r?\n/);
+  const dlg = dialog({ title: "Fix " + check, sub: head, wide: true });
+  const write = h("button", { class: "primary", type: "button", onclick: async (ev) => { await runFix(p, { check }, ev.currentTarget, after); dlg.close(); } }, "Write it");
+  dlg.set(null, [h("pre", { class: "fixdiff mono" }, lines.filter((l) => !/^Dry run/.test(l)).join("\n")),
+    h("p", { class: "muted small" }, "Only this file changes; its other lines and comments stay. To undo, remove the table again.")],
+  [h("button", { class: "ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), write]);
+}
+
 function healthReport(r, p, reload) {
   const checks = r.checks || [];
   const n = (lv) => checks.filter((c) => c.level === lv).length;
@@ -3818,7 +3918,7 @@ function healthReport(r, p, reload) {
         h("div", { class: "chead" }, h("span", { class: "cname" }, c.name, c.level !== "ok" && h("span", { class: "sr" }, ` (${c.level})`)), value && h("span", { class: "cvalue" }, value)),
         lines.filter(Boolean).map((x) => h("div", { class: "cdetail" }, x)), c.fix && h("div", { class: "fix" }, h("b", {}, "Fix: "), c.fix)),
       // what harness can fix itself: the action at the card's right
-      p && (r.fixable || []).includes(c.name) && h("button", { class: "primary fixbtn", type: "button", onclick: (ev) => runFix(p, { check: c.name }, ev.currentTarget, reload) }, icon("chore"), "Fix it"));
+      p && (r.fixable || []).includes(c.name) && h("button", { class: "primary fixbtn", type: "button", onclick: (ev) => (r.previewed || []).includes(c.name) ? previewFix(p, c.name, ev.currentTarget, reload) : runFix(p, { check: c.name }, ev.currentTarget, reload) }, icon("chore"), "Fix it")); // a fix that writes a file shows it first (from the C# rewrite: TASK-0140)
   };
   const bad = checks.filter((c) => c.level !== "ok");
   const stacks = [["Installation", "Agents' clients"], ["Project"], ["Code providers"]];
@@ -4471,6 +4571,11 @@ async function viewProviders(p) {
       caps.length === 0 ? h("p", { class: "empty" }, ps.type === "harness" ? "Declares its capabilities when started; none called yet." : "No capabilities.")
         : [quiet.length > 0 && h("p", { class: "pmeta muted" }, `Not called in ${state.days} days: `, quiet.map((c) => cap(c.capability) + (c.tool ? ` (${c.tool})` : "")).join(", "))],
       caps.some((c) => c.capability === "project.overview") && indexedSection(p, ps.name),
+      // the nuget provider against the repository's nuget.config, with Fix (from the C# rewrite: TASK-0140)
+      ps.check && ps.check.level !== "ok" && h("div", { class: "provcheck callout" },
+        h("div", {}, h("b", {}, `${ps.check.name}: `), ps.check.detail),
+        ps.check.fix && h("div", { class: "fix" }, h("b", {}, "Fix: "), ps.check.fix),
+        ps.check.fixable && h("button", { class: "primary small", type: "button", onclick: (ev) => previewFix(p, ps.check.name, ev.currentTarget, null) }, icon("chore"), "Fix")),
       ps.name === "graphify-csharp" && h("div", { class: "pmeta" }, h("h4", {}, "Warm session"), graphifySessions(p.id)));
   })]));
   if (idle.length) out.append(section("Not used here", "Configured on this machine, but disabled or serving other languages.",
@@ -5627,6 +5732,10 @@ function auditBlock(x) {
 // harness ui, and their panel follows them live and steers them (Send, Stop, Allow/Deny, Close; Resume once ended).
 // Sessions started elsewhere show the end of their transcript, read-only, and how to resume them in a terminal.
 const AGENT_CLIENTS = { "claude-code": "Claude Code", codex: "Codex" };
+// the permission modes each agent offers, as the server last sent them (from the C# rewrite, TASK-0135)
+let agentModes = {};
+// each agent's model catalog, as the server last sent it (from the C# rewrite, TASK-0142)
+let agentModels = {};
 function sessionsBlock(x) {
   const out = h("div", { class: "tblock" }, h("h4", {}, "Agent sessions"), h("p", { class: "empty" }, "Loading…"));
   const pid = route().id;
@@ -5637,6 +5746,7 @@ function sessionsBlock(x) {
     const wall = res.claimed_at && res.completed_at ? Date.parse(res.completed_at) - Date.parse(res.claimed_at) : 0;
     // a session's newest host; hosts still opening their session have no session row yet
     const hostOf = (s) => hosts.find((o) => o.client === s.client && o.session_id === s.session_id);
+    agentModes = res.permission_modes || agentModes;
     const pending = hosts.filter((o) => o.alive && !sessions.some((s) => s.client === o.client && s.session_id === o.session_id));
     fill(out, h("h4", {}, "Agent sessions ", sessions.length > 0 && h("span", { class: "count" }, String(sessions.length))),
       sessions.length > 0 && h("p", { class: "usage" },
@@ -5650,6 +5760,7 @@ function sessionsBlock(x) {
         pending.map((o) => h("li", {},
           h("span", { class: "ev" }, AGENT_CLIENTS[o.client] || o.client), " ",
           h("span", { class: "muted" }, `started from here ${ago(o.started_at)} · opening the session…`),
+          unlistedModel(o),
           agentPanel(pid, o, load))),
         sessions.map((s) => sessionItem(pid, x, s, hostOf(s), load))),
       startAgentForm(pid, x, load));
@@ -5668,34 +5779,112 @@ function sessionItem(pid, x, s, host, reload) {
     h("span", { class: "muted", title: `first seen ${s.started_at}, last seen ${s.ended_at}` },
       `${s.origin === "harness" ? "started by harness" : "seen by hooks"} · first ${ago(s.started_at)} · last ${ago(s.ended_at)}`),
     h("div", { class: "evidence" },
-      s.model && `${s.model} · `, usageLine(s), s.active_ms > 0 && ` · active ${durationText(s.active_ms)}`));
+      s.model && `${s.model} · `, host && unlistedModel(host), host && host.model_unlisted && " · ",
+      host && host.permission_mode && `${modeLabel(s.client, host.permission_mode)} mode · `,
+      usageLine(s), s.active_ms > 0 && ` · active ${durationText(s.active_ms)}`));
   if (host && host.alive) li.append(agentPanel(pid, host, reload));
   else if (s.origin === "harness") li.append(endedAgent(pid, x, s, host, reload));
   else li.append(transcriptTail(pid, x, s));
   return li;
 }
 
-// startAgentForm starts Claude Code or Codex on the task in a new agent host, with a first prompt.
+// unlistedModel (from the C# rewrite, TASK-0142) marks a session started with a model id its agent's model list
+// does not name: allowed, as any id is, but said.
+function unlistedModel(host) {
+  return host.model_unlisted ? h("span", { class: "unlisted", title: "Started with a model id the agent's model list does not name; the agent decides whether it takes it." },
+    `asked for ${host.requested_model} (not in the model list)`) : null;
+}
+
+// modeLabel (from the C# rewrite) names a session's permission mode by the label the server gives it.
+function modeLabel(client, id) {
+  return (agentModes[client] || []).find((m) => m.id === id)?.label || id;
+}
+
+// startAgentForm starts Claude Code or Codex on the task in a new agent host, with a first prompt. The permission
+// mode's choices come from the server per agent, the agent's default preselected (from the C# rewrite, TASK-0135).
+// The model is picked from the agent's model catalog (from the C# rewrite, TASK-0142): Default (the agent's own,
+// named when known), the catalog's models, and Other… for any id; opening the form asks for the catalog, which the
+// server refreshes in the background while the form shows what it has.
 function startAgentForm(pid, x, reload) {
+  const modes = agentModes;
   const client = h("select", { "aria-label": "Agent" }, Object.entries(AGENT_CLIENTS).map(([k, v]) => h("option", { value: k }, v)));
   const prompt = h("textarea", { rows: 3, "aria-label": "First prompt" });
   prompt.value = `Work on task ${x.id}: claim it with harness (task_claim), then do it.`;
-  const model = h("input", { type: "text", placeholder: "default model", "aria-label": "Model (optional)" });
+  const OTHER = " other"; // a model id has no space
+  const model = h("select", { name: "model", "aria-label": "Model" });
+  const otherModel = h("input", { type: "text", name: "model_other", placeholder: "model id", "aria-label": "Model id", hidden: true });
+  const modelNote = h("span", { class: "modelnote muted small", "aria-live": "polite" });
+  const models = (keep) => {
+    const cat = (agentModels.clients || {})[client.value] || {};
+    const was = model.value;
+    const def = cat.default;
+    fill(model,
+      h("option", { value: "", title: def ? def.id : "the agent's own default" }, def ? `Default (${def.label})` : "Default"),
+      (cat.models || []).map((m) => h("option", { value: m.id, title: m.description ? `${m.id} · ${m.description}` : m.id },
+        m.source === "seen" ? `${m.label} (seen)` : m.label)),
+      h("option", { value: OTHER }, "Other…"));
+    model.value = keep && [...model.options].some((o) => o.value === was) ? was : "";
+    otherModel.hidden = model.value !== OTHER;
+    modelNote.title = cat.error ? `${cat.error}${cat.failed_at ? ` (${cat.failed_at})` : ""}` : cat.refreshed_at ? `updated ${cat.refreshed_at}` : "";
+    fill(modelNote, cat.refreshing ? "Updating the model list…" : cat.error ? "The model list could not be updated." : "");
+  };
+  let asking = 0;
+  const loadModels = () => {
+    const ask = ++asking;
+    api(projectAPI({ id: pid }, "agent-models"), { "X-Harness-UI": "1" }).then((res) => {
+      if (ask !== asking) return;
+      agentModels = res;
+      models(true);
+      // the server probes an agent in the background: ask again until it is done, while the form is open
+      const busy = Object.values(res.clients || {}).some((c) => c.refreshing);
+      if (busy && form.open && ask < 40) setTimeout(() => { if (ask === asking && form.open && form.isConnected) loadModels(); }, 3000);
+    }).catch(() => { if (ask === asking) fill(modelNote, "The model list is not available."); });
+  };
+  const mode = h("select", { name: "permission_mode", "aria-label": "Permission mode" });
+  const about = h("p", { class: "modehint small", "aria-live": "polite" });
+  const describe = () => {
+    const m = (modes[client.value] || []).find((o) => o.id === mode.value);
+    about.className = `modehint small${m && m.unsafe ? " unsafe" : ""}`;
+    fill(about, m ? [m.unsafe && h("b", {}, "Unsafe: "), m.description.replace(/^Unsafe: /, "")] : "");
+  };
+  const options = () => {
+    const list = modes[client.value] || [];
+    fill(mode, list.map((m) => h("option", { value: m.id, title: m.description, class: m.unsafe ? "unsafe" : null },
+      m.unsafe ? `⚠ ${m.label} (unsafe)` : m.default ? `${m.label} (default)` : m.label)));
+    mode.value = (list.find((m) => m.default) || list[0] || {}).id || "";
+    mode.disabled = list.length === 0;
+    describe();
+  };
+  client.addEventListener("change", options);
+  client.addEventListener("change", () => models(false));
+  model.addEventListener("change", () => {
+    otherModel.hidden = model.value !== OTHER;
+    if (!otherModel.hidden) otherModel.focus();
+  });
+  mode.addEventListener("change", describe);
+  options();
+  models(false);
   const err = h("p", { class: "error", hidden: true });
   const go = h("button", { type: "button", onclick: async () => {
     go.disabled = true; err.hidden = true;
     try {
-      await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`), { client: client.value, prompt: prompt.value, model: model.value.trim() });
+      await post(projectAPI({ id: pid }, `tasks/${encodeURIComponent(x.id)}/agents`),
+        { client: client.value, prompt: prompt.value, model: model.value === OTHER ? otherModel.value.trim() : model.value, mode: mode.value });
       toast(`${AGENT_CLIENTS[client.value]} started on ${x.id}`);
       reload();
     } catch (e) { err.textContent = e.message; err.hidden = false; go.disabled = false; }
   } }, "Start");
-  return h("details", { class: "startagent" }, h("summary", {}, "Start an agent on this task"),
+  const form = h("details", { class: "startagent", ontoggle: () => { if (form.open) loadModels(); } },
+    h("summary", {}, "Start an agent on this task"),
     h("div", { class: "aform" },
-      h("div", { class: "frow" }, h("label", {}, "Agent", client), h("label", {}, "Model", model)),
+      h("div", { class: "frow" }, h("label", {}, "Agent", client),
+        h("div", { class: "modelpick" }, h("label", {}, "Model", model), otherModel, modelNote),
+        h("label", {}, "Permission mode", mode)),
+      about,
       h("label", {}, "Prompt", prompt),
-      h("p", { class: "hint muted small" }, "It runs in its own process beside harness ui and goes on when this page or harness ui closes. Tool calls that need permission wait here for Allow or Deny."),
+      h("p", { class: "hint muted small" }, "It runs in its own process beside harness ui and goes on when this page or harness ui closes. Tool calls the permission mode does not allow wait here for Allow or Deny."),
       err, h("div", {}, go)));
+  return form;
 }
 
 // agentPanels: the open panels by host key, fed by the live stream's "agent" events or, offline, by polling.
@@ -5760,7 +5949,8 @@ function agentPanel(pid, host, reload) {
     if (!live.connected && !document.hidden) poll();
   }, 3000);
   return h("div", { class: "agentpanel" },
-    h("div", { class: "agenthead" }, status, " ", h("span", { class: "muted small" }, `agent host ${host.key.slice(0, 8)}`)),
+    h("div", { class: "agenthead" }, status, " ", h("span", { class: "muted small" }, `agent host ${host.key.slice(0, 8)}`,
+      host.permission_mode && ` · ${modeLabel(host.client, host.permission_mode)} mode`)),
     log, err,
     h("div", { class: "agentsend" }, text, h("div", { class: "agentbtns" }, send, stop, close)));
 }

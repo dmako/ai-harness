@@ -177,12 +177,29 @@ public sealed partial class BuildReader(AnalysisRepository repository, Ecosystem
         return unit;
     }
 
-    /// <summary>The project's distinct references with where each is declared, and its packages.</summary>
+    /// <summary>
+    /// The project's distinct references with where each is declared (build-order-only and unresolved ones
+    /// apart), and its packages.
+    /// </summary>
     private static void AddDependencies(BuildUnit unit, EvaluatedProject evaluated)
     {
         foreach (var reference in evaluated.References.DistinctBy(reference => reference.Path, StringComparer.Ordinal))
         {
-            unit.References.Add(reference.Path);
+            if (reference.Unresolved)
+            {
+                (unit.UnresolvedReferences ??= new(StringComparer.Ordinal))[reference.Path] = reference.At;
+                continue;
+            }
+
+            if (reference.BuildOrder)
+            {
+                (unit.BuildOrder ??= []).Add(reference.Path);
+            }
+            else
+            {
+                unit.References.Add(reference.Path);
+            }
+
             (unit.ReferenceLocations ??= new(StringComparer.Ordinal))[reference.Path] = reference.At;
         }
         unit.Packages.AddRange(

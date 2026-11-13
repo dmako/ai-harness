@@ -9,11 +9,18 @@ public sealed record EvaluatedPackage(
     bool Unresolved = false
 );
 
+/// <summary>
+/// A project reference: Path is repository-relative, or the expression as evaluated when Unresolved (it still
+/// holds @( or $( ). BuildOrder marks ReferenceOutputAssembly=false: the target builds first, but its output is
+/// not referenced as code.
+/// </summary>
 public sealed record EvaluatedReference(
     string Path,
     string At,
     IReadOnlyList<string> Frameworks,
-    bool Conditional = false
+    bool Conditional = false,
+    bool BuildOrder = false,
+    bool Unresolved = false
 );
 
 public sealed record EvaluatedProject(

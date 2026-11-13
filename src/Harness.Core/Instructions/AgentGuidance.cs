@@ -46,7 +46,8 @@ public static class AgentGuidance
           their number. To review one, read `scm_get_merge_request_details`, `scm_get_merge_request_diff` and
           `scm_get_merge_request_comments` first (list them with `scm_list_merge_requests`); leave one
           `scm_add_merge_request_diff_comment` per concrete finding on its changed line (`line_type` old for a removed line)
-          and the summary with `scm_add_merge_request_comment`. Change a title or description, or approve, only when the user asks.
+          and the summary with `scm_add_merge_request_comment`. Change a title or description, approve, or open a merge request
+          (`scm_create_merge_request`, from a pushed branch) only when the user asks.
         - If harness tools are missing or failing (including an `scm_` tool saying no SCM matches), run `harness doctor` and report its output.
         """;
 }

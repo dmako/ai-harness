@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Harness.Core.Memory;
+using Harness.Core.Providers;
 using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Core.Web;
@@ -28,7 +29,9 @@ internal sealed partial class UiReadService
             "structure" => await ViewAsync(project, endpoint, () => StructureAsync(project, token), token),
             "complexity" => await ViewAsync(project, endpoint, () => ComplexityAsync(project, token), token),
             "stack" => await ViewAsync(project, endpoint, () => ProjectStackAsync(project, token), token),
+            "packages" => await PackagesAsync(project, request, token),
             "agents/{key}/log" => AgentLog(project, request),
+            "agent-models" => await AgentModelsAsync(project, request, token),
             _ => await ProjectDatabaseAsync(project, endpoint, request, token),
         };
     }
@@ -303,6 +306,10 @@ internal sealed partial class UiReadService
         );
         report.Id = UiProjectCatalog.Text(project, "id");
         report.Root = root;
+        report.Findings = Harness.Core.Reports.ReportAnalyzer.WithSearch(
+            report.Findings,
+            SearchTools.Status(location.Configuration.Value.Providers)
+        );
         // the user's findings; the developer's and the tuning numbers go only to the opt-in telemetry
         return UiJson.Node(report.ForUser());
     }

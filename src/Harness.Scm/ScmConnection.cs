@@ -9,6 +9,21 @@ public sealed record ScmEndpoint(string Name, ScmKind Kind, Uri BaseUrl)
     public IReadOnlyList<string> BasePath { get; } =
         BaseUrl.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.UnescapeDataString).ToArray();
 
+    /// <summary>
+    /// Other host names or base URLs under which the server is reached, used only to match remotes (never for API
+    /// calls); see <see cref="ScmAlias" />.
+    /// </summary>
+    public IReadOnlyList<ScmAlias> Aliases { get; init; } = [];
+
+    public bool Equals(ScmEndpoint? other) =>
+        other is not null
+        && string.Equals(Name, other.Name, StringComparison.Ordinal)
+        && Kind == other.Kind
+        && BaseUrl == other.BaseUrl
+        && Aliases.SequenceEqual(other.Aliases);
+
+    public override int GetHashCode() => HashCode.Combine(Name, Kind, BaseUrl);
+
     /// <summary>Normalises a typed base URL: absolute http(s), no query, fragment or trailing slash.</summary>
     public static bool TryNormalizeUrl(string? text, out Uri url, out string error)
     {

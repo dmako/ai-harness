@@ -114,10 +114,23 @@ internal static class ConfigurationValidation
 
     private static void ValidateProvider(string key, ProviderConfiguration provider)
     {
-        Require(provider.Type is "mcp" or "harness", $"{key}: set pack, type = \"mcp\" or type = \"harness\"");
+        Require(
+            provider.Type is "mcp" or "harness" or SearchTools.ProviderType,
+            $"{key}: set pack, type = \"mcp\" or type = \"harness\""
+        );
         Require(provider.Dir is "" or "project", $"{key}.dir must be project or empty");
-        Require(!provider.IsEnabled() || !string.IsNullOrWhiteSpace(provider.Command), $"{key}.command is required");
         Require(provider.TimeoutMs >= 0, $"{key}.timeout_ms must be >= 0");
+        if (provider.Type is SearchTools.ProviderType)
+        {
+            ValidateBuiltIn(key, provider);
+            return;
+        }
+
+        Require(
+            provider.Rg.Length == 0 && provider.Fd.Length == 0,
+            $"{key}: rg and fd are [providers.search] settings"
+        );
+        Require(!provider.IsEnabled() || !string.IsNullOrWhiteSpace(provider.Command), $"{key}.command is required");
         Require(
             provider.Only.All(capability => Capabilities.Contains(capability, StringComparer.Ordinal)),
             $"{key}.only: unknown capability"
@@ -140,6 +153,30 @@ internal static class ConfigurationValidation
         }
 
         ValidateMcpProvider(key, provider);
+    }
+
+    /// <summary>The built-in search ([providers.search]): enabled, rg, fd and the routing keys, nothing to start.</summary>
+    private static void ValidateBuiltIn(string key, ProviderConfiguration provider)
+    {
+        Require(
+            key == "providers." + SearchTools.ProviderName,
+            $"{key}: type = \"{SearchTools.ProviderType}\" is the built-in search, [providers.{SearchTools.ProviderName}]"
+        );
+        Require(
+            provider.Command.Length == 0
+                && provider.Args.Length == 0
+                && provider.Dir.Length == 0
+                && provider.Capabilities.Count == 0
+                && provider.Freshness.Length == 0
+                && provider.Refresh is null
+                && provider.Resolve is null
+                && !provider.IndexWorktrees,
+            $"{key}: the built-in search takes enabled, rg, fd, timeout_ms, only, languages and context"
+        );
+        Require(
+            provider.Only.All(capability => capability is "code.text_search" or "code.file_search"),
+            $"{key}.only: the built-in search serves code.text_search and code.file_search"
+        );
     }
 
     private static void ValidateMcpProvider(string key, ProviderConfiguration provider)

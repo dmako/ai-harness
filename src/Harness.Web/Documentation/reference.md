@@ -47,7 +47,7 @@ uninstall` alone lets you pick what to remove.
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
 | `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
-| `harness doctor` | Checks the installation, database, clients, hooks, providers and SCM connections, with a fix for each problem (`--all`: every project on the machine). |
+| `harness doctor` | Checks the installation, database, clients, hooks, providers, NuGet package sources and SCM connections, with a fix for each problem (`--all`: every project on the machine; `--fix nuget-config`, with `--dry-run` to only show it: writes the nuget provider's project override). |
 | `harness status` | The project, its Git state, database and clients. |
 | `harness sync` | Refreshes the recorded state (branch, HEAD, files, findings). The Git hooks run it for you. |
 | `harness instructions` | Adds the harness guidance for agents to AGENTS.md / CLAUDE.md (`--remove`). |
@@ -57,7 +57,7 @@ uninstall` alone lets you pick what to remove.
 | `harness proposals` | Knowledge agents proposed: list, show, approve, reject. |
 | `harness projects` | Every repository on this machine that uses harness (`forget <id>` drops one from the list). |
 | `harness workspace` | Groups related repositories for cross-project search and knowledge. |
-| `harness scm` | This machine's SCM connections (GitLab, Forgejo, GitHub): `list`, `add`, `set`, `remove`, `test` (see SCM connections). |
+| `harness scm` | This machine's SCM connections (GitLab, Forgejo, GitHub): `list`, `add`, `set`, `remove`, `test`, `alias`, `use`, `which` (see SCM connections). |
 | `harness search <query>` | Code search here, or across the workspace (`--workspace`). |
 | `harness providers sessions` | graphify-csharp's warm C# sessions: list, start, restart, stop. |
 | `harness report` | What you can act on so harness serves your agents better (providers, hooks, instructions, knowledge), each with a suggested action. How harness itself gathers and serves is for its developer: it reaches them only in the opt-in telemetry. |
@@ -135,7 +135,8 @@ does not run. `harness doctor` warns about hook commands that cannot run;
 Harness answers agents' code questions (`get_context`, `search_project`,
 `package_api`) from providers: other tools it starts and asks, merging their
 answers. All are optional; without any, harness still keeps knowledge and
-tasks and reads project structure itself. Declare them in the global
+tasks and reads project structure itself. Text and file search are built
+in (see Built-in search below). Declare the others in the global
 configuration (see Configuration); a table named after a provider uses
 harness's built-in mapping for it, so you only give the executable:
 
@@ -145,9 +146,6 @@ command = "/path/to/codebase-memory-mcp"
 
 [providers.ripwire]                # ranked symbol and text search, name-based callers
 command = "/path/to/ripwire"
-
-[providers.rg-fd]                  # text and file search
-command = "/path/to/rg-fd-mcp"
 
 [providers.graphify-csharp]        # compiler-exact C# callers, references, impact
 command = "/path/to/harness-graphify"
@@ -185,7 +183,189 @@ says what is missing.
   you use). Packages from a private feed need the feed and its credentials
   in your NuGet configuration (`dotnet nuget update source <name> -u <user>
   -p <token> --store-password-in-clear-text`); harness says plainly when the
-  feed cannot be reached.
+  feed cannot be reached. A repository with its own `nuget.config` may need
+  a project override: see below.
+
+### Projects with their own nuget.config
+
+A `nuget.config` in the repository (or a folder above it) changes where
+packages come from: `<clear/>` drops nuget.org, `packageSourceMapping`
+sends package ids to named feeds only, and private feeds need credentials.
+It affects the nuget provider twice, as measured with the .NET SDK
+11.0.100 and NugetMcpServer 1.1.10:
+
+- **dnx fetching the server.** dnx reads the NuGet configuration of the
+  folder it starts in (that folder and every folder above it, then your
+  user-level `NuGet.Config`). `--source <url>` replaces all of it, package
+  source mapping included, so the documented command line keeps working
+  with `<clear/>` and mapping. Without `--source`, dnx fails when nuget.org
+  is cleared or mapping gives `DimonSmart.NugetMcpServer` no nuget.org
+  source, and when any configured feed does not answer (unless you add
+  `--ignore-failed-sources`). `--add-source <url>` adds a feed, but dnx
+  refuses it while any of those files has package source mapping;
+  `--configfile <file>` reads that one file instead of the folders and the
+  user-level file. Once the exact version is in the global packages folder
+  (`~/.nuget/packages`), dnx starts it without asking any feed, so a broken
+  configuration shows only on a machine (or CI agent) that has not fetched
+  it yet.
+- **The server finding your packages.** NugetMcpServer reads the NuGet
+  configuration of the folder *it* starts in (the machine, user and folder
+  files, as `dotnet restore` does), searches every enabled source in it,
+  ignores package source mapping and falls back to nuget.org when there is
+  none. Without `dir = "project"`, harness starts it in harness's own
+  working folder, which is the repository only when an agent started
+  harness there. dnx keeps the options before `--` for itself; the
+  arguments after `--` go to the server: `--source <url or folder>`
+  (repeatable; these replace the configured sources) and `--nuget-config
+  <file>`. The server also reads `NUGET_SOURCES` and `NUGET_CONFIG` from
+  its environment.
+
+`harness doctor` (and Health, and the nuget card in Agents › Tools &
+providers) checks the provider against the repository's NuGet
+configuration as `nuget-config`. When one of the above would stop it, the
+check names the file and prints the project override that fixes it.
+`harness doctor --fix nuget-config` writes that override into the
+project's `.harness/config.toml` (`--dry-run` only shows it); in harness ui,
+Fix shows the change and writes it when you confirm. The rest of the file,
+comments included, stays as it was, a second run changes nothing, and
+removing the table undoes it.
+
+A project's `[providers.nuget]` table takes precedence over the global
+file's and replaces it whole, so give `command` and `args` again (and any
+other key you set globally, such as `timeout_ms`). Examples:
+
+```toml
+# .harness/config.toml: a private feed beside nuget.org, or <clear/> with
+# package source mapping: dnx takes the server from nuget.org, and the
+# server, started in the project, reads the project's nuget.config
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
+dir = "project"
+```
+
+```toml
+# without package source mapping you may add nuget.org to the project's
+# feeds instead of replacing them (dnx then needs every feed to answer)
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--add-source", "https://api.nuget.org/v3/index.json"]
+dir = "project"
+```
+
+```toml
+# the server reads one NuGet configuration file you name, wherever it starts
+[providers.nuget]
+command = "dnx"
+args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json",
+        "--", "--nuget-config", "C:/src/app/nuget.config"]
+```
+
+Credentials belong in the NuGet configuration, never in `config.toml`
+(which is committed): store them in your user-level `NuGet.Config` with
+`dotnet nuget update source <name> -u <user> -p <token>`, or let the
+repository's `nuget.config` read them from environment variables in its
+`packageSourceCredentials` (`<add key="ClearTextPassword"
+value="%FEED_TOKEN%" />`). Not verified: no authenticated feed was at hand,
+so that the server uses stored credentials is inferred from the NuGet
+libraries it loads its sources with; its 1.1.10 binary sets up no NuGet
+credential service, so a credential provider plugin (such as Azure
+Artifacts') may serve `dotnet restore` but not the server. Prefer stored
+credentials or a token in an environment variable for it.
+
+### NuGet package upgrades and vulnerabilities
+
+Architecture's package marks and the `vulnerable-package` and
+`outdated-package` findings come from the NuGet V3 protocol of the sources
+the repository's NuGet configuration resolves to (enabled http(s) sources,
+package source mapping applied; local folder sources are not read):
+
+- **Versions:** `PackageBaseAddress/3.0.0` (the flat container,
+  `{base}/{id-lower}/index.json`). The newest version without a pre-release
+  label above the one in use is offered, compared by NuGet's SemVer 2.0
+  rules (four numbers, labels case-insensitive, build metadata ignored).
+- **Vulnerabilities:** `VulnerabilityInfo/6.7.0` where a source offers it
+  (nuget.org does): its index lists pages (base, update) mapping lower-case
+  ids to advisories with a severity (0 low, 1 moderate, 2 high, 3 critical),
+  a link and the affected range in interval notation. The fixed version is
+  the lowest listed version above the one in use outside the range.
+- **Credentials:** `packageSourceCredentials` (Username with
+  ClearTextPassword, `%VARIABLES%` expanded, or an encrypted Password,
+  decrypted with DPAPI on Windows), sent as Basic authentication. A source
+  answering 401/403 is reported as unauthorized, one that does not answer as
+  unreachable, never guessed.
+- **Cache:** beside the global configuration in `cache/nuget/<source
+  hash>/` (`service.json`, `versions/<id>.json`, `vulnerabilities/`). A
+  version list and a service index are kept 24 h; the vulnerability index
+  is read again after 24 h and only the pages whose update time changed are
+  downloaded. harness ui asks for the marks after it has drawn the view
+  (`GET /api/projects/{id}/packages?packages=name@version,…`, at most 30 s);
+  a sync builds the findings from the cache alone (up to a week old) and
+  never waits for a source. `HARNESS_NUGET_OFFLINE=1` keeps every lookup to
+  the cache.
+- **Doctor:** `package-sources` reads each enabled source's service index
+  and names the fix for a source it cannot read (credentials, the URL, or
+  `dotnet nuget disable source`).
+
+Only packages a project references directly are looked up; transitive ones
+are out of scope. The nuget provider's `package.info` (NugetMcpServer's
+`get_package_info`) answers description, dependencies and recent versions,
+pre-releases mixed in, as text for an agent; it has no vulnerability data
+and needs the provider running, so the marks do not use it.
+
+### Built-in search
+
+The MCP server and harness ui add a provider named `search` that answers
+`code.text_search` with `rg --json` and `code.file_search` with `fd`. Each
+call starts the tool in the project root, stops it (with its whole process
+tree) once it has the limit, at the provider's timeout or when the call is
+cancelled, and returns items sorted by path: the path relative to the root,
+and for text the line number and the line. The query is plain text (its
+regular-expression characters are escaped), `path` limits the search to a
+folder, and `.gitignore` and `.ignore` apply as rg and fd read them. It
+starts no process until asked and keeps no index, so it serves light and
+workspace registries too, and its calls appear in the provider statistics
+like any other provider's.
+
+Harness looks for `rg` (`rg.exe`) and `fd` (`fd.exe`, or `fdfind` on Debian
+and Ubuntu) on `PATH` once per process. With rg but no fd, file search
+lists `rg --files` and keeps the files whose name matches the query
+(ignoring case unless the query has a capital letter, as fd does). With
+neither, the provider is left out, and `harness doctor`, `harness report`
+and `provider_status` name the install command for the system.
+
+| Platform | Install |
+|---|---|
+| Windows | `winget install BurntSushi.ripgrep.MSVC` and `winget install sharkdp.fd`; or `scoop install ripgrep fd`; or `choco install ripgrep fd` |
+| Debian, Ubuntu | `sudo apt install ripgrep fd-find` (the command is `fdfind`) |
+| Fedora, RHEL (EPEL) | `sudo dnf install ripgrep fd-find` |
+| Arch | `sudo pacman -S ripgrep fd` |
+| Alpine | `sudo apk add ripgrep fd` |
+| macOS | `brew install ripgrep fd` |
+| any, with Rust | `cargo install ripgrep fd-find` |
+
+A tool installed while harness runs is seen only by processes started
+afterwards (detection is cached per process): restart harness ui and the
+agent sessions. On Windows, winget's links folder
+(`%LOCALAPPDATA%\Microsoft\WinGet\Links`) reaches only new terminals.
+`harness doctor`'s `search` line confirms what was found. Optional
+settings:
+
+```toml
+[providers.search]
+enabled = false                    # turn the built-in search off
+rg = "/opt/ripgrep/rg"             # instead of rg on PATH
+fd = "/usr/bin/fdfind"             # instead of fd or fdfind on PATH
+timeout_ms = 10000                 # per call (default 30 s)
+only = ["code.text_search"]        # serve just this one
+```
+
+The `rg-fd` pack (`[providers.rg-fd]`, running the separate rg-fd-mcp
+server) remains available but is optional and superseded. While an
+enabled `[providers.rg-fd]` entry is configured the built-in search stays
+off, so existing setups keep answering as before; `harness doctor` notes
+that the entry can be removed once rg and fd are installed. Setting
+`enabled = true` under `[providers.search]` runs both.
 
 Agents should talk to harness, not to the providers directly: harness merges
 their answers, records how they fared and adds the project's knowledge.
@@ -224,6 +404,10 @@ warn = 31
 [architecture.complexity.metrics]     # exact .NET values (Windows, .NET SDK)
 enabled = false                       # true: sync starts a background run per HEAD
 timeout_ms = 600000                   # a longer run fails and keeps the counted values
+
+[architecture.packages]           # NuGet upgrades and vulnerabilities (see Providers)
+enabled = true                    # false: no package source is read
+outdated = false                  # true: an outdated package is an info finding
 
 [providers.<name>]                # see Providers
 
@@ -353,14 +537,21 @@ authenticated with an access token only. Connections are set up once per
 machine and serve every project on it, with `harness scm` or in harness ui
 under Machine › SCM connections, where Test connection checks the server's
 version and the token's user and names the failure (unreachable, TLS,
-token rejected, not permitted, wrong server type) with its fix.
+token rejected, not permitted, wrong server type) with its fix. Which token
+scopes and permissions each operation needs, per SCM, is in the guide's
+[Token permissions](#guide-token-permissions) (`harness docs
+guide-token-permissions`).
 
 | Command | What it does |
 |---|---|
-| `harness scm list [--json]` | Name, type, URL and token source of each SCM; tokens only masked (`****abcd`). |
+| `harness scm list [--json]` | Name, type, URL, aliases and token source of each SCM; tokens only masked (`****abcd`). |
 | `harness scm add <name> --type gitlab\|forgejo\|github --url <url> --token-stdin` | Adds an SCM; the token is read from the first line of standard input. `--token-env <VAR>` reads it from that environment variable on every call instead of storing it; `--token <t>` works but can leave the token in your shell history. |
 | `harness scm set <name> [--type] [--url] [--token-stdin\|--token\|--token-env] [--rename <new>]` | Changes an SCM; a new token or variable replaces the old one. |
-| `harness scm remove <name>` | Removes an SCM. |
+| `harness scm remove <name>` | Removes an SCM, with its aliases. |
+| `harness scm alias list <name> [--json]` | Lists an SCM's aliases. |
+| `harness scm alias add <name> <url>` | Adds an alias: a host name (`git-alias.example.com`, or an SSH host alias from `~/.ssh/config`) or a base URL (`https://git-alias.example.com[/prefix]`, `ssh://git@ssh-alias[:port]`). |
+| `harness scm alias set <name> <old> <new>` | Replaces an alias in place. |
+| `harness scm alias remove <name> <url>` | Removes an alias. |
 | `harness scm test [<name>] [--json]` | Tests one SCM, or all of them side by side: the server's version and the token's user, or what failed and how to fix it. Exits 1 when a test fails. |
 | `harness scm use <name>\|--auto [--project <dir>] [--json]` | Chooses the SCM this repository uses on this machine (one that serves its remotes), or with `--auto` forgets the choice and detects it from the remotes again. |
 | `harness scm which [--project <dir>] [--json]` | Shows the repository's SCM, project and remote, how it was chosen, and the connections that serve it equally. Exits 1 when no SCM serves it. |
@@ -371,6 +562,20 @@ the URL is the server's base address (`https://gitlab.example.com`, or
 GitHub, whose API harness calls at `api.github.com`, or an Enterprise Server's
 address, under its `/api/v3`). The type is always given explicitly.
 
+Aliases are other names under which the same server is reached, for
+repositories cloned from an alias host name, a proxy path or an SSH host alias
+while the URL stays the canonical API address. They are used only to match a
+repository's remotes to the SCM and work out its project path (an alias's path
+prefix stands for the URL's: with `url = "https://gitlab.example.com/gitlab"`
+and the alias `https://proxy.example.com/scm`, the remote
+`https://proxy.example.com/scm/group/repo` is project `group/repo`); API calls
+always go to the URL. A host name alone matches that host over HTTPS and SSH on
+any port; an `ssh://` alias matches only SSH remotes. Aliases are normalised
+(lower-case host, no default port, no user, no trailing slash), may not repeat
+or equal the SCM's own URL, and a web alias may not hold a password. An alias
+that two SCMs share leaves the project ambiguous until you choose one
+(`harness scm use`). harness ui edits them in the SCM's dialog.
+
 They are stored in `scm.toml` beside the global `config.toml`, one table per
 SCM:
 
@@ -378,6 +583,7 @@ SCM:
 [scm.work]
 type = "gitlab"
 url = "https://gitlab.example.com"
+aliases = ["https://git-alias.example.com", "ssh-alias"] # optional: only match remotes
 token_protected = "CfDJ8..." # the token, encrypted; or: token_env = "WORK_GITLAB_TOKEN"
 ```
 
@@ -468,11 +674,18 @@ the SCM shows (GitLab `!7` is 7, Forgejo or GitHub pull request `#7` is 7).
 | `scm_set_merge_request_title` | `merge_request_id`, `title` | renames the merge request |
 | `scm_set_merge_request_description` | `merge_request_id`, `description` | replaces its description |
 | `scm_approve_merge_request` | `merge_request_id` | approves it as the token's user |
+| `scm_create_merge_request` | `from`, `to`, `title`, `description` (empty), `assignees`, `reviewers` (usernames; none) | opens a merge request from branch `from` into `to`, assigns it and requests the reviews; answers like `scm_get_merge_request_details` plus `warnings` |
 
 A tool that cannot reach the SCM says why and what to do: no SCM configured
 (`harness scm add`), no remote matching one (`[scm]` above, `harness doctor`),
 or the server's answer (`unauthorized`, `forbidden`, `not_found`, `invalid`
 for a line outside the diff, `rate_limited`) with its fix.
+`scm_create_merge_request` is `invalid`, and creates nothing, for a missing
+branch, the same branch twice, an unknown username, or an open merge request
+that already merges the same branches (named with its number and URL); an
+assignee or reviewer the SCM refuses once the merge request exists is a
+warning in the answer, not an error. Agents open merge requests only when the
+user asks.
 
 ## Tasks
 
@@ -526,8 +739,35 @@ started detached beside `harness`:
 
 - Claude Code runs with stream-json input and output and asks harness for
   tool permissions (`--permission-prompt-tool stdio`); Codex runs as
-  `codex app-server` with approval policy `untrusted` and sandbox
-  `workspace-write`, so commands it does not know to be safe wait for you.
+  `codex app-server`. Whatever needs your approval waits in the panel for
+  Allow or Deny.
+- The **Model** box lists the agent's models from harness's model catalog:
+  Default (the agent's own default, named when known), then the models by
+  name (the id in the tooltip), then Other… for any id; the start accepts
+  any id, and the session marks one the list does not name. The catalog is
+  one file per machine, `agent-models.json` beside the global configuration
+  (every project and browser shares it). It is filled from what the agents
+  report: Codex's app-server `model/list` and Claude Code's answer to the
+  stream-json `initialize` request (its documented aliases sonnet, opus and
+  haiku if a version gives no list), plus the models the agents'
+  transcripts recorded (marked seen). Every session started from harness ui
+  refreshes its agent's list from its own handshake; opening the dialog
+  refreshes a list that is empty or older than 24 hours with a short probe
+  of the CLI in the background (no session, no turn, at most 30 s), and the
+  dialog shows the list it has meanwhile. A failed refresh keeps the last
+  list and says so quietly under the box. Sessions started elsewhere add
+  only the models their transcripts record: an MCP client does not tell
+  harness its models.
+- The **Permission mode** box decides how much it may do without asking; its
+  choices follow the agent, and Auto is the default for both. Claude Code:
+  Auto (`--permission-mode auto`: what it judges safe runs, the rest asks),
+  Manual (every tool that needs permission asks), Accept edits, Plan (reads
+  and plans only) and Bypass permissions (unsafe: nothing asks). Codex: Auto
+  (approval policy `on-request`, sandbox `workspace-write`: Codex decides when
+  to ask, so the sandbox is what contains it), Manual (`untrusted`: commands
+  it does not know to be safe wait for you), Read only (sandbox `read-only`)
+  and Full access (unsafe: approval policy `never`, no sandbox). A resumed
+  session keeps the mode it started with; the session shows its mode.
 - The client gets `HARNESS_TASK_ID` in its environment and is recorded on the
   task as started by harness.
 - The panel shows its messages, tool calls, approvals and turns live (over

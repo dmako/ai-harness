@@ -39,6 +39,12 @@ public sealed class ScmMcpProcessTests
                 ["GET " + Request + "/approvals"] = """{"approved":false,"approved_by":[]}""",
                 ["GET " + Request + "/diffs"] =
                     """[{"old_path":"src/parser.cs","new_path":"src/parser.cs","diff":"@@ -1,2 +1,3 @@\n line one\n+line two\n line three\n"}]""",
+                ["GET /api/v4/users"] = """[{"id":9,"username":"bob","name":"Bob"}]""",
+                ["POST /api/v4/projects/group%2Frepo/merge_requests"] = RequestJson.Replace(
+                    "\"iid\":7",
+                    "\"iid\":8,\"web_url\":\"https://gl.example.com/group/repo/-/merge_requests/8\"",
+                    StringComparison.Ordinal
+                ),
                 ["POST " + Request + "/discussions"] =
                     """{"id":"d1","individual_note":false,"notes":[{"id":31,"body":"Name it","system":false,"position":{"new_path":"src/parser.cs","old_path":"src/parser.cs","new_line":2}}]}""",
             }
@@ -67,7 +73,7 @@ public sealed class ScmMcpProcessTests
             await using var client = await StartAsync(root);
 
             var tools = await client.ListToolsAsync(cancellationToken: Token);
-            tools.Should().HaveCount(42);
+            tools.Should().HaveCount(43);
             var scm = tools.Where(tool => tool.Name.StartsWith("scm_", StringComparison.Ordinal)).ToList();
             scm.Select(tool => tool.Name)
                 .Should()
@@ -81,7 +87,8 @@ public sealed class ScmMcpProcessTests
                     "scm_get_merge_request_diff",
                     "scm_set_merge_request_title",
                     "scm_set_merge_request_description",
-                    "scm_approve_merge_request"
+                    "scm_approve_merge_request",
+                    "scm_create_merge_request"
                 );
             scm.ForEach(ToolSchema.AssertMatches);
 
@@ -110,7 +117,9 @@ public sealed class ScmMcpProcessTests
                 }
             );
             comment.GetProperty("comment").GetProperty("id").GetString().Should().Be("31");
-            var posted = gitlab.Requests.Single(request => request.Method is "POST");
+            var posted = gitlab.Requests.Single(request =>
+                request.Method is "POST" && request.Path.EndsWith("/discussions", StringComparison.Ordinal)
+            );
             using (var body = JsonDocument.Parse(posted.Body))
             {
                 var position = body.RootElement.GetProperty("position");
@@ -135,6 +144,48 @@ public sealed class ScmMcpProcessTests
             outside.IsError.Should().BeTrue();
             var text = ((TextContentBlock)outside.Content[0]).Text;
             text.Should().StartWith("invalid:").And.Contain("Fix:").And.NotContain(Good);
+
+            var created = await CallAsync(
+                client,
+                "scm_create_merge_request",
+                new
+                {
+                    from = "feature/parser",
+                    to = "main",
+                    title = "Add parser",
+                    reviewers = new[] { "bob" },
+                }
+            );
+            created.GetProperty("merge_request_id").GetInt64().Should().Be(8);
+            created
+                .GetProperty("merge_request")
+                .GetProperty("web_url")
+                .GetString()
+                .Should()
+                .Be("https://gl.example.com/group/repo/-/merge_requests/8");
+            // the stand-in answers without bob among the reviewers, as GitLab does for a user it cannot ask
+            created.GetProperty("warnings")[0].GetString().Should().Contain("bob").And.Contain("reviewer");
+            var opened = gitlab.Requests.Single(request =>
+                request.Method is "POST" && request.Path.EndsWith("/merge_requests", StringComparison.Ordinal)
+            );
+            using (var body = JsonDocument.Parse(opened.Body))
+            {
+                body.RootElement.GetProperty("source_branch").GetString().Should().Be("feature/parser");
+                body.RootElement.GetProperty("reviewer_ids")[0].GetInt64().Should().Be(9);
+            }
+
+            var same = await client.CallToolAsync(
+                "scm_create_merge_request",
+                new Dictionary<string, object?>
+                {
+                    ["from"] = "main",
+                    ["to"] = "main",
+                    ["title"] = "x",
+                },
+                cancellationToken: Token
+            );
+            same.IsError.Should().BeTrue();
+            ((TextContentBlock)same.Content[0]).Text.Should().StartWith("invalid:");
         }
         finally
         {

@@ -82,6 +82,18 @@ internal sealed record GhReviewBody(string Event, string? CommitId, string? Body
 
 internal sealed record GhPullEdit(string? Title, string? Body);
 
+/// <summary>A new pull request from <c>head</c> (a branch, or owner:branch of a fork) into <c>base</c>.</summary>
+internal sealed record GhPullCreate(string Head, string Base, string Title, string Body);
+
+internal sealed record GhAssigneesBody(List<string> Assignees);
+
+internal sealed record GhReviewersBody(List<string> Reviewers);
+
+/// <summary>The issue behind a pull request, as POST .../issues/{number}/assignees answers it.</summary>
+internal sealed record GhIssue(long Number, List<GhUser>? Assignees);
+
+internal sealed record GhBranchInfo(string? Name);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -104,4 +116,9 @@ internal sealed record GhPullEdit(string? Title, string? Body);
 [JsonSerializable(typeof(GhReviewCommentBody))]
 [JsonSerializable(typeof(GhReviewBody))]
 [JsonSerializable(typeof(GhPullEdit))]
+[JsonSerializable(typeof(GhPullCreate))]
+[JsonSerializable(typeof(GhAssigneesBody))]
+[JsonSerializable(typeof(GhReviewersBody))]
+[JsonSerializable(typeof(GhIssue))]
+[JsonSerializable(typeof(GhBranchInfo))]
 internal sealed partial class GithubJsonContext : JsonSerializerContext;

@@ -419,4 +419,138 @@ public sealed class ForgejoProviderTests
             .Should()
             .Throw<ArgumentException>();
     }
+
+    private static ScmNewMergeRequest NewRequest(
+        IReadOnlyList<string>? assignees = null,
+        IReadOnlyList<string>? reviewers = null
+    ) => new("fix/login", "main", "Fix login", "Fixes #2", assignees ?? [], reviewers ?? []);
+
+    [Fact]
+    public async Task PullRequestsAreCreatedWithAssigneesThenReviewersAreRequested()
+    {
+        using var server = new FakeScmServer();
+        server
+            .Json("GET", Api + "/users/alice", """{"id":1,"login":"alice"}""")
+            .Json("GET", Api + "/users/bob", """{"id":2,"login":"bob"}""")
+            .On(
+                "POST",
+                RepoPath + "/pulls",
+                new FakeResponse(
+                    HttpStatusCode.Created,
+                    PullJson.Replace(
+                        "\"mergeable\":true",
+                        "\"mergeable\":true,\"assignees\":[{\"id\":1,\"login\":\"alice\"}]",
+                        StringComparison.Ordinal
+                    )
+                )
+            )
+            .On("POST", PullPath + "/requested_reviewers", new FakeResponse(HttpStatusCode.Created, "[]"))
+            .Json("GET", PullPath, PullJson);
+        using var client = Connect(server);
+
+        var created = await client.CreateMergeRequestAsync(Project, NewRequest(["alice"], ["bob"]), Token);
+
+        created.Warnings.Should().BeEmpty();
+        created.MergeRequest.Number.Should().Be(3);
+        created.MergeRequest.WebUrl!.AbsoluteUri.Should().Be("https://git.example.org/owner/repo/pulls/3");
+        created.MergeRequest.Reviewers.Should().Equal(new ScmUser("bob"));
+        var body = JsonNode.Parse(server.Single("POST", RepoPath + "/pulls").Body)!;
+        body["head"]!.GetValue<string>().Should().Be("fix/login");
+        body["base"]!.GetValue<string>().Should().Be("main");
+        body["title"]!.GetValue<string>().Should().Be("Fix login");
+        body["body"]!.GetValue<string>().Should().Be("Fixes #2");
+        body["assignees"]!.AsArray().Select(name => name!.GetValue<string>()).Should().Equal("alice");
+        server.Single("POST", PullPath + "/requested_reviewers").Body.Should().Be("""{"reviewers":["bob"]}""");
+    }
+
+    [Fact]
+    public async Task RefusedAssigneesAndReviewersBecomeWarningsOnTheCreatedPullRequest()
+    {
+        using var server = new FakeScmServer();
+        server
+            .Json("GET", Api + "/users/alice", """{"id":1,"login":"alice"}""")
+            .Json("GET", Api + "/users/bob", """{"id":2,"login":"bob"}""")
+            .On(
+                "POST",
+                RepoPath + "/pulls",
+                new FakeResponse(
+                    HttpStatusCode.UnprocessableEntity,
+                    $$"""{"message":"user alice cannot be assigned {{Secret}}"}"""
+                ),
+                new FakeResponse(HttpStatusCode.Created, PullJson)
+            )
+            .Json("GET", RepoPath + "/pulls", "[]")
+            .Json("GET", RepoPath + "/branches/fix/login", """{"name":"fix/login"}""")
+            .Json("GET", RepoPath + "/branches/main", """{"name":"main"}""")
+            .On(
+                "POST",
+                PullPath + "/requested_reviewers",
+                new FakeResponse(
+                    HttpStatusCode.UnprocessableEntity,
+                    """{"message":"reviewer bob is not a collaborator"}"""
+                )
+            );
+        using var client = Connect(server);
+
+        var created = await client.CreateMergeRequestAsync(Project, NewRequest(["alice"], ["bob"]), Token);
+
+        created.MergeRequest.Number.Should().Be(3);
+        created.Warnings.Should().HaveCount(2);
+        created.Warnings[0].Should().Contain("alice").And.Contain("assignee").And.Contain("cannot be assigned");
+        created.Warnings[1].Should().Contain("bob").And.Contain("reviewer").And.Contain("not a collaborator");
+        created.Warnings.Should().AllSatisfy(warning => warning.Should().NotContain(Secret));
+        var creates = server
+            .Requests.Where(request => request.Method == HttpMethod.Post && request.Path == RepoPath + "/pulls")
+            .Select(request => JsonNode.Parse(request.Body)!.AsObject())
+            .ToList();
+        creates.Should().HaveCount(2);
+        creates[1].ContainsKey("assignees").Should().BeFalse("the retry leaves the refused assignees out");
+    }
+
+    [Fact]
+    public async Task UnknownUsersDuplicatesAndMissingBranchesAreRefused()
+    {
+        using var unknown = new FakeScmServer();
+        unknown.Json("GET", Api + "/users/alice", """{"id":1,"login":"alice"}""");
+        using (var client = Connect(unknown))
+        {
+            var create = () => client.CreateMergeRequestAsync(Project, NewRequest(["alice"], ["ghost"]), Token);
+            var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+            failure.Kind.Should().Be(ScmErrorKind.Invalid);
+            failure.Message.Should().Contain("'ghost'");
+            unknown.Requests.Should().NotContain(request => request.Method == HttpMethod.Post);
+        }
+
+        using var duplicate = new FakeScmServer();
+        duplicate
+            .On(
+                "POST",
+                RepoPath + "/pulls",
+                new FakeResponse(
+                    HttpStatusCode.Conflict,
+                    """{"message":"pull request already exists for these targets"}"""
+                )
+            )
+            .Json("GET", RepoPath + "/pulls", "[" + PullJson + "]");
+        using (var client = Connect(duplicate))
+        {
+            var create = () => client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+            var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+            failure.Kind.Should().Be(ScmErrorKind.Invalid);
+            failure.Message.Should().Contain("#3").And.Contain("https://git.example.org/owner/repo/pulls/3");
+        }
+
+        using var missing = new FakeScmServer();
+        missing
+            .On("POST", RepoPath + "/pulls", new FakeResponse(HttpStatusCode.NotFound, """{"message":"not found"}"""))
+            .Json("GET", RepoPath + "/pulls", "[]")
+            .Json("GET", RepoPath + "/branches/fix/login", """{"name":"fix/login"}""");
+        using (var client = Connect(missing))
+        {
+            var create = () => client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+            var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+            failure.Kind.Should().Be(ScmErrorKind.Invalid);
+            failure.Message.Should().Contain("target branch 'main' does not exist");
+        }
+    }
 }

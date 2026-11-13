@@ -36,6 +36,12 @@ internal abstract class InteractiveSession : IAsyncDisposable
     /// <summary>A turn is running.</summary>
     public bool Busy { get; protected set; }
 
+    /// <summary>Told the models the client reported in its handshake (TASK-0142).</summary>
+    public Action<AgentModelReport>? ModelsReported { get; set; }
+
+    /// <summary>Told why the client's handshake gave no models.</summary>
+    public Action<string>? ModelsFailed { get; set; }
+
     /// <summary>Ends when the client's process has exited.</summary>
     public Task<int> Exited => Process.Completion;
 
@@ -291,6 +297,8 @@ internal sealed class ClaudeSession : InteractiveSession
         Action<JsonObject> emit
     )
     {
+        // an unknown mode throws before any process starts
+        var mode = AgentPermissionModes.Resolve(AgentClients.Claude, start.PermissionMode);
         var sessionId = resume.Length > 0 ? resume : Guid.NewGuid().ToString();
         List<string> arguments =
         [
@@ -303,6 +311,7 @@ internal sealed class ClaudeSession : InteractiveSession
             "--verbose",
             "--permission-prompt-tool",
             "stdio",
+            .. mode.ClaudeArguments,
             resume.Length > 0 ? "--resume" : "--session-id",
             sessionId,
         ];
@@ -321,11 +330,12 @@ internal sealed class ClaudeSession : InteractiveSession
         return new ClaudeSession(process, emit, sessionId);
     }
 
-    protected override Task HandshakeAsync(CancellationToken cancellationToken)
+    protected override async Task HandshakeAsync(CancellationToken cancellationToken)
     {
-        // Claude says nothing until its first turn: the session id is the one harness chose.
+        // the models come back as a control_response, read with everything else: no turn waits for them
+        await WriteAsync(AgentModelProtocol.ClaudeInitialize(), cancellationToken);
+        // Claude says nothing else until its first turn: the session id is the one harness chose.
         EmitEvent(new AgentEvent(AgentEventKind.Session, DateTimeOffset.UtcNow) { SessionId = SessionId });
-        return Task.CompletedTask;
     }
 
     protected override Task StartTurnAsync(string text, CancellationToken cancellationToken)
@@ -394,6 +404,21 @@ internal sealed class ClaudeSession : InteractiveSession
         if (Text(line["type"]) is "control_request")
         {
             Request(line);
+            return;
+        }
+        if (
+            Text(line["type"]) is "control_response"
+            && Text(line["response"]?["request_id"]) is AgentModelProtocol.ClaudeInitializeId
+        )
+        {
+            if (AgentModelProtocol.Claude(line) is { } report)
+            {
+                ModelsReported?.Invoke(report);
+            }
+            else
+            {
+                ModelsFailed?.Invoke("claude-code initialize: " + Text(line["response"]?["error"]));
+            }
             return;
         }
         List<AgentEvent> events = [];

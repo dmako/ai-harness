@@ -440,6 +440,84 @@ public sealed class ProjectLifecycleTests
     }
 
     [Fact]
+    public async Task DoctorFixWritesTheNuGetProviderOverrideOnceKeepingTheProjectConfig()
+    {
+        using var fixture = new ProjectFixture();
+        var root = await fixture.CreateRepositoryAsync("nuget");
+        Directory.CreateDirectory(fixture.GlobalDirectory);
+        await File.WriteAllTextAsync(
+            fixture.GlobalConfig,
+            """
+            [providers.nuget]
+            command = "dnx"
+            args = ["DimonSmart.NugetMcpServer@1.1.10", "--yes", "--source", "https://api.nuget.org/v3/index.json"]
+            timeout_ms = 90000
+            """,
+            TestContext.Current.CancellationToken
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "nuget.config"),
+            """
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="company" value="https://pkgs.example.com/feed/v3/index.json" />
+              </packageSources>
+            </configuration>
+            """,
+            TestContext.Current.CancellationToken
+        );
+        var config = ConfigurationPaths.ProjectPath(root);
+        Directory.CreateDirectory(Path.GetDirectoryName(config)!);
+        const string Before = "# ours\n[log]\nlevel = \"debug\"  # for now\n";
+        await File.WriteAllTextAsync(config, Before, TestContext.Current.CancellationToken);
+
+        var doctor = await fixture.CliAsync("doctor", "--project", root, "--json");
+        doctor.Code.Should().Be(0, doctor.Output + doctor.Error);
+        using (var json = JsonDocument.Parse(doctor.Output))
+        {
+            var check = json
+                .RootElement.GetProperty("checks")
+                .EnumerateArray()
+                .Single(c => c.GetProperty("name").GetString() == "nuget-config");
+            check.GetProperty("level").GetString().Should().Be("warn");
+            check.GetProperty("detail").GetString().Should().Contain("company");
+            check
+                .GetProperty("fix")
+                .GetString()
+                .Should()
+                .Contain("harness doctor --fix nuget-config")
+                .And.Contain("dir = \"project\"");
+        }
+
+        var dry = await fixture.CliAsync("doctor", "--fix", "nuget-config", "--project", root, "--dry-run");
+        dry.Code.Should().Be(0, dry.Output + dry.Error);
+        dry.Output.Should().Contain("+ [providers.nuget]").And.Contain("+ timeout_ms = 90000");
+        (await File.ReadAllTextAsync(config, TestContext.Current.CancellationToken)).Should().Be(Before);
+
+        var fix = await fixture.CliAsync("doctor", "--fix", "nuget-config", "--project", root);
+        fix.Code.Should().Be(0, fix.Output + fix.Error);
+        var written = await File.ReadAllTextAsync(config, TestContext.Current.CancellationToken);
+        written
+            .Should()
+            .Be(
+                Before
+                    + "\n[providers.nuget]\ncommand = \"dnx\"\n"
+                    + "args = [\"DimonSmart.NugetMcpServer@1.1.10\", \"--yes\", \"--source\", "
+                    + "\"https://api.nuget.org/v3/index.json\"]\n"
+                    + "dir = \"project\"\ntimeout_ms = 90000\n"
+            );
+        ConfigurationLoader.LoadFiles(fixture.GlobalConfig, config).Value.Providers["nuget"].Dir.Should().Be("project");
+
+        var again = await fixture.CliAsync("doctor", "--fix", "nuget-config", "--project", root);
+        again.Code.Should().Be(0);
+        again.Output.Should().Contain("nothing to fix");
+        (await File.ReadAllTextAsync(config, TestContext.Current.CancellationToken)).Should().Be(written);
+        var after = await fixture.CliAsync("doctor", "--project", root);
+        after.Output.Should().MatchRegex(@"\[ok  \] nuget-config");
+    }
+
+    [Fact]
     public async Task InspectionReadsCommittedLiveWalAndDoesNotChangeDatabaseRows()
     {
         using var fixture = new ProjectFixture();

@@ -189,7 +189,8 @@ public sealed class MetricsWorker(ProjectLifecycle lifecycle, IMetricsTool tool,
                 return;
             }
 
-            foreach (var reference in unit.References.Order(StringComparer.Ordinal))
+            // build-order-only references (ReferenceOutputAssembly=false) build first as well
+            foreach (var reference in unit.References.Concat(unit.BuildOrder ?? []).Order(StringComparer.Ordinal))
             {
                 Visit(reference);
             }

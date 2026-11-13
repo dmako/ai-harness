@@ -78,6 +78,10 @@ public sealed record LayeredUnit : BuildUnit
 
     [JsonPropertyName("referenced_by")]
     public IReadOnlyList<string> ReferencedBy { get; init; } = [];
+
+    /// <summary>The units that build this one first through a build-order-only reference.</summary>
+    [JsonPropertyName("build_order_by"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? BuildOrderBy { get; init; }
 }
 
 public sealed record ProjectArchitecture(

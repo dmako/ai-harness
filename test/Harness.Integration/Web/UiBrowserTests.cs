@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -2178,6 +2179,159 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     [Fact]
+    public async Task TheStartDialogsPermissionModeFollowsTheAgentAndMarksTheUnsafeModes()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        new TaskStore(database).Create(
+            new TaskDefinition { Id = "UI-0001", Title = "For an agent" },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        const string Mode = "document.querySelector('.startagent select[name=permission_mode]')";
+        const string Ids = "[..." + Mode + ".options].map(o => o.value).join(',')";
+        const string Hint = "document.querySelector('.startagent .modehint')";
+        const string Agent = "document.querySelector('.startagent select[aria-label=Agent]')";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/UI-0001" }
+                );
+                await page.WaitAsync("!!" + Mode + " && " + Mode + ".options.length > 0");
+                await page.EvaluateAsync("document.querySelector('.startagent').open = true");
+                (await ValueAsync(page, Ids)).Should().Be("auto,manual,acceptEdits,plan,bypassPermissions");
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto");
+                (await ValueAsync(page, Mode + ".selectedOptions[0].textContent")).Should().Be("Auto (default)");
+                (await ValueAsync(page, Hint + ".textContent")).Should().StartWith("Actions Claude Code judges safe");
+                (await ValueAsync(page, Mode + ".options[4].textContent"))
+                    .Should()
+                    .Be("⚠ Bypass permissions (unsafe)");
+
+                await page.EvaluateAsync(
+                    Mode + ".value = 'bypassPermissions'; " + Mode + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("True");
+                (await ValueAsync(page, Hint + ".textContent")).Should().StartWith("Unsafe: every tool runs");
+
+                await page.EvaluateAsync(Agent + ".value = 'codex'; " + Agent + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Ids)).Should().Be("auto,manual,read-only,full-access");
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto", "switching the agent resets the mode");
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("False");
+                (await ValueAsync(page, Hint + ".textContent")).Should().Contain("workspace-write sandbox");
+                (await ValueAsync(page, Mode + ".options[3].textContent")).Should().Be("⚠ Full access (unsafe)");
+                (await ValueAsync(page, Mode + ".options[3].title")).Should().StartWith("Unsafe: no sandbox");
+
+                await page.EvaluateAsync(
+                    Mode + ".value = 'full-access'; " + Mode + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("True");
+                await page.EvaluateAsync(
+                    Agent + ".value = 'claude-code'; " + Agent + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto");
+                (await ValueAsync(page, Hint + ".classList.contains('unsafe')")).Should().Be("False");
+                (await ValueAsync(page, Mode + ".options.length")).Should().Be("5");
+            }
+        );
+    }
+
+    [Fact]
+    public async Task TheStartDialogsModelPickerOffersDefaultTheCatalogAndOtherAndFollowsTheAgent()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        using var database = fixture.Database();
+        new TaskStore(database).Create(
+            new TaskDefinition { Id = "UI-0001", Title = "For an agent" },
+            "",
+            new("test", "test", "fixture"),
+            Token
+        );
+        // the catalogs are current, so harness ui only reads them; Codex's last refresh failed
+        var store = new AgentModelStore(Path.Combine(fixture.Global, AgentModelStore.FileName));
+        await store.RefreshedAsync(
+            "claude-code",
+            new([
+                new("opus", "Opus 5.5")
+                {
+                    IsDefault = true,
+                    Resolved = "claude-opus-5-5",
+                    Description = "complex work",
+                },
+                new("sonnet", "Sonnet 5.5"),
+            ]),
+            "probe",
+            DateTimeOffset.UtcNow,
+            Token
+        );
+        await store.SeenAsync("claude-code", [("claude-sonnet-4-6", DateTimeOffset.UtcNow)], Token);
+        await store.RefreshedAsync(
+            "codex",
+            new([new("gpt-fake", "GPT Fake"), new("gpt-hidden", "Hidden") { Hidden = true }]),
+            "session",
+            DateTimeOffset.UtcNow,
+            Token
+        );
+        await store.FailedAsync("codex", "codex did not tell its models within 30 s", DateTimeOffset.UtcNow, Token);
+        const string Model = "document.querySelector('.startagent select[name=model]')";
+        const string Labels = "[..." + Model + ".options].map(o => o.textContent).join('|')";
+        const string Other = "document.querySelector('.startagent input[name=model_other]')";
+        const string Note = "document.querySelector('.startagent .modelnote')";
+        const string Agent = "document.querySelector('.startagent select[aria-label=Agent]')";
+        const string Mode = "document.querySelector('.startagent select[name=permission_mode]')";
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + UiWriteTests.ProjectId(fixture) + "/work/UI-0001" }
+                );
+                await page.WaitAsync("!!" + Model);
+                // before the dialog opens it knows no catalog: Default and Other… only
+                (await ValueAsync(page, Labels))
+                    .Should()
+                    .Be("Default|Other…");
+                await page.EvaluateAsync("document.querySelector('.startagent').open = true");
+                await page.WaitAsync(Model + ".options.length > 2");
+                (await ValueAsync(page, Labels))
+                    .Should()
+                    .Be("Default (Opus 5.5)|Opus 5.5|Sonnet 5.5|claude-sonnet-4-6 (seen)|Other…");
+                (await ValueAsync(page, Model + ".value")).Should().Be("");
+                (await ValueAsync(page, Model + ".options[0].title")).Should().Be("opus");
+                (await ValueAsync(page, Model + ".options[1].title")).Should().Be("opus · complex work");
+                (await ValueAsync(page, Other + ".hidden")).Should().Be("True");
+                (await ValueAsync(page, Note + ".textContent")).Should().BeEmpty();
+
+                await page.EvaluateAsync(Model + ".value = ' other'; " + Model + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Other + ".hidden")).Should().Be("False", "Other… reveals the id field");
+                await page.EvaluateAsync(Model + ".value = 'sonnet'; " + Model + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Other + ".hidden")).Should().Be("True");
+
+                await page.EvaluateAsync(Agent + ".value = 'codex'; " + Agent + ".dispatchEvent(new Event('change'))");
+                (await ValueAsync(page, Labels)).Should().Be("Default|GPT Fake|Other…", "hidden models are left out");
+                (await ValueAsync(page, Model + ".value")).Should().Be("", "switching the agent resets to Default");
+                (await ValueAsync(page, Note + ".textContent")).Should().Be("The model list could not be updated.");
+                (await ValueAsync(page, Note + ".title")).Should().StartWith("codex did not tell its models");
+                (await ValueAsync(page, Mode + ".value")).Should().Be("auto", "the permission mode picker still works");
+
+                await page.EvaluateAsync(
+                    Agent + ".value = 'claude-code'; " + Agent + ".dispatchEvent(new Event('change'))"
+                );
+                (await ValueAsync(page, Model + ".options[0].textContent")).Should().Be("Default (Opus 5.5)");
+                (await ValueAsync(page, Note + ".textContent")).Should().BeEmpty();
+            }
+        );
+    }
+
+    [Fact]
     public async Task TaskIsDeletedFromItsRowAfterTheDialogSaysWhatGoes()
     {
         var executable = Browser();
@@ -2428,6 +2582,96 @@ public sealed class UiBrowserTests(SharedBrowser browser)
     }
 
     /// <summary>
+    /// Machine › SCM connections lists a connection's aliases (TASK-0134), and its edit dialog adds, edits and deletes
+    /// them; the server normalises them, and a duplicate is refused with the error shown in the dialog.
+    /// </summary>
+    [Fact]
+    public async Task MachineScmDialogAddsEditsAndDeletesAliases()
+    {
+        const string Secret = "glpat-alias-token-0123456789";
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var file = Path.Combine(fixture.Global, "scm.toml");
+        await new Harness.Infrastructure.Scm.ScmConfigurationFile(file).AddAsync(
+            new Harness.Scm.ScmEntryInput("work", "gitlab", "https://gitlab.example.com", Secret, null, ["ssh-alias"]),
+            Token
+        );
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var root = server.Client.BaseAddress!.ToString().TrimEnd('/');
+                await page.CommandAsync("Page.navigate", new { url = root + "/#/machine" });
+                await page.WaitAsync(
+                    "document.querySelector('.scmrow[data-scm=work] [data-scm-aliases]')?.textContent.includes('ssh-alias')"
+                );
+
+                async Task Click(string scope, string text) =>
+                    await page.EvaluateAsync(
+                        $"[...document.querySelectorAll('{scope} button')].find(b => b.textContent.trim() === '{text}').click()"
+                    );
+                async Task FillAlias(int index, string value) =>
+                    await page.EvaluateAsync(
+                        $"document.querySelectorAll('dialog[open] input[aria-label=Alias]')[{index}].value = '{value}'"
+                    );
+                async Task RemoveAlias(int index) =>
+                    await page.EvaluateAsync(
+                        $"document.querySelectorAll('dialog[open] button[aria-label=\"Remove alias\"]')[{index}].click()"
+                    );
+                const string Aliases =
+                    "[...document.querySelectorAll('dialog[open] input[aria-label=Alias]')].map(i => i.value).join(' ')";
+
+                // edit one alias and add another; the server stores them normalised
+                await page.EvaluateAsync("document.querySelector('button[aria-label=\"Edit SCM work\"]').click()");
+                await page.WaitAsync($"{Aliases} === 'ssh-alias'");
+                await FillAlias(0, "ssh://git@ssh-alias:2222");
+                await Click("dialog[open]", "Add alias");
+                await page.WaitAsync("document.querySelectorAll('dialog[open] input[aria-label=Alias]').length === 2");
+                await FillAlias(1, "https://Git-Alias.example.com/");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync(
+                    "!document.querySelector('dialog[open]') && document.querySelector('.scmrow[data-scm=work] [data-scm-aliases]')?.textContent.includes('https://git-alias.example.com')"
+                );
+                (await ValueAsync(page, "document.querySelector('.scmrow[data-scm=work]').textContent"))
+                    .Should()
+                    .Contain("ssh://ssh-alias:2222")
+                    .And.NotContain(Secret);
+                (await File.ReadAllTextAsync(file, Token))
+                    .Should()
+                    .Contain("aliases = [\"ssh://ssh-alias:2222\", \"https://git-alias.example.com\"]")
+                    .And.Contain("token_protected");
+
+                // a duplicate is refused by the server and shown in the dialog
+                await page.EvaluateAsync("document.querySelector('button[aria-label=\"Edit SCM work\"]').click()");
+                await page.WaitAsync($"{Aliases} === 'ssh://ssh-alias:2222 https://git-alias.example.com'");
+                await Click("dialog[open]", "Add alias");
+                await FillAlias(2, "SSH://ssh-alias:2222/");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync(
+                    "document.querySelector('dialog[open] p.error:not([hidden])')?.textContent.includes('already an alias')"
+                );
+
+                // delete the duplicate and the first alias; the one left is saved
+                await RemoveAlias(2);
+                await RemoveAlias(0);
+                await page.WaitAsync($"{Aliases} === 'https://git-alias.example.com'");
+                await Click("dialog[open]", "Save");
+                await page.WaitAsync("!document.querySelector('dialog[open]')");
+                var scm = new Harness.Infrastructure.Scm.ScmConfigurationFile(file);
+                scm.Find("work")!
+                    .Endpoint.Aliases.Select(alias => alias.Text)
+                    .Should()
+                    .Equal("https://git-alias.example.com");
+                scm.Resolve("work").Token.Should().Be(Secret);
+                await page.WaitAsync(
+                    "!document.querySelector('.scmrow[data-scm=work] [data-scm-aliases]')?.textContent.includes('ssh-alias')"
+                );
+            }
+        );
+    }
+
+    /// <summary>
     /// Agents › Tools &amp; providers › Used here shows the project's SCM (TASK-0132): two connections serve its server,
     /// so it asks for a choice; choosing one keeps it on this machine, Test checks the connection and the project, and
     /// the scm_ calls agents made are counted.
@@ -2486,6 +2730,70 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                     .Should()
                     .Contain("as reviewer");
                 (await ValueAsync(page, "document.body.innerHTML")).Should().NotContain("glpat-");
+            }
+        );
+    }
+
+    /// <summary>
+    /// The nuget card in Agents › Tools &amp; providers names the repository's nuget.config problem; Fix shows the
+    /// override it would write to .harness/config.toml and writes it only on Write it (TASK-0140).
+    /// </summary>
+    [Fact]
+    public async Task ToolsPageShowsTheNuGetOverrideBeforeWritingIt()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        var global = Path.Combine(fixture.Global, "config.toml");
+        var globalText = File.Exists(global) ? await File.ReadAllTextAsync(global, Token) : "";
+        await File.WriteAllTextAsync(
+            global,
+            globalText
+                + "\n[providers.nuget]\ncommand = \"dnx\"\n"
+                + "args = [\"DimonSmart.NugetMcpServer@1.1.10\", \"--yes\", \"--source\", "
+                + "\"https://api.nuget.org/v3/index.json\"]\n",
+            Token
+        );
+        await File.WriteAllTextAsync(Path.Combine(fixture.Root, "App.csproj"), "<Project />", Token);
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.Root, "nuget.config"),
+            "<configuration><packageSources><clear />"
+                + "<add key=\"company\" value=\"https://pkgs.example.com/feed/v3/index.json\" />"
+                + "</packageSources></configuration>",
+            Token
+        );
+        var config = Path.Combine(fixture.Root, ".harness", "config.toml");
+        var before = File.Exists(config) ? await File.ReadAllTextAsync(config, Token) : "";
+        var id = UiWriteTests.ProjectId(fixture);
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + "#/p/" + id + "/agents/tools" }
+                );
+                await page.WaitAsync("!!document.querySelector('.provcheck button')");
+                (await ValueAsync(page, "document.querySelector('.provcheck').textContent"))
+                    .Should()
+                    .Contain("nuget-config")
+                    .And.Contain("company");
+                await page.EvaluateAsync("document.querySelector('.provcheck button').click()");
+                await page.WaitAsync("!!document.querySelector('dialog .fixdiff')");
+                (await ValueAsync(page, "document.querySelector('dialog .fixdiff').textContent"))
+                    .Should()
+                    .Contain("+ [providers.nuget]")
+                    .And.Contain("+ dir = \"project\"");
+                (File.Exists(config) ? await File.ReadAllTextAsync(config, Token) : "").Should().Be(before);
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('dialog button')].find(b => b.textContent.trim() === 'Write it').click()"
+                );
+                await page.WaitAsync("!document.querySelector('dialog') && !document.querySelector('.provcheck')");
+                (await File.ReadAllTextAsync(config, Token))
+                    .Should()
+                    .StartWith(before.TrimEnd())
+                    .And.Contain("[providers.nuget]")
+                    .And.Contain("dir = \"project\"");
             }
         );
     }
@@ -2734,6 +3042,10 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 await page.WaitAsync(
                     "document.querySelectorAll('.agentpanel').length === 3 && document.querySelectorAll('.ae-approval button').length === 2"
                 );
+                // the live session names its permission mode, by the label the server gives it (TASK-0135)
+                (await ValueAsync(page, "document.querySelector('.agentpanel .agenthead').textContent"))
+                    .Should()
+                    .Contain("Auto mode");
 
                 // the checks do report: a control too small to hit
                 await page.EvaluateAsync(
@@ -2768,6 +3080,7 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 ["client"] = "claude-code",
                 ["task_id"] = "UI-0001",
                 ["session_id"] = "33333333-live-session",
+                ["permission_mode"] = "auto",
                 ["pid"] = Environment.ProcessId,
                 ["status"] = "running",
                 ["started_at"] = "2026-11-08T10:00:00.000Z",
@@ -2878,6 +3191,268 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 var task = tasks.List(cancellationToken: Token).Single(t => t.Definition.Title == "Waits for theirs");
                 task.Definition.DependsOn.Should().Equal("theirs:OT-0001");
                 task.Status.Should().Be("backlog", "their task is not done");
+            }
+        );
+    }
+
+    /// <summary>
+    /// A plugin host's build-order-only references (an item list with ReferenceOutputAssembly=false) are dashed
+    /// lines in Layers, and its side panel lists them as 'Builds before' (TASK-0137).
+    /// </summary>
+    [Fact]
+    public async Task BuildOrderOnlyReferencesAreDashedLinesInLayers()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "Host/Host.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+              <ItemGroup>
+                <PluginProject Include="..\Plugins\Alpha\Alpha.csproj" />
+                <PluginProject Include="..\Plugins\Beta\Beta.csproj" />
+              </ItemGroup>
+              <ItemGroup>
+                <ProjectReference Include="@(PluginProject)">
+                  <ReferenceOutputAssembly>False</ReferenceOutputAssembly>
+                </ProjectReference>
+                <ProjectReference Include="..\Shared\Shared.csproj" />
+              </ItemGroup>
+            </Project>
+            """
+        );
+        foreach (
+            var library in new[] { "Plugins/Alpha/Alpha.csproj", "Plugins/Beta/Beta.csproj", "Shared/Shared.csproj" }
+        )
+        {
+            fixture.Write(library, """<Project Sdk="Microsoft.NET.Sdk" />""");
+        }
+
+        await fixture.CommitAsync("a plugin host");
+        await fixture.RunAsync();
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + $"#/p/{id}/architecture/layers" }
+                );
+                await page.WaitAsync("document.querySelectorAll('.archlines path.aline').length === 3");
+                (await ValueAsync(page, "document.querySelectorAll('.archlines path.aline.build').length"))
+                    .Should()
+                    .Be("2", "both plugins are build-order-only references");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.archlines path.aline')].map(p => (p.classList.contains('build') ? 'build ' : 'code ') + getComputedStyle(p).strokeDasharray).sort().join(' | ')"
+                    )
+                )
+                    .Should()
+                    .MatchRegex(@"^build \d.* \| build \d.* \| code none$", "only build-order lines are dashed");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.anode')].find(n => n.title === 'Alpha').closest('.arow').querySelector('.alabel').textContent"
+                    )
+                )
+                    .Should()
+                    .Be("layer 0");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.anode')].find(n => n.title === 'Host').closest('.arow').querySelector('.alabel').textContent"
+                    )
+                )
+                    .Should()
+                    .Be("layer 1", "only the code reference to Shared lifts the host");
+
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.anode')].find(n => n.title === 'Host').click()"
+                );
+                await page.WaitAsync("document.querySelector('.archside h4')?.textContent === 'Host'");
+                var side = await ValueAsync(page, "document.querySelector('.archside').textContent");
+                side.Should().Contain("Builds before").And.Contain("Alpha").And.Contain("Beta");
+                side[
+                    side.IndexOf("References", StringComparison.Ordinal)..side.IndexOf(
+                        "Referenced by",
+                        StringComparison.Ordinal
+                    )
+                ]
+                    .Should()
+                    .Contain("Shared")
+                    .And.NotContain("Alpha", "build-order references are listed apart");
+
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.anode')].find(n => n.title === 'Beta').click()"
+                );
+                await page.WaitAsync("document.querySelector('.archside h4')?.textContent === 'Beta'");
+                (await ValueAsync(page, "document.querySelector('.archside').textContent"))
+                    .Should()
+                    .Contain("Built before");
+            }
+        );
+    }
+
+    /// <summary>
+    /// The Layers side panel marks a NuGet package with a newer stable version with an info mark and one with a known
+    /// vulnerability with a warning sign, each focusable with its explanation as title and label; the marks come from
+    /// the package cache after the view is drawn, and the panel passes the UI checks in both themes and widths
+    /// (TASK-0141).
+    /// </summary>
+    [Fact]
+    public async Task NuGetPackagesShowUpgradeAndVulnerabilityMarksWithTheirTooltips()
+    {
+        const string Feed = "https://feed.test/v3/index.json";
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "nuget.config",
+            $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="feed" value="{Feed}" />
+              </packageSources>
+              <!-- the user-level NuGet.Config may map packages to its own sources -->
+              <packageSourceMapping>
+                <clear />
+                <packageSource key="feed"><package pattern="*" /></packageSource>
+              </packageSourceMapping>
+            </configuration>
+            """
+        );
+        fixture.Write(
+            "App/App.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Acme.Json" Version="8.0.1" />
+                <PackageReference Include="Acme.Http" Version="1.0.0" />
+                <PackageReference Include="Acme.Clean" Version="3.0.0" />
+                <PackageReference Include="Acme.Property" Version="$(AcmeVersion)" />
+              </ItemGroup>
+            </Project>
+            """
+        );
+        await fixture.CommitAsync("an app with packages");
+        await fixture.RunAsync();
+
+        // what the feed said, cached an hour ago: harness ui reads no package source in tests
+        var cache = new Harness.Infrastructure.Architecture.PackageFeeds.PackageMetadataCache(
+            Path.Combine(fixture.Global, "cache", "nuget")
+        );
+        var at = DateTimeOffset.UtcNow.AddHours(-1);
+        cache.SaveService(
+            Feed,
+            new(at, "https://feed.test/v3-flatcontainer/", "https://feed.test/v3/vulnerabilities/index.json")
+        );
+        cache.SaveVersions(Feed, "Acme.Json", new(at, true, ["8.0.1", "9.0.0", "9.0.3", "10.0.0-rc.1"]));
+        cache.SaveVersions(Feed, "Acme.Http", new(at, true, ["1.0.0", "2.0.0"]));
+        cache.SaveVersions(Feed, "Acme.Clean", new(at, true, ["2.0.0", "3.0.0"]));
+        cache.SaveVulnerabilities(
+            Feed,
+            new(at, [new("base", "https://feed.test/v3-vulnerabilities/base.json", "2026-11-11T06:01:49Z")])
+        );
+        cache.SavePage(
+            Feed,
+            "base",
+            """
+            {"acme.json":[{"url":"https://github.com/advisories/GHSA-acme-json","severity":3,"versions":"[8.0.0, 9.0.0)"}],
+             "acme.http":[{"url":"https://github.com/advisories/GHSA-acme-http","severity":0,"versions":"(, 2.0.0)"}]}
+            """
+        );
+
+        string checks;
+        using (var stream = typeof(UiBrowserTests).Assembly.GetManifestResourceStream("checks.js")!)
+        using (var reader = new StreamReader(stream))
+        {
+            checks = await reader.ReadToEndAsync(Token);
+        }
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + $"#/p/{id}/architecture/layers" }
+                );
+                await page.WaitAsync("[...document.querySelectorAll('.anode')].some(n => n.title === 'App')");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.anode')].find(n => n.title === 'App').click()"
+                );
+                await page.WaitAsync("document.querySelectorAll('.archside .pkmark').length === 4");
+                const string Marks =
+                    "[...document.querySelectorAll('.archside ul.pkgs li')].map(li => li.firstChild.textContent + ': ' + [...li.querySelectorAll('.pkmark')].map(m => m.className.replace('pkmark ', '') + ' ' + m.getAttribute('tabindex') + ' ' + (m.getAttribute('aria-label') === m.title)).join(', ')).join(' | ')";
+                (await ValueAsync(page, Marks))
+                    .Should()
+                    .Be(
+                        "Acme.Json: pkup 0 true, pkvuln sev-critical 0 true | Acme.Http: pkup 0 true, pkvuln sev-low 0 true"
+                            + " | Acme.Clean:  | Acme.Property: ",
+                        "a newer stable version and a vulnerability are marked, an unresolved version is not"
+                    );
+                static string Title(int index) =>
+                    "document.querySelectorAll('.archside .pkmark')["
+                    + index.ToString(CultureInfo.InvariantCulture)
+                    + "].title";
+                (await ValueAsync(page, Title(0)))
+                    .Should()
+                    .Be("Newer stable version 9.0.3 available (you use 8.0.1)", "pre-releases are not offered");
+                (await ValueAsync(page, Title(1)))
+                    .Should()
+                    .Be(
+                        "Known critical vulnerability in 8.0.1: https://github.com/advisories/GHSA-acme-json"
+                            + " (affects [8.0.0, 9.0.0)); fixed in 9.0.0"
+                    );
+                (await ValueAsync(page, Title(3)))
+                    .Should()
+                    .Contain("Known low vulnerability in 1.0.0")
+                    .And.Contain("fixed in 2.0.0");
+                // gold ink for low and moderate, the critical red for high and critical
+                (
+                    await ValueAsync(
+                        page,
+                        "(() => { const probe = (v) => { const s = document.createElement('span'); s.style.color = `var(${v})`; document.body.append(s); const c = getComputedStyle(s).color; s.remove(); return c; };"
+                            + " return [...document.querySelectorAll('.archside .pkvuln')].map(m => getComputedStyle(m).color === probe(m.classList.contains('sev-critical') ? '--critical' : '--gold-ink')).join(); })()"
+                    )
+                )
+                    .Should()
+                    .Be("true,true");
+
+                // the marks are reached by keyboard
+                await page.EvaluateAsync("document.querySelector('.archside .pkvuln').focus()");
+                (await ValueAsync(page, "document.activeElement.classList.contains('pkvuln')")).Should().Be("True");
+
+                List<string> faults = [];
+                foreach (var (theme, width) in new[] { ("dark", 1400), ("dark", 390), ("light", 1400), ("light", 390) })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setDeviceMetricsOverride",
+                        new
+                        {
+                            width,
+                            height = 900,
+                            deviceScaleFactor = 1,
+                            mobile = width < 600,
+                        }
+                    );
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    await Task.Delay(300, Token);
+                    faults.AddRange((await ChecksAsync(page, checks)).Select(f => $"{theme} {width}: {f}"));
+                }
+
+                faults.Should().BeEmpty(string.Join("\n", faults));
             }
         );
     }

@@ -50,6 +50,24 @@ public static class ReportAnalyzer
                 .ToArray();
     }
 
+    /// <summary>
+    /// The findings with the built-in search's when rg and fd are both missing: there is then no text or file search
+    /// unless a provider offers one, and the action is the install command for this operating system.
+    /// </summary>
+    public static IReadOnlyList<ReportFinding>? WithSearch(
+        IReadOnlyList<ReportFinding>? findings,
+        Providers.SearchStatus status
+    )
+    {
+        ArgumentNullException.ThrowIfNull(status);
+        if (status.State is not Providers.SearchTools.Missing)
+        {
+            return findings;
+        }
+
+        return [.. findings ?? [], new("warn", ReportAudience.User, "providers", status.Detail, status.Fix)];
+    }
+
     private static void Add(
         List<ReportFinding> result,
         string level,

@@ -1,6 +1,6 @@
 namespace Harness.Scm;
 
-/// <summary>An SCM implementation (GitLab, Forgejo): creates clients bound to one connection.</summary>
+/// <summary>An SCM implementation (GitLab, Forgejo, GitHub): creates clients bound to one connection.</summary>
 public interface IScmProvider
 {
     ScmKind Kind { get; }
@@ -68,6 +68,18 @@ public interface IScmClient : IDisposable
     );
 
     Task<ScmApproval> ApproveAsync(string project, long number, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens a merge request, then assigns it and requests reviews as asked. Unknown usernames, a missing branch, a
+    /// merge request into itself and an already open merge request for the same branches are refused as
+    /// <see cref="ScmErrorKind.Invalid" /> (nothing is created); an assignee or reviewer the server refuses after the
+    /// merge request was created becomes a warning of the result.
+    /// </summary>
+    Task<ScmCreatedMergeRequest> CreateMergeRequestAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    );
 }
 
 /// <summary>Bounds every provider applies to its calls.</summary>

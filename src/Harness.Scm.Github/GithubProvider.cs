@@ -312,6 +312,103 @@ internal sealed class GithubClient(ScmConnection connection, HttpMessageHandler 
         return new ScmApproval(null, ApprovedBy(reviews));
     }
 
+    public async Task<ScmCreatedMergeRequest> CreateMergeRequestAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        request = ScmMergeRequestCreation.Normalize(request);
+        await KnownUsersAsync(request.Assignees.Concat(request.Reviewers), cancellationToken).ConfigureAwait(false);
+        GhPull pull;
+        try
+        {
+            pull = await _http
+                .SendAsync(
+                    HttpMethod.Post,
+                    RepoPath(project) + "/pulls",
+                    new GhPullCreate(request.SourceBranch, request.TargetBranch, request.Title, request.Description),
+                    Json.GhPullCreate,
+                    Json.GhPull,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+        }
+        catch (ScmException failure)
+        {
+            throw await ScmMergeRequestCreation
+                .ExplainAsync(
+                    failure,
+                    request,
+                    "pull request #",
+                    token => OpenPullAsync(project, request, token),
+                    (branch, token) => BranchExistsAsync(project, branch, token),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+        }
+
+        List<string> warnings = [];
+        if (request.Assignees.Count > 0)
+        {
+            try
+            {
+                var issue = await _http
+                    .SendAsync(
+                        HttpMethod.Post,
+                        IssuePath(project, pull.Number) + "/assignees",
+                        new GhAssigneesBody(request.Assignees.ToList()),
+                        Json.GhAssigneesBody,
+                        Json.GhIssue,
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+                // GitHub leaves out, without an error, users who cannot be assigned
+                var unassigned = ScmMergeRequestCreation.Missing(
+                    request.Assignees,
+                    (issue.Assignees ?? []).Select(user => user.Login ?? "")
+                );
+                if (unassigned.Count > 0)
+                {
+                    warnings.Add(
+                        ScmMergeRequestCreation.Warning(
+                            "assignee",
+                            unassigned,
+                            "GitHub did not assign them (only users with access to the repository can be assigned)."
+                        )
+                    );
+                }
+            }
+            catch (ScmException exception)
+            {
+                warnings.Add(ScmMergeRequestCreation.Warning("assignee", request.Assignees, exception.Message));
+            }
+        }
+
+        if (request.Reviewers.Count > 0)
+        {
+            try
+            {
+                pull = await _http
+                    .SendAsync(
+                        HttpMethod.Post,
+                        RequestPath(project, pull.Number) + "/requested_reviewers",
+                        new GhReviewersBody(request.Reviewers.ToList()),
+                        Json.GhReviewersBody,
+                        Json.GhPull,
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+            }
+            catch (ScmException exception)
+            {
+                warnings.Add(ScmMergeRequestCreation.Warning("reviewer", request.Reviewers, exception.Message));
+            }
+        }
+
+        return new ScmCreatedMergeRequest(Request(pull, null), warnings);
+    }
+
     public void Dispose() => _http.Dispose();
 
     private async Task<MergeRequest> EditAsync(
@@ -333,6 +430,76 @@ internal sealed class GithubClient(ScmConnection connection, HttpMessageHandler 
                 .ConfigureAwait(false),
             null
         );
+
+    /// <summary>Throws naming every username GitHub does not know (GET /users/{username} answers 404).</summary>
+    private async Task KnownUsersAsync(IEnumerable<string> usernames, CancellationToken cancellationToken)
+    {
+        List<string> unknown = [];
+        foreach (var name in usernames.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await _http
+                    .GetAsync("users/" + Uri.EscapeDataString(name), Json.GhUser, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (ScmException exception) when (exception.Kind is ScmErrorKind.NotFound)
+            {
+                unknown.Add(name);
+            }
+        }
+
+        if (unknown.Count > 0)
+        {
+            throw ScmMergeRequestCreation.UnknownUsers(unknown);
+        }
+    }
+
+    /// <summary>The open pull request from the source branch (owner:branch, as GitHub filters) into the target.</summary>
+    private async Task<MergeRequest?> OpenPullAsync(
+        string project,
+        ScmNewMergeRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var head = request.SourceBranch.Contains(':', StringComparison.Ordinal)
+            ? request.SourceBranch
+            : Split(project).Owner + ":" + request.SourceBranch;
+        var open = await _http
+            .GetAsync(
+                $"{RepoPath(project)}/pulls?state=open&head={Uri.EscapeDataString(head)}"
+                    + $"&base={Uri.EscapeDataString(request.TargetBranch)}",
+                Json.ListGhPull,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        return open.Value.FirstOrDefault() is { } found ? Request(found, null) : null;
+    }
+
+    /// <summary>Whether a branch exists; null for a fork's owner:branch, which this repository cannot tell.</summary>
+    private async Task<bool?> BranchExistsAsync(string project, string branch, CancellationToken cancellationToken)
+    {
+        if (branch.Contains(':', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        try
+        {
+            await _http
+                .GetAsync(
+                    RepoPath(project) + "/branches/" + string.Join('/', branch.Split('/').Select(Uri.EscapeDataString)),
+                    Json.GhBranchInfo,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+            return true;
+        }
+        catch (ScmException exception) when (exception.Kind is ScmErrorKind.NotFound)
+        {
+            return false;
+        }
+    }
 
     private async Task<GhPull> GetPullAsync(string project, long number, CancellationToken cancellationToken) =>
         (

@@ -237,7 +237,56 @@ public sealed class ScmToolsTests : IDisposable
             );
     }
 
+    [Fact]
+    public async Task MergeRequestsAreCreatedWithAssigneesReviewersAndWarnings()
+    {
+        await using var session = await SessionAsync();
+
+        var created = await CallAsync(
+            session,
+            "scm_create_merge_request",
+            """
+            {"from":" feature/parser ","to":"main","title":"Add parser","description":"Adds it",
+             "assignees":["@alice"],"reviewers":["bob","carol"]}
+            """
+        );
+
+        created.Error.Should().BeFalse(created.Text);
+        session
+            .Client.Calls.Should()
+            .Equal("create group/repo feature/parser>main Add parser [Adds it] [alice] [bob,carol]");
+        created.Json.GetProperty("project").GetString().Should().Be("group/repo");
+        created.Json.GetProperty("merge_request_id").GetInt64().Should().Be(8);
+        var request = created.Json.GetProperty("merge_request");
+        request.GetProperty("id").GetInt64().Should().Be(8);
+        request.GetProperty("source_branch").GetString().Should().Be("feature/parser");
+        request
+            .GetProperty("web_url")
+            .GetString()
+            .Should()
+            .Be("https://gitlab.example.com/group/repo/-/merge_requests/8");
+        request.TryGetProperty("merge_status", out _).Should().BeTrue("the same shape as the details tool");
+        created.Json.GetProperty("warnings")[0].GetString().Should().Contain("carol");
+
+        var plain = await CallAsync(
+            session,
+            "scm_create_merge_request",
+            """{"from":"fix","to":"main","title":"Fix"}"""
+        );
+        plain.Error.Should().BeFalse(plain.Text);
+        plain.Json.GetProperty("warnings").GetArrayLength().Should().Be(0);
+        session.Client.Calls[^1].Should().Be("create group/repo fix>main Fix [] [] []");
+    }
+
     [Theory]
+    [InlineData("scm_create_merge_request", """{"from":"a","title":"x"}""", "to")]
+    [InlineData("scm_create_merge_request", """{"from":"a","to":"b","title":" "}""", "title must not be empty")]
+    [InlineData(
+        "scm_create_merge_request",
+        """{"from":"main","to":"main","title":"x"}""",
+        "invalid: The source and target"
+    )]
+    [InlineData("scm_create_merge_request", """{"from":"a","to":"b","title":"x","assignees":"bob"}""", "assignees")]
     [InlineData("scm_get_merge_request_details", "{}", "merge_request_id")]
     [InlineData("scm_get_merge_request_details", """{"merge_request_id":"7"}""", "merge_request_id")]
     [InlineData("scm_get_merge_request_details", """{"merge_request_id":0}""", "positive")]
@@ -314,7 +363,7 @@ public sealed class ScmToolsTests : IDisposable
     }
 
     [Fact]
-    public async Task SessionsWithoutProvidersSaySoAndTenScmToolsAreAdvertised()
+    public async Task SessionsWithoutProvidersSaySoAndElevenScmToolsAreAdvertised()
     {
         await using var session = await SessionAsync();
         session.WithoutProviders = true;
@@ -324,7 +373,7 @@ public sealed class ScmToolsTests : IDisposable
             .Assembly.GetManifestResourceNames()
             .Where(name => name.StartsWith("Harness.Mcp.Schemas.scm_", StringComparison.Ordinal))
             .ToList();
-        schemas.Should().HaveCount(10);
+        schemas.Should().HaveCount(11);
         foreach (var resource in schemas)
         {
             using var stream = typeof(HarnessMcpServer).Assembly.GetManifestResourceStream(resource)!;
@@ -513,6 +562,32 @@ public sealed class ScmToolsTests : IDisposable
 
         public Task<ScmApproval> ApproveAsync(string project, long number, CancellationToken cancellationToken) =>
             Task.FromResult(Record($"approve {project} {number}", new ScmApproval(true, [Alice])));
+
+        public Task<ScmCreatedMergeRequest> CreateMergeRequestAsync(
+            string project,
+            ScmNewMergeRequest request,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult(
+                Record(
+                    $"create {project} {request.SourceBranch}>{request.TargetBranch} {request.Title} "
+                        + $"[{request.Description}] [{string.Join(",", request.Assignees)}] "
+                        + $"[{string.Join(",", request.Reviewers)}]",
+                    new ScmCreatedMergeRequest(
+                        Request with
+                        {
+                            Number = 8,
+                            Title = request.Title,
+                            SourceBranch = request.SourceBranch,
+                            TargetBranch = request.TargetBranch,
+                            WebUrl = new Uri("https://gitlab.example.com/group/repo/-/merge_requests/8"),
+                        },
+                        request.Reviewers.Contains("carol")
+                            ? ["Could not add carol as reviewer: carol is not a project member."]
+                            : []
+                    )
+                )
+            );
 
         public void Dispose()
         {

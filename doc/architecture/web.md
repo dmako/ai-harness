@@ -29,6 +29,8 @@ Machine › SCM connections (`GET /api/scm`; `POST /api/scm`,
 the CLI's `UiReadService` over Harness.Scm's configuration store and providers.
 Entries carry the token only masked; a test of the form's unsaved values may use
 a saved entry's token by name, so an edit is tested without typing it again.
+Entries list their aliases; add and edit take `aliases` (an array of strings, all of
+them, validated by the store as for `harness scm alias`).
 
 A project's SCM card on Agents › Tools & providers (`GET
 /api/projects/{id}/scm?days=N`; `POST /api/projects/{id}/scm/choice` and
