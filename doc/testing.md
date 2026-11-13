@@ -55,6 +55,46 @@ The whole-UI check runs its theme/width passes on parallel pages.
 The release workflow adds native publish, repeat hashes and archive probes for
 all four supported RIDs. Local execution does not imply those CI jobs ran.
 
+### The Avalonia UI (BP-010)
+
+`Harness.Ui.Tests` runs with the solution. These are the headless view tests: the
+shared views against `FixtureApi`, the UI checks, the contracts' strictness, and
+the router (see `test/Harness.Ui.Tests/README.md`). They need no workload.
+
+The browser bundle is different: `src/Harness.Ui.Browser` needs the `wasm-tools`
+workload, because SkiaSharp's WebAssembly libraries are linked into
+`dotnet.native.wasm`. It is therefore not built by the solution build
+(`<Build Project="false" />` in `Harness.slnx`). Build it on its own, into a new
+folder, since a publish into a used folder keeps the old fingerprinted files
+beside the new ones:
+
+```powershell
+dotnet workload install wasm-tools
+dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/next
+python scripts/ui_bundle.py artifacts/next/wwwroot
+```
+
+The tests that use the bundle read it from `HARNESS_UI_NEXT_DIR`, else from
+`artifacts/next/wwwroot`, and skip, saying how to build it, when it is missing:
+
+- `UiNextBrowserTests`, the browser smoke test. It also needs `HARNESS_UI_BROWSER`.
+- `UiBundleBudgetTests`. The Brotli total must stay within 6.0 MB, 25 % over the
+  spike's 4.81 MB. Raise the budget here and in `scripts/ui_bundle.py` together,
+  on purpose.
+
+Run them with `harness ui` serving the bundle at `/next/`
+(`HARNESS_UI_NEXT_DIR=<repo>/artifacts/next/wwwroot`).
+
+The `ui` job of `tests.yml` does all of this on Linux with Chrome, in order:
+
+1. installs the workload;
+2. runs the locked restore with it installed;
+3. publishes the bundle;
+4. reports its size in the step summary;
+5. runs `Harness.Ui.Tests`, the bundle tests, the contract tests and the
+   `/next/` tests;
+6. uploads the bundle.
+
 ## Performance
 
 ```shell

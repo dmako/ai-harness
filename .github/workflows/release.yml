@@ -10,7 +10,46 @@ on:
 permissions:
   contents: read
 jobs:
+  ui-bundle:
+    # The Avalonia UI's WebAssembly bundle is the same for every runtime: built once here (with the wasm-tools
+    # workload, which the Native AOT publishes do not need) and handed to each runtime's packaging step.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_CLI_HOME: ${{ github.workspace }}/artifacts/cli-home
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/packages
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+      - name: Locked restore and publish the bundle
+        run: |
+          dotnet restore src/Harness.Ui.Browser/Harness.Ui.Browser.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish src/Harness.Ui.Browser/Harness.Ui.Browser.csproj -c Release --no-restore -o artifacts/next
+      - name: Bundle size
+        run: |
+          $report = python scripts/ui_bundle.py artifacts/next/wwwroot --markdown
+          $code = $LASTEXITCODE
+          $report | Write-Output
+          $report[-1] | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY
+          exit $code
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ui-bundle
+          retention-days: 7
+          path: artifacts/next/wwwroot
   qualify:
+    needs: ui-bundle
     strategy:
       fail-fast: false
       matrix:
@@ -51,8 +90,12 @@ jobs:
           dotnet restore Harness.slnx --locked-mode "-bl:artifacts/restore-$([guid]::NewGuid().ToString('N')).binlog"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet test --solution Harness.slnx --no-restore "-bl:artifacts/test-$([guid]::NewGuid().ToString('N')).binlog" --report-trx --results-directory "$PWD/artifacts/tests"
+      - uses: actions/download-artifact@v8
+        with:
+          name: ui-bundle
+          path: artifacts/ui-bundle
       - name: Publish and verify repeat binary hashes
-        run: python scripts/publish_release.py --version "$env:RELEASE_VERSION" --rids "$env:RID" --output artifacts/package --verify-repeat
+        run: python scripts/publish_release.py --version "$env:RELEASE_VERSION" --rids "$env:RID" --output artifacts/package --verify-repeat --ui-bundle artifacts/ui-bundle
       - name: Native runtime isolation smoke test
         run: |
           $archive = Get-ChildItem artifacts/package/harness-* | Where-Object { $_.Name -match '\.(zip|tar.gz)$' } | Select-Object -First 1

@@ -37,3 +37,58 @@ jobs:
           path: |
             artifacts/tests
             artifacts/**/*.binlog
+  ui:
+    # The Avalonia UI's WebAssembly bundle (TASK-0163): built once here with the wasm-tools workload (the solution
+    # build above does not need it), then its size budget, its headless view tests, the contract tests and the
+    # browser smoke test against it in Chrome.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+      DOTNET_CLI_HOME: ${{ github.workspace }}/artifacts/cli-home
+      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/packages
+      HARNESS_UI_NEXT_DIR: ${{ github.workspace }}/artifacts/next/wwwroot
+      HARNESS_UI_BROWSER: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+      - name: Locked restore with the workload installed
+        run: dotnet restore Harness.slnx --locked-mode "-bl:artifacts/restore-$([guid]::NewGuid().ToString('N')).binlog"
+      - name: Publish the bundle
+        run: dotnet publish src/Harness.Ui.Browser/Harness.Ui.Browser.csproj -c Release -o artifacts/next "-bl:artifacts/ui-publish-$([guid]::NewGuid().ToString('N')).binlog"
+      - name: Bundle size
+        run: |
+          $report = python scripts/ui_bundle.py artifacts/next/wwwroot --markdown
+          $code = $LASTEXITCODE
+          $report | Write-Output
+          $report[-1] | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY
+          exit $code
+      - name: Headless view tests, contract tests and the browser smoke test
+        run: |
+          dotnet test --project test/Harness.Ui.Tests/Harness.Ui.Tests.csproj --no-restore --report-trx --results-directory "$PWD/artifacts/tests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --report-trx --results-directory "$PWD/artifacts/tests" -- --filter-class Harness.Integration.Web.UiNextBrowserTests --filter-class Harness.Integration.Web.UiBundleBudgetTests --filter-class Harness.Integration.Web.UiContractTests --filter-class Harness.Integration.Web.UiNextTests
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ui-bundle
+          retention-days: 7
+          path: artifacts/next/wwwroot
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: tests-ui
+          retention-days: 7
+          path: |
+            artifacts/tests
+            artifacts/**/*.binlog

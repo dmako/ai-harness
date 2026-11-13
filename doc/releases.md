@@ -50,3 +50,36 @@ starts the Linux executable in a runtime-dependencies-only container without
 network access. This container check is a startup smoke; full functional probes
 run in isolated child environments on the native host. Those hosts may have SDKs
 installed even though the application children cannot resolve them through PATH.
+
+## The Avalonia UI bundle
+
+The Avalonia harness ui (BP-010) is a WebAssembly bundle: the publish output's
+`wwwroot` of `src/Harness.Ui.Browser`.
+
+**It is built once, not per runtime.** It is the same for every runtime and is not
+part of the Native AOT publishes. Building it needs the `wasm-tools` workload
+(SkiaSharp's WebAssembly libraries are linked into it); the executables do not.
+So the release workflow's `ui-bundle` job builds it once:
+
+- installs the workload;
+- restores the browser host in locked mode;
+- publishes the bundle;
+- reports its size against the budget (`scripts/ui_bundle.py`);
+- uploads it as an artifact.
+
+**Each runtime's packaging step only checks and records it.** Every `qualify` job
+downloads the bundle and passes it to `publish_release.py --ui-bundle`, which
+checks that it is one and within the size budget. It records it in `RELEASE.json`
+as `ui_bundle`: files, raw and Brotli bytes, a hash of its tree, and
+`shipped: false`.
+
+**It ships from the switch-over.** It goes into the archives with the switch-over
+(TASK-0164), which also chooses how it is delivered.
+
+Locally, the same as the CI:
+
+```shell
+dotnet workload install wasm-tools
+dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/next
+python scripts/publish_release.py --version 0.13.0-preview --output dist/preview --ui-bundle artifacts/next/wwwroot
+```

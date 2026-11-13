@@ -20,6 +20,7 @@ import uuid
 import zipfile
 
 from release_licenses import inventory, repository_notices
+import ui_bundle as bundle_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 RIDS = {"win-x64": ("windows", "amd64"), "linux-x64": ("linux", "amd64"), "linux-arm64": ("linux", "arm64"), "osx-arm64": ("darwin", "arm64")}
@@ -89,11 +90,20 @@ def main():
     p.add_argument("--packages", type=Path)
     p.add_argument("--refresh-locks", action="store_true", help="Bootstrap changed publish lockfiles; review/commit the diff before locked CI")
     p.add_argument("--verify-repeat", action="store_true", help="Repeat each publish and require identical executable hashes")
+    p.add_argument("--ui-bundle", type=Path, help="The Avalonia UI's published WebAssembly bundle (wwwroot), the same for every runtime: checked and recorded in RELEASE.json; it ships in the archives from the switch-over (TASK-0164)")
     a = p.parse_args()
     if any(rid != host_rid() for rid in a.rids):
         p.error("Build Native AOT releases on each target host; this host supports " + host_rid())
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+\-]{0,79}", a.version):
         p.error("Version must be a safe archive component")
+    ui_bundle = None
+    if a.ui_bundle:
+        try:
+            ui_bundle = bundle_tool.describe(a.ui_bundle)
+        except ValueError as error:
+            p.error(str(error))
+        if ui_bundle["brotli_bytes"] > bundle_tool.BUDGET_MB * 1e6:
+            p.error("The Avalonia UI bundle is over its size budget: see scripts/ui_bundle.py")
     output = (a.output or ROOT / "dist" / a.version).resolve()
     if output.exists():
         p.error("Use a fresh output directory")
@@ -114,6 +124,8 @@ def main():
     source_files = [name for name in source_files if name.split("/")[0] in ("src", "configuration", "scripts") or name in ("global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "NuGet.config", ".editorconfig", "LICENSE", "doc/third-party-notices/unicode-BSD.txt", "README.md")]
     source_hashes = {name: sha(ROOT / name) for name in source_files if (ROOT / name).is_file()}
     manifest = {"schema": 1, "version": a.version, "commit": commit, "modified": modified, "source_date_epoch": epoch, "sdk": subprocess.check_output(["dotnet", "--version"], cwd=ROOT, env=environment).decode().strip(), "build_directory": build.relative_to(ROOT).as_posix(), "self_contained": True, "single_file": False, "trimmed": True, "native_aot": True, "source_sha256": source_hashes, "companion_policy": "Main archives contain harness, harness-graphify and harness-agents. Optional collect/share developer archives are separate and never installed by harness. Native SQLite libraries must stay beside their executables.", "repository_license_declaration": "MIT", "artifacts": []}
+    if ui_bundle:
+        manifest["ui_bundle"] = dict(ui_bundle, shipped=False, note="Built once for every runtime by the release's ui-bundle job; shipped from TASK-0164.")
     notes = "# Harness " + a.version + "\n\nTrimmed Native AOT binaries targeting .NET 11. Keep the included native SQLite library beside the executables. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools. See the included README.md for distribution dependencies (including libssl3t64 where applicable) and explicit trust steps for unsigned macOS downloads.\n\nMain archives: harness + harness-graphify + harness-agents. Developer archives: harness-collect + harness-share, not installed with the main CLI.\n\nCross-compilation does not imply native qualification. See doc/releases.md and the validation receipt for host/architecture execution status. Trimming and Native AOT are enabled; release archives contain native executables and the SQLite sidecar.\n"
     (output / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
     for rid in a.rids:
