@@ -18,17 +18,15 @@ using Xunit;
 namespace Harness.Ui.Tests;
 
 /// <summary>
-/// The Avalonia Board against a fixture harness ui API: what it shows, what its pickers send, live reloads, and the
-/// layout checks UiBrowserTests makes of the JavaScript UI (clipped text, overflow, 24 px controls, contrast).
+/// The Avalonia Board against the fixture API: what it shows, what its pickers send, live reloads kept in place, the
+/// UI checks (UiChecks) at every size and theme, and the contrast of the colour tokens it draws with.
 /// </summary>
 public sealed class BoardViewTests
 {
-    private static readonly Uri Server = new("http://127.0.0.1:17477/");
-
     [Fact]
     public Task TheBoardShowsTheServersColumnsAndCards() => Ui.RunAsync(async () =>
     {
-        var (window, _, _) = await OpenAsync(1280, 800);
+        var (window, _, _) = await Ui.OpenMainAsync(1280, 800);
 
         var columns = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("column")).ToArray();
         columns.Select(c => ((BoardColumnViewModel)c.DataContext!).Label)
@@ -55,7 +53,7 @@ public sealed class BoardViewTests
     [Fact]
     public Task ChoosingASortSavesItForTheProjectAndReloadsTheBoard() => Ui.RunAsync(async () =>
     {
-        var (window, api, model) = await OpenAsync(1280, 800);
+        var (window, api, model) = await Ui.OpenMainAsync(1280, 800);
         var gets = api.Gets.Count(g => g.EndsWith("/board", StringComparison.Ordinal));
         api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(sort: "id");
 
@@ -73,14 +71,14 @@ public sealed class BoardViewTests
     [Fact]
     public Task ALiveChangeToTheShownProjectRedrawsItsBoard() => Ui.RunAsync(async () =>
     {
-        var (window, api, model) = await OpenAsync(1280, 800);
-        await UntilAsync(() => model.Live is "live");
+        var (window, api, model) = await Ui.OpenMainAsync(1280, 800);
+        await Ui.UntilAsync(() => model.Live is "live");
         api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(title: "Changed elsewhere");
 
         api.Change("""{"projects":["prj_other"],"kinds":{"prj_other":["tasks"]}}""");
         api.Change($$$"""{"projects":["{{{Fixtures.ProjectId}}}"],"kinds":{"{{{Fixtures.ProjectId}}}":["tasks"]}}""");
-        await UntilAsync(() => model.LiveReloads > 0);
-        await UntilAsync(() => Cards(window).Count is 4);
+        await Ui.UntilAsync(() => model.LiveReloads > 0);
+        await Ui.UntilAsync(() => Cards(window).Count is 4);
 
         model.LiveReloads.Should().Be(1, "a change to another project does not reload this Board");
         Cards(window)[1].FindControl<SelectableTextBlock>("Title")!.Text.Should().Be("Changed elsewhere");
@@ -89,8 +87,8 @@ public sealed class BoardViewTests
     [Fact]
     public Task ALiveReloadUpdatesTheChangedCardInPlaceAndKeepsScrollAndSelection() => Ui.RunAsync(async () =>
     {
-        var (window, api, model) = await OpenAsync(1280, 600, Fixtures.Board(moreDone: 30));
-        await UntilAsync(() => model.Live is "live");
+        var (window, api, model) = await Ui.OpenMainAsync(1280, 600, Fixtures.Board(moreDone: 30));
+        await Ui.UntilAsync(() => model.Live is "live");
         var done = window
             .GetVisualDescendants()
             .OfType<Border>()
@@ -106,7 +104,7 @@ public sealed class BoardViewTests
 
         api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(title: "Changed elsewhere", moreDone: 30);
         api.Change($$$"""{"projects":["{{{Fixtures.ProjectId}}}"],"kinds":{"{{{Fixtures.ProjectId}}}":["tasks"]}}""");
-        await UntilAsync(() => model.LiveReloads > 0 && !model.Board!.Loading);
+        await Ui.UntilAsync(() => model.LiveReloads > 0 && !model.Board!.Loading);
         var cardsAfter = Cards(window).ToDictionary(c => ((TaskCardViewModel)c.DataContext!).Id, StringComparer.Ordinal);
 
         cardsAfter.Keys.Should().BeEquivalentTo(cardsBefore.Keys);
@@ -119,66 +117,9 @@ public sealed class BoardViewTests
         selected.SelectedText.Should().Be("the");
     });
 
-    [Theory]
-    [InlineData(1280, 800, "Light")]
-    [InlineData(1280, 800, "Dark")]
-    [InlineData(390, 844, "Light")]
-    [InlineData(390, 844, "Dark")]
-    [InlineData(800, 300, "Light")]
-    [InlineData(800, 160, "Light")]
-    public Task EveryWidthAndThemePassesTheUiChecks(int width, int height, string theme) => Ui.RunAsync(async () =>
-    {
-        Application.Current!.RequestedThemeVariant = theme is "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
-        try
-        {
-            var (window, _, _) = await OpenAsync(width, height);
-            var problems = new List<string>();
-            var view = ((MainView)window.Content!);
-
-            // the page never scrolls sideways: only the Board does, inside itself
-            view.FindControl<ScrollViewer>("PageScroller")!.Extent.Width.Should().BeLessThanOrEqualTo(width + 0.5);
-
-            foreach (var control in window.GetVisualDescendants().OfType<Control>().Where(Shown))
-            {
-                // controls a pointer or finger must hit are at least 24 px in both directions (WCAG 2.5.8)
-                if (control is ComboBox or HyperlinkButton or Button && control.Bounds.Height < 24 - 0.5)
-                {
-                    problems.Add($"{Name(control)} is {control.Bounds.Height:0.#} px tall");
-                }
-                // text is never cut (unless it trims with an ellipsis): its lines fit the height it was given, and no
-                // clipping ancestor cuts it except a scroller along the direction it scrolls
-                if (control is TextBlock { TextTrimming: var trimming, Text.Length: > 0 } text && trimming == TextTrimming.None)
-                {
-                    var lines = text.TextLayout.Height + text.Padding.Top + text.Padding.Bottom;
-                    if (lines > text.Bounds.Height + 1)
-                    {
-                        problems.Add($"'{text.Text}' needs {lines:0.#} px but has {text.Bounds.Height:0.#}");
-                    }
-                    if (ClippedBy(text, window) is { } clip)
-                    {
-                        problems.Add($"'{text.Text}' is cut by {clip}");
-                    }
-                }
-            }
-            // a column is never squeezed below its header: short windows scroll the page instead
-            foreach (var column in window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("column")))
-            {
-                if (column.Bounds.Height < 120)
-                {
-                    problems.Add($"column {((BoardColumnViewModel)column.DataContext!).Label} is {column.Bounds.Height:0} px");
-                }
-            }
-            problems.Should().BeEmpty();
-
-            using var frame = window.CaptureRenderedFrame();
-            frame.Should().NotBeNull();
-            frame.PixelSize.Width.Should().Be(width);
-        }
-        finally
-        {
-            Application.Current.RequestedThemeVariant = ThemeVariant.Default;
-        }
-    });
+    [Fact]
+    public Task EveryWidthAndThemePassesTheUiChecks() =>
+        Ui.RunAsync(() => UiChecks.AssertAsync(async (width, height) => (await Ui.OpenMainAsync(width, height)).Window));
 
     [Theory]
     [InlineData("Light")]
@@ -211,7 +152,7 @@ public sealed class BoardViewTests
         {
             foreach (var ink in inks)
             {
-                var ratio = Contrast(Token(ink), Token(surface));
+                var ratio = UiChecks.Contrast(Token(ink), Token(surface));
                 if (ratio < 4.5)
                 {
                     problems.Add($"{ink} on {surface}: {ratio:0.00}:1");
@@ -225,7 +166,7 @@ public sealed class BoardViewTests
     [Fact]
     public Task TabMovesThroughThePickersAndCards() => Ui.RunAsync(async () =>
     {
-        var (window, _, _) = await OpenAsync(1280, 800);
+        var (window, _, _) = await Ui.OpenMainAsync(1280, 800);
         var focused = new List<string>();
         for (var i = 0; i < 6; i++)
         {
@@ -237,123 +178,12 @@ public sealed class BoardViewTests
         focused.Take(4).Should().Equal("ProjectPicker", "SortPicker", "HideDonePicker", "BlueprintPicker");
     });
 
-    private static async Task<(Window Window, FixtureApi Api, MainViewModel Model)> OpenAsync(
-        int width,
-        int height,
-        string? board = null
-    )
-    {
-        var api = new FixtureApi();
-        api.Answers["/api/projects"] = Fixtures.Projects;
-        api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = board ?? Fixtures.Board();
-        // the client lives as long as the window: closing it disposes the client
-#pragma warning disable CA2000 // disposed by the window's Closed handler
-        var http = new HttpClient(api) { BaseAddress = Server };
-#pragma warning restore CA2000
-        var model = new MainViewModel(new HarnessApi(http), new UiHostContext { Server = Server });
-        var window = new Window
-        {
-            Width = width,
-            Height = height,
-            Content = new MainView { DataContext = model },
-        };
-        window.Closed += (_, _) => http.Dispose();
-        window.Show();
-        await model.StartAsync(Fixtures.ProjectId, TestContext.Current.CancellationToken);
-        await UntilAsync(() => model.Board is { Loading: false, Columns.Count: > 0 } && Cards(window).Count > 0);
-        return (window, api, model);
-    }
-
     private static List<TaskCard> Cards(Window window)
     {
         Dispatcher.UIThread.RunJobs();
         return [.. window.GetVisualDescendants().OfType<TaskCard>()];
     }
 
-    private static async Task UntilAsync(Func<bool> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException("the view did not get there in 5 s");
-            }
-            Dispatcher.UIThread.RunJobs();
-            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-            await Task.Delay(20);
-        }
-        Dispatcher.UIThread.RunJobs();
-    }
-
-    /// <summary>
-    /// The ancestor that cuts <paramref name="control"/> off, or null: one that clips to its bounds, where a scroller
-    /// only cuts along a direction it cannot scroll (what lies beyond the other way is reached by scrolling).
-    /// </summary>
-    private static string? ClippedBy(Control control, Visual root)
-    {
-        if (control.TranslatePoint(default, root) is not { } origin)
-        {
-            return null;
-        }
-        var rect = new Rect(origin, control.Bounds.Size);
-        foreach (var ancestor in control.GetVisualAncestors().OfType<Control>().TakeWhile(a => a != root))
-        {
-            if (!ancestor.ClipToBounds || ancestor.TranslatePoint(default, root) is not { } at)
-            {
-                continue;
-            }
-            var box = new Rect(at, ancestor.Bounds.Size).Inflate(1);
-            var scroller =
-                ancestor as ScrollViewer ?? (ancestor as ScrollContentPresenter)?.TemplatedParent as ScrollViewer;
-            var scrollsAcross = scroller?.Extent.Width > scroller?.Viewport.Width + 0.5;
-            var scrollsDown = scroller?.Extent.Height > scroller?.Viewport.Height + 0.5;
-            if (
-                (!scrollsAcross && (rect.X < box.X || rect.Right > box.Right))
-                || (!scrollsDown && (rect.Y < box.Y || rect.Bottom > box.Bottom))
-            )
-            {
-                return Name(scroller ?? ancestor);
-            }
-            // beyond a scroller what it scrolls away is reached by scrolling: only its visible part goes on up
-            var visible = rect.Intersect(box);
-            if (visible.Width <= 0 || visible.Height <= 0)
-            {
-                return null;
-            }
-            rect = visible;
-        }
-        return null;
-    }
-
-    /// <summary>
-    /// On screen and the page's own: visible, with a size, not in a popup and not a scroll bar's part (the browser
-    /// checks leave native scroll bars out too; Fluent's arrows are 16 px and shown only on hover).
-    /// </summary>
-    private static bool Shown(Control control) =>
-        control.IsEffectivelyVisible
-        && control.Bounds is { Width: > 0, Height: > 0 }
-        && !InPopup(control)
-        && control.FindAncestorOfType<ScrollBar>() is null;
-
-    private static bool InPopup(Control control) => control.FindLogicalAncestorOfType<Popup>() is not null;
-
     private static string Name(Control control) =>
         control.Name is { Length: > 0 } name ? name : control.GetType().Name;
-
-    /// <summary>WCAG 2 contrast ratio of two opaque colours (alpha composited over the background).</summary>
-    private static double Contrast(Color ink, Color surface)
-    {
-        static double Channel(double c) => c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
-        static double Luminance(double r, double g, double b) =>
-            (0.2126 * Channel(r)) + (0.7152 * Channel(g)) + (0.0722 * Channel(b));
-        var a = ink.A / 255.0;
-        var l1 = Luminance(
-            ((ink.R * a) + (surface.R * (1 - a))) / 255,
-            ((ink.G * a) + (surface.G * (1 - a))) / 255,
-            ((ink.B * a) + (surface.B * (1 - a))) / 255
-        );
-        var l2 = Luminance(surface.R / 255.0, surface.G / 255.0, surface.B / 255.0);
-        return (Math.Max(l1, l2) + 0.05) / (Math.Min(l1, l2) + 0.05);
-    }
 }

@@ -1,5 +1,10 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Threading;
+using Harness.Ui.Api;
+using Harness.Ui.ViewModels;
+using Harness.Ui.Views;
 using Xunit;
 
 namespace Harness.Ui.Tests;
@@ -16,11 +21,13 @@ public static class TestApp
 }
 
 /// <summary>
-/// Runs a test on the headless UI thread. Avalonia.Headless.XUnit 12.1.6 is built against xunit.v3 3.2 and fails
-/// discovery under the 4.x this repository uses, so tests start one shared session themselves.
+/// Runs tests on the headless UI thread and opens views against <see cref="FixtureApi"/>. See README.md for why
+/// tests start the session themselves and dispatch as they do.
 /// </summary>
 internal static class Ui
 {
+    public static readonly Uri Server = new("http://127.0.0.1:17477/");
+
     private static readonly Lazy<HeadlessUnitTestSession> Session = new(
         () => HeadlessUnitTestSession.StartNew(typeof(TestApp))
     );
@@ -39,4 +46,67 @@ internal static class Ui
             },
             TestContext.Current.CancellationToken
         );
+
+    /// <summary>
+    /// The main view in a shown window of <paramref name="width"/> x <paramref name="height"/>, its Board loaded from
+    /// <paramref name="api"/> (a new FixtureApi, its Board answer <paramref name="board"/> when given).
+    /// </summary>
+    public static async Task<(Window Window, FixtureApi Api, MainViewModel Model)> OpenMainAsync(
+        int width,
+        int height,
+        string? board = null,
+        FixtureApi? api = null
+    )
+    {
+        api ??= new FixtureApi();
+        if (board is not null)
+        {
+            api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = board;
+        }
+        // the client lives as long as the window: closing it disposes the client and the view model
+#pragma warning disable CA2000 // disposed by the window's Closed handler
+        var http = new HttpClient(api) { BaseAddress = Server };
+#pragma warning restore CA2000
+        var model = new MainViewModel(new HarnessApi(http), new UiHostContext { Server = Server });
+        var window = Show(new MainView { DataContext = model }, width, height);
+        window.Closed += (_, _) =>
+        {
+            model.Dispose();
+            http.Dispose();
+        };
+        await model.StartAsync(Fixtures.ProjectId, TestContext.Current.CancellationToken);
+        await UntilAsync(() => model.Board is { Loading: false, Columns.Count: > 0 });
+        return (window, api, model);
+    }
+
+    /// <summary><paramref name="content"/> in a shown window of the given size, laid out.</summary>
+    public static Window Show(Control content, int width, int height)
+    {
+        var window = new Window
+        {
+            Width = width,
+            Height = height,
+            Content = content,
+        };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return window;
+    }
+
+    /// <summary>Runs the UI thread's jobs and render ticks until <paramref name="condition"/> holds, at most 5 s.</summary>
+    public static async Task UntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("the view did not get there in 5 s");
+            }
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            await Task.Delay(20);
+        }
+        Dispatcher.UIThread.RunJobs();
+    }
 }

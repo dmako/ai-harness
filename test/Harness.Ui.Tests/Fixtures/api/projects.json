@@ -1,0 +1,13 @@
+{
+  "projects": [
+    {
+      "id": "prj_fixture",
+      "title": "Fixture project",
+      "root": "C:\repos\fixture"
+    },
+    {
+      "id": "prj_other",
+      "root": "/home/dev/other"
+    }
+  ]
+}
