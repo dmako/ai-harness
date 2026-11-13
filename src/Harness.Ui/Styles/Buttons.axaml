@@ -96,7 +96,9 @@
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
   </Style>
 
+  <!-- every link gets Open in new tab / Copy link and middle-click (Controls/Links.cs) -->
   <Style Selector="HyperlinkButton">
+    <Setter Property="c:Links.Menu" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
     <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
     <Setter Property="MinWidth" Value="{StaticResource ControlMin}" />

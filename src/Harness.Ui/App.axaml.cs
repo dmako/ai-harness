@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
 
@@ -29,7 +30,7 @@ public sealed partial class App : Application
     {
         if (Startup is { } startup)
         {
-            var model = new MainViewModel(startup.Api, startup.Host);
+            var model = new MainViewModel(new UiServices(startup.Api, startup.Host));
             var view = new MainView { DataContext = model };
             switch (ApplicationLifetime)
             {

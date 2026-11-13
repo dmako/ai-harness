@@ -72,7 +72,7 @@ public sealed class BoardViewTests
     public Task ALiveChangeToTheShownProjectRedrawsItsBoard() => Ui.RunAsync(async () =>
     {
         var (window, api, model) = await Ui.OpenMainAsync(1280, 800);
-        await Ui.UntilAsync(() => model.Live is "live");
+        await Ui.UntilAsync(() => model.Services.Live.State is "live");
         api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(title: "Changed elsewhere");
 
         api.Change("""{"projects":["prj_other"],"kinds":{"prj_other":["tasks"]}}""");
@@ -88,7 +88,7 @@ public sealed class BoardViewTests
     public Task ALiveReloadUpdatesTheChangedCardInPlaceAndKeepsScrollAndSelection() => Ui.RunAsync(async () =>
     {
         var (window, api, model) = await Ui.OpenMainAsync(1280, 600, Fixtures.Board(moreDone: 30));
-        await Ui.UntilAsync(() => model.Live is "live");
+        await Ui.UntilAsync(() => model.Services.Live.State is "live");
         var done = window
             .GetVisualDescendants()
             .OfType<Border>()

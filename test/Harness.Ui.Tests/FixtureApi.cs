@@ -12,7 +12,7 @@ namespace Harness.Ui.Tests;
 /// </summary>
 internal sealed class FixtureApi : HttpMessageHandler
 {
-    private readonly Channel<string> _events = Channel.CreateUnbounded<string>();
+    private Channel<string> _events = Channel.CreateUnbounded<string>();
     private readonly Dictionary<string, string> _files = Load();
 
     /// <summary>Answers by concrete path or route template; they win over the fixture files.</summary>
@@ -30,6 +30,17 @@ internal sealed class FixtureApi : HttpMessageHandler
     /// <summary>Sends an "event: change" with <paramref name="json"/> to the open stream.</summary>
     public void Change(string json) => _events.Writer.TryWrite($"event: change\ndata: {json}\n\n");
 
+    /// <summary>Ends the open /api/events stream, as a dropped connection does; the next one is a new stream.</summary>
+    public void Drop()
+    {
+        var dropped = _events;
+        _events = Channel.CreateUnbounded<string>();
+        dropped.Writer.TryComplete();
+    }
+
+    /// <summary>How many times /api/events was opened.</summary>
+    public int Streams => Gets.Count(g => g == "/api/events");
+
     /// <summary>Sends an "event: agent" with <paramref name="json"/> to the open stream.</summary>
     public void Agent(string json) => _events.Writer.TryWrite($"event: agent\ndata: {json}\n\n");
 
@@ -43,13 +54,7 @@ internal sealed class FixtureApi : HttpMessageHandler
         {
             await Task.Delay(delay, cancellationToken);
         }
-        if (Find(Failures, path) is { } status)
-        {
-            return new HttpResponseMessage(status)
-            {
-                Content = new StringContent($"{{\"error\":\"fixture failure {(int)status}\"}}", Encoding.UTF8),
-            };
-        }
+        // a write is recorded whether it is answered or refused
         if (request.Method == HttpMethod.Post)
         {
             Posts.Add(
@@ -60,6 +65,16 @@ internal sealed class FixtureApi : HttpMessageHandler
                     request.Headers.TryGetValues("X-Harness-UI", out var u) ? u.Single() : null
                 )
             );
+        }
+        if (Find(Failures, path) is { } status)
+        {
+            return new HttpResponseMessage(status)
+            {
+                Content = new StringContent($"{{\"error\":\"fixture failure {(int)status}\"}}", Encoding.UTF8),
+            };
+        }
+        if (request.Method == HttpMethod.Post)
+        {
             return Json("{}");
         }
         Gets.Add(path);
@@ -146,7 +161,11 @@ internal sealed class FixtureApi : HttpMessageHandler
         {
             if (_offset >= _buffer.Length)
             {
-                _buffer = Encoding.UTF8.GetBytes(await reader.ReadAsync(cancellationToken));
+                if (!await reader.WaitToReadAsync(cancellationToken) || !reader.TryRead(out var next))
+                {
+                    return 0;
+                }
+                _buffer = Encoding.UTF8.GetBytes(next);
                 _offset = 0;
             }
             var count = Math.Min(buffer.Length, _buffer.Length - _offset);

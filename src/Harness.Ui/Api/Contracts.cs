@@ -98,6 +98,9 @@ public sealed class LiveChange
     public bool Registry { get; init; }
     public bool Workspaces { get; init; }
     public bool All { get; init; }
+
+    /// <summary>Knowledge levels whose memories changed (workspace:&lt;name&gt;, user).</summary>
+    public IReadOnlyList<string> Levels { get; init; } = [];
     public IReadOnlyList<string> Projects { get; init; } = [];
     public IReadOnlyDictionary<string, IReadOnlyList<string>> Kinds { get; init; } =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);

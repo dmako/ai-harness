@@ -8,6 +8,7 @@
              Classes="page">
   <!-- the page scrolls up and down only when the window is shorter than PageMinHeight (zoomed in, phones); otherwise
        the page is exactly the window's height and each Board column scrolls on its own (MainView.axaml.cs) -->
+  <Panel>
   <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
   <DockPanel Name="Page">
     <Border Classes="header" DockPanel.Dock="Top">
@@ -25,7 +26,7 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBlock Classes="live" Text="{Binding Live, StringFormat='● {0}'}" />
+        <TextBlock Classes="live" Text="{Binding Services.Live.State, StringFormat='● {0}'}" />
       </WrapPanel>
     </Border>
     <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0"
@@ -33,4 +34,7 @@
     <views:BoardView Name="Board" DataContext="{Binding Board}" Margin="16,8,16,16" />
   </DockPanel>
   </ScrollViewer>
+  <views:ToastLayer DataContext="{Binding Services.Toasts}" />
+  <views:DialogLayer DataContext="{Binding Services.Dialogs}" />
+  </Panel>
 </UserControl>

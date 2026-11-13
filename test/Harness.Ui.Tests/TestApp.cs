@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Harness.Ui.Api;
+using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
 using Xunit;
@@ -55,7 +56,8 @@ internal static class Ui
         int width,
         int height,
         string? board = null,
-        FixtureApi? api = null
+        FixtureApi? api = null,
+        bool fastLive = false
     )
     {
         api ??= new FixtureApi();
@@ -67,16 +69,45 @@ internal static class Ui
 #pragma warning disable CA2000 // disposed by the window's Closed handler
         var http = new HttpClient(api) { BaseAddress = Server };
 #pragma warning restore CA2000
-        var model = new MainViewModel(new HarnessApi(http), new UiHostContext { Server = Server });
+#pragma warning disable CA2000 // disposed by the window's Closed handler
+        var services = Services(http, fastLive);
+#pragma warning restore CA2000
+        var model = new MainViewModel(services);
         var window = Show(new MainView { DataContext = model }, width, height);
         window.Closed += (_, _) =>
         {
             model.Dispose();
+            services.Dispose();
             http.Dispose();
         };
         await model.StartAsync(Fixtures.ProjectId, TestContext.Current.CancellationToken);
         await UntilAsync(() => model.Board is { Loading: false, Columns.Count: > 0 });
         return (window, api, model);
+    }
+
+    /// <summary>
+    /// The page's services over <paramref name="http"/> as a desktop host has them (writes carry the Origin). With
+    /// <paramref name="fastLive"/> live updates use test timings: 100 ms quiet, 600 ms gap, 200 ms reconnect.
+    /// </summary>
+    public static UiServices Services(HttpClient http, bool fastLive = false)
+    {
+        var api = new HarnessApi(http) { Origin = Server.GetLeftPart(UriPartial.Authority) };
+        var host = new UiHostContext { Server = Server };
+        if (!fastLive)
+        {
+            return new UiServices(api, host);
+        }
+        UiServices? services = null;
+#pragma warning disable CA2000 // owned and disposed by the UiServices
+        var updates = new LiveUpdates(
+            () => services?.Dialogs.IsOpen is true,
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(600),
+            TimeSpan.FromMilliseconds(200)
+        );
+#pragma warning restore CA2000
+        services = new UiServices(api, host, updates);
+        return services;
     }
 
     /// <summary><paramref name="content"/> in a shown window of the given size, laid out.</summary>

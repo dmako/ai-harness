@@ -5,13 +5,17 @@ using System.Text.Json;
 namespace Harness.Ui.Api;
 
 /// <summary>
-/// The harness ui HTTP API, typed. <paramref name="http"/> has the harness ui address as its BaseAddress. A browser
-/// sends Origin itself; another host (desktop, tests) sets the Origin header harness ui requires on writes.
+/// The harness ui HTTP API, typed. <paramref name="http"/> has the harness ui address as its BaseAddress. Every write
+/// goes through <see cref="PostAsync{TBody}"/>: harness ui takes a write only with X-Harness-UI: 1 and an Origin of
+/// its own address; a browser sends Origin itself, another host (desktop, tests) sets <see cref="Origin"/>.
 /// </summary>
 public sealed class HarnessApi(HttpClient http)
 {
     /// <summary>Lets a host stream a response body as it arrives (the browser's fetch buffers it otherwise).</summary>
     public Action<HttpRequestMessage>? Streaming { get; init; }
+
+    /// <summary>The Origin to send with writes (http://host:port), for hosts that are not a page of harness ui.</summary>
+    public string? Origin { get; init; }
 
     public async Task<IReadOnlyList<ProjectInfo>> ProjectsAsync(CancellationToken token) =>
         (await GetAsync("api/projects", UiJsonContext.Default.ProjectList, token)).Projects;
@@ -20,18 +24,38 @@ public sealed class HarnessApi(HttpClient http)
         GetAsync($"api/projects/{Uri.EscapeDataString(projectId)}/board", UiJsonContext.Default.BoardResponse, token);
 
     /// <summary>Saves this machine's Board choices for the project (kept in ui.json, shared by every browser).</summary>
-    public async Task SetBoardAsync(string projectId, BoardChange change, CancellationToken token)
+    public Task SetBoardAsync(string projectId, BoardChange change, CancellationToken token) =>
+        PostAsync($"api/projects/{Uri.EscapeDataString(projectId)}/board", change, UiJsonContext.Default.BoardChange, token);
+
+    /// <summary>A read as JSON, for answers that have no typed contract yet; fails with the server's message.</summary>
+    public async Task<JsonElement> ReadAsync(string path, CancellationToken token)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"api/projects/{Uri.EscapeDataString(projectId)}/board"
-        )
-        {
-            Content = JsonContent.Create(change, UiJsonContext.Default.BoardChange),
-        };
+        using var response = await http.GetAsync(path, token);
+        await EnsureAsync(response, token);
+        return JsonElement.Parse(await response.Content.ReadAsStringAsync(token));
+    }
+
+    /// <summary>
+    /// A write: POSTs <paramref name="body"/> as JSON with the headers harness ui requires and fails with the server's
+    /// message; the answer is returned for writes that send something back.
+    /// </summary>
+    public async Task<JsonElement> PostAsync<TBody>(
+        string path,
+        TBody body,
+        System.Text.Json.Serialization.Metadata.JsonTypeInfo<TBody> type,
+        CancellationToken token
+    )
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body, type) };
         request.Headers.Add("X-Harness-UI", "1");
+        if (Origin is { Length: > 0 } origin)
+        {
+            request.Headers.Add("Origin", origin);
+        }
         using var response = await http.SendAsync(request, token);
         await EnsureAsync(response, token);
+        var text = await response.Content.ReadAsStringAsync(token);
+        return text.Length is 0 ? default : JsonElement.Parse(text);
     }
 
     /// <summary>

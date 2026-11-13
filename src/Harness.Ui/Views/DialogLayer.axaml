@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:s="using:Harness.Ui.Services"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.DialogLayer"
+             x:DataType="s:DialogService"
+             IsVisible="{Binding IsOpen}">
+  <!-- the open dialog over the page (app.js dialog()): Esc cancels, Enter accepts (not in a multi-line field), the
+       first field takes the focus when it opens. A form's fields are its view model's DataTemplate. -->
+  <Border Classes="backdrop">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <Border Name="Dialog" Classes="dialog" DataContext="{Binding Current}" Classes.wide="{Binding Wide}"
+              x:DataType="s:DialogViewModel">
+        <StackPanel>
+          <Border Classes="dialog-head">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="title" Text="{Binding Title}" />
+              <TextBlock Classes="sub" Text="{Binding Sub}"
+                         IsVisible="{Binding Sub, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="dialog-body">
+            <StackPanel Spacing="10">
+              <ContentControl Name="Body" Content="{Binding}" IsVisible="{Binding !Reviewing}" />
+              <Border Classes="inset" IsVisible="{Binding Reviewing}">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="label" Text="What will change" />
+                  <SelectableTextBlock Text="{Binding ReviewText}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <Border Name="Error" Classes="error" IsVisible="{Binding HasError}">
+                <StackPanel Orientation="Horizontal">
+                  <c:Icon Kind="status-ready" />
+                  <SelectableTextBlock Text="{Binding Error}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Border>
+          <Border Classes="dialog-foot">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <Button Name="Cancel" Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+              <Button Name="Back" Classes="ghost" Content="Back" Command="{Binding BackCommand}"
+                      IsVisible="{Binding Reviewing}" />
+              <Button Name="Accept" Classes.primary="{Binding !Danger}" Classes.danger="{Binding Danger}"
+                      Content="{Binding AcceptLabel}" Command="{Binding AcceptCommand}" IsEnabled="{Binding !Busy}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+  </Border>
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="s:ConfirmDialog">
+      <SelectableTextBlock Text="{Binding Message}" TextWrapping="Wrap"
+                           IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </DataTemplate>
+  </UserControl.DataTemplates>
+</UserControl>

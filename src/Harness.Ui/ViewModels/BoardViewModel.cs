@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using DynamicData;
 using DynamicData.Binding;
 using Harness.Ui.Api;
+using Harness.Ui.Services;
 
 namespace Harness.Ui.ViewModels;
 
@@ -34,12 +35,16 @@ public sealed record BoardItem(
 /// <summary>
 /// A project's Board: one column per status, sorted and filtered by the server (TaskBoard). The tasks live in a
 /// SourceCache keyed by id: a reload applies only the differences, so unchanged cards keep their controls, scroll
-/// position and text selection. Changing a picker saves this machine's choice for the project and reloads.
+/// position and text selection. Changing a picker saves this machine's choice for the project and reloads. It
+/// follows live changes to its project's tasks.
 /// </summary>
-public sealed partial class BoardViewModel(HarnessApi api, string projectId, Func<string, string> taskLink)
+public sealed partial class BoardViewModel(UiServices services, string projectId, Func<string, string> taskLink)
     : ObservableObject,
+        ILiveSection,
         IDisposable
 {
+    private static readonly string[] LiveKinds = ["tasks"];
+
     private static readonly Dictionary<string, string> SortLabels = new(StringComparer.Ordinal)
     {
         ["priority"] = "Priority",
@@ -53,6 +58,10 @@ public sealed partial class BoardViewModel(HarnessApi api, string projectId, Fun
     private bool _applying;
 
     public string ProjectId { get; } = projectId;
+
+    public IReadOnlyList<string> Kinds => LiveKinds;
+
+    Task ILiveSection.RefreshAsync(bool force) => LoadAsync(CancellationToken.None);
     public ObservableCollection<BoardColumnViewModel> Columns { get; } = [];
     public ObservableCollection<Choice> Sorts { get; } = [];
     public ObservableCollection<Choice> HideDoneOptions { get; } = [];
@@ -79,7 +88,7 @@ public sealed partial class BoardViewModel(HarnessApi api, string projectId, Fun
         Loading = true;
         try
         {
-            Apply(await api.BoardAsync(ProjectId, token));
+            Apply(await services.Api.BoardAsync(ProjectId, token));
             Error = null;
         }
         catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
@@ -151,12 +160,12 @@ public sealed partial class BoardViewModel(HarnessApi api, string projectId, Fun
     {
         try
         {
-            await api.SetBoardAsync(ProjectId, change, CancellationToken.None);
+            await services.Api.SetBoardAsync(ProjectId, change, CancellationToken.None);
             await LoadAsync(CancellationToken.None);
         }
         catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
         {
-            Error = exception.Message;
+            services.Toasts.Fail("The Board's choice was not saved", exception.Message);
         }
     }
 

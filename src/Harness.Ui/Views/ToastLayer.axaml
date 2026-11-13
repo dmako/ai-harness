@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:s="using:Harness.Ui.Services"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.ToastLayer"
+             x:DataType="s:ToastService"
+             HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20">
+  <!-- toasts at the bottom corner (app.js toast()): a tick, the word, and a failure's detail -->
+  <ItemsControl ItemsSource="{Binding Items}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Spacing="8" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="s:Toast">
+        <Border Classes="toast" Classes.bad="{Binding Bad}">
+          <StackPanel Orientation="Horizontal">
+            <Border Classes="tick" VerticalAlignment="Top">
+              <Panel>
+                <c:Icon Kind="status-done" IsVisible="{Binding !Bad}" />
+                <c:Icon Kind="close" IsVisible="{Binding Bad}" />
+              </Panel>
+            </Border>
+            <StackPanel>
+              <TextBlock Text="{Binding Text}" />
+              <TextBlock Classes="detail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>
