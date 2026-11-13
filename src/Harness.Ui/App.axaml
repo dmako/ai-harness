@@ -1,0 +1,19 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Harness.Ui.App"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Harness.Ui/Styles/Tokens.axaml" />
+        <ResourceInclude Source="avares://Harness.Ui/Styles/Blueprints.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Base.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Board.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/BlueprintFrames.axaml" />
+  </Application.Styles>
+</Application>

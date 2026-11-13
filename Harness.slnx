@@ -14,11 +14,18 @@
     <Project Path="src/Harness.Scm.Gitlab/Harness.Scm.Gitlab.csproj" />
     <Project Path="src/Harness.Scm.Forgejo/Harness.Scm.Forgejo.csproj" />
     <Project Path="src/Harness.Scm.Github/Harness.Scm.Github.csproj" />
+    <Project Path="src/Harness.Ui/Harness.Ui.csproj" />
+    <!-- needs the wasm-tools workload (SkiaSharp links natively): built on its own (dotnet publish), not by the
+         solution build that CI runs without the workload -->
+    <Project Path="src/Harness.Ui.Browser/Harness.Ui.Browser.csproj">
+      <Build Project="false" />
+    </Project>
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Harness.Unit/Harness.Unit.csproj" />
     <Project Path="test/Harness.Integration/Harness.Integration.csproj" />
     <Project Path="test/Harness.Integration/Storage/Worker/Harness.StorageWorker.csproj" />
     <Project Path="test/Harness.ProviderWorker/Harness.ProviderWorker.csproj" />
+    <Project Path="test/Harness.Ui.Tests/Harness.Ui.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,0 +1,38 @@
+<!-- Page-wide styles: typography and the shared controls (pickers, header, messages). -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="UserControl.page">
+    <Setter Property="Background" Value="{DynamicResource Page}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontSize" Value="{StaticResource TextMd}" />
+  </Style>
+  <Style Selector="Border.header">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="16,8" />
+  </Style>
+  <Style Selector="TextBlock.brand">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="{StaticResource TextLg}" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.label">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.live">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+</Styles>

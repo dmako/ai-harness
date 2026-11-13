@@ -1,0 +1,99 @@
+<!-- A blueprint's frame drawn in its colour: the card sets the class bp-<colour>. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Border.bpframe.bp-teal">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.teal}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-teal TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.teal}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-orange">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.orange}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-orange TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.orange}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-blue">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.blue}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-blue TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.blue}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-rose">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.rose}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-rose TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.rose}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-green">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.green}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-green TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.green}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-violet">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.violet}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-violet TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.violet}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-amber">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.amber}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-amber TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.amber}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-cyan">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.cyan}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-cyan TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.cyan}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-pink">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.pink}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-pink TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.pink}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-lime">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.lime}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-lime TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.lime}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-indigo">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.indigo}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-indigo TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.indigo}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-red">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.red}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-red TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.red}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-fuchsia">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.fuchsia}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-fuchsia TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.fuchsia}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-yellow">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.yellow}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-yellow TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.yellow}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-slate">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.slate}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-slate TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.slate}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-purple">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.purple}" />
+  </Style>
+  <Style Selector="Border.bpframe.bp-purple TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Bp.purple}" />
+  </Style>
+</Styles>

@@ -1,0 +1,41 @@
+<!-- The 16 blueprint colours (brand.css: the bp colours), each WCAG AA on a card surface in its theme. -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="Bp.teal" Color="#0f766e" />
+      <SolidColorBrush x:Key="Bp.orange" Color="#c2410c" />
+      <SolidColorBrush x:Key="Bp.blue" Color="#1d4ed8" />
+      <SolidColorBrush x:Key="Bp.rose" Color="#be123c" />
+      <SolidColorBrush x:Key="Bp.green" Color="#15803d" />
+      <SolidColorBrush x:Key="Bp.violet" Color="#6d28d9" />
+      <SolidColorBrush x:Key="Bp.amber" Color="#b45309" />
+      <SolidColorBrush x:Key="Bp.cyan" Color="#0e7490" />
+      <SolidColorBrush x:Key="Bp.pink" Color="#be185d" />
+      <SolidColorBrush x:Key="Bp.lime" Color="#4d7c0f" />
+      <SolidColorBrush x:Key="Bp.indigo" Color="#4338ca" />
+      <SolidColorBrush x:Key="Bp.red" Color="#b91c1c" />
+      <SolidColorBrush x:Key="Bp.fuchsia" Color="#a21caf" />
+      <SolidColorBrush x:Key="Bp.yellow" Color="#a16207" />
+      <SolidColorBrush x:Key="Bp.slate" Color="#475569" />
+      <SolidColorBrush x:Key="Bp.purple" Color="#7e22ce" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="Bp.teal" Color="#5eead4" />
+      <SolidColorBrush x:Key="Bp.orange" Color="#fdba74" />
+      <SolidColorBrush x:Key="Bp.blue" Color="#93c5fd" />
+      <SolidColorBrush x:Key="Bp.rose" Color="#fda4af" />
+      <SolidColorBrush x:Key="Bp.green" Color="#86efac" />
+      <SolidColorBrush x:Key="Bp.violet" Color="#c4b5fd" />
+      <SolidColorBrush x:Key="Bp.amber" Color="#fcd34d" />
+      <SolidColorBrush x:Key="Bp.cyan" Color="#67e8f9" />
+      <SolidColorBrush x:Key="Bp.pink" Color="#f9a8d4" />
+      <SolidColorBrush x:Key="Bp.lime" Color="#bef264" />
+      <SolidColorBrush x:Key="Bp.indigo" Color="#a5b4fc" />
+      <SolidColorBrush x:Key="Bp.red" Color="#fca5a5" />
+      <SolidColorBrush x:Key="Bp.fuchsia" Color="#f0abfc" />
+      <SolidColorBrush x:Key="Bp.yellow" Color="#fde047" />
+      <SolidColorBrush x:Key="Bp.slate" Color="#cbd5e1" />
+      <SolidColorBrush x:Key="Bp.purple" Color="#d8b4fe" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

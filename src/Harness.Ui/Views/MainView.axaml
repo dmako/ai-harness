@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:api="using:Harness.Ui.Api"
+             xmlns:views="using:Harness.Ui.Views"
+             x:Class="Harness.Ui.Views.MainView"
+             x:DataType="vm:MainViewModel"
+             Classes="page">
+  <!-- the page scrolls up and down only when the window is shorter than PageMinHeight (zoomed in, phones); otherwise
+       the page is exactly the window's height and each Board column scrolls on its own (MainView.axaml.cs) -->
+  <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+  <DockPanel Name="Page">
+    <Border Classes="header" DockPanel.Dock="Top">
+      <WrapPanel Orientation="Horizontal">
+        <TextBlock Classes="brand" Text="harness" Margin="0,0,16,0" />
+        <TextBlock Classes="label" Text="Project:" Margin="0,0,6,0" />
+        <ComboBox Name="ProjectPicker"
+                  ItemsSource="{Binding Projects}"
+                  SelectedItem="{Binding Project}"
+                  AutomationProperties.Name="Project"
+                  MinWidth="200" Margin="0,0,16,0">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="api:ProjectInfo">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Classes="live" Text="{Binding Live, StringFormat='● {0}'}" />
+      </WrapPanel>
+    </Border>
+    <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0"
+               Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <views:BoardView Name="Board" DataContext="{Binding Board}" Margin="16,8,16,16" />
+  </DockPanel>
+  </ScrollViewer>
+</UserControl>

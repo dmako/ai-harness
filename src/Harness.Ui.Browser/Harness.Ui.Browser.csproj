@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <!-- harness ui's Avalonia browser host (TASK-0144 spike): the shared Harness.Ui in WebAssembly. harness ui serves
+       its publish output (wwwroot) at /next/; it is built on its own, not referenced by any harness executable. -->
+  <PropertyGroup>
+    <TargetFramework>net11.0-browser</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
+    <Platforms>AnyCPU</Platforms>
+    <!-- the JSImport source generator emits unsafe code -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- the WebAssembly SDK needs static web assets (Directory.Build.props turns them off for the Web SDK hosts) -->
+    <StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- served by harness ui on loopback: the .br and .gz copies are what the size measurement compares -->
+    <CompressionEnabled>true</CompressionEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Harness.Ui/Harness.Ui.csproj" />
+    <PackageReference Include="Avalonia.Browser" />
+  </ItemGroup>
+</Project>

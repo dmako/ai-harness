@@ -158,6 +158,7 @@ public static class UiHost
             );
         }
         UiAssets.Map(app);
+        UiNextAssets.Map(app);
         if (writes is not null)
         {
             UiWrites.Map(app);

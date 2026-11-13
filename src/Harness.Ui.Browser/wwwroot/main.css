@@ -1,0 +1,4 @@
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #fff; }
+@media (prefers-color-scheme: dark) { html, body { background: #141413; } }
+#out { height: 100%; width: 100%; }
+.loading { font: 14px system-ui, sans-serif; color: #6e6e6d; padding: 16px; }

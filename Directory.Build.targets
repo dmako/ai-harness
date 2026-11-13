@@ -66,12 +66,16 @@
       <AssemblyMetadata Include="Modified" Value="$(RepositoryModified)" />
     </ItemGroup>
   </Target>
-  <!-- The six port assemblies, the agent host (Core, Infrastructure) and the SCM libraries form a DAG; tests and the
-       other companion hosts are outside this rule. Harness.Scm references nothing, its providers only Harness.Scm. -->
+  <!-- The six port assemblies, the agent host (Core, Infrastructure), the SCM libraries and the Avalonia UI form a DAG;
+       tests and the other companion hosts are outside this rule. Harness.Scm references nothing, its providers only
+       Harness.Scm; Harness.Ui references nothing, Harness.Ui.Browser only Harness.Ui. -->
   <Target Name="ValidateHarnessProjectReferences" BeforeTargets="PrepareProjectReferences;_GenerateRestoreProjectPathWalk"
-          Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' OR '$(MSBuildProjectName)' == 'Harness.Agents' OR '$(MSBuildProjectName)' == 'Harness.Scm' OR '$(MSBuildProjectName)' == 'Harness.Scm.Gitlab' OR '$(MSBuildProjectName)' == 'Harness.Scm.Forgejo' OR '$(MSBuildProjectName)' == 'Harness.Scm.Github' ">
+          Condition=" '$(MSBuildProjectName)' == 'Harness.Core' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Providers' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Web' OR '$(MSBuildProjectName)' == 'Harness.Cli' OR '$(MSBuildProjectName)' == 'Harness.Agents' OR '$(MSBuildProjectName)' == 'Harness.Scm' OR '$(MSBuildProjectName)' == 'Harness.Scm.Gitlab' OR '$(MSBuildProjectName)' == 'Harness.Scm.Forgejo' OR '$(MSBuildProjectName)' == 'Harness.Scm.Github' OR '$(MSBuildProjectName)' == 'Harness.Ui' OR '$(MSBuildProjectName)' == 'Harness.Ui.Browser' ">
     <ItemGroup>
-      <_HarnessAllowedReference Include="Harness.Core" Condition=" '$(MSBuildProjectName)' != 'Harness.Core' AND '$(MSBuildProjectName)' != 'Harness.Scm' AND '$(MSBuildProjectName)' != 'Harness.Scm.Gitlab' AND '$(MSBuildProjectName)' != 'Harness.Scm.Forgejo' AND '$(MSBuildProjectName)' != 'Harness.Scm.Github' " />
+      <_HarnessAllowedReference Include="Harness.Core" Condition=" '$(MSBuildProjectName)' != 'Harness.Core' AND '$(MSBuildProjectName)' != 'Harness.Scm' AND '$(MSBuildProjectName)' != 'Harness.Scm.Gitlab' AND '$(MSBuildProjectName)' != 'Harness.Scm.Forgejo' AND '$(MSBuildProjectName)' != 'Harness.Scm.Github' AND '$(MSBuildProjectName)' != 'Harness.Ui' AND '$(MSBuildProjectName)' != 'Harness.Ui.Browser' " />
+      <!-- the Avalonia UI (TASK-0144) speaks only harness ui's HTTP API: Harness.Ui references no harness project,
+           its hosts only Harness.Ui, and no harness executable references them (harness ui serves the bundle) -->
+      <_HarnessAllowedReference Include="Harness.Ui" Condition=" '$(MSBuildProjectName)' == 'Harness.Ui.Browser' " />
       <_HarnessAllowedReference Include="Harness.Scm" Condition=" '$(MSBuildProjectName)' == 'Harness.Scm.Gitlab' OR '$(MSBuildProjectName)' == 'Harness.Scm.Forgejo' OR '$(MSBuildProjectName)' == 'Harness.Scm.Github' OR '$(MSBuildProjectName)' == 'Harness.Mcp' OR '$(MSBuildProjectName)' == 'Harness.Infrastructure' OR '$(MSBuildProjectName)' == 'Harness.Agents' " />
       <_HarnessAllowedReference Include="Harness.Infrastructure;Harness.Providers;Harness.Mcp;Harness.Web;Harness.Scm;Harness.Scm.Gitlab;Harness.Scm.Forgejo;Harness.Scm.Github" Condition=" '$(MSBuildProjectName)' == 'Harness.Cli' " />
       <_HarnessAllowedReference Include="Harness.Infrastructure" Condition=" '$(MSBuildProjectName)' == 'Harness.Agents' " />
