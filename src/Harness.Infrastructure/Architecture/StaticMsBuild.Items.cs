@@ -429,12 +429,18 @@ public sealed partial class StaticMsBuild
 
     private static bool Wildcard(string value) => value.IndexOfAny(['*', '?']) >= 0;
 
-    /// <summary>The full path of an item path, resolved against a directory; null when it is not a path.</summary>
+    /// <summary>
+    /// The full path of an item path, resolved against a directory; null when it is not a path. MSBuild treats
+    /// both slashes as separators on every system, so a backslash is one on Linux and macOS too.
+    /// </summary>
     private static string? Full(string path, string directory)
     {
         try
         {
-            return Path.GetFullPath(path.Replace('/', Path.DirectorySeparatorChar), directory);
+            return Path.GetFullPath(
+                path.Replace('\\', '/').Replace('/', Path.DirectorySeparatorChar),
+                directory
+            );
         }
         catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException)
         {
