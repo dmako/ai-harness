@@ -19,6 +19,9 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="AwesomeAssertions" />
     <Compile Remove="Storage/Worker/**/*.cs" />
+    <!-- the Avalonia UI's API contracts and client (no Avalonia in them), checked against a real harness ui by
+         UiContractTests without referencing the UI project -->
+    <Compile Include="../../src/Harness.Ui/Api/*.cs" Link="UiApi/%(Filename)%(Extension)" />
     <!-- the Go harness's layout and accessibility checks (cmd/harness-uicheck/checks.js at 283e6ab), unchanged -->
     <EmbeddedResource Include="Web/checks.js" LogicalName="checks.js" />
   </ItemGroup>

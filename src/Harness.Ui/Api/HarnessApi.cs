@@ -9,26 +9,13 @@ namespace Harness.Ui.Api;
 /// goes through <see cref="PostAsync{TBody}"/>: harness ui takes a write only with X-Harness-UI: 1 and an Origin of
 /// its own address; a browser sends Origin itself, another host (desktop, tests) sets <see cref="Origin"/>.
 /// </summary>
-public sealed class HarnessApi(HttpClient http)
+public sealed partial class HarnessApi(HttpClient http)
 {
     /// <summary>Lets a host stream a response body as it arrives (the browser's fetch buffers it otherwise).</summary>
     public Action<HttpRequestMessage>? Streaming { get; init; }
 
     /// <summary>The Origin to send with writes (http://host:port), for hosts that are not a page of harness ui.</summary>
     public string? Origin { get; init; }
-
-    public async Task<IReadOnlyList<ProjectInfo>> ProjectsAsync(CancellationToken token) =>
-        (await GetAsync("api/projects", UiJsonContext.Default.ProjectList, token)).Projects;
-
-    public async Task<IReadOnlyList<WorkspaceInfo>> WorkspacesAsync(CancellationToken token) =>
-        (await GetAsync("api/workspaces", UiJsonContext.Default.WorkspaceList, token)).Workspaces;
-
-    public Task<BoardResponse> BoardAsync(string projectId, CancellationToken token) =>
-        GetAsync($"api/projects/{Uri.EscapeDataString(projectId)}/board", UiJsonContext.Default.BoardResponse, token);
-
-    /// <summary>Saves this machine's Board choices for the project (kept in ui.json, shared by every browser).</summary>
-    public Task SetBoardAsync(string projectId, BoardChange change, CancellationToken token) =>
-        PostAsync($"api/projects/{Uri.EscapeDataString(projectId)}/board", change, UiJsonContext.Default.BoardChange, token);
 
     /// <summary>A read as JSON, for answers that have no typed contract yet; fails with the server's message.</summary>
     public async Task<JsonElement> ReadAsync(string path, CancellationToken token)
@@ -61,32 +48,7 @@ public sealed class HarnessApi(HttpClient http)
         return text.Length is 0 ? default : JsonElement.Parse(text);
     }
 
-    /// <summary>
-    /// /api/events as it comes: each "change" event, until <paramref name="token"/> ends it or the stream drops
-    /// (the caller reconnects). Comments, heartbeats and "agent" events are skipped; <paramref name="connected"/>
-    /// is called once the stream is open.
-    /// </summary>
-    public async IAsyncEnumerable<LiveChange> ChangesAsync(
-        Action? connected,
-        [EnumeratorCancellation] CancellationToken token
-    )
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "api/events");
-        Streaming?.Invoke(request);
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-        await EnsureAsync(response, token);
-        await using var stream = await response.Content.ReadAsStreamAsync(token);
-        connected?.Invoke();
-        await foreach (var (name, data) in ServerSentEvents.ReadAsync(stream, token))
-        {
-            if (name is "change" && JsonSerializer.Deserialize(data, UiJsonContext.Default.LiveChange) is { } change)
-            {
-                yield return change;
-            }
-        }
-    }
-
-    private async Task<T> GetAsync<T>(
+    internal async Task<T> GetAsync<T>(
         string path,
         System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> type,
         CancellationToken token

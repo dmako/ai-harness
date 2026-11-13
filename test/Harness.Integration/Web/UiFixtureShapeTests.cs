@@ -69,11 +69,11 @@ public sealed class UiFixtureShapeTests
     }
 
     /// <summary>Gives the project a display title through harness ui's own write, so title appears in its answers.</summary>
-    private static Task TitleAsync(UiFixture server, string id, string title) =>
+    internal static Task TitleAsync(UiFixture server, string id, string title) =>
         PostAsync(server, $"/api/projects/{id}/rename", new JsonObject { ["title"] = title });
 
     /// <summary>A write through harness ui, as its page sends it.</summary>
-    private static async Task PostAsync(UiFixture server, string path, JsonObject body)
+    internal static async Task PostAsync(UiFixture server, string path, JsonObject body)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path)
         {
@@ -86,7 +86,7 @@ public sealed class UiFixtureShapeTests
     }
 
     /// <summary>A project with blueprints (coloured) and a task in several statuses, so lists have items to compare.</summary>
-    private static void Seed(SyncFixture fixture)
+    internal static void Seed(SyncFixture fixture)
     {
         using var database = fixture.Database();
         var tasks = new TaskStore(database);
