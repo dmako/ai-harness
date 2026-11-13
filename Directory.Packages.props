@@ -10,6 +10,7 @@
     <PackageVersion Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- Avalonia 12.1.6 asks for SkiaSharp 3.119.4 / HarfBuzzSharp 8.3.1.3, whose WebAssembly libraries are built for
          Emscripten 3.1.56 (.NET 9/10): .NET 11's Emscripten 6.0.2 link fails on them (saveSetjmp/testSetjmp). These
          releases add Emscripten 6.0.2 builds; pinned transitively for every Avalonia project. -->

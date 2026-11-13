@@ -12,8 +12,11 @@ internal static class Fixtures
         ]}
         """;
 
-    /// <summary>A Board with a card in ready, in progress and done; <paramref name="title"/> names TASK-0002.</summary>
-    public static string Board(string sort = "priority", string title = "Port the Board to Avalonia") => $$"""
+    /// <summary>
+    /// A Board with a card in ready, in progress and done; <paramref name="title"/> names TASK-0002, and
+    /// <paramref name="moreDone"/> adds that many done tasks (TASK-1000…) so the done column scrolls.
+    /// </summary>
+    public static string Board(string sort = "priority", string title = "Port the Board to Avalonia", int moreDone = 0) => $$"""
         {
           "settings":{"sort":"{{sort}}","hide_done_days":7,"blueprint":""},
           "defaults":{"sort":"priority","hide_done_days":7},
@@ -31,7 +34,7 @@ internal static class Fixtures
             ]},
             {"status":"review","tasks":[]},
             {"status":"done","tasks":[
-              {"id":"TASK-0004","title":"Bump version to 0.13.0","status":"done","priority":"medium","type":"chore","blueprint":"BP-008"}
+              {"id":"TASK-0004","title":"Bump version to 0.13.0","status":"done","priority":"medium","type":"chore","blueprint":"BP-008"}{{Done(moreDone)}}
             ]},
             {"status":"blocked","tasks":[]}
           ],
@@ -41,4 +44,13 @@ internal static class Fixtures
           ]
         }
         """;
+
+    private static string Done(int count) =>
+        string.Concat(
+            Enumerable
+                .Range(1000, count)
+                .Select(n =>
+                    $$""",{"id":"TASK-{{n}}","title":"Done task {{n}} with a title that wraps onto a second line","status":"done","priority":"low","type":"chore","blueprint":"BP-008"}"""
+                )
+        );
 }

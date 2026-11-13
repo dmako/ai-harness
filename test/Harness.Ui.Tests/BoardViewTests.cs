@@ -60,7 +60,7 @@ public sealed class BoardViewTests
         api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(sort: "id");
 
         ((MainView)window.Content!).FindControl<BoardView>("Board")!.FindControl<ComboBox>("SortPicker")!.SelectedIndex = 1;
-        await model.Board!.Saving;
+        await model.Board!.SaveCommand.ExecutionTask!;
 
         var post = api.Posts.Should().ContainSingle().Subject;
         post.Path.Should().Be($"/api/projects/{Fixtures.ProjectId}/board");
@@ -84,6 +84,39 @@ public sealed class BoardViewTests
 
         model.LiveReloads.Should().Be(1, "a change to another project does not reload this Board");
         Cards(window)[1].FindControl<SelectableTextBlock>("Title")!.Text.Should().Be("Changed elsewhere");
+    });
+
+    [Fact]
+    public Task ALiveReloadUpdatesTheChangedCardInPlaceAndKeepsScrollAndSelection() => Ui.RunAsync(async () =>
+    {
+        var (window, api, model) = await OpenAsync(1280, 600, Fixtures.Board(moreDone: 30));
+        await UntilAsync(() => model.Live is "live");
+        var done = window
+            .GetVisualDescendants()
+            .OfType<Border>()
+            .Single(b => b.Classes.Contains("column") && ((BoardColumnViewModel)b.DataContext!).Status is "done");
+        var scroller = done.GetVisualDescendants().OfType<ScrollViewer>().First();
+        scroller.Extent.Height.Should().BeGreaterThan(scroller.Viewport.Height, "the done column must scroll");
+        scroller.Offset = new Vector(0, 300);
+        Dispatcher.UIThread.RunJobs();
+        var cardsBefore = Cards(window).ToDictionary(c => ((TaskCardViewModel)c.DataContext!).Id, StringComparer.Ordinal);
+        var selected = cardsBefore["TASK-0001"].FindControl<SelectableTextBlock>("Title")!;
+        selected.SelectionStart = 8;
+        selected.SelectionEnd = 11;
+
+        api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(title: "Changed elsewhere", moreDone: 30);
+        api.Change($$$"""{"projects":["{{{Fixtures.ProjectId}}}"],"kinds":{"{{{Fixtures.ProjectId}}}":["tasks"]}}""");
+        await UntilAsync(() => model.LiveReloads > 0 && !model.Board!.Loading);
+        var cardsAfter = Cards(window).ToDictionary(c => ((TaskCardViewModel)c.DataContext!).Id, StringComparer.Ordinal);
+
+        cardsAfter.Keys.Should().BeEquivalentTo(cardsBefore.Keys);
+        foreach (var (id, card) in cardsAfter)
+        {
+            card.Should().BeSameAs(cardsBefore[id], $"{id}'s card is kept, not rebuilt");
+        }
+        cardsAfter["TASK-0002"].FindControl<SelectableTextBlock>("Title")!.Text.Should().Be("Changed elsewhere");
+        scroller.Offset.Y.Should().Be(300);
+        selected.SelectedText.Should().Be("the");
     });
 
     [Theory]
@@ -204,11 +237,15 @@ public sealed class BoardViewTests
         focused.Take(4).Should().Equal("ProjectPicker", "SortPicker", "HideDonePicker", "BlueprintPicker");
     });
 
-    private static async Task<(Window Window, FixtureApi Api, MainViewModel Model)> OpenAsync(int width, int height)
+    private static async Task<(Window Window, FixtureApi Api, MainViewModel Model)> OpenAsync(
+        int width,
+        int height,
+        string? board = null
+    )
     {
         var api = new FixtureApi();
         api.Answers["/api/projects"] = Fixtures.Projects;
-        api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board();
+        api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = board ?? Fixtures.Board();
         // the client lives as long as the window: closing it disposes the client
 #pragma warning disable CA2000 // disposed by the window's Closed handler
         var http = new HttpClient(api) { BaseAddress = Server };

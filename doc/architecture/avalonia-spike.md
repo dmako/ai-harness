@@ -154,6 +154,45 @@ emulated colour scheme and device pixel ratio.
 - **Avalonia.Headless.XUnit 12.1.6 does not work with this repository's xunit.v3 4.x.** It is built against xunit.v3 3.2, and discovery fails with `MissingMethodException` (`TestIntrospectionHelper.GetTestCaseDetails`). The tests use `Avalonia.Headless`'s `HeadlessUnitTestSession` directly, through `Ui.RunAsync`.
 - **`HeadlessUnitTestSession.Dispatch` with an async lambda binds to the `Func<TResult>` overload.** The test then ends at its first `await`: it passes without running its assertions, or hangs once awaited. Only `Func<Task<T>>` keeps the dispatcher running until the test ends. `Ui.RunAsync` wraps every test so.
 
+## View models and lists: CommunityToolkit.Mvvm and DynamicData (TASK-0165)
+
+The spike's hand-written `ViewModel`/`Set()` base and its `Clear()`-and-refill collections were replaced, as the user
+decided, by **CommunityToolkit.Mvvm 8.4.2** and **DynamicData 9.4.33**. ReactiveUI was left out: it overlaps them,
+has a reflection and AOT risk, and is harder to learn.
+
+**View models.**
+- They derive from `ObservableObject` and declare `[ObservableProperty]` partial properties, with private setters where only the view model writes them.
+- Picker saves are `On<Property>Changed` hooks that run a generated `[RelayCommand]` async command (`SaveCommand`); tests await its `ExecutionTask`.
+- The toolkit's generators emit plain code: no trim warnings.
+
+**Lists.**
+- The Board keeps its tasks in a `SourceCache<BoardItem, string>` keyed by id. `BoardItem` is a record, so `EditDiff` applies only what a reload changed.
+- Each column is created once and is the cache filtered by status (`Filter`).
+- Cards are `TransformWithInlineUpdate`d, so a changed task updates its existing card's properties, and `SortAndBind` keeps them in the server's order.
+- The card's style classes (priority, blueprint colour) follow its property changes.
+- The headless test `ALiveReloadUpdatesTheChangedCardInPlaceAndKeepsScrollAndSelection` shows that a live reload changing one task:
+  - keeps every card's control, including the changed one;
+  - keeps the done column's scroll offset;
+  - keeps a text selection in another card;
+  - updates the changed title.
+
+**Live updates.**
+- `MainViewModel` pushes changes into an Rx `Subject`, `Throttle`s them by 500 ms on the UI thread's `SynchronizationContextScheduler`, and runs the reloads one at a time (`Concat`).
+- Rx timers work in single-threaded WebAssembly. In Edge one `task_update` caused 2 Board reloads, where the spike's timer caused 3. The 3 s minimum gap is still TASK-0148's.
+
+**Cost.**
+
+| | Brotli | Raw |
+| --- | --- | --- |
+| Bundle total | 4.94 MB (+0.13 MB over the spike) | 17.88 MB (+0.28 MB) |
+| DynamicData | 54 KB | 87 KB |
+| System.Reactive (trimmed) | 36 KB | 91 KB |
+| CommunityToolkit.Mvvm | 22 KB | 36 KB |
+
+- The Release publish has no trim or AOT warnings.
+- First load to a drawn Board in Edge: 1.9 s, as before.
+- The repository's central transitive pin resolves System.Reactive to **7.0.0**, although DynamicData asks for 6.1.0; all tests and the browser run pass with it.
+
 ## Follow-up blueprint
 
 Proposed as a blueprint, "Avalonia harness ui: parity", for the user to approve. In order:

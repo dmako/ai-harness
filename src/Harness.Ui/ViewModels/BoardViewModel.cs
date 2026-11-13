@@ -1,4 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DynamicData;
+using DynamicData.Binding;
 using Harness.Ui.Api;
 
 namespace Harness.Ui.ViewModels;
@@ -10,10 +16,29 @@ public sealed record Choice(string Value, string Label)
 }
 
 /// <summary>
-/// A project's Board: one column per status, sorted and filtered by the server (TaskBoard). Changing a picker saves
-/// this machine's choice for the project and reloads the Board, as the JavaScript UI does.
+/// A task as the Board places it: what its card shows and its place in its column (the server's order). A record,
+/// so a reload's diff (SourceCache.EditDiff) sees which tasks really changed.
 /// </summary>
-public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string, string> taskLink) : ViewModel
+public sealed record BoardItem(
+    string Id,
+    string Status,
+    int Order,
+    string Title,
+    string Priority,
+    string Type,
+    string? BlueprintId,
+    string? BlueprintText,
+    string? BlueprintColor
+);
+
+/// <summary>
+/// A project's Board: one column per status, sorted and filtered by the server (TaskBoard). The tasks live in a
+/// SourceCache keyed by id: a reload applies only the differences, so unchanged cards keep their controls, scroll
+/// position and text selection. Changing a picker saves this machine's choice for the project and reloads.
+/// </summary>
+public sealed partial class BoardViewModel(HarnessApi api, string projectId, Func<string, string> taskLink)
+    : ObservableObject,
+        IDisposable
 {
     private static readonly Dictionary<string, string> SortLabels = new(StringComparer.Ordinal)
     {
@@ -24,12 +49,8 @@ public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string
         ["changed"] = "Last changed",
     };
 
+    private readonly SourceCache<BoardItem, string> _items = new(item => item.Id);
     private bool _applying;
-    private Choice? _sort;
-    private Choice? _hideDone;
-    private Choice? _blueprint;
-    private string? _error;
-    private bool _loading;
 
     public string ProjectId { get; } = projectId;
     public ObservableCollection<BoardColumnViewModel> Columns { get; } = [];
@@ -37,53 +58,20 @@ public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string
     public ObservableCollection<Choice> HideDoneOptions { get; } = [];
     public ObservableCollection<Choice> Blueprints { get; } = [];
 
-    public Choice? Sort
-    {
-        get => _sort;
-        set
-        {
-            if (Set(ref _sort, value) && value is not null)
-            {
-                Save(new BoardChange { Sort = value.Value });
-            }
-        }
-    }
+    [ObservableProperty]
+    public partial Choice? Sort { get; set; }
 
-    public Choice? HideDone
-    {
-        get => _hideDone;
-        set
-        {
-            if (Set(ref _hideDone, value) && value is not null)
-            {
-                Save(new BoardChange { HideDoneDays = int.Parse(value.Value, System.Globalization.CultureInfo.InvariantCulture) });
-            }
-        }
-    }
+    [ObservableProperty]
+    public partial Choice? HideDone { get; set; }
 
-    public Choice? Blueprint
-    {
-        get => _blueprint;
-        set
-        {
-            if (Set(ref _blueprint, value) && value is not null)
-            {
-                Save(new BoardChange { Blueprint = value.Value });
-            }
-        }
-    }
+    [ObservableProperty]
+    public partial Choice? Blueprint { get; set; }
 
-    public string? Error
-    {
-        get => _error;
-        private set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    public partial string? Error { get; private set; }
 
-    public bool Loading
-    {
-        get => _loading;
-        private set => Set(ref _loading, value);
-    }
+    [ObservableProperty]
+    public partial bool Loading { get; private set; }
 
     /// <summary>Fetches the Board and shows it; a failure is shown, not thrown.</summary>
     public async Task LoadAsync(CancellationToken token)
@@ -110,17 +98,12 @@ public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string
         _applying = true;
         try
         {
-            var info = board.Blueprints.ToDictionary(b => b.Id, StringComparer.Ordinal);
-            Replace(Sorts, board.Sorts.Select(s => new Choice(s, SortLabels.GetValueOrDefault(s, s))));
-            Replace(
+            Same(Sorts, board.Sorts.Select(s => new Choice(s, SortLabels.GetValueOrDefault(s, s))));
+            Same(
                 HideDoneOptions,
-                board.HideDoneDaysOptions.Select(d =>
-                {
-                    var days = d.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    return new Choice(days, d is 1 ? "1 day" : days + " days");
-                })
+                board.HideDoneDaysOptions.Select(d => new Choice(Text(d), d is 1 ? "1 day" : Text(d) + " days"))
             );
-            Replace(
+            Same(
                 Blueprints,
                 [
                     new Choice("", "all blueprints"),
@@ -129,15 +112,15 @@ public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string
                 ]
             );
             Sort = Sorts.FirstOrDefault(c => c.Value == board.Settings.Sort);
-            var hide = board.Settings.HideDoneDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            HideDone = HideDoneOptions.FirstOrDefault(c => c.Value == hide);
+            HideDone = HideDoneOptions.FirstOrDefault(c => c.Value == Text(board.Settings.HideDoneDays));
             Blueprint = Blueprints.FirstOrDefault(c => c.Value == (board.Settings.Blueprint ?? ""));
-            Replace(
-                Columns,
-                board.Columns.Select(c => new BoardColumnViewModel(
-                    c.Status,
-                    [.. c.Tasks.Select(t => new TaskCardViewModel(t, t.Blueprint is { } b ? info.GetValueOrDefault(b) : null, taskLink(t.Id)))]
-                ))
+            ShowColumns(board.Columns.Select(c => c.Status).ToArray());
+            var info = board.Blueprints.ToDictionary(b => b.Id, StringComparer.Ordinal);
+            _items.EditDiff(
+                board.Columns.SelectMany(column =>
+                    column.Tasks.Select((task, order) => Item(task, order, info))
+                ),
+                EqualityComparer<BoardItem>.Default
             );
         }
         finally
@@ -146,17 +129,24 @@ public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string
         }
     }
 
-    /// <summary>The last save a picker started (tests and hosts can wait for it).</summary>
-    public Task Saving { get; private set; } = Task.CompletedTask;
-
-    private void Save(BoardChange change)
+    public void Dispose()
     {
-        if (!_applying)
+        foreach (var column in Columns)
         {
-            Saving = SaveAsync(change);
+            column.Dispose();
         }
+        _items.Dispose();
     }
 
+    partial void OnSortChanged(Choice? value) => Save(value, v => new BoardChange { Sort = v });
+
+    partial void OnHideDoneChanged(Choice? value) =>
+        Save(value, v => new BoardChange { HideDoneDays = int.Parse(v, CultureInfo.InvariantCulture) });
+
+    partial void OnBlueprintChanged(Choice? value) => Save(value, v => new BoardChange { Blueprint = v });
+
+    /// <summary>Saves a picker's choice for the project and reloads the Board with it.</summary>
+    [RelayCommand]
     private async Task SaveAsync(BoardChange change)
     {
         try
@@ -170,52 +160,164 @@ public sealed class BoardViewModel(HarnessApi api, string projectId, Func<string
         }
     }
 
-    private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> items)
+    private void Save(Choice? value, Func<string, BoardChange> change)
     {
+        if (!_applying && value is not null)
+        {
+            _ = SaveCommand.ExecuteAsync(change(value.Value));
+        }
+    }
+
+    /// <summary>One column per status, created once: later reloads only change the cards inside them.</summary>
+    private void ShowColumns(string[] statuses)
+    {
+        if (Columns.Select(c => c.Status).SequenceEqual(statuses, StringComparer.Ordinal))
+        {
+            return;
+        }
+        foreach (var column in Columns)
+        {
+            column.Dispose();
+        }
+        Columns.Clear();
+        foreach (var status in statuses)
+        {
+            Columns.Add(new BoardColumnViewModel(status, _items.Connect(), taskLink));
+        }
+    }
+
+    private static BoardItem Item(TaskSummary task, int order, Dictionary<string, BlueprintInfo> blueprints)
+    {
+        var blueprint = task.Blueprint is { } id ? blueprints.GetValueOrDefault(id) : null;
+        string? text = null;
+        if (task.Blueprint is not null)
+        {
+            text = blueprint?.Title is { Length: > 0 } title ? title : task.Blueprint;
+        }
+        return new BoardItem(
+            task.Id,
+            task.Status,
+            order,
+            task.Title,
+            task.Priority,
+            task.Type,
+            task.Blueprint,
+            text,
+            blueprint?.Color
+        );
+    }
+
+    /// <summary>Replaces <paramref name="target"/>'s items only when they differ, so a bound picker keeps its state.</summary>
+    private static void Same(ObservableCollection<Choice> target, IEnumerable<Choice> items)
+    {
+        var wanted = items.ToArray();
+        if (target.SequenceEqual(wanted))
+        {
+            return;
+        }
         target.Clear();
-        foreach (var item in items)
+        foreach (var item in wanted)
         {
             target.Add(item);
         }
     }
+
+    private static string Text(int value) => value.ToString(CultureInfo.InvariantCulture);
 }
 
-/// <summary>A status's column: its heading, count and cards.</summary>
-public sealed class BoardColumnViewModel(string status, IReadOnlyList<TaskCardViewModel> tasks)
+/// <summary>
+/// A status's column: its heading, count and cards. The cards are the Board's SourceCache filtered by status,
+/// updated in place and kept in the server's order.
+/// </summary>
+public sealed partial class BoardColumnViewModel : ObservableObject, IDisposable
 {
-    public string Status { get; } = status;
-    public string Label { get; } = status.Replace('_', ' ');
-    public IReadOnlyList<TaskCardViewModel> Tasks { get; } = tasks;
-    public int Count => Tasks.Count;
-    public bool IsEmpty => Tasks.Count is 0;
+    private readonly IDisposable _subscription;
+    private readonly ReadOnlyObservableCollection<TaskCardViewModel> _cards;
+
+    public BoardColumnViewModel(
+        string status,
+        IObservable<IChangeSet<BoardItem, string>> items,
+        Func<string, string> taskLink
+    )
+    {
+        Status = status;
+        Label = status.Replace('_', ' ');
+        _subscription = items
+            .Filter(item => item.Status == status)
+            .TransformWithInlineUpdate(
+                item => new TaskCardViewModel(item, taskLink(item.Id)),
+                (card, item) => card.Update(item)
+            )
+            .SortAndBind(out _cards, SortExpressionComparer<TaskCardViewModel>.Ascending(card => card.Order))
+            .Subscribe();
+        ((INotifyCollectionChanged)_cards).CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(Count));
+            OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(AccessibleName));
+        };
+    }
+
+    public string Status { get; }
+    public string Label { get; }
+    public ReadOnlyObservableCollection<TaskCardViewModel> Tasks => _cards;
+    public int Count => _cards.Count;
+    public bool IsEmpty => _cards.Count is 0;
     public string AccessibleName => $"{Label}: {Count}";
+
+    public void Dispose() => _subscription.Dispose();
 }
 
-/// <summary>A task's card: type and id, priority, title and its blueprint's frame.</summary>
-public sealed class TaskCardViewModel(TaskSummary task, BlueprintInfo? blueprint, string link)
+/// <summary>A task's card: type and id, priority, title and its blueprint's frame; updated in place on reloads.</summary>
+public sealed partial class TaskCardViewModel : ObservableObject
 {
-    public string Id { get; } = task.Id;
-    public string Title { get; } = task.Title;
-    public string Priority { get; } = task.Priority;
-    public string Type { get; } = task.Type;
-    public Uri Link { get; } = new(link, UriKind.RelativeOrAbsolute);
-    public string? BlueprintId { get; } = task.Blueprint;
+    public TaskCardViewModel(BoardItem item, string link)
+    {
+        Id = item.Id;
+        Link = new Uri(link, UriKind.RelativeOrAbsolute);
+        Update(item);
+    }
+
+    public string Id { get; }
+    public Uri Link { get; }
+
+    [ObservableProperty]
+    public partial int Order { get; private set; }
+
+    [ObservableProperty]
+    public partial string Title { get; private set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PriorityTip))]
+    public partial string Priority { get; private set; } = "";
+
+    [ObservableProperty]
+    public partial string Type { get; private set; } = "";
+
+    [ObservableProperty]
+    public partial string? BlueprintId { get; private set; }
 
     /// <summary>The blueprint's title, else its id; null without a blueprint.</summary>
-    public string? BlueprintText { get; } = BlueprintName(task.Blueprint, blueprint);
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBlueprint))]
+    public partial string? BlueprintText { get; private set; }
 
     /// <summary>The blueprint's colour name (one of the 16), or null for the neutral frame.</summary>
-    public string? BlueprintColor { get; } = blueprint?.Color;
+    [ObservableProperty]
+    public partial string? BlueprintColor { get; private set; }
 
     public bool HasBlueprint => BlueprintText is not null;
     public string PriorityTip => Priority + " priority";
 
-    private static string? BlueprintName(string? id, BlueprintInfo? blueprint)
+    /// <summary>Takes a reload's values; only those that changed notify, so only they redraw.</summary>
+    public void Update(BoardItem item)
     {
-        if (id is null)
-        {
-            return null;
-        }
-        return blueprint?.Title is { Length: > 0 } title ? title : id;
+        Order = item.Order;
+        Title = item.Title;
+        Priority = item.Priority;
+        Type = item.Type;
+        BlueprintId = item.BlueprintId;
+        BlueprintText = item.BlueprintText;
+        BlueprintColor = item.BlueprintColor;
     }
 }

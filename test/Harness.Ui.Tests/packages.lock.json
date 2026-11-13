@@ -215,7 +215,9 @@
         "dependencies": {
           "Avalonia": "[12.1.6, )",
           "Avalonia.Fonts.Inter": "[12.1.6, )",
-          "Avalonia.Themes.Fluent": "[12.1.6, )"
+          "Avalonia.Themes.Fluent": "[12.1.6, )",
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
+          "DynamicData": "[9.4.33, )"
         }
       },
       "Avalonia": {
@@ -245,6 +247,21 @@
         "contentHash": "CafSFU8q6I2ij7VRWy3D5qw3ObrDEOXRqIvFqVuEh7vqk1EC9ob94KYRmbHLZRsyj3Ob2xsF/tgcF5YF2uiKzQ==",
         "dependencies": {
           "Avalonia": "12.1.6"
+        }
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "CentralTransitive",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
+      },
+      "DynamicData": {
+        "type": "CentralTransitive",
+        "requested": "[9.4.33, )",
+        "resolved": "9.4.33",
+        "contentHash": "JpjbJOhwdZjmA0Y0USZH1jpJ8EHkzPNDKfEVuiaRVbtuPpheNSTbJ7ik1PkrLcDqnSu+uMP999FOHZAfoVndUA==",
+        "dependencies": {
+          "System.Reactive": "6.1.0"
         }
       },
       "HarfBuzzSharp": {
@@ -320,6 +337,12 @@
         "requested": "[4.156.0, )",
         "resolved": "4.156.0",
         "contentHash": "D4q5I+N/IBH3LTC/SK51MkfdjuX5JZVSS4gTJHbLPZ9btgga3xSC/gL/lyh18mfpwFmnm6b61DsEv6zrhTy0Ow=="
+      },
+      "System.Reactive": {
+        "type": "CentralTransitive",
+        "requested": "[7.0.0, )",
+        "resolved": "7.0.0",
+        "contentHash": "VYaSP2Kt+45GFnr3q7c/b4awT48VvueOJV4jPjdUXi5MxC9mSUy+HkJYtm8rGZ6fC3tNHG9gBu/YwNAR/FYqhg=="
       }
     },
     "net11.0/linux-arm64": {

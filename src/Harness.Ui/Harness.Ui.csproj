@@ -8,6 +8,8 @@
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="DynamicData" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Harness.Ui.Tests" />

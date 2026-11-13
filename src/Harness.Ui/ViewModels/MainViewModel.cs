@@ -1,59 +1,66 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Concurrency;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Harness.Ui.Api;
 
 namespace Harness.Ui.ViewModels;
 
 /// <summary>
 /// The page: the project picker, the chosen project's Board and the live-update state. Live updates follow
-/// /api/events: a change naming the shown project reloads its Board after a short quiet period; a dropped stream
-/// reconnects and reloads.
+/// /api/events: changes naming the shown project reload its Board once they have been quiet for 500 ms (Rx
+/// Throttle on the UI thread's scheduler); a dropped stream reconnects and reloads.
 /// </summary>
-public sealed class MainViewModel(HarnessApi api, UiHostContext host) : ViewModel
+public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan Quiet = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan Reconnect = TimeSpan.FromSeconds(3);
 
-    private ProjectInfo? _project;
-    private BoardViewModel? _board;
-    private string _live = "connecting";
-    private string? _error;
-    private DispatcherTimer? _pending;
+    private readonly HarnessApi _api;
+    private readonly UiHostContext _host;
+    private readonly Subject<LiveChange> _changes = new();
+    private readonly IDisposable _reloads;
+
+    /// <summary>Created on the UI thread: the reloads run on its scheduler.</summary>
+    public MainViewModel(HarnessApi api, UiHostContext host)
+    {
+        _api = api;
+        _host = host;
+        var ui = new SynchronizationContextScheduler(
+            SynchronizationContext.Current ?? throw new InvalidOperationException("create on the UI thread")
+        );
+        // true: the project list changed (and with it maybe the shown project); false: the shown project's data
+        var projects = _changes.Where(c => c.All || c.Registry).Throttle(Quiet, ui).Select(_ => true);
+        var board = _changes
+            .Where(c => !c.All && !c.Registry && Project is { } shown && c.Projects.Contains(shown.Id, StringComparer.Ordinal))
+            .Throttle(Quiet, ui)
+            .Select(_ => false);
+        // one reload at a time, in order, on the UI thread
+        _reloads = projects
+            .Merge(board)
+            .ObserveOn(ui)
+            .Select(list => Observable.FromAsync(() => LiveReloadAsync(list)))
+            .Concat()
+            .Subscribe();
+    }
 
     public ObservableCollection<ProjectInfo> Projects { get; } = [];
 
-    public ProjectInfo? Project
-    {
-        get => _project;
-        set
-        {
-            if (Set(ref _project, value) && value is not null)
-            {
-                host.Navigated?.Invoke(value.Id);
-                _ = ShowAsync(value);
-            }
-        }
-    }
+    [ObservableProperty]
+    public partial ProjectInfo? Project { get; set; }
 
-    public BoardViewModel? Board
-    {
-        get => _board;
-        private set => Set(ref _board, value);
-    }
+    [ObservableProperty]
+    public partial BoardViewModel? Board { get; private set; }
 
-    public string Live
-    {
-        get => _live;
-        private set => Set(ref _live, value);
-    }
+    [ObservableProperty]
+    public partial string Live { get; private set; } = "connecting";
 
-    public string? Error
-    {
-        get => _error;
-        private set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    public partial string? Error { get; private set; }
 
-    /// <summary>The number of Board reloads live updates caused (the spike measures and tests it).</summary>
+    /// <summary>The number of reloads live updates caused (the spike measures and tests it).</summary>
     public int LiveReloads { get; private set; }
 
     /// <summary>Lists the projects, shows <paramref name="projectId"/> (else the first) and follows live updates.</summary>
@@ -63,24 +70,48 @@ public sealed class MainViewModel(HarnessApi api, UiHostContext host) : ViewMode
         _ = FollowAsync(token);
     }
 
+    /// <summary>Called for each live change; public so a host or test can feed changes in directly.</summary>
+    public void Changed(LiveChange change)
+    {
+        Live = "live";
+        _changes.OnNext(change);
+    }
+
+    public void Dispose()
+    {
+        _reloads.Dispose();
+        _changes.Dispose();
+        Board?.Dispose();
+    }
+
+    partial void OnProjectChanged(ProjectInfo? value)
+    {
+        if (value is not null)
+        {
+            _host.Navigated?.Invoke(value.Id);
+            _ = ShowAsync(value);
+        }
+    }
+
     private async Task LoadProjectsAsync(string? projectId, CancellationToken token)
     {
         try
         {
-            var projects = await api.ProjectsAsync(token);
+            var projects = await _api.ProjectsAsync(token);
+            var wanted = projectId ?? Project?.Id;
+            var sorted = projects.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
             Projects.Clear();
-            foreach (var project in projects.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var project in sorted)
             {
                 Projects.Add(project);
             }
             Error = null;
-            var wanted = projectId ?? _project?.Id;
             var chosen = Projects.FirstOrDefault(p => p.Id == wanted) ?? Projects.FirstOrDefault();
-            if (chosen is not null && chosen.Id == _project?.Id)
+            if (chosen is not null && chosen.Id == Board?.ProjectId)
             {
-                _project = chosen;
-                Notify(nameof(Project));
-                await ReloadAsync(token);
+                // the same project: keep its Board (and its cards), only refresh it; ShowAsync keeps a shown Board
+                Project = chosen;
+                await Board.LoadAsync(token);
                 return;
             }
             Project = chosen;
@@ -93,17 +124,34 @@ public sealed class MainViewModel(HarnessApi api, UiHostContext host) : ViewMode
 
     private async Task ShowAsync(ProjectInfo project)
     {
-        var board = new BoardViewModel(api, project.Id, id => host.TaskLink(project.Id, id));
+        if (Board?.ProjectId == project.Id)
+        {
+            return;
+        }
+        Board?.Dispose();
+        var board = new BoardViewModel(_api, project.Id, id => _host.TaskLink(project.Id, id));
         Board = board;
         await board.LoadAsync(CancellationToken.None);
-        if (host.BoardShown is { } shown)
+        if (_host.BoardShown is { } shown)
         {
             // after the frame that draws the cards
             Dispatcher.UIThread.Post(shown, DispatcherPriority.Background);
         }
     }
 
-    private Task ReloadAsync(CancellationToken token) => Board?.LoadAsync(token) ?? Task.CompletedTask;
+    private async Task LiveReloadAsync(bool projects)
+    {
+        LiveReloads++;
+        if (projects)
+        {
+            await LoadProjectsAsync(null, CancellationToken.None);
+        }
+        else if (Board is { } board)
+        {
+            await board.LoadAsync(CancellationToken.None);
+        }
+        _host.LiveReloaded?.Invoke();
+    }
 
     private async Task FollowAsync(CancellationToken token)
     {
@@ -113,7 +161,7 @@ public sealed class MainViewModel(HarnessApi api, UiHostContext host) : ViewMode
             try
             {
                 Live = "connecting";
-                await foreach (var change in api.ChangesAsync(() => Live = "live", token))
+                await foreach (var change in _api.ChangesAsync(() => Live = "live", token))
                 {
                     Changed(change);
                 }
@@ -134,35 +182,6 @@ public sealed class MainViewModel(HarnessApi api, UiHostContext host) : ViewMode
             }
             first = false;
         }
-    }
-
-    /// <summary>Called for each live change; public so a host or test can feed changes in directly.</summary>
-    public void Changed(LiveChange change)
-    {
-        Live = "live";
-        if (change.All || change.Registry)
-        {
-            Schedule(() => LoadProjectsAsync(null, CancellationToken.None));
-        }
-        else if (_project is { } shown && change.Projects.Contains(shown.Id, StringComparer.Ordinal))
-        {
-            Schedule(() => ReloadAsync(CancellationToken.None));
-        }
-    }
-
-    private void Schedule(Func<Task> reload)
-    {
-        _pending?.Stop();
-        _pending = new DispatcherTimer { Interval = Quiet };
-        _pending.Tick += async (_, _) =>
-        {
-            _pending?.Stop();
-            _pending = null;
-            LiveReloads++;
-            await reload();
-            host.LiveReloaded?.Invoke();
-        };
-        _pending.Start();
     }
 }
 
