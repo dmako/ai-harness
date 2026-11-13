@@ -412,6 +412,157 @@ public sealed class GitlabProviderTests
         approval.ApprovedBy.Should().Equal(new ScmUser("alice"));
     }
 
+    private static ScmNewMergeRequest NewRequest(
+        IReadOnlyList<string>? assignees = null,
+        IReadOnlyList<string>? reviewers = null
+    ) => new("feature/parser", "main", "Add parser", "Adds the parser", assignees ?? [], reviewers ?? []);
+
+    [Fact]
+    public async Task MergeRequestsAreCreatedWithUsernamesResolvedToIds()
+    {
+        using var server = new FakeScmServer();
+        server
+            .On(
+                "GET",
+                Api + "/users",
+                new FakeResponse(HttpStatusCode.OK, """[{"id":11,"username":"Alice","name":"Alice"}]"""),
+                new FakeResponse(HttpStatusCode.OK, """[{"id":12,"username":"bob","name":"Bob"}]"""),
+                new FakeResponse(HttpStatusCode.OK, """[{"id":13,"username":"carol","name":"Carol"}]""")
+            )
+            .On(
+                "POST",
+                ProjectPath + "/merge_requests",
+                new FakeResponse(
+                    HttpStatusCode.Created,
+                    RequestJson.Replace(
+                        "\"detailed_merge_status\"",
+                        "\"assignees\":[{\"id\":11,\"username\":\"Alice\"}],\"detailed_merge_status\"",
+                        StringComparison.Ordinal
+                    )
+                )
+            );
+        using var client = Connect(server);
+
+        var created = await client.CreateMergeRequestAsync(
+            Project,
+            NewRequest(["@alice"], ["bob", "carol", "Bob"]),
+            Token
+        );
+
+        created.MergeRequest.Number.Should().Be(7);
+        created.MergeRequest.WebUrl!.AbsoluteUri.Should().EndWith("/merge_requests/7");
+        server
+            .Requests.Where(request => request.Path == Api + "/users")
+            .Select(request => request.Query)
+            .Should()
+            .Equal("?username=alice", "?username=bob", "?username=carol");
+        var body = JsonNode.Parse(server.Single("POST", ProjectPath + "/merge_requests").Body)!;
+        body["source_branch"]!.GetValue<string>().Should().Be("feature/parser");
+        body["target_branch"]!.GetValue<string>().Should().Be("main");
+        body["title"]!.GetValue<string>().Should().Be("Add parser");
+        body["description"]!.GetValue<string>().Should().Be("Adds the parser");
+        body["assignee_ids"]!.AsArray().Select(id => id!.GetValue<long>()).Should().Equal(11);
+        body["reviewer_ids"]!.AsArray().Select(id => id!.GetValue<long>()).Should().Equal(12, 13);
+        // the answer lists bob as reviewer but not carol, whom GitLab dropped without an error
+        created.Warnings.Should().ContainSingle().Which.Should().Contain("carol").And.Contain("reviewer");
+    }
+
+    [Fact]
+    public async Task CreatingWithoutUsersSendsNoIdsAndWarnsOfNothing()
+    {
+        using var server = new FakeScmServer();
+        server.On("POST", ProjectPath + "/merge_requests", new FakeResponse(HttpStatusCode.Created, RequestJson));
+        using var client = Connect(server);
+
+        var created = await client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+
+        created.Warnings.Should().BeEmpty();
+        var body = JsonNode.Parse(server.Single("POST", ProjectPath + "/merge_requests").Body)!.AsObject();
+        body.Select(property => property.Key).Should().NotContain(["assignee_ids", "reviewer_ids"]);
+    }
+
+    [Fact]
+    public async Task UnknownUsernamesAreNamedAndNothingIsCreated()
+    {
+        using var server = new FakeScmServer();
+        server.On(
+            "GET",
+            Api + "/users",
+            new FakeResponse(HttpStatusCode.OK, """[{"id":11,"username":"alice"}]"""),
+            new FakeResponse(HttpStatusCode.OK, "[]")
+        );
+        using var client = Connect(server);
+
+        var create = () => client.CreateMergeRequestAsync(Project, NewRequest(["alice"], ["ghost"]), Token);
+
+        var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+        failure.Kind.Should().Be(ScmErrorKind.Invalid);
+        failure.Message.Should().Contain("'ghost'").And.NotContain("'alice'");
+        server.Requests.Should().NotContain(request => request.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task AnOpenMergeRequestForTheSameBranchesIsNamedWithItsNumberAndUrl()
+    {
+        using var server = new FakeScmServer();
+        server
+            .On(
+                "POST",
+                ProjectPath + "/merge_requests",
+                new FakeResponse(
+                    HttpStatusCode.Conflict,
+                    $$"""{"message":["Another open merge request already exists for this source branch: !7 {{Secret}}"]}"""
+                )
+            )
+            .Json("GET", ProjectPath + "/merge_requests", "[" + RequestJson + "]");
+        using var client = Connect(server);
+
+        var create = () => client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+
+        var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+        failure.Kind.Should().Be(ScmErrorKind.Invalid);
+        failure
+            .Message.Should()
+            .Contain("!7")
+            .And.Contain("https://gl.example.com/gitlab/group/sub/repo/-/merge_requests/7")
+            .And.NotContain(Secret);
+        failure.InnerException!.Message.Should().NotContain(Secret);
+        server
+            .Requests.Single(request => request.Method == HttpMethod.Get)
+            .Query.Should()
+            .Be("?state=opened&source_branch=feature%2Fparser&target_branch=main");
+    }
+
+    [Fact]
+    public async Task AMissingBranchIsNamedAndTheSameBranchTwiceIsRefusedBeforeAnyCall()
+    {
+        using var server = new FakeScmServer();
+        server
+            .On(
+                "POST",
+                ProjectPath + "/merge_requests",
+                new FakeResponse(HttpStatusCode.UnprocessableEntity, """{"message":"Invalid"}""")
+            )
+            .Json("GET", ProjectPath + "/merge_requests", "[]")
+            .Json("GET", ProjectPath + "/repository/branches/main", """{"name":"main"}""");
+        using var client = Connect(server);
+
+        var create = () => client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+
+        var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+        failure.Kind.Should().Be(ScmErrorKind.Invalid);
+        failure.Message.Should().Contain("source branch 'feature/parser' does not exist").And.Contain("push it");
+        server
+            .Requests.Should()
+            .Contain(request => request.Path == ProjectPath + "/repository/branches/feature%2Fparser");
+
+        using var quiet = new FakeScmServer();
+        using var other = Connect(quiet);
+        var same = () => other.CreateMergeRequestAsync(Project, NewRequest() with { SourceBranch = "main" }, Token);
+        (await same.Should().ThrowAsync<ScmException>()).Which.Kind.Should().Be(ScmErrorKind.Invalid);
+        quiet.Requests.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task RateLimitsAreRetriedOnceWithinTheBoundedWait()
     {

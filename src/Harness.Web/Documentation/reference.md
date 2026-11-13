@@ -353,7 +353,10 @@ authenticated with an access token only. Connections are set up once per
 machine and serve every project on it, with `harness scm` or in harness ui
 under Machine › SCM connections, where Test connection checks the server's
 version and the token's user and names the failure (unreachable, TLS,
-token rejected, not permitted, wrong server type) with its fix.
+token rejected, not permitted, wrong server type) with its fix. Which token
+scopes and permissions each operation needs, per SCM, is in the guide's
+[Token permissions](#guide-token-permissions) (`harness docs
+guide-token-permissions`).
 
 | Command | What it does |
 |---|---|
@@ -487,11 +490,18 @@ the SCM shows (GitLab `!7` is 7, Forgejo or GitHub pull request `#7` is 7).
 | `scm_set_merge_request_title` | `merge_request_id`, `title` | renames the merge request |
 | `scm_set_merge_request_description` | `merge_request_id`, `description` | replaces its description |
 | `scm_approve_merge_request` | `merge_request_id` | approves it as the token's user |
+| `scm_create_merge_request` | `from`, `to`, `title`, `description` (empty), `assignees`, `reviewers` (usernames; none) | opens a merge request from branch `from` into `to`, assigns it and requests the reviews; answers like `scm_get_merge_request_details` plus `warnings` |
 
 A tool that cannot reach the SCM says why and what to do: no SCM configured
 (`harness scm add`), no remote matching one (`[scm]` above, `harness doctor`),
 or the server's answer (`unauthorized`, `forbidden`, `not_found`, `invalid`
 for a line outside the diff, `rate_limited`) with its fix.
+`scm_create_merge_request` is `invalid`, and creates nothing, for a missing
+branch, the same branch twice, an unknown username, or an open merge request
+that already merges the same branches (named with its number and URL); an
+assignee or reviewer the SCM refuses once the merge request exists is a
+warning in the answer, not an error. Agents open merge requests only when the
+user asks.
 
 ## Tasks
 

@@ -188,3 +188,21 @@ public sealed record ScmConnectionTest(
     public static ScmConnectionTest Failed(ScmException exception) =>
         new(false, null, null, exception.Kind, exception.Message, ScmErrors.Hint(exception.Kind));
 }
+
+/// <summary>A merge request to open: from <see cref="SourceBranch" /> into <see cref="TargetBranch" />.</summary>
+/// <param name="Assignees">Usernames to assign; empty for none.</param>
+/// <param name="Reviewers">Usernames to request a review from; empty for none.</param>
+public sealed record ScmNewMergeRequest(
+    string SourceBranch,
+    string TargetBranch,
+    string Title,
+    string Description,
+    IReadOnlyList<string> Assignees,
+    IReadOnlyList<string> Reviewers
+);
+
+/// <summary>
+/// A merge request just opened, with what could not be done after it was created (an assignee or reviewer the server
+/// refused), as one sentence each.
+/// </summary>
+public sealed record ScmCreatedMergeRequest(MergeRequest MergeRequest, IReadOnlyList<string> Warnings);

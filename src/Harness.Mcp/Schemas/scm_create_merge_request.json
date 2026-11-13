@@ -1,0 +1,225 @@
+{
+  "description": "Open a merge request (GitLab merge request, Forgejo or GitHub pull request) from a source branch into a target branch, optionally assigning it and requesting reviews. Create one only when the user asks. Refused, with nothing created, when a branch is missing, both branches are the same, a username is unknown, or an open merge request already merges the same branches (its number and URL are named). Assignees or reviewers the SCM refuses after the merge request exists come back as warnings. Acts on the current project's merge requests on its SCM (GitLab, Forgejo or GitHub, found from the repository's git remotes).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "description": "the source branch, pushed to the SCM, whose changes the merge request proposes"
+      },
+      "to": {
+        "type": "string",
+        "description": "the target branch the changes merge into (usually the default branch)"
+      },
+      "title": {
+        "type": "string",
+        "description": "the merge request's title"
+      },
+      "description": {
+        "type": "string",
+        "description": "the merge request's description (Markdown); empty when left out"
+      },
+      "assignees": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "usernames to assign, as the SCM shows them (without @)"
+      },
+      "reviewers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "usernames to request a review from, as the SCM shows them (without @)"
+      }
+    },
+    "required": [
+      "from",
+      "to",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "name": "scm_create_merge_request",
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "scm": {
+        "type": "object",
+        "description": "the SCM the call went to",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "project": {
+        "type": "string",
+        "description": "the project's path on the SCM"
+      },
+      "merge_request_id": {
+        "type": "integer",
+        "description": "the new merge request's number in the project (pass it as merge_request_id to the other scm_ tools)"
+      },
+      "merge_request": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "the merge request's number in the project (pass it as merge_request_id)"
+          },
+          "title": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "description": "opened, merged or closed"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_branch": {
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "web_url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "global_id": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "base_sha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "start_sha": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "merged_at": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approved": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "whether the approval rules are met; null when the SCM does not say"
+          },
+          "approved_by": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "reviewers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "merge_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "state",
+          "source_branch",
+          "target_branch",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "warnings": {
+        "type": [
+          "null",
+          "array"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "description": "what could not be done once the merge request existed: assignees or reviewers the SCM refused, and why"
+      }
+    },
+    "required": [
+      "scm",
+      "project",
+      "merge_request_id",
+      "merge_request",
+      "warnings"
+    ],
+    "additionalProperties": false
+  }
+}

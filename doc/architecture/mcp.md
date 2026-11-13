@@ -34,7 +34,7 @@ suggested work and knowledge are represented as pending proposals.
 
 ## SCM tools
 
-`Scm/ScmTools` serves the ten `scm_` tools over the session's `IScmSession`
+`Scm/ScmTools` serves the eleven `scm_` tools over the session's `IScmSession`
 (Harness.Scm: the project's SCM resolution, the machine's SCM connections and
 the providers the CLI composes). Each acts on the current project's SCM and
 project as its git remotes (or `[scm]`) name them; a merge request is its
@@ -51,6 +51,7 @@ project-scoped number (GitLab iid, Forgejo index, GitHub pull request number).
 | `scm_get_merge_request_diff` | its changes per file within a 60 KB budget, truncation marked per file |
 | `scm_set_merge_request_title`, `scm_set_merge_request_description` | edit the merge request |
 | `scm_approve_merge_request` | approve as the token's user |
+| `scm_create_merge_request` | open a merge request (`from`, `to`, `title`, optional `description`, `assignees`, `reviewers`); answers the new merge request as `scm_get_merge_request_details` does, with `warnings` for assignees or reviewers the SCM refused |
 
 Write tools are always available. Allowed values (`state`, `visibility`,
 `line_type`) are checked by the tools, since the schema validator has no

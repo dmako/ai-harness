@@ -539,4 +539,125 @@ public sealed class GithubProviderTests
             .Should()
             .Throw<ArgumentException>();
     }
+
+    private static ScmNewMergeRequest NewRequest(
+        IReadOnlyList<string>? assignees = null,
+        IReadOnlyList<string>? reviewers = null
+    ) => new("fix/login", "main", "Fix login", "Fixes #2", assignees ?? [], reviewers ?? []);
+
+    [Fact]
+    public async Task PullRequestsAreCreatedThenAssignedAndReviewersAreRequested()
+    {
+        using var server = new FakeScmServer();
+        server
+            .Json("GET", "/users/alice", """{"id":1,"login":"alice"}""")
+            .Json("GET", "/users/bob", """{"id":2,"login":"bob"}""")
+            .On("POST", RepoPath + "/pulls", new FakeResponse(HttpStatusCode.Created, PullJson))
+            .On(
+                "POST",
+                RepoPath + "/issues/3/assignees",
+                new FakeResponse(HttpStatusCode.Created, """{"number":3,"assignees":[{"id":1,"login":"alice"}]}""")
+            )
+            .On("POST", PullPath + "/requested_reviewers", new FakeResponse(HttpStatusCode.Created, PullJson));
+        using var client = Connect(server);
+
+        var created = await client.CreateMergeRequestAsync(Project, NewRequest(["alice"], ["bob"]), Token);
+
+        created.Warnings.Should().BeEmpty();
+        created.MergeRequest.Number.Should().Be(3);
+        created.MergeRequest.WebUrl!.AbsoluteUri.Should().Be("https://github.com/owner/repo/pull/3");
+        server
+            .Single("POST", RepoPath + "/pulls")
+            .Body.Should()
+            .Be("""{"head":"fix/login","base":"main","title":"Fix login","body":"Fixes #2"}""");
+        server.Single("POST", RepoPath + "/issues/3/assignees").Body.Should().Be("""{"assignees":["alice"]}""");
+        server.Single("POST", PullPath + "/requested_reviewers").Body.Should().Be("""{"reviewers":["bob"]}""");
+        server.Requests.Should().AllSatisfy(request => request.Uri.Host.Should().Be("api.github.com"));
+    }
+
+    [Fact]
+    public async Task AssigneesGithubDropsAndRefusedReviewersBecomeWarnings()
+    {
+        using var server = new FakeScmServer();
+        server
+            .Json("GET", "/users/alice", """{"id":1,"login":"alice"}""")
+            .Json("GET", "/users/bob", """{"id":2,"login":"bob"}""")
+            .On("POST", RepoPath + "/pulls", new FakeResponse(HttpStatusCode.Created, PullJson))
+            .On(
+                "POST",
+                RepoPath + "/issues/3/assignees",
+                new FakeResponse(HttpStatusCode.Created, """{"number":3,"assignees":[]}""")
+            )
+            .On(
+                "POST",
+                PullPath + "/requested_reviewers",
+                new FakeResponse(
+                    HttpStatusCode.UnprocessableEntity,
+                    $$"""{"message":"Reviews may only be requested from collaborators. {{Secret}}"}"""
+                )
+            );
+        using var client = Connect(server);
+
+        var created = await client.CreateMergeRequestAsync(Project, NewRequest(["alice"], ["bob"]), Token);
+
+        created.MergeRequest.Number.Should().Be(3);
+        created.Warnings.Should().HaveCount(2);
+        created.Warnings[0].Should().Contain("alice").And.Contain("assignee");
+        created.Warnings[1].Should().Contain("bob").And.Contain("reviewer").And.Contain("collaborators");
+        created.Warnings.Should().AllSatisfy(warning => warning.Should().NotContain(Secret));
+    }
+
+    [Fact]
+    public async Task UnknownUsersDuplicatesAndMissingBranchesAreRefused()
+    {
+        using var unknown = new FakeScmServer();
+        using (var client = Connect(unknown))
+        {
+            var create = () => client.CreateMergeRequestAsync(Project, NewRequest([], ["ghost", "nobody"]), Token);
+            var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+            failure.Kind.Should().Be(ScmErrorKind.Invalid);
+            failure.Message.Should().Contain("'ghost'").And.Contain("'nobody'");
+            unknown.Requests.Should().NotContain(request => request.Method == HttpMethod.Post);
+        }
+
+        using var duplicate = new FakeScmServer();
+        duplicate
+            .On(
+                "POST",
+                RepoPath + "/pulls",
+                new FakeResponse(
+                    HttpStatusCode.UnprocessableEntity,
+                    """{"message":"Validation Failed","errors":[{"message":"A pull request already exists for owner:fix/login."}]}"""
+                )
+            )
+            .Json("GET", RepoPath + "/pulls", "[" + PullJson + "]");
+        using (var client = Connect(duplicate))
+        {
+            var create = () => client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+            var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+            failure.Kind.Should().Be(ScmErrorKind.Invalid);
+            failure.Message.Should().Contain("#3").And.Contain("https://github.com/owner/repo/pull/3");
+            duplicate
+                .Requests.Single(request => request.Method == HttpMethod.Get)
+                .Query.Should()
+                .Be("?state=open&head=owner%3Afix%2Flogin&base=main");
+        }
+
+        using var missing = new FakeScmServer();
+        missing
+            .On(
+                "POST",
+                RepoPath + "/pulls",
+                new FakeResponse(HttpStatusCode.UnprocessableEntity, """{"message":"Validation Failed"}""")
+            )
+            .Json("GET", RepoPath + "/pulls", "[]")
+            .Json("GET", RepoPath + "/branches/main", """{"name":"main"}""");
+        using (var client = Connect(missing))
+        {
+            var create = () => client.CreateMergeRequestAsync(Project, NewRequest(), Token);
+            var failure = (await create.Should().ThrowAsync<ScmException>()).Which;
+            failure.Kind.Should().Be(ScmErrorKind.Invalid);
+            failure.Message.Should().Contain("source branch 'fix/login' does not exist");
+        }
+    }
 }

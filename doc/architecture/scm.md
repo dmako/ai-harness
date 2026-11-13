@@ -44,7 +44,11 @@ through the one of a connection's kind. A client offers:
 - projects: list (search, visibility) and get one;
 - merge requests: list by state (opened, merged, closed), details, comments,
   a general comment, a comment on one diff line (path, line, `new` or `old`
-  side), the diff within a byte budget, title, description and approval.
+  side), the diff within a byte budget, title, description and approval;
+- `CreateMergeRequestAsync(project, ScmNewMergeRequest)`: opens a merge request
+  (source and target branch, title, description, assignee and reviewer
+  usernames) and returns `ScmCreatedMergeRequest`, the new `MergeRequest` with
+  warnings for assignees or reviewers the server refused once it existed.
 
 A project is named by the full path the API uses (`group/sub/repo` on GitLab,
 `owner/repo` on Forgejo and GitHub); a merge request by its project-scoped
@@ -67,7 +71,21 @@ Only token authentication is supported. `ScmEndpoint` (name, kind, base URL)
 is what may be shown and matched; `ScmConnection` adds the token and prints
 it only masked (`ScmTokens.Mask`: `****` and the last four characters).
 Exception messages never contain the token; providers pass any server text
-through `ScmErrors.Redact` before using it.
+through `ScmErrors.Redact` before using it. The scopes and permissions each
+operation needs per SCM are in the user guide's Token permissions section
+(`src/Harness.Web/Documentation/guide.md`, `harness docs guide-token-permissions`).
+
+`ScmMergeRequestCreation` holds what creating does the same way on every SCM.
+`Normalize` trims the request and refuses, as `invalid` and before any call, a
+missing branch or title and a merge request into its own branch; usernames
+lose a leading `@`, blanks and duplicates. Each provider checks every username
+first and refuses unknown ones by name (`UnknownUsers`), so nothing is created
+for a typo. When the server refuses the create with `invalid` or `not_found`,
+`ExplainAsync` looks for an open merge request from the same source into the
+same target (the error names its number and URL) and then for a missing source
+or target branch; lookups that fail leave the server's error as it was. An
+assignee or reviewer the server refuses or silently drops after the merge
+request exists becomes a warning (`Warning`, `Missing`), never a failure.
 
 ## Matching a remote
 
@@ -239,6 +257,7 @@ path (`api/v4/projects/group%2Fsub%2Frepo`), a merge request by its iid.
 | Diff | `GET .../diffs` (GitLab 15.7+), else `GET .../changes`; `too_large` files are marked truncated |
 | Title, description | `PUT .../merge_requests/:iid` |
 | Approve | `POST .../approve` |
+| Create | `GET /users?username=` per assignee and reviewer (unknown ones refused), then `POST /projects/:id/merge_requests` with `source_branch`, `target_branch`, `title`, `description`, `assignee_ids`, `reviewer_ids`; users missing from the answer's `assignees` or `reviewers` are warnings. A refused create looks up `GET .../merge_requests?state=opened&source_branch=&target_branch=` and `GET .../repository/branches/:branch` |
 
 ## Forgejo
 
@@ -258,6 +277,7 @@ by Gitea) with the token in `Authorization: token <t>`. A project is
 | Diff | `GET .../pulls/{i}.diff`, split per file |
 | Title, description | `PATCH .../pulls/{i}` |
 | Approve | `POST .../pulls/{i}/reviews` with event `APPROVED` on the head commit |
+| Create | `GET /users/{username}` per assignee and reviewer (404 refused), then `POST /repos/{o}/{r}/pulls` with `head`, `base`, `title`, `body`, `assignees` (refused as a whole when an assignee cannot be assigned: created again without them, with a warning), then `POST .../pulls/{i}/requested_reviewers` (a failure is a warning). A refused create looks up the open pulls and `GET .../branches/{branch}` |
 
 Where it differs from GitLab:
 
@@ -304,6 +324,7 @@ number.
 | Diff | `GET .../pulls/{n}` with `Accept: application/vnd.github.diff`, split per file |
 | Title, description | `PATCH .../pulls/{n}` |
 | Approve | `POST .../pulls/{n}/reviews` with event `APPROVE` on the head commit |
+| Create | `GET /users/{username}` per assignee and reviewer (404 refused), then `POST /repos/{o}/{r}/pulls` with `head`, `base`, `title`, `body`, then `POST .../issues/{n}/assignees` (users GitHub silently leaves out are warnings) and `POST .../pulls/{n}/requested_reviewers` (a failure is a warning). A refused create looks up `GET .../pulls?state=open&head=owner:branch&base=` and `GET .../branches/{branch}` |
 
 Where it differs:
 
@@ -429,4 +450,5 @@ the project's resolution, the machine's `IScmConfiguration` for tokens and the
 `ScmProviderRegistry`. `HarnessStateSession` implements it; `harness mcp` gives it
 the GitLab, Forgejo and GitHub providers, so Mcp needs neither Infrastructure nor the
 providers. The generated agent instructions (`AgentGuidance`) tell agents how to
-review a merge request with them.
+review a merge request with them, and to change, approve or open one
+(`scm_create_merge_request`) only when the user asks.

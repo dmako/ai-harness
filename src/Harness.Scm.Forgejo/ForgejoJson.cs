@@ -43,7 +43,8 @@ internal sealed record FjPull(
     bool Merged,
     List<FjLabel>? Labels,
     List<FjUser>? RequestedReviewers,
-    bool? Mergeable
+    bool? Mergeable,
+    List<FjUser>? Assignees = null
 );
 
 internal sealed record FjComment(long Id, string? Body, FjUser? User, DateTimeOffset? CreatedAt, string? HtmlUrl);
@@ -81,6 +82,13 @@ internal sealed record FjReviewBody(string Event, string Body, string? CommitId,
 
 internal sealed record FjPullEdit(string? Title, string? Body);
 
+/// <summary>A new pull request from <c>head</c> into <c>base</c>; assignees are left out when null.</summary>
+internal sealed record FjPullCreate(string Head, string Base, string Title, string Body, List<string>? Assignees);
+
+internal sealed record FjReviewersBody(List<string> Reviewers);
+
+internal sealed record FjBranchInfo(string? Name);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -101,4 +109,7 @@ internal sealed record FjPullEdit(string? Title, string? Body);
 [JsonSerializable(typeof(FjCommentBody))]
 [JsonSerializable(typeof(FjReviewBody))]
 [JsonSerializable(typeof(FjPullEdit))]
+[JsonSerializable(typeof(FjPullCreate))]
+[JsonSerializable(typeof(FjReviewersBody))]
+[JsonSerializable(typeof(FjBranchInfo))]
 internal sealed partial class ForgejoJsonContext : JsonSerializerContext;

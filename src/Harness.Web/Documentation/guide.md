@@ -268,19 +268,15 @@ harness lets agents read and review the merge requests of a project hosted on
 GitLab (REST API v4), Forgejo (REST API v1, also Gitea) or GitHub (github.com
 or GitHub Enterprise Server; there they are pull requests): list them, read the
 details, diff and comments, comment on the whole request or on one changed
-line, change the title or description, and approve.
+line, change the title or description, approve, and open new ones.
 
-**Connect a server once per machine.** Only access tokens are supported:
-
-- GitLab: a personal, group or project access token with the `api` scope
-  (`read_api` is enough for reading, but not for comments or approvals);
-- Forgejo: an access token with repository read and write (comments, reviews,
-  edits), user read (for the connection test) and issue write (general
-  comments live on the pull request's issue);
-- GitHub: a fine-grained personal access token with Pull requests read and
-  write (Contents and Metadata read come with it), or a classic token with the
-  `repo` scope. Its URL is `https://github.com`, or your Enterprise Server's
-  address (harness calls its `/api/v3`).
+**Connect a server once per machine.** Only access tokens are supported: a
+GitLab personal, group or project access token, a Forgejo access token, or a
+GitHub fine-grained or classic personal access token. Give it only what the
+agents should do; [Token permissions](#guide-token-permissions) lists the
+scopes and permissions each harness operation needs, per SCM. A GitHub
+connection's URL is `https://github.com`, or your Enterprise Server's address
+(harness calls its `/api/v3`).
 
 ```
 harness scm add work --type gitlab --url https://gitlab.example.com --token-stdin
@@ -346,9 +342,146 @@ its diff (`scm_get_merge_request_diff`) and the discussion so far
 (`scm_get_merge_request_comments`), reads the code around the changes in the
 working tree, then leaves one comment per finding on the line it is about
 (`scm_add_merge_request_diff_comment`) and a summary
-(`scm_add_merge_request_comment`). Agents change a title or description, or
-approve, only when you ask: those act as the token's user. If an agent says
-no SCM matches the project, `harness doctor` tells why.
+(`scm_add_merge_request_comment`). Agents change a title or description,
+approve, or open a merge request only when you ask: those act as the token's
+user. If an agent says no SCM matches the project, `harness doctor` tells why.
+
+**Opening a merge request.** Ask your agent to open one once its branch is
+pushed, for example "open a merge request from this branch into main and ask
+bob to review it". It calls `scm_create_merge_request` with the source and
+target branch, a title and description, and optionally assignees and reviewers
+(usernames as the SCM shows them). harness refuses, without creating anything,
+when a branch is missing, both branches are the same, a username is unknown, or
+an open merge request already merges the same branches (it names that one's
+number and link). If the merge request is created but the SCM refuses an
+assignee or reviewer (no access to the project, say), the agent gets the new
+merge request with a warning naming who was not added and why.
+
+## Token permissions
+
+harness acts as the token's user, so the token decides what agents can do.
+Give it the least that covers what you want them to do: a read-only token lets
+agents read and review privately (they report findings to you), a writing one
+lets them comment, edit, approve and open merge requests. The tables below say
+what each harness operation calls and needs; the token's user also needs the
+role or access in the project that the SCM itself requires for that action.
+They were checked against each provider's documentation in November 2026
+(sources under each table).
+
+The operations: **test** is the connection test (`harness scm test`, harness
+ui, `harness doctor`); **projects** is `scm_get_projects`; **read** is listing
+and reading merge requests, their diffs and comments
+(`scm_list_merge_requests`, `scm_get_merge_request_details`,
+`scm_get_merge_request_diff`, `scm_get_merge_request_comments`, and finding the
+project's SCM project); **comment** is `scm_add_merge_request_comment` and
+`scm_add_merge_request_diff_comment`; **edit** is
+`scm_set_merge_request_title` and `scm_set_merge_request_description`;
+**approve** is `scm_approve_merge_request`; **create** is
+`scm_create_merge_request` with its assignees and reviewers.
+
+**GitLab** (personal, group and project access tokens):
+
+| Operation | Calls | Scope | Role in the project |
+|---|---|---|---|
+| test | `GET /version`, `GET /user` | `read_api` | none |
+| projects | `GET /projects?membership=true` | `read_api` | member |
+| read | `GET /projects/:id/merge_requests`, `…/:iid`, `…/approvals`, `…/diffs` (or `…/changes`), `…/discussions` | `read_api` | Reporter (Guest cannot see the code of a private project) |
+| comment | `POST …/notes`, `POST …/discussions` | `api` | Reporter (Planner and up can comment) |
+| edit | `PUT /projects/:id/merge_requests/:iid` | `api` | Developer (or the merge request's author) |
+| approve | `POST …/approve` | `api` | Developer by default; with approval rules (Premium, Ultimate), an eligible approver |
+| create | `GET /users?username=`, `POST /projects/:id/merge_requests` (`assignee_ids`, `reviewer_ids`); on refusal `GET …/merge_requests?state=opened`, `GET …/repository/branches/:branch` | `api` | Developer (to push the source branch and set assignees and reviewers) |
+
+- `read_api` is read-only: it covers test, projects and read; everything that
+  writes needs `api`, which also grants all other API writes the user may do.
+- A personal access token acts as you with your roles. Group and project
+  access tokens act as a bot user, created with the token, that has the role
+  chosen for the token (pick Reporter for reading, Developer to comment, edit,
+  approve and create); a project token reaches only its project, a group token
+  the group's projects. `read_user` (personal tokens only) covers just the
+  token's user, not the rest of the API: use `read_api` or `api`.
+- On GitLab.com, group and project access tokens need Premium or Ultimate; on
+  GitLab Self-Managed and Dedicated they come with any license.
+- GitLab drops assignees and reviewers it cannot add without an error (users
+  outside the project; on the Free tier only one assignee is kept): harness
+  reports them as warnings.
+
+Sources: [token scopes](https://docs.gitlab.com/security/tokens/access_token_scopes/),
+[project access tokens](https://docs.gitlab.com/user/project/settings/project_access_tokens/),
+[group access tokens](https://docs.gitlab.com/user/group/settings/group_access_tokens/),
+[roles and permissions](https://docs.gitlab.com/user/permissions/),
+[merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/),
+[merge requests API](https://docs.gitlab.com/api/merge_requests/).
+
+**Forgejo** (and Gitea) access tokens: each scope is `read:` (GET only) or
+`write:` (also POST, PATCH and DELETE, and includes read).
+
+| Operation | Calls | Scopes |
+|---|---|---|
+| test | `GET /version`, `GET /user` | `read:user` |
+| projects | `GET /repos/search`, `GET /user/repos` | `read:repository`, `read:user` |
+| read | `GET /repos/{owner}/{repo}/pulls…` (pulls, reviews, review comments, `.diff`), `GET /repos/{owner}/{repo}/issues/{index}/comments` | `read:repository`, `read:issue` |
+| comment | `POST /repos/…/issues/{index}/comments` (general), `POST /repos/…/pulls/{index}/reviews` (diff line) | `write:issue`, `write:repository` |
+| edit | `PATCH /repos/…/pulls/{index}` | `write:repository` |
+| approve | `POST /repos/…/pulls/{index}/reviews` | `write:repository` |
+| create | `GET /users/{username}`, `POST /repos/…/pulls` (`assignees`), `POST /repos/…/pulls/{index}/requested_reviewers`; on refusal `GET /repos/…/pulls`, `GET /repos/…/branches/{branch}` | `write:repository`, `read:user` |
+
+- So a read-only token is `read:user`, `read:repository` and `read:issue`; a
+  full one is `read:user`, `write:repository` and `write:issue`.
+  `read:organization` is not needed: harness reads repositories through the
+  repository routes and requests reviews from users, not teams.
+- The token's user needs read access to the repository to read and comment,
+  and write access to edit others' pull requests, assign, request reviews and
+  open pull requests from the repository's branches. Branch protection decides
+  whose approvals count.
+- Forgejo refuses the whole pull request when an assignee cannot be assigned;
+  harness then opens it without assignees and reports them as a warning.
+
+Source: [Forgejo token scopes](https://forgejo.org/docs/latest/user/token-scope/)
+(Gitea uses the same scopes).
+
+**GitHub fine-grained personal access tokens** (repository permissions; choose
+the repositories, and the organization as resource owner for its
+repositories):
+
+| Operation | Calls | Permissions |
+|---|---|---|
+| test | `GET /meta`, `GET /user` | none |
+| projects | `GET /user/repos`, `GET /search/repositories` | Metadata: read |
+| read | `GET /repos/{owner}/{repo}`, `…/pulls`, `…/pulls/{n}` (also as diff), `…/pulls/{n}/reviews`, `…/pulls/{n}/comments`, `…/issues/{n}/comments` | Metadata: read, Pull requests: read, Contents: read (the diff) |
+| comment | `POST …/issues/{n}/comments` (general), `POST …/pulls/{n}/comments` (diff line) | Pull requests: read and write |
+| edit | `PATCH …/pulls/{n}` | Pull requests: read and write |
+| approve | `POST …/pulls/{n}/reviews` | Pull requests: read and write |
+| create | `GET /users/{username}`, `POST …/pulls`, `POST …/issues/{n}/assignees`, `POST …/pulls/{n}/requested_reviewers`; on refusal `GET …/pulls?head=&base=`, `GET …/branches/{branch}` | Pull requests: read and write, Contents: read; Issues: read and write is an alternative for the assignees |
+
+- Read-only: Metadata, Contents and Pull requests read. To write, raise Pull
+  requests to read and write. Metadata read is always part of a fine-grained
+  token. GitHub accepts Pull requests or Issues permission for the issue
+  routes of a pull request (general comments, assignees).
+- An organization can require approval of fine-grained tokens that reach its
+  repositories: until an owner approves it, the token is pending and reads
+  only public resources (an owner's own token is approved at once). An
+  organization can also block fine-grained tokens; then use a classic token.
+  Outside collaborators of an organization's repositories must use classic
+  tokens.
+- Assignees need the token's user to have push access; GitHub ignores others
+  without an error, and harness reports them as warnings. Reviewers must be
+  collaborators.
+- GitHub Enterprise Server has fine-grained tokens from 3.10 (a beta there);
+  older versions take only classic tokens, and an enterprise or organization
+  may require approval or block them as above.
+
+**GitHub classic personal access tokens:** `repo` for private repositories
+(everything above), or `public_repo` when every repository is public; no
+scope at all reads only public information. A classic token reaches every
+repository its user can; in an organization with SAML single sign-on,
+authorize the token for it.
+
+Sources: [permissions required for fine-grained tokens](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens),
+[managing personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+(and its [Enterprise Server 3.10 version](https://docs.github.com/en/enterprise-server@3.10/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)),
+[assignees API](https://docs.github.com/en/rest/issues/assignees),
+[pull requests API](https://docs.github.com/en/rest/pulls/pulls),
+[OAuth scopes](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps).
 
 ## Updating harness
 
