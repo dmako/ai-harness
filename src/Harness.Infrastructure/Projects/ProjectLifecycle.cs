@@ -33,7 +33,14 @@ public sealed record InitResult(
 public sealed class ProjectLifecycle(string? globalConfigurationPath = null, string version = "dev")
 {
     private const string IgnoreTemplate =
-        "# Managed by harness: keep local state out of Git.\n*.db\n*.db-wal\n*.db-shm\n";
+        """
+        # Managed by harness: agent hosts' state and logs stay local.
+        *.db
+        *.db-wal
+        *.db-shm
+        *.db.findings-inputs
+
+        """;
     public string GlobalConfigurationPath => globalConfigurationPath ?? ConfigurationPaths.GlobalPath();
     public string Version => version;
 
