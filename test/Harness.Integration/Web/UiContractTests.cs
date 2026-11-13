@@ -53,6 +53,30 @@ public sealed class UiContractTests
         saved.Settings.Sort.Should().Be("id");
         saved.Settings.HideDoneDays.Should().Be(14);
 
+        // Health: the checks, a probe from harness ui's own page, a fix, and a sync that then shows as a run
+        var health = await api.HealthAsync(id, probe: false, Token);
+        health.Probed.Should().BeFalse();
+        health.Status.Project!.Id.Should().Be(id);
+        health.Status.Database.Exists.Should().BeTrue();
+        health.Checks.Should().Contain(c => c.Name == "claude-code" && c.Level != "ok" && c.Fix != null);
+        health.Fixable.Should().Contain("claude-code");
+        (await api.HealthAsync(id, probe: true, Token)).Probed.Should().BeTrue();
+        var fixedCheck = await api.FixAsync(id, new FixRequest { Check = "claude-code" }, Token);
+        fixedCheck.Ok.Should().BeTrue(fixedCheck.Output);
+        fixedCheck.Message.Should().Be("harness install --client claude-code done");
+        var synced = await api.FixAsync(id, new FixRequest { Sync = true }, Token);
+        synced.Ok.Should().BeTrue(synced.Output);
+        health = await api.HealthAsync(id, probe: false, Token);
+        health.Status.Sync!.SyncedAt.Should().NotBeNull();
+        health.Status.Sync.Stale.Should().BeNull();
+        var run = health.Status.Sync.Runs.Should().NotBeEmpty().And.Subject.First();
+        run.Status.Should().NotBeNullOrEmpty();
+        run.HeadCommit.Should().Be(health.Status.Git!.Commit);
+        await FluentActions
+            .Awaiting(() => api.FixAsync(id, new FixRequest { Check = "config" }, Token))
+            .Should()
+            .ThrowAsync<HarnessApiException>();
+
         // the docs
         var docs = await api.DocsAsync(Token);
         docs.Docs.Select(d => d.Name).Should().Equal("guide", "reference");

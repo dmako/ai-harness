@@ -47,6 +47,20 @@
     <DataTemplate DataType="vm:BoardViewModel">
       <views:BoardView Name="Board" />
     </DataTemplate>
+    <DataTemplate DataType="vm:HealthViewModel">
+      <views:HealthView Name="Health" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:FixPreviewDialog">
+      <StackPanel Spacing="8">
+        <TextBlock Text="{Binding Head}" TextWrapping="Wrap" />
+        <Border Classes="inset">
+          <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Auto">
+            <SelectableTextBlock Name="FixDiff" Classes="mono" Text="{Binding Diff}" />
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="hint" Text="{x:Static vm:FixPreviewDialog.Note}" />
+      </StackPanel>
+    </DataTemplate>
     <DataTemplate DataType="vm:MessagePage">
       <StackPanel Spacing="8">
         <Border Classes="error"><TextBlock Text="{Binding Message}" /></Border>

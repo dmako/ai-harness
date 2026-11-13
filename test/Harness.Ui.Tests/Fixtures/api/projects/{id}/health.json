@@ -1,0 +1,116 @@
+{
+  "status": {
+    "project_root": "C:\\repos\\fixture",
+    "state_root": "C:\\repos\\fixture",
+    "project": {
+      "id": "prj_fixture"
+    },
+    "git": {
+      "branch": "main",
+      "commit": "eeacf0ad66624dd474a85bfdd650fd1ef3d14864",
+      "detached": false,
+      "unborn": false,
+      "linked_worktree": false
+    },
+    "worktrees": [
+      {
+        "id": "wt_e4d33f509883bdd7bd27ac12a1cd5d91",
+        "path": "C:\\repos\\fixture",
+        "branch": "main",
+        "linked": false
+      }
+    ],
+    "database": {
+      "path": "C:\\repos\\fixture\\.harness\\harness.db",
+      "exists": true,
+      "schema_version": 27,
+      "schema_latest": 27
+    },
+    "config": {
+      "global": "C:\\Users\\dev\\AppData\\Roaming\\harness\\config.toml",
+      "project": "C:\\repos\\fixture\\.harness\\config.toml"
+    },
+    "clients": [
+      {
+        "client": "claude-code",
+        "configured": false,
+        "scopes": null
+      },
+      {
+        "client": "codex",
+        "configured": false,
+        "scopes": null
+      }
+    ],
+    "providers": [],
+    "scm": {
+      "status": "no_scm",
+      "source": "auto",
+      "reason": "No SCM is configured on this machine; add one with 'harness scm add'.",
+      "remotes": []
+    },
+    "sync": {
+      "runs": [],
+      "stale": "this worktree has never been synced; provider indexes may not reflect it (run 'harness sync')"
+    }
+  },
+  "checks": [
+    {
+      "name": "binary",
+      "level": "ok",
+      "detail": "0.13.0 (release, win-x64)",
+      "fix": null
+    },
+    {
+      "name": "config",
+      "level": "ok",
+      "detail": "configuration loaded",
+      "fix": null
+    },
+    {
+      "name": "git",
+      "level": "ok",
+      "detail": "C:\\repos\\fixture \u2014 main at eeacf0ad6662",
+      "fix": null
+    },
+    {
+      "name": "project",
+      "level": "ok",
+      "detail": "prj_fixture, 1 worktree(s)",
+      "fix": null
+    },
+    {
+      "name": "database",
+      "level": "ok",
+      "detail": "C:\\repos\\fixture\\.harness\\harness.db, schema 27/27",
+      "fix": null
+    },
+    {
+      "name": "search",
+      "level": "ok",
+      "detail": "built-in text and file search: rg C:\\tools\\rg.exe, fd C:\\tools\\fd.exe",
+      "fix": null
+    },
+    {
+      "name": "claude-code",
+      "level": "warn",
+      "detail": "harness MCP server not configured (checked C:\\repos\\fixture\\.mcp.json)",
+      "fix": "harness install --client claude-code"
+    },
+    {
+      "name": "codex",
+      "level": "fail",
+      "detail": "the harness MCP server entry is out of date (read C:\\Users\\dev\\.codex\\config.toml)",
+      "fix": "harness doctor --fix codex"
+    }
+  ],
+  "healthy": false,
+  "probed": false,
+  "fixable": [
+    "claude-code",
+    "codex"
+  ],
+  "previewed": [
+    "codex"
+  ]
+}

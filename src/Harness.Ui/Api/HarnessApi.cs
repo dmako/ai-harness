@@ -60,7 +60,7 @@ public sealed partial class HarnessApi(HttpClient http)
             ?? throw new HarnessApiException($"{path}: empty answer");
     }
 
-    private static async Task EnsureAsync(HttpResponseMessage response, CancellationToken token)
+    internal static async Task EnsureAsync(HttpResponseMessage response, CancellationToken token)
     {
         if (response.IsSuccessStatusCode)
         {

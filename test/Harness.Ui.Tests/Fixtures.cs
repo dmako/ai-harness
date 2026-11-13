@@ -47,6 +47,54 @@ internal static class Fixtures
         return board.ToJsonString();
     }
 
+    /// <summary>
+    /// The Health fixture synced: two recent syncs (the newest partial, its graph provider failing; the one before
+    /// refreshing both providers), the index fresh; with <paramref name="healthy"/> every check passes.
+    /// </summary>
+    public static string Health(bool healthy = false)
+    {
+        var health = JsonNode.Parse(Read("api/projects/{id}/health.json"))!;
+        var sync = health["status"]!["sync"]!.AsObject();
+        sync.Remove("stale");
+        sync["synced_at"] = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O");
+        sync["runs"] = new JsonArray(
+            Run(2, minutesAgo: 5, "partial", "eeacf0ad6662", ("text", "refreshed", null), ("graph", "failed", "the graph provider timed out after 120 s")),
+            Run(1, minutesAgo: 90, "ok", "1234567890ab", ("text", "refreshed", null), ("graph", "refreshed", null))
+        );
+        health["status"]!["providers"] = new JsonArray("text", "graph");
+        if (healthy)
+        {
+            foreach (var check in health["checks"]!.AsArray())
+            {
+                check!["level"] = "ok";
+                check["fix"] = null;
+            }
+            health["healthy"] = true;
+            health["fixable"] = new JsonArray();
+            health["previewed"] = new JsonArray();
+        }
+        return health.ToJsonString();
+    }
+
+    private static JsonObject Run(long id, int minutesAgo, string status, string head, params (string Name, string Status, string? Detail)[] providers) =>
+        new()
+        {
+            ["id"] = id,
+            ["started_at"] = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo).ToString("O"),
+            ["finished_at"] = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo).AddSeconds(4).ToString("O"),
+            ["mode"] = "incremental",
+            ["reason"] = "post-commit",
+            ["base_commit"] = "0000aaaa1111",
+            ["head_commit"] = head,
+            ["added"] = 2,
+            ["changed"] = 5,
+            ["removed"] = 1,
+            ["status"] = status,
+            ["providers"] = new JsonArray(
+                [.. providers.Select(p => (JsonNode)new JsonObject { ["name"] = p.Name, ["status"] = p.Status, ["detail"] = p.Detail })]
+            ),
+        };
+
     public static string Read(string path) => File.ReadAllText(Path.Combine(Folder, path));
 
     private static JsonArray Column(JsonArray columns, string status) =>

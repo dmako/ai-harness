@@ -7,8 +7,8 @@ namespace Harness.Ui.Tests;
 /// <summary>
 /// harness ui's API as fixed answers. A GET is answered from <see cref="Answers"/> (a concrete path, or a route
 /// template such as /api/projects/{id}/board), else from the fixture file at the route's path under Fixtures/
-/// (api/projects/{id}/board.json). POSTs are recorded and answered with {}; /api/events is a stream the test
-/// writes change events into.
+/// (api/projects/{id}/board.json). POSTs are recorded and answered by <see cref="Reply"/>, else with {};
+/// /api/events is a stream the test writes change events into.
 /// </summary>
 internal sealed class FixtureApi : HttpMessageHandler
 {
@@ -26,6 +26,12 @@ internal sealed class FixtureApi : HttpMessageHandler
 
     public List<(string Path, string Body, string? Origin, string? Ui)> Posts { get; } = [];
     public List<string> Gets { get; } = [];
+
+    /// <summary>The GETs sent with X-Harness-UI (harness ui's own page), with their query.</summary>
+    public List<string> UiGets { get; } = [];
+
+    /// <summary>A POST's answer from its path and body; null (or no Reply) answers {}.</summary>
+    public Func<string, string, string?>? Reply { get; set; }
 
     /// <summary>Sends an "event: change" with <paramref name="json"/> to the open stream.</summary>
     public void Change(string json) => _events.Writer.TryWrite($"event: change\ndata: {json}\n\n");
@@ -75,9 +81,14 @@ internal sealed class FixtureApi : HttpMessageHandler
         }
         if (request.Method == HttpMethod.Post)
         {
-            return Json("{}");
+            var (posted, body, _, _) = Posts[^1];
+            return Json(Reply?.Invoke(posted, body) ?? "{}");
         }
         Gets.Add(path);
+        if (request.Headers.Contains("X-Harness-UI"))
+        {
+            UiGets.Add(path + request.RequestUri.Query);
+        }
         if (path is "/api/events")
         {
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new EventStream(_events.Reader)) };

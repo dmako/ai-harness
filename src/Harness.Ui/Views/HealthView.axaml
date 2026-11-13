@@ -1,0 +1,208 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.HealthView"
+             x:DataType="vm:HealthViewModel">
+  <!-- a project's Health (app.js viewHealth/healthReport): the summary, what is wrong first with its fix, what passes
+       by area, paths and identifiers, index freshness and the recent syncs -->
+  <views:SectionView>
+    <views:SectionView.Body>
+      <StackPanel Spacing="16">
+        <WrapPanel>
+          <Button Name="Probe" Content="Check providers" Command="{Binding ProbeCommand}" Margin="0,0,12,0" />
+          <TextBlock Classes="muted" VerticalAlignment="Center" IsVisible="{Binding Probing}" TextWrapping="Wrap"
+                     Text="Starting each provider to check it (can take a while)…" />
+        </WrapPanel>
+
+        <Border Name="Summary" Classes="card"
+                Classes.lv-ok="{Binding Tone, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                Classes.lv-warn="{Binding Tone, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                Classes.lv-fail="{Binding Tone, Converter={x:Static c:Converters.Is}, ConverterParameter=fail}">
+          <DockPanel>
+            <Button Name="Sync" DockPanel.Dock="Right" Classes="primary" Content="Sync now" VerticalAlignment="Center"
+                    Command="{Binding SyncCommand}" IsVisible="{Binding CanSync}" Margin="12,0,0,0" />
+            <c:Icon DockPanel.Dock="Left" Kind="{Binding ToneIcon}" Size="20" VerticalAlignment="Top" Margin="0,2,10,0" />
+            <StackPanel Spacing="2">
+              <TextBlock Name="Headline" Classes="h3" Text="{Binding Headline}" />
+              <TextBlock Classes="muted" Text="{Binding Summary}" TextWrapping="Wrap" />
+            </StackPanel>
+          </DockPanel>
+        </Border>
+
+        <StackPanel Spacing="8" IsVisible="{Binding HasFailing}">
+          <TextBlock Classes="hint" Text="{Binding ChecksHint}" />
+          <ItemsControl Name="Failing" ItemsSource="{Binding Failing}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:CheckItem">
+                <Border Classes="card" Classes.lv-warn="{Binding IsWarn}" Classes.lv-fail="{Binding IsFail}"
+                        AutomationProperties.Name="{Binding AccessibleName}">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Fix it" VerticalAlignment="Top" Margin="12,0,0,0"
+                            IsVisible="{Binding CanFix}"
+                            AutomationProperties.Name="{Binding Name, StringFormat='Fix {0}'}"
+                            Command="{Binding $parent[views:HealthView].((vm:HealthViewModel)DataContext).FixCommand}"
+                            CommandParameter="{Binding}" />
+                    <c:Icon DockPanel.Dock="Left" Kind="{Binding Icon}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="mono" FontWeight="SemiBold" Text="{Binding Name}" />
+                      <ItemsControl ItemsSource="{Binding Lines}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <SelectableTextBlock Text="{Binding}" TextWrapping="Wrap" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <SelectableTextBlock Classes="path" TextWrapping="Wrap" Text="{Binding Tip, StringFormat='Read from {0}'}"
+                                           IsVisible="{Binding HasTip}" />
+                      <SelectableTextBlock Classes="mono" Text="{Binding FixLine}" TextWrapping="Wrap"
+                                           IsVisible="{Binding HasFix}" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <ItemsControl Name="Passing" ItemsSource="{Binding Passing}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:CheckArea">
+              <Expander HorizontalAlignment="Stretch" AutomationProperties.Name="{Binding Name}">
+                <Expander.Header>
+                  <StackPanel Spacing="2">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                      <TextBlock Classes="muted" Text="{Binding Count}" />
+                    </StackPanel>
+                    <TextBlock Classes="muted small" Text="{Binding Names}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Expander.Header>
+                <ItemsControl ItemsSource="{Binding Checks}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:CheckItem">
+                      <Border Classes="lv-ok">
+                        <DockPanel>
+                          <c:Icon DockPanel.Dock="Left" Kind="st-ok" VerticalAlignment="Top" Margin="0,2,8,0" />
+                          <StackPanel Spacing="2">
+                            <WrapPanel>
+                              <TextBlock Classes="mono" FontWeight="SemiBold" Text="{Binding Name}" Margin="0,0,10,0" />
+                              <TextBlock Text="{Binding Value}" IsVisible="{Binding HasValue}" TextWrapping="Wrap" />
+                            </WrapPanel>
+                            <ItemsControl ItemsSource="{Binding Lines}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                  <SelectableTextBlock Classes="path" Text="{Binding}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Expander>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Spacing="4">
+          <TextBlock Classes="h3" Text="Paths and identifiers" />
+          <Border Classes="card">
+            <StackPanel Spacing="6">
+              <ItemsControl Name="Paths" ItemsSource="{Binding Paths}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:Fact">
+                    <Grid ColumnDefinitions="128,*">
+                      <TextBlock Classes="muted" Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                      <SelectableTextBlock Grid.Column="1" Classes="mono" Text="{Binding Value}" TextWrapping="Wrap" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <ItemsControl Name="Git" ItemsSource="{Binding GitFacts}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:Fact">
+                    <Grid ColumnDefinitions="128,*">
+                      <TextBlock Classes="muted" Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                      <SelectableTextBlock Grid.Column="1" Classes="mono" Text="{Binding Value}" TextWrapping="Wrap" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Grid ColumnDefinitions="128,*" IsVisible="{Binding GitError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Classes="muted" Text="Git" Margin="0,0,8,0" />
+                <SelectableTextBlock Grid.Column="1" Text="{Binding GitError}" TextWrapping="Wrap" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsVisible="{Binding HasFresh}">
+          <TextBlock Classes="h3" Text="Index freshness" />
+          <TextBlock Classes="hint" Text="Each provider over the recent syncs: what it last did, when it last refreshed its index, and its last failure." />
+          <Border Classes="card" Padding="0">
+            <ItemsControl Name="Fresh" ItemsSource="{Binding Fresh}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:Freshness">
+                  <Border Classes="trow" Classes.lv-fail="{Binding Failed}">
+                    <StackPanel Spacing="2">
+                      <WrapPanel>
+                        <TextBlock Classes="mono" FontWeight="SemiBold" Text="{Binding Provider}" Margin="0,0,10,0" />
+                        <TextBlock Classes="muted" Text="{Binding LastOutcome, StringFormat='last: {0}'}" />
+                      </WrapPanel>
+                      <TextBlock Classes="small" Text="{Binding RefreshedLine}" TextWrapping="Wrap" />
+                      <TextBlock Classes="small muted" Text="{Binding LastFailure, StringFormat='last failure: {0}'}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsVisible="{Binding HasSyncs}">
+          <TextBlock Classes="h3" Text="Recent syncs" />
+          <Border Classes="card" Padding="0">
+            <ItemsControl Name="Syncs" ItemsSource="{Binding Syncs}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:SyncLine">
+                  <Border Classes="trow" Classes.lv-ok="{Binding Ok}" Classes.lv-fail="{Binding Failed}"
+                          Classes.lv-warn="{Binding Partial}">
+                    <DockPanel>
+                      <c:Icon DockPanel.Dock="Left" Kind="{Binding Icon}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding Head}" TextWrapping="Wrap" />
+                        <TextBlock Classes="small muted" Text="{Binding Providers}" TextWrapping="Wrap" />
+                        <SelectableTextBlock Classes="small" Text="{Binding Problem}" TextWrapping="Wrap"
+                                             IsVisible="{Binding HasProblem}" />
+                      </StackPanel>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </views:SectionView.Body>
+  </views:SectionView>
+</UserControl>

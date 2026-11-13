@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Harness.Ui.Api;
 
 /// <summary>
-/// Source-generated JSON metadata for the API contracts (one file per area: Projects, Workspaces, Tasks, Live, Docs):
+/// Source-generated JSON metadata for the API contracts (one file per area: Projects, Workspaces, Tasks, Live, Docs, Health):
 /// no reflection, so trimming and AOT keep working. Strict: a required member missing from an answer, or null where
 /// the contract says it cannot be, fails deserialisation.
 /// </summary>
@@ -21,4 +21,7 @@ namespace Harness.Ui.Api;
 [JsonSerializable(typeof(LiveChange))]
 [JsonSerializable(typeof(ApiError))]
 [JsonSerializable(typeof(DocList))]
+[JsonSerializable(typeof(HealthReport))]
+[JsonSerializable(typeof(FixRequest))]
+[JsonSerializable(typeof(FixResult))]
 internal sealed partial class UiJsonContext : JsonSerializerContext;

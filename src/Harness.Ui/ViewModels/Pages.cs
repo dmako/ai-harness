@@ -278,13 +278,19 @@ public sealed partial class ProjectPage : PageViewModel
             _ = ShowBoardAsync(board);
             return board;
         }
+        if (route.View is "health")
+        {
+            var health = new HealthViewModel(_services, Id);
+            _follow = _services.Live.Register(health);
+            _ = health.LoadAsync();
+            return health;
+        }
         var (label, task) = route.View switch
         {
             "architecture" => ("Architecture", "TASK-0156"),
             "knowledge" => ("Knowledge", "TASK-0153"),
             "work" => ("Work", "TASK-0152"),
             "agents" => ("Agents", "TASK-0154"),
-            "health" => ("Health", "TASK-0157"),
             _ => ("Overview", "TASK-0151"),
         };
         return new PlaceholderPage(label, task, _services.Host.Current(route));
