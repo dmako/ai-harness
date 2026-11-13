@@ -9,6 +9,7 @@ public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposabl
     private readonly object _gate = new();
     private readonly List<IProvider> _providers = [];
     private readonly HashSet<string> _noContext = new(StringComparer.Ordinal);
+    private readonly List<UnavailableProvider> _unavailable = [];
     private readonly TimeSpan _timeout;
     private Action<ProviderResult, ProviderRequest>? _observer;
     private Func<string, bool>? _skipPath;
@@ -30,6 +31,24 @@ public sealed class ProviderRegistry : IContextProviderRegistry, IAsyncDisposabl
         lock (_gate)
         {
             return _providers.ToArray();
+        }
+    }
+
+    /// <summary>Records a provider that could not be registered, for provider_status to name.</summary>
+    public void AddUnavailable(UnavailableProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        lock (_gate)
+        {
+            _unavailable.Add(provider);
+        }
+    }
+
+    public IReadOnlyList<UnavailableProvider> Unavailable()
+    {
+        lock (_gate)
+        {
+            return _unavailable.ToArray();
         }
     }
 

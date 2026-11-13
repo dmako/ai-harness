@@ -135,7 +135,8 @@ does not run. `harness doctor` warns about hook commands that cannot run;
 Harness answers agents' code questions (`get_context`, `search_project`,
 `package_api`) from providers: other tools it starts and asks, merging their
 answers. All are optional; without any, harness still keeps knowledge and
-tasks and reads project structure itself. Declare them in the global
+tasks and reads project structure itself. Text and file search are built
+in (see Built-in search below). Declare the others in the global
 configuration (see Configuration); a table named after a provider uses
 harness's built-in mapping for it, so you only give the executable:
 
@@ -145,9 +146,6 @@ command = "/path/to/codebase-memory-mcp"
 
 [providers.ripwire]                # ranked symbol and text search, name-based callers
 command = "/path/to/ripwire"
-
-[providers.rg-fd]                  # text and file search
-command = "/path/to/rg-fd-mcp"
 
 [providers.graphify-csharp]        # compiler-exact C# callers, references, impact
 command = "/path/to/harness-graphify"
@@ -186,6 +184,44 @@ says what is missing.
   in your NuGet configuration (`dotnet nuget update source <name> -u <user>
   -p <token> --store-password-in-clear-text`); harness says plainly when the
   feed cannot be reached.
+
+### Built-in search
+
+The MCP server and harness ui add a provider named `search` that answers
+`code.text_search` with `rg --json` and `code.file_search` with `fd`. Each
+call starts the tool in the project root, stops it (with its whole process
+tree) once it has the limit, at the provider's timeout or when the call is
+cancelled, and returns items sorted by path: the path relative to the root,
+and for text the line number and the line. The query is plain text (its
+regular-expression characters are escaped), `path` limits the search to a
+folder, and `.gitignore` and `.ignore` apply as rg and fd read them. It
+starts no process until asked and keeps no index, so it serves light and
+workspace registries too, and its calls appear in the provider statistics
+like any other provider's.
+
+Harness looks for `rg` (`rg.exe`) and `fd` (`fd.exe`, or `fdfind` on Debian
+and Ubuntu) on `PATH` once per process. With rg but no fd, file search
+lists `rg --files` and keeps the files whose name matches the query
+(ignoring case unless the query has a capital letter, as fd does). With
+neither, the provider is left out, and `harness doctor`, `harness report`
+and `provider_status` name the install command for the system (winget or
+scoop, apt, brew). Optional settings:
+
+```toml
+[providers.search]
+enabled = false                    # turn the built-in search off
+rg = "/opt/ripgrep/rg"             # instead of rg on PATH
+fd = "/usr/bin/fdfind"             # instead of fd or fdfind on PATH
+timeout_ms = 10000                 # per call (default 30 s)
+only = ["code.text_search"]        # serve just this one
+```
+
+The `rg-fd` pack (`[providers.rg-fd]`, running the separate rg-fd-mcp
+server) remains available but is optional and superseded. While an
+enabled `[providers.rg-fd]` entry is configured the built-in search stays
+off, so existing setups keep answering as before; `harness doctor` notes
+that the entry can be removed once rg and fd are installed. Setting
+`enabled = true` under `[providers.search]` runs both.
 
 Agents should talk to harness, not to the providers directly: harness merges
 their answers, records how they fared and adds the project's knowledge.

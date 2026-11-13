@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Harness.Core.Projects;
+using Harness.Core.Providers;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Storage;
@@ -379,6 +380,11 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
             inspection = inspection with { Knowledge = await KnowledgeCheckAsync(repository, cancellationToken) };
         }
 
+        if (configError is null)
+        {
+            inspection = inspection with { Search = SearchCheck(loaded.Value.Providers) };
+        }
+
         if (!location.Initialized)
         {
             return inspection;
@@ -432,6 +438,24 @@ public sealed class ProjectLifecycle(string? globalConfigurationPath = null, str
         }
 
         return inspection;
+    }
+
+    /// <summary>
+    /// The built-in search as doctor reports it: missing rg and fd is a warning with the install command; a
+    /// [providers.rg-fd] entry that keeps it off is fine, with a note that the entry can go when rg and fd are found.
+    /// </summary>
+    public static HealthCheck SearchCheck(
+        IReadOnlyDictionary<string, ProviderConfiguration> providers,
+        SearchToolset? tools = null
+    )
+    {
+        var status = SearchTools.Status(providers, tools);
+        return new(
+            SearchTools.ProviderName,
+            status.State is SearchTools.Missing ? "warn" : "ok",
+            status.State is SearchTools.Active ? "built-in text and file search: " + status.Detail : status.Detail,
+            status.Fix
+        );
     }
 
     /// <summary>Sharing knowledge needs Git to carry .harness/knowledge.toml; a rule ignoring it keeps it local.</summary>

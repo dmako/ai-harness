@@ -435,6 +435,16 @@ internal static class McpMapping
             : text[(dot + 1)..];
     }
 
+    /// <summary>A plain-text query as a regular expression ({query_regex}): rg's and fd's metacharacters escaped.</summary>
+    internal static string QuoteMeta(string text) =>
+        string.Concat(
+            text.Select(character =>
+                "\\.+*?()|[]{}^$".Contains(character, StringComparison.Ordinal)
+                    ? "\\" + character
+                    : character.ToString()
+            )
+        );
+
     internal static string FirstLine(string text) => text.Trim().Split('\n')[0];
 
     internal static string Utf8Prefix(string text, int limit, string suffix)

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Harness.Cli.Memory;
+using Harness.Core.Providers;
 using Harness.Core.Reports;
 using Harness.Core.Serialization;
 using Harness.Core.Telemetry;
@@ -135,18 +136,12 @@ internal sealed class ReportCommandRunner(ProjectLifecycle lifecycle, TextWriter
     private LocalReport Read(string path, string root, int days, DateTimeOffset now)
     {
         using var db = HarnessDatabase.OpenReadOnly(path);
-        var report = new TelemetryStore(db).Report(
-            days,
-            now,
-            Tools,
-            ProviderServerMap.Read(
-                root,
-                ConfigurationLoader
-                    .LoadFiles(lifecycle.GlobalConfigurationPath, ConfigurationPaths.ProjectPath(root))
-                    .Value.Providers
-            )
-        );
+        var providers = ConfigurationLoader
+            .LoadFiles(lifecycle.GlobalConfigurationPath, ConfigurationPaths.ProjectPath(root))
+            .Value.Providers;
+        var report = new TelemetryStore(db).Report(days, now, Tools, ProviderServerMap.Read(root, providers));
         report.Root = root;
+        report.Findings = ReportAnalyzer.WithSearch(report.Findings, SearchTools.Status(providers));
         return report;
     }
 

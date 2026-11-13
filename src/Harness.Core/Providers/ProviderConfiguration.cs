@@ -20,6 +20,12 @@ public sealed record ProviderConfiguration
     public ResolveMapping? Resolve { get; set; }
     public bool IndexWorktrees { get; set; }
 
+    /// <summary>The built-in search's ripgrep (type builtin): a path or a name on PATH; empty finds rg.</summary>
+    public string Rg { get; set; } = "";
+
+    /// <summary>The built-in search's fd (type builtin): a path or a name on PATH; empty finds fd or fdfind.</summary>
+    public string Fd { get; set; } = "";
+
     public bool IsEnabled() => Enabled is not false;
 
     public bool InContext() => Context is not false;

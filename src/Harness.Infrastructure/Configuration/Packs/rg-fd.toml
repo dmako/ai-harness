@@ -1,5 +1,7 @@
 # rg-fd MCP (ripgrep + fd): live text and file search in the working tree,
-# which becomes its allowed root.
+# which becomes its allowed root. Optional and superseded: harness's built-in
+# search ([providers.search]) runs rg and fd itself, and stays off while this
+# pack is configured and enabled.
 type = "mcp"
 command = "rg-fd-mcp"
 dir = "project"

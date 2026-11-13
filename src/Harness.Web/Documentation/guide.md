@@ -12,9 +12,9 @@ forgotten and answers agents' questions about the code in one place:
 
 - **Code**: `get_context` answers a task in words with the code that
   matters, its callers and impact, from the providers configured
-  (codebase-memory, graphify for C#, ripwire, rg-fd) merged into one
-  answer. `search_project`, `package_api` and `architecture_findings` drill
-  down.
+  (codebase-memory, graphify for C#, ripwire) and harness's built-in text
+  and file search merged into one answer. `search_project`, `package_api`
+  and `architecture_findings` drill down.
 - **Knowledge**: goals, constraints, decisions, conventions and warnings,
   each a short statement with where it came from. This is the project's
   retrieval ("RAG") of decisions and constraints: `get_context` adds the
@@ -498,6 +498,24 @@ was not there. A project whose folder is gone is skipped, never forgotten, and
 the summary says how to restore or forget it. `--dry-run` shows what would
 change, and `--json` gives the result per project. You no longer need to run
 `harness init` and `harness sync` in every project by hand.
+
+## Text and file search
+
+Harness searches the working tree itself whenever ripgrep (`rg`) and `fd`
+are installed: agents get live text and file search with nothing to
+configure, and no separate rg-fd-mcp server is needed. Install them once
+per machine:
+
+| System | Command |
+|---|---|
+| Windows | `winget install BurntSushi.ripgrep.MSVC sharkdp.fd` (or `scoop install ripgrep fd`) |
+| Debian, Ubuntu | `sudo apt install ripgrep fd-find` (fd is installed as `fdfind`; harness finds it) |
+| macOS | `brew install ripgrep fd` |
+
+Without fd, file search still works through `rg --files`. Without either,
+`harness doctor`, `harness report` and `provider_status` say so with the
+command above. Searches honour `.gitignore` and `.ignore` as rg and fd do.
+The reference (Providers) has the settings and how to turn it off.
 
 ## When something seems off
 

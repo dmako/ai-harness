@@ -70,7 +70,15 @@ public static partial class ConfigurationExample
             "ranked symbol and text search, name-based callers",
             [new("command", "\"/path/to/ripwire\"")]
         ),
-        new("providers.rg-fd", "text and file search", [new("command", "\"/path/to/rg-fd-mcp\"")]),
+        new(
+            "providers.search",
+            "built-in text and file search over rg and fd, found on PATH",
+            [
+                new("enabled", "true", "false turns it off"),
+                new("rg", "\"/path/to/rg\"", "instead of rg on PATH"),
+                new("fd", "\"/path/to/fd\"", "instead of fd (or fdfind) on PATH"),
+            ]
+        ),
         new(
             "providers.graphify-csharp",
             "compiler-exact C# callers, references, impact",
@@ -95,7 +103,7 @@ public static partial class ConfigurationExample
             "any provider: every key",
             [
                 new("pack", "\"ripwire\"", "start from a built-in mapping"),
-                new("type", "\"mcp\"", "mcp, or harness for a built-in one"),
+                new("type", "\"mcp\"", "mcp, or harness for a harness-protocol one"),
                 new("enabled", "true", "false switches it off"),
                 new("command", "\"/path/to/server\"", "the executable, or a name on PATH"),
                 new("args", "[\"--mcp\"]"),
@@ -106,6 +114,8 @@ public static partial class ConfigurationExample
                 new("dir", "\"project\"", "start it in the project root"),
                 new("freshness", "\"indexed\"", "live | indexed"),
                 new("index_worktrees", "false", "an index per worktree (needs refresh and resolve)"),
+                new("rg", "\"rg\"", "[providers.search] only: its ripgrep"),
+                new("fd", "\"fd\"", "[providers.search] only: its fd"),
             ]
         ),
         new(
@@ -195,6 +205,8 @@ public static partial class ConfigurationExample
                 "refresh",
                 "resolve",
                 "index_worktrees",
+                "rg",
+                "fd",
             ]
         ),
         ("providers.*.capabilities", null),

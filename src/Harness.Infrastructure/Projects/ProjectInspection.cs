@@ -26,6 +26,9 @@ public sealed record ProjectInspection(
     /// <summary>Whether Git carries the shared knowledge file to the team, when the worktree has one.</summary>
     public HealthCheck? Knowledge { get; init; }
 
+    /// <summary>The built-in text and file search: rg and fd found, missing (with an install hint), off or superseded.</summary>
+    public HealthCheck? Search { get; init; }
+
     /// <summary>The SCM and project the repository's remotes (or its [scm] configuration) point to.</summary>
     public Harness.Scm.ScmResolution? Scm { get; init; }
 
@@ -127,6 +130,11 @@ public sealed record ProjectInspection(
         if (Knowledge is not null)
         {
             checks.Add(Knowledge);
+        }
+
+        if (Search is not null)
+        {
+            checks.Add(Search);
         }
 
         return checks;

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Harness.Core.Memory;
+using Harness.Core.Providers;
 using Harness.Core.Serialization;
 using Harness.Core.Tasks;
 using Harness.Core.Web;
@@ -303,6 +304,10 @@ internal sealed partial class UiReadService
         );
         report.Id = UiProjectCatalog.Text(project, "id");
         report.Root = root;
+        report.Findings = Harness.Core.Reports.ReportAnalyzer.WithSearch(
+            report.Findings,
+            SearchTools.Status(location.Configuration.Value.Providers)
+        );
         // the user's findings; the developer's and the tuning numbers go only to the opt-in telemetry
         return UiJson.Node(report.ForUser());
     }

@@ -187,6 +187,12 @@ public static class ConfigurationLoader
 
             if (pack.Length == 0)
             {
+                // [providers.search] without a type is the built-in search.
+                if (name == SearchTools.ProviderName && string.IsNullOrEmpty(table["type"]?.GetValue<string>()))
+                {
+                    table["type"] = SearchTools.ProviderType;
+                }
+
                 continue;
             }
 

@@ -42,7 +42,8 @@ internal sealed class McpCommand(
             location.Configuration.Value.Providers,
             location.Root,
             new ProviderProcessFactory(),
-            detectedLanguages: languages
+            detectedLanguages: languages,
+            builtInSearch: true
         );
         await using var calls = new TelemetryRecorder(
             location.DatabasePath,
@@ -87,7 +88,8 @@ internal sealed class McpCommand(
                         member.Root,
                         new ProviderProcessFactory(),
                         light: !deep,
-                        detectedLanguages: deep ? Languages(member.Root, configuration.Value.Providers) : null
+                        detectedLanguages: deep ? Languages(member.Root, configuration.Value.Providers) : null,
+                        builtInSearch: true
                     );
                 }
             ),

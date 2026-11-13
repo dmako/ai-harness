@@ -36,7 +36,8 @@ internal sealed partial class UiReadService
             await using var providers = ConfiguredProviders.Build(
                 inspection.Location.Configuration.Value.Providers,
                 inspection.Location.Root,
-                new ProviderProcessFactory()
+                new ProviderProcessFactory(),
+                builtInSearch: true
             );
             foreach (var provider in providers.Providers())
             {
@@ -78,7 +79,11 @@ internal sealed partial class UiReadService
         var inspection = await lifecycle.InspectAsync(UiProjectCatalog.Text(project, "root"), token);
         var checks = inspection.Checks(lifecycle.Version).ToList();
         checks.AddRange(ClientChecks(inspection.Location.Root));
-        foreach (var (name, provider) in inspection.Location.Configuration.Value.Providers)
+        foreach (
+            var (name, provider) in inspection.Location.Configuration.Value.Providers.Where(pair =>
+                pair.Value.Type is not SearchTools.ProviderType
+            )
+        )
         {
             checks.Add(
                 new(name, "ok", provider.IsEnabled() ? "configured: " + provider.Command + " (not probed)" : "disabled")
