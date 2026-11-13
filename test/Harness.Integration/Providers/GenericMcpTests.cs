@@ -424,12 +424,17 @@ public sealed class GenericMcpTests
             },
         };
 
-        // codebase-memory records C:/... while VS Code opens c:\... (TASK-0117); and the reverse.
+        // codebase-memory records C:/... while VS Code opens c:\... (TASK-0117); and the reverse. Elsewhere the
+        // temporary folder's random suffix can be all lower case, so the lower-case spelling would be the root
+        // itself: there the second spelling swaps every letter's case, which always differs.
         foreach (
             var (recorded, opened) in new[]
             {
                 (fixture.Root.ToUpperInvariant().Replace('\\', '/'), Lower(fixture.Root)),
-                (Lower(fixture.Root), fixture.Root.ToUpperInvariant()),
+                (
+                    OperatingSystem.IsWindows() ? Lower(fixture.Root) : SwapCase(fixture.Root),
+                    fixture.Root.ToUpperInvariant()
+                ),
             }
         )
         {
@@ -461,6 +466,10 @@ public sealed class GenericMcpTests
 
     /// <summary>The path in lower case, as VS Code spells the drive (c:\).</summary>
     private static string Lower(string path) => string.Concat(path.Select(char.ToLowerInvariant));
+
+    /// <summary>The path with every letter's case swapped: another case of it, whatever its letters are.</summary>
+    private static string SwapCase(string path) =>
+        string.Concat(path.Select(c => char.IsUpper(c) ? char.ToLowerInvariant(c) : char.ToUpperInvariant(c)));
 
     [Fact]
     public void NotIndexedMemoKeepsOneAnswerForEverySpellingOfARootOnWindows()
