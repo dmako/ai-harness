@@ -304,16 +304,40 @@ public sealed class SharedKnowledgeMergeTests
     private static async Task WaitForAsync(string marker)
     {
         var deadline = DateTime.UtcNow.AddMinutes(2);
-        while (!File.Exists(marker) || (await File.ReadAllTextAsync(marker, Token)).Trim().Length is 0)
+        string? status;
+        while ((status = await ReadWrittenAsync(marker)) is null)
         {
             DateTime.UtcNow.Should().BeBefore(deadline, "the post-merge hook runs harness sync");
             await Task.Delay(200, Token);
         }
 
-        (await File.ReadAllTextAsync(marker, Token))
-            .Trim()
+        status
             .Should()
-            .Be("0", "the hook's harness sync succeeds: {0}", await File.ReadAllTextAsync(marker + ".log", Token));
+            .Be("0", "the hook's harness sync succeeds: {0}", await ReadWrittenAsync(marker + ".log") ?? "");
+    }
+
+    /// <summary>
+    /// A file the hook writes, once it has content; null while it is missing, empty or still open for writing (on
+    /// Windows the hook's shell can hold it open while the test reads, which is a sharing violation).
+    /// </summary>
+    private static async Task<string?> ReadWrittenAsync(string path)
+    {
+        try
+        {
+            await using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete
+            );
+            using var reader = new StreamReader(stream);
+            var text = (await reader.ReadToEndAsync(Token)).Trim();
+            return text.Length is 0 ? null : text;
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException or IOException)
+        {
+            return null;
+        }
     }
 
     private static HarnessStateSession Session(SyncFixture fixture, ProjectLocation location) =>
