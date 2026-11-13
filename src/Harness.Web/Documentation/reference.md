@@ -47,7 +47,7 @@ uninstall` alone lets you pick what to remove.
 | `harness init` | Creates `.harness/` for the repository (safe to rerun), and the project and global `config.toml` with every option commented out; run again after an upgrade, it brings both up to date (see Configuration). |
 | `harness migrate` | After an upgrade: brings the machine (global config, knowledge databases, user-scope MCP entries and hooks) and then every registered project (what `init` does, plus the guidance, hooks and MCP entries it already has) up to date, and syncs every worktree that exists. Projects run in parallel (`--jobs N`, default the processor count up to 4). `--full` makes the syncs full ones, `--dry-run` changes nothing, and `--json` gives a per-project result. Exits 1 when a project failed or was skipped (its folder is missing; it stays registered). |
 | `harness install` / `uninstall` | In a terminal: the setup wizard. With flags: adds or removes harness in Claude Code / Codex (`--client`, `--scope`, `--dry-run`). |
-| `harness doctor` | Checks the installation, database, clients, hooks, providers and SCM connections, with a fix for each problem (`--all`: every project on the machine; `--fix nuget-config`, with `--dry-run` to only show it: writes the nuget provider's project override). |
+| `harness doctor` | Checks the installation, database, clients, hooks, providers, NuGet package sources and SCM connections, with a fix for each problem (`--all`: every project on the machine; `--fix nuget-config`, with `--dry-run` to only show it: writes the nuget provider's project override). |
 | `harness status` | The project, its Git state, database and clients. |
 | `harness sync` | Refreshes the recorded state (branch, HEAD, files, findings). The Git hooks run it for you. |
 | `harness instructions` | Adds the harness guidance for agents to AGENTS.md / CLAUDE.md (`--remove`). |
@@ -273,6 +273,46 @@ credential service, so a credential provider plugin (such as Azure
 Artifacts') may serve `dotnet restore` but not the server. Prefer stored
 credentials or a token in an environment variable for it.
 
+### NuGet package upgrades and vulnerabilities
+
+Architecture's package marks and the `vulnerable-package` and
+`outdated-package` findings come from the NuGet V3 protocol of the sources
+the repository's NuGet configuration resolves to (enabled http(s) sources,
+package source mapping applied; local folder sources are not read):
+
+- **Versions:** `PackageBaseAddress/3.0.0` (the flat container,
+  `{base}/{id-lower}/index.json`). The newest version without a pre-release
+  label above the one in use is offered, compared by NuGet's SemVer 2.0
+  rules (four numbers, labels case-insensitive, build metadata ignored).
+- **Vulnerabilities:** `VulnerabilityInfo/6.7.0` where a source offers it
+  (nuget.org does): its index lists pages (base, update) mapping lower-case
+  ids to advisories with a severity (0 low, 1 moderate, 2 high, 3 critical),
+  a link and the affected range in interval notation. The fixed version is
+  the lowest listed version above the one in use outside the range.
+- **Credentials:** `packageSourceCredentials` (Username with
+  ClearTextPassword, `%VARIABLES%` expanded, or an encrypted Password,
+  decrypted with DPAPI on Windows), sent as Basic authentication. A source
+  answering 401/403 is reported as unauthorized, one that does not answer as
+  unreachable, never guessed.
+- **Cache:** beside the global configuration in `cache/nuget/<source
+  hash>/` (`service.json`, `versions/<id>.json`, `vulnerabilities/`). A
+  version list and a service index are kept 24 h; the vulnerability index
+  is read again after 24 h and only the pages whose update time changed are
+  downloaded. harness ui asks for the marks after it has drawn the view
+  (`GET /api/projects/{id}/packages?packages=name@version,…`, at most 30 s);
+  a sync builds the findings from the cache alone (up to a week old) and
+  never waits for a source. `HARNESS_NUGET_OFFLINE=1` keeps every lookup to
+  the cache.
+- **Doctor:** `package-sources` reads each enabled source's service index
+  and names the fix for a source it cannot read (credentials, the URL, or
+  `dotnet nuget disable source`).
+
+Only packages a project references directly are looked up; transitive ones
+are out of scope. The nuget provider's `package.info` (NugetMcpServer's
+`get_package_info`) answers description, dependencies and recent versions,
+pre-releases mixed in, as text for an agent; it has no vulnerability data
+and needs the provider running, so the marks do not use it.
+
 ### Built-in search
 
 The MCP server and harness ui add a provider named `search` that answers
@@ -348,6 +388,10 @@ warn = 31
 [architecture.complexity.metrics]     # exact .NET values (Windows, .NET SDK)
 enabled = false                       # true: sync starts a background run per HEAD
 timeout_ms = 600000                   # a longer run fails and keeps the counted values
+
+[architecture.packages]           # NuGet upgrades and vulnerabilities (see Providers)
+enabled = true                    # false: no package source is read
+outdated = false                  # true: an outdated package is an info finding
 
 [providers.<name>]                # see Providers
 

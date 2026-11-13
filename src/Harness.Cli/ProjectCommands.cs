@@ -218,6 +218,11 @@ internal sealed class DoctorCommand(
                 {
                     var inspection = await lifecycle.InspectAsync(root, cancellationToken);
                     checks = [.. inspection.Checks(information.Version)];
+                    if (await PackageSourcesAsync(inspection, cancellationToken) is { } packages)
+                    {
+                        checks.Add(packages);
+                    }
+
                     if (inspection.Scm is { } scm && scmTests.Count > 0)
                     {
                         checks.Add(
@@ -282,6 +287,11 @@ internal sealed class DoctorCommand(
                     cancellationToken
                 ),
             ];
+            if (await PackageSourcesAsync(inspection, cancellationToken) is { } packages)
+            {
+                checks.Add(packages);
+            }
+
             failed = checks.Any(check => check.Level == "fail");
             if (settings.Json)
             {
@@ -298,6 +308,18 @@ internal sealed class DoctorCommand(
 
         return failed ? 1 : 0;
     }
+
+    /// <summary>Whether the repository's NuGet package sources can be read for upgrades and vulnerabilities.</summary>
+    private async Task<HealthCheck?> PackageSourcesAsync(ProjectInspection inspection, CancellationToken token) =>
+        inspection.GitError is null
+            ? await Harness.Infrastructure.Architecture.PackageFeeds.PackageSourcesCheck.CheckAsync(
+                inspection.Location.Root,
+                lifecycle.GlobalConfigurationPath,
+                lifecycle.NuGetUserFile,
+                null,
+                token
+            )
+            : null;
 
     /// <summary>
     /// 'harness doctor --fix &lt;check&gt;': applies the fix harness can make itself, showing the change (only showing

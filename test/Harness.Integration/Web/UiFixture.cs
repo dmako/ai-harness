@@ -78,6 +78,8 @@ internal sealed class UiFixture : IAsyncDisposable
         start.Environment["USERPROFILE"] = fixture.DirectoryRoot;
         start.Environment["CLAUDE_CONFIG_DIR"] = Path.Combine(fixture.DirectoryRoot, "claude");
         start.Environment["CODEX_HOME"] = Path.Combine(fixture.DirectoryRoot, "codex");
+        // NuGet package marks come from the package cache alone: tests never read a package source (TASK-0141)
+        start.Environment["HARNESS_NUGET_OFFLINE"] = "1";
         foreach (var (key, value) in environment ?? new Dictionary<string, string>())
         {
             start.Environment[key] = value;

@@ -39,6 +39,17 @@ public sealed record SyncConfiguration
 public sealed record ArchitectureConfiguration
 {
     public ComplexityConfiguration Complexity { get; set; } = new();
+    public PackagesConfiguration Packages { get; set; } = new();
+}
+
+/// <summary>
+/// NuGet package lookups (TASK-0141): newer stable versions and known vulnerabilities from the project's package
+/// sources, shown in Architecture; vulnerable packages are findings, outdated ones only with Outdated.
+/// </summary>
+public sealed record PackagesConfiguration
+{
+    public bool Enabled { get; set; } = true;
+    public bool Outdated { get; set; }
 }
 
 /// <summary>

@@ -16,6 +16,12 @@ public sealed record NuGetSource(string Key, string Location, bool Enabled, stri
         && uri.Host.Equals("api.nuget.org", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>A source's credentials from packageSourceCredentials; Problem says why they cannot be used.</summary>
+public sealed record NuGetCredential(string Username, string Password, string Problem)
+{
+    public override string ToString() => Username + " (password hidden)";
+}
+
 /// <summary>
 /// The NuGet configuration a tool started in a folder reads, as NuGet resolves it: nuget.config in that folder and
 /// every folder above it (the closest wins), then the user-level NuGet.Config. Only what decides where packages come
@@ -45,6 +51,14 @@ public sealed class NuGetSettings
 
     /// <summary>Files that could not be read, with why.</summary>
     public IReadOnlyList<string> Errors { get; private init; } = [];
+
+    /// <summary>
+    /// The credentials of packageSourceCredentials by source key, the closest file winning: a user name and a
+    /// password (ClearTextPassword with %VARIABLES% expanded, or Password decrypted with DPAPI on Windows), or why the
+    /// password cannot be used.
+    /// </summary>
+    public IReadOnlyDictionary<string, NuGetCredential> Credentials { get; private init; } =
+        new Dictionary<string, NuGetCredential>();
 
     /// <summary>The user-level NuGet.Config's path on this system (it may not exist).</summary>
     public static string DefaultUserFile() =>
@@ -85,6 +99,7 @@ public sealed class NuGetSettings
         Dictionary<string, List<string>> mapping = new(StringComparer.OrdinalIgnoreCase);
         List<string> mappingFiles = [];
         List<string> errors = [];
+        Dictionary<string, NuGetCredential> credentials = new(StringComparer.OrdinalIgnoreCase);
         var cleared = "";
         foreach (var file in order)
         {
@@ -144,6 +159,11 @@ public sealed class NuGetSettings
                 }
             }
 
+            if (root.Element("packageSourceCredentials") is { } secrets)
+            {
+                ReadCredentials(secrets, credentials);
+            }
+
             if (root.Element("packageSourceMapping") is { } mapped)
             {
                 foreach (var item in mapped.Elements())
@@ -196,7 +216,48 @@ public sealed class NuGetSettings
             MappingFiles = mappingFiles,
             ClearedIn = cleared,
             Errors = errors,
+            Credentials = credentials,
         };
+    }
+
+    /// <summary>One file's packageSourceCredentials: an element per source key (spaces encoded as _x0020_).</summary>
+    private static void ReadCredentials(XElement secrets, Dictionary<string, NuGetCredential> credentials)
+    {
+        foreach (var source in secrets.Elements())
+        {
+            if (source.Name.LocalName is "clear")
+            {
+                credentials.Clear();
+                continue;
+            }
+
+            var values = source
+                .Elements()
+                .Where(item => item.Name.LocalName is "add")
+                .GroupBy(item => Attribute(item, "key"), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => Attribute(group.Last(), "value"),
+                    StringComparer.OrdinalIgnoreCase
+                );
+            var user = values.GetValueOrDefault("Username", "");
+            var (password, problem) = ("", "no password");
+            if (values.TryGetValue("ClearTextPassword", out var clear))
+            {
+                (password, problem) = (Environment.ExpandEnvironmentVariables(clear), "");
+            }
+            else if (values.TryGetValue("Password", out var encrypted))
+            {
+                (password, problem) = NuGetPasswords.Decrypt(encrypted);
+            }
+
+            if (problem.Length is 0 && password.Contains('%', StringComparison.Ordinal))
+            {
+                problem = "its ClearTextPassword names an environment variable that is not set";
+            }
+
+            credentials[XmlConvert.DecodeName(source.Name.LocalName)] = new(user, password, problem);
+        }
     }
 
     /// <summary>A folder's nuget.config in its on-disk spelling (NuGet looks for these three names).</summary>

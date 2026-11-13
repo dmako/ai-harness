@@ -29,6 +29,7 @@ internal sealed partial class UiReadService
             "structure" => await ViewAsync(project, endpoint, () => StructureAsync(project, token), token),
             "complexity" => await ViewAsync(project, endpoint, () => ComplexityAsync(project, token), token),
             "stack" => await ViewAsync(project, endpoint, () => ProjectStackAsync(project, token), token),
+            "packages" => await PackagesAsync(project, request, token),
             "agents/{key}/log" => AgentLog(project, request),
             _ => await ProjectDatabaseAsync(project, endpoint, request, token),
         };

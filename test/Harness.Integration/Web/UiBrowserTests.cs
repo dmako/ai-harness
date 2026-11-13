@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -3202,6 +3203,166 @@ public sealed class UiBrowserTests(SharedBrowser browser)
                 (await ValueAsync(page, "document.querySelector('.archside').textContent"))
                     .Should()
                     .Contain("Built before");
+            }
+        );
+    }
+
+    /// <summary>
+    /// The Layers side panel marks a NuGet package with a newer stable version with an info mark and one with a known
+    /// vulnerability with a warning sign, each focusable with its explanation as title and label; the marks come from
+    /// the package cache after the view is drawn, and the panel passes the UI checks in both themes and widths
+    /// (TASK-0141).
+    /// </summary>
+    [Fact]
+    public async Task NuGetPackagesShowUpgradeAndVulnerabilityMarksWithTheirTooltips()
+    {
+        const string Feed = "https://feed.test/v3/index.json";
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "nuget.config",
+            $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="feed" value="{Feed}" />
+              </packageSources>
+              <!-- the user-level NuGet.Config may map packages to its own sources -->
+              <packageSourceMapping>
+                <clear />
+                <packageSource key="feed"><package pattern="*" /></packageSource>
+              </packageSourceMapping>
+            </configuration>
+            """
+        );
+        fixture.Write(
+            "App/App.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Acme.Json" Version="8.0.1" />
+                <PackageReference Include="Acme.Http" Version="1.0.0" />
+                <PackageReference Include="Acme.Clean" Version="3.0.0" />
+                <PackageReference Include="Acme.Property" Version="$(AcmeVersion)" />
+              </ItemGroup>
+            </Project>
+            """
+        );
+        await fixture.CommitAsync("an app with packages");
+        await fixture.RunAsync();
+
+        // what the feed said, cached an hour ago: harness ui reads no package source in tests
+        var cache = new Harness.Infrastructure.Architecture.PackageFeeds.PackageMetadataCache(
+            Path.Combine(fixture.Global, "cache", "nuget")
+        );
+        var at = DateTimeOffset.UtcNow.AddHours(-1);
+        cache.SaveService(
+            Feed,
+            new(at, "https://feed.test/v3-flatcontainer/", "https://feed.test/v3/vulnerabilities/index.json")
+        );
+        cache.SaveVersions(Feed, "Acme.Json", new(at, true, ["8.0.1", "9.0.0", "9.0.3", "10.0.0-rc.1"]));
+        cache.SaveVersions(Feed, "Acme.Http", new(at, true, ["1.0.0", "2.0.0"]));
+        cache.SaveVersions(Feed, "Acme.Clean", new(at, true, ["2.0.0", "3.0.0"]));
+        cache.SaveVulnerabilities(
+            Feed,
+            new(at, [new("base", "https://feed.test/v3-vulnerabilities/base.json", "2026-11-11T06:01:49Z")])
+        );
+        cache.SavePage(
+            Feed,
+            "base",
+            """
+            {"acme.json":[{"url":"https://github.com/advisories/GHSA-acme-json","severity":3,"versions":"[8.0.0, 9.0.0)"}],
+             "acme.http":[{"url":"https://github.com/advisories/GHSA-acme-http","severity":0,"versions":"(, 2.0.0)"}]}
+            """
+        );
+
+        string checks;
+        using (var stream = typeof(UiBrowserTests).Assembly.GetManifestResourceStream("checks.js")!)
+        using (var reader = new StreamReader(stream))
+        {
+            checks = await reader.ReadToEndAsync(Token);
+        }
+
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + $"#/p/{id}/architecture/layers" }
+                );
+                await page.WaitAsync("[...document.querySelectorAll('.anode')].some(n => n.title === 'App')");
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.anode')].find(n => n.title === 'App').click()"
+                );
+                await page.WaitAsync("document.querySelectorAll('.archside .pkmark').length === 4");
+                const string Marks =
+                    "[...document.querySelectorAll('.archside ul.pkgs li')].map(li => li.firstChild.textContent + ': ' + [...li.querySelectorAll('.pkmark')].map(m => m.className.replace('pkmark ', '') + ' ' + m.getAttribute('tabindex') + ' ' + (m.getAttribute('aria-label') === m.title)).join(', ')).join(' | ')";
+                (await ValueAsync(page, Marks))
+                    .Should()
+                    .Be(
+                        "Acme.Json: pkup 0 true, pkvuln sev-critical 0 true | Acme.Http: pkup 0 true, pkvuln sev-low 0 true"
+                            + " | Acme.Clean:  | Acme.Property: ",
+                        "a newer stable version and a vulnerability are marked, an unresolved version is not"
+                    );
+                static string Title(int index) =>
+                    "document.querySelectorAll('.archside .pkmark')["
+                    + index.ToString(CultureInfo.InvariantCulture)
+                    + "].title";
+                (await ValueAsync(page, Title(0)))
+                    .Should()
+                    .Be("Newer stable version 9.0.3 available (you use 8.0.1)", "pre-releases are not offered");
+                (await ValueAsync(page, Title(1)))
+                    .Should()
+                    .Be(
+                        "Known critical vulnerability in 8.0.1: https://github.com/advisories/GHSA-acme-json"
+                            + " (affects [8.0.0, 9.0.0)); fixed in 9.0.0"
+                    );
+                (await ValueAsync(page, Title(3)))
+                    .Should()
+                    .Contain("Known low vulnerability in 1.0.0")
+                    .And.Contain("fixed in 2.0.0");
+                // gold ink for low and moderate, the critical red for high and critical
+                (
+                    await ValueAsync(
+                        page,
+                        "(() => { const probe = (v) => { const s = document.createElement('span'); s.style.color = `var(${v})`; document.body.append(s); const c = getComputedStyle(s).color; s.remove(); return c; };"
+                            + " return [...document.querySelectorAll('.archside .pkvuln')].map(m => getComputedStyle(m).color === probe(m.classList.contains('sev-critical') ? '--critical' : '--gold-ink')).join(); })()"
+                    )
+                )
+                    .Should()
+                    .Be("true,true");
+
+                // the marks are reached by keyboard
+                await page.EvaluateAsync("document.querySelector('.archside .pkvuln').focus()");
+                (await ValueAsync(page, "document.activeElement.classList.contains('pkvuln')")).Should().Be("True");
+
+                List<string> faults = [];
+                foreach (var (theme, width) in new[] { ("dark", 1400), ("dark", 390), ("light", 1400), ("light", 390) })
+                {
+                    await page.CommandAsync(
+                        "Emulation.setDeviceMetricsOverride",
+                        new
+                        {
+                            width,
+                            height = 900,
+                            deviceScaleFactor = 1,
+                            mobile = width < 600,
+                        }
+                    );
+                    await page.CommandAsync(
+                        "Emulation.setEmulatedMedia",
+                        new { features = new[] { new { name = "prefers-color-scheme", value = theme } } }
+                    );
+                    await Task.Delay(300, Token);
+                    faults.AddRange((await ChecksAsync(page, checks)).Select(f => $"{theme} {width}: {f}"));
+                }
+
+                faults.Should().BeEmpty(string.Join("\n", faults));
             }
         );
     }

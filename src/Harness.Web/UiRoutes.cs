@@ -85,6 +85,7 @@ public static class UiRoutes
         "/api/projects/{id}/arch-proposals",
         "/api/projects/{id}/stack",
         "/api/projects/{id}/complexity",
+        "/api/projects/{id}/packages",
         "/api/knowledge",
         "/api/knowledge/memories/{mid}",
         "/api/machine",

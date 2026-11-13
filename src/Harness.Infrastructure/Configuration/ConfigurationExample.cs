@@ -52,6 +52,14 @@ public static partial class ConfigurationExample
             ]
         ),
         new(
+            "architecture.packages",
+            "newer stable versions and known vulnerabilities of NuGet packages",
+            [
+                new("enabled", "true", "false: no package source is read"),
+                new("outdated", "false", "true: a package with a newer stable version is an info finding"),
+            ]
+        ),
+        new(
             "scm",
             "this project's SCM when its git remotes do not match one ('harness scm' configures them)",
             [
@@ -180,12 +188,13 @@ public static partial class ConfigurationExample
         ("storage", ["db_path", "busy_timeout_ms"]),
         ("log", ["level"]),
         ("sync", ["ignore"]),
-        ("architecture", ["complexity"]),
+        ("architecture", ["complexity", "packages"]),
         ("architecture.complexity", ["languages", "note", "warn", "problem", "csharp", "go", "typescript", "metrics"]),
         ("architecture.complexity.csharp", Levels),
         ("architecture.complexity.go", Levels),
         ("architecture.complexity.typescript", Levels),
         ("architecture.complexity.metrics", ["enabled", "timeout_ms"]),
+        ("architecture.packages", ["enabled", "outdated"]),
         ("providers", null),
         (
             "providers.*",

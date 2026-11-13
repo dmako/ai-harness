@@ -214,7 +214,9 @@ flight or next; and what needs a person, most urgent first. Then:
 
 - **Architecture:** Structure (projects or packages and their smells),
   Layers (a dashed line is a project only built first, through
-  `ReferenceOutputAssembly=false`), Complexity (every function by cyclomatic complexity, the most
+  `ReferenceOutputAssembly=false`; a NuGet package with a newer stable
+  version or a known vulnerability is marked, see Package upgrades and
+  vulnerabilities), Complexity (every function by cyclomatic complexity, the most
   complex named) and Change coupling.
 - **Knowledge:** the memories by type (the team's marked PROJECT, with
   Share with project or Withdraw from project on each card), what applies
@@ -544,6 +546,44 @@ one whole and is undone by removing it. Keep feed credentials in the NuGet
 configuration or in environment variables, never in `config.toml`. The
 reference (Providers › Projects with their own nuget.config) explains what
 dnx and the server do, with more examples.
+
+## Package upgrades and vulnerabilities
+
+In a .NET repository, Architecture marks each NuGet package a project
+references directly (in the Layers side panel's package list, and in a
+workspace's Version drift table for the members' own packages):
+
+- **ⓘ** (the info colour): a newer stable version is published, e.g.
+  "Newer stable version 9.0.3 available (you use 8.0.1)". Pre-releases are
+  never offered; a package on a pre-release is compared with the stable
+  versions above it.
+- **⚠** (gold for low and moderate, red for high and critical): the version
+  in use falls into a known advisory's range. The tooltip names the
+  severity, the advisory's link, the affected versions and the first fixed
+  version when known.
+
+Both marks can be reached with Tab and read by screen readers. Versions
+managed centrally (`Directory.Packages.props`) count; a version harness
+cannot resolve (`$(Property)`, `1.*`, an open range) gets no mark, and
+transitive packages are not looked at (`dotnet list package --vulnerable
+--include-transitive` covers those).
+
+The data comes from the package sources your NuGet configuration resolves
+to (nuget.config from the repository up, then the user-level NuGet.Config,
+with `<clear/>`, disabled sources and package source mapping), nuget.org
+when nothing else is configured. A private feed is read with the
+credentials of its `packageSourceCredentials` (a `ClearTextPassword` may
+name an environment variable, `%FEED_TOKEN%`; an encrypted `Password` is
+read on Windows only). Answers are cached on this machine for a day, so the
+view draws at once and the marks follow; offline, or when a source cannot
+be read, the view stays as it is with a short note, and `harness doctor`
+reports the source as `package-sources` with how to fix it.
+
+A vulnerable package is also an architecture finding (`vulnerable-package`:
+a warning for low and moderate, a problem for high and critical), with the
+usual marks (by design, review). Turn on `outdated = true` under
+`[architecture.packages]` to get an info finding per outdated package too,
+or `enabled = false` to read no package source at all.
 
 ## When something seems off
 

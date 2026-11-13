@@ -1971,3 +1971,14 @@ table.dups { min-width: 45rem; }
 .provcheck { display: grid; gap: 0.25rem; justify-items: start; margin-top: var(--space-2); overflow-wrap: anywhere; }
 .provcheck .fix, .chk .fix { white-space: pre-line; }
 .fixdiff { margin: 0; padding: var(--space-2) var(--space-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-x: auto; font-size: var(--text-sm); white-space: pre; }
+/* NuGet package marks (TASK-0141): an info mark for a newer stable version
+   in the palette's info colour, a warning sign for a known vulnerability in
+   gold ink (low, moderate) or the critical red (high, critical), both AA on
+   the surfaces; focusable, their title and label say why */
+.pkmark { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.25rem; padding: 0 0.125rem; font-size: var(--text-sm); font-family: var(--font); line-height: 1; cursor: help; border-radius: var(--radius-xs); }
+.pkmark:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pkup { color: var(--accent); }
+.pkvuln { color: var(--gold-ink); font-weight: 700; }
+.pkvuln.sev-high, .pkvuln.sev-critical { color: var(--critical); }
+.pknote { margin-top: 0.25rem; overflow-wrap: anywhere; }
+.pkslot:empty { display: none; }

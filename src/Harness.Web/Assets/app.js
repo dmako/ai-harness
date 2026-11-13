@@ -2876,6 +2876,7 @@ function versionsTable(w, d) {
   }
   let last = "";
   const rows = [];
+  const slots = [];
   for (const r of merged) {
     if (r.kind !== last) {
       last = r.kind;
@@ -2891,12 +2892,22 @@ function versionsTable(w, d) {
         const vs = r.versions[id];
         if (!vs) return h("td", { class: "muted", title: "not used" }, "—");
         const behind = vs.some((v) => cmpVer(v, r.published || top) < 0);
-        return h("td", { class: "mono" + (behind ? " vdiff" : "") }, vs.join(", "), behind && h("span", { class: "sr" }, " (behind)"));
+        // the NuGet marks of a member's own packages, when they arrive (from the C# rewrite: TASK-0141)
+        const slot = r.kind === "core" ? h("span", { class: "pkslot" }) : null;
+        if (slot) slots.push({ id, names: r.names, vs, slot });
+        return h("td", { class: "mono" + (behind ? " vdiff" : "") }, vs.join(", "), behind && h("span", { class: "sr" }, " (behind)"), slot);
       }),
       h("td", { class: "mono" }, r.published || (r.kind === "core" ? h("span", { class: "muted" }, "—") : ""),
         r.published && all.some((v) => cmpVer(v, r.published) > 0) && h("span", { class: "flag info", title: "A member uses a newer version than the owner's files declare: the declaration may be stale (CI may set the version)." }, " stale?"))));
   }
-  return section("Versions across the workspace", "What each member is built on, compared. Highlighted: a member on an older version than another, or than the one its owner declares now.",
+  // each member's marks from its own package sources (from the C# rewrite: TASK-0141)
+  for (const id of new Set(slots.map((x) => x.id))) {
+    const mine = slots.filter((x) => x.id === id);
+    packageMarks(id, mine.flatMap((x) => x.names.flatMap((name) => x.vs.map((version) => ({ name, version }))))).then((m) => {
+      for (const x of mine) fill(x.slot, x.names.flatMap((name) => x.vs.map((v) => pkgMarks(pkgInfo(m, name, v), v, x.names.length > 1 ? name : null))));
+    });
+  }
+  return section("Versions across the workspace", "What each member is built on, compared. Highlighted: a member on an older version than another, or than the one its owner declares now; ⓘ a newer stable version on its package source, ⚠ a known vulnerability.",
     h("div", { class: "card versions" }, h("table", {},
       h("thead", {}, h("tr", {}, h("th", {}, ""), ids.map((id) => h("th", {}, name(id))), h("th", {}, "declared by its owner"))),
       h("tbody", {}, rows))));
@@ -2922,6 +2933,39 @@ function builtOnSection(b) {
             h("td", { class: "mono" }, u.declared || h("span", { class: "muted" }, "—"),
               behind && h("span", { class: "flag warn" }, " behind"), ahead && h("span", { class: "flag info" }, " used is newer: is this declaration stale?")));
         })))));
+}
+
+// --- NuGet package marks (from the C# rewrite: TASK-0141) ---
+// packageMarks asks which NuGet packages have a newer stable version or a
+// known vulnerability once a view is drawn: the answer comes from the
+// project's package sources (cached on disk for a day), so the view never
+// waits for it. It resolves to { packages: { "name@version": … }, notes }.
+function packageMarks(projectId, list) {
+  const q = [...new Set(list.filter((x) => x.name && x.version && !x.unresolved).map((x) => `${x.name}@${x.version}`))];
+  if (!q.length) return Promise.resolve({ packages: {}, notes: [] });
+  return api(`/api/projects/${encodeURIComponent(projectId)}/packages?packages=${encodeURIComponent(q.join(","))}`)
+    .catch(() => ({ packages: {}, notes: [] }));
+}
+// pkgInfo: a package's answer at the version in use ([1.2.3] is 1.2.3).
+const pkgInfo = (marks, name, version) => marks && version
+  ? (marks.packages || {})[`${name}@${String(version).replace(/^\[([^,\]]+)\]$/, "$1").trim()}`.toLowerCase()] : null;
+// pkgMarks: an info mark for a newer stable version and a warning sign for
+// known vulnerabilities (gold for low and moderate, red for high and
+// critical), each focusable, its explanation its title and label.
+function pkgMarks(info, version, name) {
+  if (!info) return null;
+  const who = name ? `${name}: ` : "";
+  const marks = [];
+  if (info.latest) {
+    const t = `${who}Newer stable version ${info.latest} available (you use ${version || info.version})`;
+    marks.push(h("span", { class: "pkmark pkup", tabindex: "0", role: "img", title: t, "aria-label": t }, "ⓘ"));
+  }
+  const vs = info.vulnerabilities || [];
+  if (vs.length) {
+    const t = who + vs.map((v) => `Known ${v.severity} vulnerability in ${info.version}: ${v.url} (affects ${v.versions})${v.fixed ? `; fixed in ${v.fixed}` : ""}`).join("\n");
+    marks.push(h("span", { class: `pkmark pkvuln sev-${vs[0].severity}`, tabindex: "0", role: "img", title: t, "aria-label": t }, "⚠"));
+  }
+  return marks;
 }
 
 // cmpVer orders versions part by part ("1.4.0-alpha.29" < "1.4.0-alpha.42").
@@ -3498,10 +3542,19 @@ async function viewArchitecture(p, sec) {
         us.length ? h("ul", {}, Object.entries(byMember).map(([m, ps]) => h("li", {}, h("b", {}, m), h("div", { class: "muted small" }, ps.join(", ")))))
           : h("p", { class: "muted small" }, s.workspaces ? "by no other member" : "not in a workspace")],
       h("h5", {}, `${a.language === "go" ? "Modules" : a.language === "typescript" ? "npm packages" : "Packages"} (${x.packages.length})`),
-      x.packages.length ? h("ul", { class: "pkgs" }, x.packages.map((q) => h("li", {}, q.name, q.version && h("span", { class: "muted" }, " " + q.version)))) : h("p", { class: "muted small" }, "none"),
+      // with the NuGet marks once they arrive (from the C# rewrite: TASK-0141)
+      x.packages.length ? h("ul", { class: "pkgs" }, x.packages.map((q) => h("li", {}, q.name, q.version && h("span", { class: "muted" }, " " + q.version),
+        !q.unresolved && pkgMarks(pkgInfo(marks, q.name, q.version), q.version)))) : h("p", { class: "muted small" }, "none"),
+      x.packages.length > 0 && marks && (marks.notes || []).length > 0 && h("p", { class: "muted small pknote" }, marks.notes.join("; ")),
       a.language === "dotnet" && x.solutions.length === 0 && h("p", { class: "flag warn" }, "in no solution"));
   }
   select(null);
+  // NuGet marks for the side panel's packages, when they arrive; the view
+  // is drawn without them (from the C# rewrite: TASK-0141)
+  let marks = null;
+  if (a.language === "dotnet") {
+    packageMarks(p.id, all.flatMap((x) => x.packages || [])).then((m) => { marks = m; if (sel && side.isConnected) select(sel); });
+  }
   const layout = h("div", { class: "deplayout archlayout" }, h("div", { class: "depwrap archwrap" }, map), side);
   requestAnimationFrame(draw);
   if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(map);

@@ -7,6 +7,7 @@ using Harness.Infrastructure.Architecture;
 using Harness.Infrastructure.Architecture.Clones;
 using Harness.Infrastructure.Architecture.Complexity;
 using Harness.Infrastructure.Architecture.Metrics;
+using Harness.Infrastructure.Architecture.PackageFeeds;
 using Harness.Infrastructure.Configuration;
 using Harness.Infrastructure.Git;
 using Harness.Infrastructure.Memory;
@@ -66,6 +67,7 @@ public sealed partial class FindingSets(
         else if (read.Architecture is not null)
         {
             found.AddRange(await SyncedAsync(reader, own, stored, providers, refreshed, token).ConfigureAwait(false));
+            found.AddRange(await PackageFindingsAsync(read.Architecture, token).ConfigureAwait(false));
         }
         return (FindingStore.Merge(found), read.Architecture is not null);
     }
@@ -115,8 +117,8 @@ public sealed partial class FindingSets(
     }
 
     /// <summary>
-    /// The stored findings a quick read cannot recompute: providers', clones', complexity, stale knowledge
-    /// and published packages' unused code.
+    /// The stored findings a quick read cannot recompute: providers', clones', complexity, NuGet packages', stale
+    /// knowledge and published packages' unused code.
     /// </summary>
     private static IEnumerable<ArchitectureFinding> SyncOnly(
         IEnumerable<LayeredUnit> projects,
@@ -131,7 +133,11 @@ public sealed partial class FindingSets(
             .ToHashSet(StringComparer.Ordinal);
         return stored.Where(f =>
             f.Source.Provider is not ("" or "harness")
-            || f.Source.Tool is "internal/clones" or "internal/complexity" or ComplexityReader.Measured
+            || f.Source.Tool
+                is "internal/clones"
+                    or "internal/complexity"
+                    or "internal/packages"
+                    or ComplexityReader.Measured
             || f.Kind is "stale-knowledge"
             || f.Kind is "unused" && published.Contains(f.Project ?? "") && !have.Contains(f.Key)
         );
@@ -218,17 +224,52 @@ public sealed partial class FindingSets(
         return fresh;
     }
 
-    private ComplexityConfiguration Complexity()
+    private ComplexityConfiguration Complexity() => ArchitectureSettings().Complexity;
+
+    private ArchitectureConfiguration ArchitectureSettings()
     {
         try
         {
             var project = root.Length is 0 ? "" : ConfigurationPaths.ProjectPath(root);
-            return ConfigurationLoader.LoadFiles(globalConfigurationPath, project).Value.Architecture.Complexity;
+            return ConfigurationLoader.LoadFiles(globalConfigurationPath, project).Value.Architecture;
         }
         catch (InvalidDataException)
-        { /* The commands that load configuration report its errors; findings keep the default thresholds. */
+        { /* The commands that load configuration report its errors; findings keep the defaults. */
             return new();
         }
+    }
+
+    /// <summary>
+    /// Vulnerable NuGet packages (and, when [architecture.packages] outdated is on, outdated ones) of a .NET
+    /// repository, from the package cache alone: a sync never waits for a package source (TASK-0141).
+    /// </summary>
+    private async Task<IReadOnlyList<ArchitectureFinding>> PackageFindingsAsync(
+        ProjectArchitecture architecture,
+        CancellationToken token
+    )
+    {
+        var packages = ArchitectureSettings().Packages;
+        if (architecture.Language is not "dotnet" || root.Length is 0 || !packages.Enabled)
+        {
+            return [];
+        }
+
+        var lookup = await PackageMetadata
+            .For(globalConfigurationPath)
+            .LookupAsync(
+                NuGetSettings.Load(root),
+                architecture.Projects.SelectMany(unit =>
+                    unit.Packages.Where(package => !package.Unresolved)
+                        .Select(package => (package.Name, package.Version ?? ""))
+                ),
+                PackageLookupMode.CacheOnly,
+                token
+            )
+            .ConfigureAwait(false);
+        return architecture
+            .Projects.SelectMany(unit => PackageCheck.Findings(unit, lookup.Packages, packages.Outdated))
+            .Select(finding => ArchitectureAnalyzer.Complete(finding))
+            .ToArray();
     }
 
     /// <summary>Exact .NET values measured for HEAD, if the worker is enabled and its run for HEAD is done.</summary>
