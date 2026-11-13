@@ -16,6 +16,7 @@ globalThis.harnessLocation = {
     // the placeholder stays in the page under the canvas: a screen reader would still read it
     if (name === "board") document.querySelector(".loading")?.remove();
   },
+  shown: (href) => { globalThis.harnessTimings.route = href; },
   count: (name) => { globalThis.harnessTimings[name] = (globalThis.harnessTimings[name] || 0) + 1; },
 };
 

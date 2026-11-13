@@ -100,6 +100,8 @@ internal sealed partial class BrowserNavigation : INavigation
     {
         Current = route;
         Changed?.Invoke(this, EventArgs.Empty);
+        // the page shown, for tests and measurements (window.harnessTimings.route)
+        Location.Shown(route.Href);
     }
 }
 
@@ -123,6 +125,9 @@ internal static partial class Location
 
     [JSImport("globalThis.harnessLocation.forward")]
     internal static partial void Forward();
+
+    [JSImport("globalThis.harnessLocation.shown")]
+    internal static partial void Shown(string href);
 
     [JSImport("globalThis.harnessLocation.mark")]
     internal static partial void Mark(string name);
