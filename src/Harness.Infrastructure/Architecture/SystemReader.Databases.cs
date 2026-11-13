@@ -176,7 +176,9 @@ public sealed partial class SystemReader
                     || config.Contains(".EntityFrameworkCore", StringComparison.OrdinalIgnoreCase)
                 )
             || evaluated.References.Any(reference =>
-                projects.Contains(Folder(reference.Path))
+                !reference.BuildOrder
+                && !reference.Unresolved
+                && projects.Contains(Folder(reference.Path))
                 && projects[Folder(reference.Path)].Contains(reference.Path, StringComparer.Ordinal)
                 && EntityFrameworkProject(member, projects, reference.Path)
             );

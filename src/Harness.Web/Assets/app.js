@@ -3447,7 +3447,9 @@ async function viewArchitecture(p, sec) {
     const lines = [];
     const focus = sel || hover;
     for (const x of all) {
-      for (const r of x.references) {
+      // build-order-only references (ReferenceOutputAssembly=false) as
+      // dashed lines (from the C# rewrite: TASK-0137)
+      for (const [r, build] of x.references.map((r) => [r, false]).concat((x.build_order || []).map((r) => [r, true]))) {
         const from = nodes[x.path], to = nodes[r];
         if (!from || !to) continue;
         const hot = focus && (x.path === focus || r === focus);
@@ -3460,23 +3462,25 @@ async function viewArchitecture(p, sec) {
         const ya = down ? y1 : fa.top - box.top, yb = down ? y2 : ta.bottom - box.top;
         const m = (ya + yb) / 2;
         lines.push(sv("path", { d: `M${x1},${ya} C${x1},${m} ${x2},${m} ${x2},${yb}`,
-          class: "aline" + (hot ? (x.path === focus ? " out" : " in") : "") }));
+          class: "aline" + (hot ? (x.path === focus ? " out" : " in") : "") + (build ? " build" : "") }));
       }
     }
     fill(svg, sv("defs", {}, ["", " out", " in"].map((c) => sv("marker", { id: "ah" + c.trim(), viewBox: "0 0 8 8", refX: "7", refY: "4", markerWidth: "7", markerHeight: "7", orient: "auto" },
-      sv("path", { d: "M0,0 L8,4 L0,8 z", class: "ahead" + c })))), lines.map((l) => { l.setAttribute("marker-end", `url(#ah${l.getAttribute("class").replace("aline", "").trim()})`); return l; }));
+      sv("path", { d: "M0,0 L8,4 L0,8 z", class: "ahead" + c })))), lines.map((l) => { l.setAttribute("marker-end", `url(#ah${l.getAttribute("class").replace("aline", "").replace("build", "").trim()})`); return l; }));
   }
   function select(path) {
     sel = path;
     const x = path && byPath[path];
+    // what it builds first, and what builds it first, count as related (from the C# rewrite: TASK-0137)
+    const outs = x ? x.references.concat(x.build_order || []) : [], ins = x ? x.referenced_by.concat(x.build_order_by || []) : [];
     for (const [k, el] of Object.entries(nodes)) {
       el.classList.toggle("sel", k === path);
-      el.classList.toggle("rel-out", !!x && x.references.includes(k));
-      el.classList.toggle("rel-in", !!x && x.referenced_by.includes(k));
-      el.classList.toggle("dim", !!x && k !== path && !x.references.includes(k) && !x.referenced_by.includes(k));
+      el.classList.toggle("rel-out", outs.includes(k));
+      el.classList.toggle("rel-in", ins.includes(k));
+      el.classList.toggle("dim", !!x && k !== path && !outs.includes(k) && !ins.includes(k));
     }
     draw();
-    if (!x) return fill(side, h("p", { class: "hint" }, `${big ? `Point at a ${noun} to see its lines; select` : "Select"} a ${noun} to see what it ${ts ? "imports" : "references"}, what ${ts ? "imports" : "references"} it, its packages and who uses it. Lines point from a ${noun} to the ${nouns} it ${ts ? "imports" : "references"}.`));
+    if (!x) return fill(side, h("p", { class: "hint" }, `${big ? `Point at a ${noun} to see its lines; select` : "Select"} a ${noun} to see what it ${ts ? "imports" : "references"}, what ${ts ? "imports" : "references"} it, its packages and who uses it. Lines point from a ${noun} to the ${nouns} it ${ts ? "imports" : "references"}${all.some((u) => u.build_order) ? "; a dashed one to a project it only builds first" : ""}.`));
     const list = (paths) => paths.length ? h("ul", {}, paths.map((q) => h("li", {}, h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); select(q); } }, byPath[q] ? short(byPath[q]) : q)))) : h("p", { class: "muted small" }, "none");
     const us = users[x.package] || [];
     const byMember = {};
@@ -3487,6 +3491,9 @@ async function viewArchitecture(p, sec) {
       x.package && h("p", { class: "small" }, "publishes ", h("code", {}, x.package)),
       h("h5", {}, ts ? "Imports" : "References"), list(x.references),
       h("h5", {}, ts ? "Imported by" : "Referenced by"), list(x.referenced_by),
+      // build-order-only references apart (from the C# rewrite: TASK-0137)
+      x.build_order && [h("h5", {}, "Builds before"), h("p", { class: "muted small" }, "Built first, not referenced as code (ReferenceOutputAssembly=false); dashed lines."), list(x.build_order)],
+      x.build_order_by && [h("h5", {}, "Built before"), list(x.build_order_by)],
       x.package && [h("h5", {}, "Used in the workspace"),
         us.length ? h("ul", {}, Object.entries(byMember).map(([m, ps]) => h("li", {}, h("b", {}, m), h("div", { class: "muted small" }, ps.join(", ")))))
           : h("p", { class: "muted small" }, s.workspaces ? "by no other member" : "not in a workspace")],
@@ -3551,6 +3558,7 @@ function depMatrix(all, short, ts) {
     fill(side, h("h4", {}, short(x)), h("p", { class: "muted small" }, `${group(x)} · ${x.kind}`),
       h("h5", {}, ts ? "Imports" : "References"), nameList((x.references || []).filter((r) => idx[r] != null)),
       h("h5", {}, `${verbed[0].toUpperCase() + verbed.slice(1)} by`), nameList((x.referenced_by || []).filter((r) => idx[r] != null)),
+      x.build_order && [h("h5", {}, "Builds before"), nameList(x.build_order.filter((r) => idx[r] != null))], // (from the C# rewrite: TASK-0137)
       h("button", { class: "ghost small", type: "button", onclick: () => { lit([i], false); picked = null; intro(); } }, "Back"));
   }
   // the pairs, counted once
@@ -3563,6 +3571,9 @@ function depMatrix(all, short, ts) {
     edges++;
     if (wrong) back++;
   }));
+  // build-order-only references as hollow dashed marks, never against the
+  // layers (from the C# rewrite: TASK-0137)
+  xs.forEach((x, i) => (x.build_order || []).forEach((r) => { if (idx[r] != null) pairs.push([i, idx[r], false, true]); }));
   // draw lays the grid out at cell size C
   const holder = h("div", { class: "mxscroll" });
   function draw() {
@@ -3584,10 +3595,10 @@ function depMatrix(all, short, ts) {
       }
     }
     labels = xs.map((x, i) => sv("text", { x: L - 8, y: T + i * C + C / 2 + 4, "text-anchor": "end", class: "mxlabel" + (isTest(x) ? " test" : "") + (i === picked ? " on" : ""), onclick: () => pick(i) }, short(x)));
-    const cells = pairs.map(([i, j, wrong]) => { const x = xs[i]; return sv("rect", { x: L + j * C + 2, y: T + i * C + 2, width: C - 4, height: C - 4, rx: 3, class: "mxdot" + (wrong ? " back" : ""),
-      onmouseenter: () => { lit([i, j], true); if (picked == null) fill(side, h("h4", {}, short(x)), h("p", { class: "small" }, `${verb} `, h("b", {}, short(xs[j]))), wrong && h("p", { class: "flag warn small" }, "a lower layer reaching up")); },
+    const cells = pairs.map(([i, j, wrong, build]) => { const x = xs[i]; return sv("rect", { x: L + j * C + 2, y: T + i * C + 2, width: C - 4, height: C - 4, rx: 3, class: "mxdot" + (wrong ? " back" : "") + (build ? " build" : ""),
+      onmouseenter: () => { lit([i, j], true); if (picked == null) fill(side, h("h4", {}, short(x)), h("p", { class: "small" }, build ? "builds first " : `${verb} `, h("b", {}, short(xs[j]))), wrong && h("p", { class: "flag warn small" }, "a lower layer reaching up")); },
       onmouseleave: () => { lit([i, j], false); if (picked != null) lit([picked], true); else intro(); } },
-      sv("title", {}, `${short(x)} ${verb} ${short(xs[j])}`)); });
+      sv("title", {}, `${short(x)} ${build ? "builds first" : verb} ${short(xs[j])}`)); });
     // as wide as its card, never wider: the cells are sized to fit it
     fill(holder, sv("svg", { viewBox: `0 0 ${W} ${H}`, style: `width: min(100%, ${W}px)`, class: "depmx", role: "img", "aria-label": `${n} packages; ${back} imports against the layers` },
       bands, heads,

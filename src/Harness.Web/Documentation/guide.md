@@ -213,7 +213,8 @@ Each project opens on its Overview: rings for the tasks done and how well
 flight or next; and what needs a person, most urgent first. Then:
 
 - **Architecture:** Structure (projects or packages and their smells),
-  Layers, Complexity (every function by cyclomatic complexity, the most
+  Layers (a dashed line is a project only built first, through
+  `ReferenceOutputAssembly=false`), Complexity (every function by cyclomatic complexity, the most
   complex named) and Change coupling.
 - **Knowledge:** the memories by type (the team's marked PROJECT, with
   Share with project or Withdraw from project on each card), what applies

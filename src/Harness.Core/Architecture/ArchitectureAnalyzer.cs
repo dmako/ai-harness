@@ -67,20 +67,16 @@ public static class ArchitectureAnalyzer
 
             return layers[component] = layer;
         }
-        var referencedBy = build
-            .Projects.SelectMany(unit => unit.References.Select(target => (target, unit.Path)))
-            .GroupBy(pair => pair.target, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<string>)group.Select(pair => pair.Path).Order(StringComparer.Ordinal).ToArray(),
-                StringComparer.Ordinal
-            );
+        var referencedBy = Incoming(build.Projects, unit => unit.References);
+        // build-order-only references count only for the unused finding and the views
+        var buildOrderBy = Incoming(build.Projects, unit => unit.BuildOrder ?? []);
         var projects = build
             .Projects.Select(unit => new LayeredUnit(unit)
             {
                 Layer = Visit(components[unit.Path]),
                 Role = RoleOf(build.Language, unit),
                 ReferencedBy = referencedBy.GetValueOrDefault(unit.Path) ?? [],
+                BuildOrderBy = buildOrderBy.GetValueOrDefault(unit.Path),
             })
             .ToArray();
         var findings = Findings(build, projects, byPath, members.Where(component => component.Count > 1), used);
@@ -93,6 +89,20 @@ public static class ArchitectureAnalyzer
             projects.Length is 0 ? 0 : projects.Max(unit => unit.Layer) + 1
         );
     }
+
+    /// <summary>For each unit, the units whose chosen references name it, in path order.</summary>
+    private static Dictionary<string, IReadOnlyList<string>> Incoming(
+        IReadOnlyList<BuildUnit> units,
+        Func<BuildUnit, IEnumerable<string>> references
+    ) =>
+        units
+            .SelectMany(unit => references(unit).Select(target => (target, unit.Path)))
+            .GroupBy(pair => pair.target, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group.Select(pair => pair.Path).Order(StringComparer.Ordinal).ToArray(),
+                StringComparer.Ordinal
+            );
 
     /// <summary>
     /// What the finding rules read: the build, its units by path, their roles and the noun for a unit.
@@ -124,6 +134,16 @@ public static class ArchitectureAnalyzer
             foreach (var reference in unit.References)
             {
                 found.AddRange(ReferenceFindings(input, unit, reference));
+            }
+
+            foreach (var reference in (unit.BuildOrder ?? []).Where(reference => !byPath.ContainsKey(reference)))
+            {
+                found.Add(MissingFinding(input, unit, reference));
+            }
+
+            if (UnresolvedFinding(input, unit) is { } unresolved)
+            {
+                found.Add(unresolved);
             }
 
             if (UnusedFinding(input, unit, used) is { } unused)
@@ -203,20 +223,7 @@ public static class ArchitectureAnalyzer
     {
         if (!input.ByPath.TryGetValue(reference, out var target))
         {
-            return
-            [
-                new()
-                {
-                    Kind = "missing-project",
-                    Level = "warn",
-                    Title = unit.Name + " references a " + input.Noun + " that is not there",
-                    Why = reference + " does not exist in the repository.",
-                    Fix = "Remove the stale reference, or restore what it points to.",
-                    Project = unit.Path,
-                    Evidence = At(unit, reference),
-                    Key = Key("missing-project", unit.Path, reference),
-                },
-            ];
+            return [MissingFinding(input, unit, reference)];
         }
 
         List<ArchitectureFinding> found = [];
@@ -244,6 +251,50 @@ public static class ArchitectureAnalyzer
         }
 
         return found;
+    }
+
+    private static ArchitectureFinding MissingFinding(FindingInput input, BuildUnit unit, string reference) =>
+        new()
+        {
+            Kind = "missing-project",
+            Level = "warn",
+            Title = unit.Name + " references a " + input.Noun + " that is not there",
+            Why = reference + " does not exist in the repository.",
+            Fix = "Remove the stale reference, or restore what it points to.",
+            Project = unit.Path,
+            Evidence = At(unit, reference),
+            Key = Key("missing-project", unit.Path, reference),
+        };
+
+    /// <summary>
+    /// One finding for a unit's references that still hold @( or $( after the static read: what they
+    /// name is unknown, so they are neither checked nor drawn.
+    /// </summary>
+    private static ArchitectureFinding? UnresolvedFinding(FindingInput input, BuildUnit unit)
+    {
+        if (unit.UnresolvedReferences is not { Count: > 0 } unresolved)
+        {
+            return null;
+        }
+
+        var expressions = unresolved.Keys.Order(StringComparer.Ordinal).ToArray();
+        return new()
+        {
+            Kind = "unresolved-reference",
+            Level = "info",
+            Title = unit.Name + " has references harness cannot resolve: " + string.Join(", ", expressions),
+            Why =
+                "Reading the project files without running MSBuild, harness cannot tell which "
+                + input.Noun
+                + "s they name (an item list or property set in a target, an SDK or the command line), so they are"
+                + " neither drawn nor checked.",
+            Fix =
+                "Nothing to fix if the build resolves them; to have them read, declare the item list or property in"
+                + " the project or a file it imports.",
+            Project = unit.Path,
+            Evidence = expressions.Select(expression => unresolved[expression] + " (" + expression + ")").ToArray(),
+            Key = Key("unresolved-reference", unit.Path),
+        };
     }
 
     /// <summary>A library whose role ranks below the role of the unit it references.</summary>
@@ -284,7 +335,10 @@ public static class ArchitectureAnalyzer
     /// </summary>
     private static ArchitectureFinding? UnusedFinding(FindingInput input, LayeredUnit unit, Func<string, bool>? used)
     {
-        if (unit.Kind is not "library" || unit.ReferencedBy.Any(path => input.ByPath[path].Kind is not "test"))
+        if (
+            unit.Kind is not "library"
+            || unit.ReferencedBy.Concat(unit.BuildOrderBy ?? []).Any(path => input.ByPath[path].Kind is not "test")
+        )
         {
             return null;
         }

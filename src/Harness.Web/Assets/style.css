@@ -1961,3 +1961,8 @@ table.dups { min-width: 45rem; }
 .scmcard .scmcalls li { display: flex; gap: 0.5rem; flex-wrap: wrap; overflow-wrap: anywhere; }
 .scmcard .scmacts { margin-top: 0.25rem; }
 .scmresult:empty { display: none; }
+/* build-order-only project references (TASK-0137: ReferenceOutputAssembly=false):
+   dashed lines in Layers, hollow dashed marks in its matrix */
+.aline.build { stroke-dasharray: 5 4; }
+.mxdot.build { fill-opacity: 0.12; stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.mxdot.build:hover { fill-opacity: 0.3; stroke: var(--accent); }

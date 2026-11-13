@@ -66,6 +66,22 @@ public declarations, imports, configuration and repository history. Static
 MSBuild evaluation is bounded and does not load build tasks or execute projects.
 Compiler-exact semantics belong to external providers.
 
+`StaticMsBuild` keeps every item type of a project evaluation in evaluation
+order, an import's item groups at the point it is imported (TASK-0137): Include
+(`;` lists, `@(Name)` lists with their metadata, the `%(FullPath)`,
+`%(Identity)`, `%(Filename)` and `%(Extension)` transforms), Exclude, Remove,
+Update and the group and item conditions. Wildcards are expanded against the
+repository's file list, only for ProjectReference and the item types an `@(...)`
+names, never by a directory walk; relative item paths resolve against the
+project's directory. A ProjectReference with `ReferenceOutputAssembly=false`
+(metadata as an element or attribute, inherited through an item list) is
+build-order only: `BuildUnit.build_order` instead of `references`, drawn dashed
+in Layers, counted for the `unused` finding and the Metrics worker's build
+order, and left out of layers, cycles, layering, test-reference and boundary
+rules. A reference still holding `@(` or `$(` after evaluation is reported once
+per project as an `unresolved-reference` info finding instead of
+`missing-project`.
+
 Repeated-code analysis compares functions, normalized structure and statement
 sequences, filters generated/test/vendor sources and reports qualified evidence.
 Change coupling combines history and provider evidence to suggest missing usual

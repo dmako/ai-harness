@@ -3040,6 +3040,108 @@ public sealed class UiBrowserTests(SharedBrowser browser)
         );
     }
 
+    /// <summary>
+    /// A plugin host's build-order-only references (an item list with ReferenceOutputAssembly=false) are dashed
+    /// lines in Layers, and its side panel lists them as 'Builds before' (TASK-0137).
+    /// </summary>
+    [Fact]
+    public async Task BuildOrderOnlyReferencesAreDashedLinesInLayers()
+    {
+        var executable = Browser();
+        using var fixture = await SyncFixture.CreateAsync();
+        fixture.Write(
+            "Host/Host.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+              <ItemGroup>
+                <PluginProject Include="..\Plugins\Alpha\Alpha.csproj" />
+                <PluginProject Include="..\Plugins\Beta\Beta.csproj" />
+              </ItemGroup>
+              <ItemGroup>
+                <ProjectReference Include="@(PluginProject)">
+                  <ReferenceOutputAssembly>False</ReferenceOutputAssembly>
+                </ProjectReference>
+                <ProjectReference Include="..\Shared\Shared.csproj" />
+              </ItemGroup>
+            </Project>
+            """
+        );
+        foreach (
+            var library in new[] { "Plugins/Alpha/Alpha.csproj", "Plugins/Beta/Beta.csproj", "Shared/Shared.csproj" }
+        )
+        {
+            fixture.Write(library, """<Project Sdk="Microsoft.NET.Sdk" />""");
+        }
+
+        await fixture.CommitAsync("a plugin host");
+        await fixture.RunAsync();
+        await BrowseAsync(
+            executable,
+            fixture,
+            async (page, server) =>
+            {
+                var id = UiWriteTests.ProjectId(fixture);
+                await page.CommandAsync(
+                    "Page.navigate",
+                    new { url = server.Client.BaseAddress + $"#/p/{id}/architecture/layers" }
+                );
+                await page.WaitAsync("document.querySelectorAll('.archlines path.aline').length === 3");
+                (await ValueAsync(page, "document.querySelectorAll('.archlines path.aline.build').length"))
+                    .Should()
+                    .Be("2", "both plugins are build-order-only references");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.archlines path.aline')].map(p => (p.classList.contains('build') ? 'build ' : 'code ') + getComputedStyle(p).strokeDasharray).sort().join(' | ')"
+                    )
+                )
+                    .Should()
+                    .MatchRegex(@"^build \d.* \| build \d.* \| code none$", "only build-order lines are dashed");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.anode')].find(n => n.title === 'Alpha').closest('.arow').querySelector('.alabel').textContent"
+                    )
+                )
+                    .Should()
+                    .Be("layer 0");
+                (
+                    await ValueAsync(
+                        page,
+                        "[...document.querySelectorAll('.anode')].find(n => n.title === 'Host').closest('.arow').querySelector('.alabel').textContent"
+                    )
+                )
+                    .Should()
+                    .Be("layer 1", "only the code reference to Shared lifts the host");
+
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.anode')].find(n => n.title === 'Host').click()"
+                );
+                await page.WaitAsync("document.querySelector('.archside h4')?.textContent === 'Host'");
+                var side = await ValueAsync(page, "document.querySelector('.archside').textContent");
+                side.Should().Contain("Builds before").And.Contain("Alpha").And.Contain("Beta");
+                side[
+                    side.IndexOf("References", StringComparison.Ordinal)..side.IndexOf(
+                        "Referenced by",
+                        StringComparison.Ordinal
+                    )
+                ]
+                    .Should()
+                    .Contain("Shared")
+                    .And.NotContain("Alpha", "build-order references are listed apart");
+
+                await page.EvaluateAsync(
+                    "[...document.querySelectorAll('.anode')].find(n => n.title === 'Beta').click()"
+                );
+                await page.WaitAsync("document.querySelector('.archside h4')?.textContent === 'Beta'");
+                (await ValueAsync(page, "document.querySelector('.archside').textContent"))
+                    .Should()
+                    .Contain("Built before");
+            }
+        );
+    }
+
     [Fact]
     public async Task EveryPageLoadsWithoutAScriptError()
     {

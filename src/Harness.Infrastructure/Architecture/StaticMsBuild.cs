@@ -23,7 +23,9 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
     {
         internal Dictionary<string, string> Properties { get; } = new(StringComparer.OrdinalIgnoreCase);
         internal Dictionary<string, string> Locations { get; } = new(StringComparer.OrdinalIgnoreCase);
-        internal List<(string File, XElement Root)> Order { get; } = [];
+
+        /// <summary>The item groups in evaluation order: each import's at the point it is imported.</summary>
+        internal List<(string File, XElement Group)> ItemGroups { get; } = [];
         internal HashSet<string> Globals { get; } = new(StringComparer.OrdinalIgnoreCase);
         internal HashSet<string> Seen { get; } = new(StringComparer.Ordinal);
     }
@@ -78,10 +80,12 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                 }
                 else
                 {
+                    // a code reference anywhere makes it a code reference
                     references[existing] = references[existing] with
                     {
                         Frameworks = Add(references[existing].Frameworks, framework),
                         Conditional = references[existing].Conditional || item.Conditional,
+                        BuildOrder = references[existing].BuildOrder && item.BuildOrder,
                     };
                 }
             }
@@ -142,7 +146,6 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             return;
         }
 
-        context.Order.Add((file, xml));
         var dir = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
         foreach (var element in xml.Elements())
         {
@@ -156,6 +159,9 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
                     break;
                 case "ImportGroup":
                     ImportGroup(context, element, dir, depth);
+                    break;
+                case "ItemGroup":
+                    context.ItemGroups.Add((file, element));
                     break;
             }
         }
@@ -220,41 +226,35 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         }
     }
 
+    /// <summary>
+    /// The project's items, its imports' included, in evaluation order: packages, and project references from
+    /// the item lists kept on the way (each evaluation keeps its own).
+    /// </summary>
     private (List<EvaluatedPackage> Packages, List<EvaluatedReference> References) Items(
         string project,
         Context context
     )
     {
-        var items = new ItemLists();
-        foreach (var (file, xml) in context.Order)
+        var items = new ItemLists(Path.GetDirectoryName(Path.Combine(repository.Root, project))!);
+        foreach (var (file, group) in context.ItemGroups)
         {
             var directory = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
-            foreach (var group in xml.Elements().Where(e => e.Name.LocalName is "ItemGroup"))
+            var condition = Condition(context, Attr(group, "Condition"), directory);
+            if (!condition.Value && condition.Known)
             {
-                var condition = Condition(context, Attr(group, "Condition"), directory);
-                if (!condition.Value && condition.Known)
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                foreach (var item in group.Elements())
-                {
-                    Item(project, context, items, file, item, condition.Known);
-                }
+            foreach (var item in group.Elements())
+            {
+                Item(context, items, file, item, condition.Known);
             }
         }
-        return (items.Packages.Select(package => Centrally(package, items.Central)).ToList(), items.References);
-    }
-
-    private sealed class ItemLists
-    {
-        internal List<EvaluatedPackage> Packages { get; } = [];
-        internal List<EvaluatedReference> References { get; } = [];
-        internal Dictionary<string, string> Central { get; } = new(StringComparer.OrdinalIgnoreCase);
+        return (items.Packages.Select(package => Centrally(package, items.Central)).ToList(), ProjectReferences(items));
     }
 
     /// <summary>One item of a group whose condition is true or unknown (then the item is conditional).</summary>
-    private void Item(string project, Context context, ItemLists items, string file, XElement item, bool known)
+    private void Item(Context context, ItemLists items, string file, XElement item, bool known)
     {
         var directory = Path.GetDirectoryName(Path.Combine(repository.Root, file))!;
         var childCondition = Condition(context, Attr(item, "Condition"), directory);
@@ -268,17 +268,22 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
         var include = Expand(context, Attr(item, "Include"), directory);
         var update = Expand(context, Attr(item, "Update"), directory);
         var remove = Expand(context, Attr(item, "Remove"), directory);
-        var version = ItemVersion(context, item, directory);
         switch (item.Name.LocalName)
         {
             case "PackageVersion":
-                PackageVersion(items.Central, include, update, version);
+                PackageVersion(items.Central, include, update, ItemVersion(context, item, directory));
                 break;
             case "PackageReference":
-                PackageReference(items.Packages, include, update, remove, new(include, version, at, [], conditional));
+                PackageReference(
+                    items.Packages,
+                    include,
+                    update,
+                    remove,
+                    new(include, ItemVersion(context, item, directory), at, [], conditional)
+                );
                 break;
-            case "ProjectReference":
-                items.References.AddRange(ProjectReferences(project, include, at, conditional));
+            default:
+                ListItem(context, items, item, directory, (include, update, remove), (at, conditional));
                 break;
         }
     }
@@ -341,22 +346,6 @@ public sealed partial class StaticMsBuild(AnalysisRepository repository)
             packages.AddRange(Split(include).Select(name => added with { Name = name }));
         }
     }
-
-    private IEnumerable<EvaluatedReference> ProjectReferences(
-        string project,
-        string include,
-        string at,
-        bool conditional
-    ) =>
-        Split(include.Replace('\\', '/'))
-            .Select(path => new EvaluatedReference(
-                repository.Relative(
-                    Path.GetFullPath(path, Path.GetDirectoryName(Path.Combine(repository.Root, project))!)
-                ),
-                at,
-                [],
-                conditional
-            ));
 
     /// <summary>A package without a version takes the central one; a version still holding $( is unresolved.</summary>
     private static EvaluatedPackage Centrally(EvaluatedPackage package, Dictionary<string, string> central)
