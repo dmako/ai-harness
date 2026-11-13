@@ -1,40 +1,80 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Harness.Ui.ViewModels"
-             xmlns:api="using:Harness.Ui.Api"
              xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.MainView"
              x:DataType="vm:MainViewModel"
              Classes="page">
-  <!-- the page scrolls up and down only when the window is shorter than PageMinHeight (zoomed in, phones); otherwise
-       the page is exactly the window's height and each Board column scrolls on its own (MainView.axaml.cs) -->
+  <!-- the page frame: the sidebar (beside the page when wide, over it when narrow), the top bar, and the page the
+       address names; toasts and the open dialog above everything -->
   <Panel>
-  <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-  <DockPanel Name="Page">
-    <Border Classes="header" DockPanel.Dock="Top">
-      <WrapPanel Orientation="Horizontal">
-        <TextBlock Classes="brand" Text="harness" Margin="0,0,16,0" />
-        <TextBlock Classes="label" Text="Project:" Margin="0,0,6,0" />
-        <ComboBox Name="ProjectPicker"
-                  ItemsSource="{Binding Projects}"
-                  SelectedItem="{Binding Project}"
-                  AutomationProperties.Name="Project"
-                  MinWidth="200" Margin="0,0,16,0">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="api:ProjectInfo">
-              <TextBlock Text="{Binding Name}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <TextBlock Classes="live" Text="{Binding Services.Live.State, StringFormat='● {0}'}" />
-      </WrapPanel>
-    </Border>
-    <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0"
-               Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-    <views:BoardView Name="Board" DataContext="{Binding Board}" Margin="16,8,16,16" />
-  </DockPanel>
-  </ScrollViewer>
-  <views:ToastLayer DataContext="{Binding Services.Toasts}" />
-  <views:DialogLayer DataContext="{Binding Services.Dialogs}" />
+    <Grid Name="Frame" ColumnDefinitions="Auto,*">
+      <Border Name="Sidebar" Classes="sidebar" Grid.Column="0" ZIndex="1">
+        <views:Sidebar />
+      </Border>
+      <DockPanel Grid.Column="1">
+        <Border Classes="topbar" DockPanel.Dock="Top">
+          <DockPanel>
+            <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
+                    AutomationProperties.Name="Show projects" IsVisible="False" />
+            <TextBlock DockPanel.Dock="Right" Classes="live" Text="{Binding Services.Live.State, StringFormat='● {0}'}" />
+            <TextBlock Classes="brand" Text="harness" />
+          </DockPanel>
+        </Border>
+        <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0" Text="{Binding Error}"
+                   IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <!-- the page scrolls up and down only when the window is shorter than PageMinHeight; otherwise the page is
+             exactly the window's height and a view that scrolls (the Board's columns) scrolls inside itself -->
+        <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ContentControl Name="Page" Content="{Binding Page}" Margin="16,12,16,16" />
+        </ScrollViewer>
+      </DockPanel>
+    </Grid>
+    <views:ToastLayer DataContext="{Binding Services.Toasts}" />
+    <views:DialogLayer DataContext="{Binding Services.Dialogs}" />
   </Panel>
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:HomePage">
+      <views:HomeView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ProjectPage">
+      <views:ProjectPageView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:WorkspacePage">
+      <views:WorkspacePageView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:BoardViewModel">
+      <views:BoardView Name="Board" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:MessagePage">
+      <StackPanel Spacing="8">
+        <Border Classes="error"><TextBlock Text="{Binding Message}" /></Border>
+        <c:AppLink Classes="link" Href="#/" Content="Home" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:PlaceholderPage">
+      <StackPanel Classes="section" Margin="0">
+        <TextBlock Classes="h3" Text="{Binding Title}" />
+        <TextBlock Classes="hint" Text="{Binding Note}" />
+        <HyperlinkButton Content="Open it in the current harness ui" NavigateUri="{Binding Current}" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:UnreadableBody">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="empty" Text="{Binding Message}" />
+        <c:AppLink Classes="link" Href="{Binding HealthHref}" Content="See Health" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:RenameDialog">
+      <StackPanel Classes="field">
+        <TextBlock Classes="label" Text="Display name" />
+        <TextBox Name="DisplayField" Text="{Binding Display}" PlaceholderText="{Binding DisplayHint}" MaxLength="80"
+                 AutomationProperties.Name="Display name" />
+        <TextBlock Classes="label" Text="Short name" Margin="0,8,0,0" />
+        <TextBox Name="ShortField" Classes="mono" Text="{Binding Short}" PlaceholderText="{Binding ShortHint}"
+                 AutomationProperties.Name="Short name" />
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
 </UserControl>

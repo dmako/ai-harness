@@ -3,11 +3,34 @@
     {
       "id": "prj_fixture",
       "title": "Fixture project",
-      "root": "C:\repos\fixture"
+      "root": "C:\\repos\\fixture",
+      "live": {
+        "state": "ok",
+        "pending_proposals": 1,
+        "pending_arch_proposals": 0,
+        "pending_task_proposals": 2,
+        "pending_blueprint_proposals": 0,
+        "removed_from_project": 0,
+        "checks_failed": 0,
+        "checks_warned": 1
+      },
+      "workspaces": [
+        "main"
+      ]
     },
     {
       "id": "prj_other",
-      "root": "/home/dev/other"
+      "root": "/home/dev/other",
+      "live": {
+        "state": "missing",
+        "pending_proposals": 0,
+        "pending_arch_proposals": 0,
+        "pending_task_proposals": 0,
+        "pending_blueprint_proposals": 0,
+        "removed_from_project": 0,
+        "checks_failed": 1,
+        "checks_warned": 0
+      }
     }
   ]
 }

@@ -32,6 +32,11 @@ public sealed class UiFixtureShapeTests
         var projects = JsonNode.Parse(await server.Client.GetStringAsync("/api/projects", Token))!;
         var id = (string)projects["projects"]![0]!["id"]!;
         await TitleAsync(server, id, "Fixture project");
+        await PostAsync(
+            server,
+            "/api/workspaces",
+            new JsonObject { ["name"] = "main", ["title"] = "Main workspace", ["project_ids"] = new JsonArray(id) }
+        );
         var capture = Environment.GetEnvironmentVariable(CaptureVariable);
 
         var files = Directory.EnumerateFiles(FixtureFolder, "*.json", SearchOption.AllDirectories).ToArray();
@@ -64,15 +69,15 @@ public sealed class UiFixtureShapeTests
     }
 
     /// <summary>Gives the project a display title through harness ui's own write, so title appears in its answers.</summary>
-    private static async Task TitleAsync(UiFixture server, string id, string title)
+    private static Task TitleAsync(UiFixture server, string id, string title) =>
+        PostAsync(server, $"/api/projects/{id}/rename", new JsonObject { ["title"] = title });
+
+    /// <summary>A write through harness ui, as its page sends it.</summary>
+    private static async Task PostAsync(UiFixture server, string path, JsonObject body)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{id}/rename")
+        using var request = new HttpRequestMessage(HttpMethod.Post, path)
         {
-            Content = new StringContent(
-                new JsonObject { ["title"] = title }.ToJsonString(),
-                System.Text.Encoding.UTF8,
-                "application/json"
-            ),
+            Content = new StringContent(body.ToJsonString(), System.Text.Encoding.UTF8, "application/json"),
         };
         request.Headers.Add("X-Harness-UI", "1");
         request.Headers.Add("Origin", "http://" + server.Client.BaseAddress!.Authority);

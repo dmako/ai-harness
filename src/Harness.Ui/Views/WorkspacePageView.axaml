@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.WorkspacePageView"
+             x:DataType="vm:WorkspacePage">
+  <!-- a workspace's page (app.js workspaceHead): its name, rename, workspace:<name> to copy, its size, its tabs -->
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Classes="phead">
+      <WrapPanel ItemSpacing="10" LineSpacing="4">
+        <TextBlock Classes="kind" Text="WORKSPACE" />
+        <TextBlock Classes="h2" Text="{Binding Workspace.DisplayName}" />
+        <Button Name="Rename" Classes="icon" Command="{Binding RenameCommand}" ToolTip.Tip="Rename: change the display name or the short name"
+                AutomationProperties.Name="Rename this workspace" VerticalAlignment="Center">
+          <c:Icon Kind="edit" />
+        </Button>
+        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
+                ToolTip.Tip="Agents and commands name this workspace so. Click to copy." />
+      </WrapPanel>
+      <TextBlock Classes="path" Text="{Binding Path}" />
+    </StackPanel>
+    <Border DockPanel.Dock="Top" Classes="tabs">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl Name="Tabs" ItemsSource="{Binding Tabs}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TabItem">
+              <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}"
+                         AutomationProperties.Name="{Binding Label}" Content="{Binding Label}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+    <ContentControl Name="Body" Content="{Binding Body}" />
+  </DockPanel>
+</UserControl>

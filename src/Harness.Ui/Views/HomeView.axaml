@@ -1,0 +1,114 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.HomeView"
+             x:DataType="vm:HomePage">
+  <!-- Home (app.js renderHome): what is on this machine at a glance, the workspaces' cards, the projects outside -->
+  <StackPanel>
+    <StackPanel Classes="phead">
+      <TextBlock Classes="h2" Text="Home" />
+      <TextBlock Classes="path" Text="Every repository on this machine that uses harness." />
+    </StackPanel>
+    <ItemsControl Name="Tiles" ItemsSource="{Binding Tiles}" Margin="0,16,0,0">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:Tile">
+          <Border Classes="tile">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="{Binding Label}" />
+              <TextBlock Classes="value" Text="{Binding Value}" />
+              <TextBlock Classes="muted small" Text="{Binding Note}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <StackPanel Classes="section">
+      <TextBlock Classes="h3" Text="Workspaces" />
+      <TextBlock Classes="hint" Text="Repositories searched and reasoned about together." />
+      <TextBlock Classes="empty" Text="No workspaces yet." IsVisible="{Binding !HasWorkspaces}" />
+      <ItemsControl Name="WorkspaceCards" ItemsSource="{Binding WorkspaceCards}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:NavWorkspace">
+            <Border Classes="card wscard" Padding="8">
+              <StackPanel>
+                <c:AppLink Classes="nav" Href="{Binding Href}" Margin="0" AutomationProperties.Name="{Binding Title}">
+                  <DockPanel>
+                    <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}">
+                      <TextBlock Text="{Binding Waiting}" />
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <c:Icon Kind="workspace" />
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </DockPanel>
+                </c:AppLink>
+                <TextBlock Classes="muted small" Text="No projects yet." Margin="8,4" IsVisible="{Binding !Members.Count}" />
+                <ItemsControl ItemsSource="{Binding Members}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NavProject">
+                      <c:AppLink Classes="nav" Href="{Binding Href}" Margin="0" AutomationProperties.Name="{Binding Name}">
+                        <DockPanel>
+                          <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}"><TextBlock Text="{Binding Waiting}" /></Border>
+                          <c:Icon DockPanel.Dock="Right" Classes="state" Classes.g-ok="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                                  Classes.g-stale="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=stale}"
+                                  Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                                  Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
+                                  Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        </DockPanel>
+                      </c:AppLink>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <c:AppLink Classes="link" Href="{Binding MoreHref}" IsVisible="{Binding HasMore}" Margin="8,4">
+                  <TextBlock Text="{Binding MoreText}" />
+                </c:AppLink>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <StackPanel Classes="section">
+      <TextBlock Classes="h3" Text="{Binding OutsideTitle}" />
+      <TextBlock Classes="empty" Text="{Binding OutsideEmpty}" IsVisible="{Binding OutsideEmpty, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <ItemsControl Name="OutsideCards" ItemsSource="{Binding Outside}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:NavProject">
+            <Border Classes="card" Padding="8" Width="240">
+              <c:AppLink Classes="nav" Href="{Binding Href}" Margin="0" AutomationProperties.Name="{Binding Name}">
+                <StackPanel Spacing="4">
+                  <DockPanel>
+                    <c:Icon DockPanel.Dock="Right" Classes="state" Classes.g-ok="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                            Classes.g-stale="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=stale}"
+                            Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                            Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
+                            Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  </DockPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border Classes="badge" IsVisible="{Binding HasWaiting}"><TextBlock Text="{Binding Waiting}" /></Border>
+                    <TextBlock Classes="muted small" Text="waiting" IsVisible="{Binding HasWaiting}" />
+                    <TextBlock Classes="good small" Text="✓ nothing waiting" IsVisible="{Binding !HasWaiting}" />
+                  </StackPanel>
+                </StackPanel>
+              </c:AppLink>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

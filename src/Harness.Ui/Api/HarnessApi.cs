@@ -20,6 +20,9 @@ public sealed class HarnessApi(HttpClient http)
     public async Task<IReadOnlyList<ProjectInfo>> ProjectsAsync(CancellationToken token) =>
         (await GetAsync("api/projects", UiJsonContext.Default.ProjectList, token)).Projects;
 
+    public async Task<IReadOnlyList<WorkspaceInfo>> WorkspacesAsync(CancellationToken token) =>
+        (await GetAsync("api/workspaces", UiJsonContext.Default.WorkspaceList, token)).Workspaces;
+
     public Task<BoardResponse> BoardAsync(string projectId, CancellationToken token) =>
         GetAsync($"api/projects/{Uri.EscapeDataString(projectId)}/board", UiJsonContext.Default.BoardResponse, token);
 

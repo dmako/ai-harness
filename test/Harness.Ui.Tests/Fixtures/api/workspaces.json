@@ -1,0 +1,19 @@
+{
+  "workspaces": [
+    {
+      "id": "ws_fixture",
+      "name": "main",
+      "created": "2026-11-01T10:00:00Z",
+      "title": "Main workspace",
+      "members": [
+        {
+          "project": "fixture",
+          "project_id": "prj_fixture",
+          "root": "C:\\repos\\fixture",
+          "state": "ok",
+          "title": "Fixture project"
+        }
+      ]
+    }
+  ]
+}

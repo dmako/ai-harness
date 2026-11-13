@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.Sidebar"
+             x:DataType="vm:MainViewModel">
+  <!-- the sidebar (app.js renderProjects): Home and Search, the workspaces with their first projects, the projects
+       outside workspaces, then your knowledge, the machine and the docs; each row with its state and what waits -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="0,8,0,12">
+      <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=home}" Href="#/" AutomationProperties.Name="Home">
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="home" /><TextBlock Text="Home" /></StackPanel>
+      </c:AppLink>
+      <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=search}" Href="#/search" AutomationProperties.Name="Search">
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="search" /><TextBlock Text="Search" /></StackPanel>
+      </c:AppLink>
+
+      <TextBlock Classes="nhead" Text="WORKSPACES" />
+      <TextBlock Classes="nempty" Text="No workspaces yet: create one on Home."
+                 IsVisible="{Binding !Workspaces.Count}" />
+      <ItemsControl Name="WorkspaceList" ItemsSource="{Binding Workspaces}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:NavWorkspace">
+            <StackPanel>
+              <c:AppLink Classes="nav" Classes.current="{Binding Current}" Href="{Binding Href}"
+                         AutomationProperties.Name="{Binding Title}">
+                <DockPanel>
+                  <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}" ToolTip.Tip="waiting for you in its projects">
+                    <TextBlock Text="{Binding Waiting}" />
+                  </Border>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <c:Icon Kind="workspace" />
+                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </DockPanel>
+              </c:AppLink>
+              <ItemsControl ItemsSource="{Binding Members}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:NavProject">
+                    <c:AppLink Classes="nav member" Classes.current="{Binding Current}" Href="{Binding Href}"
+                               AutomationProperties.Name="{Binding Name}">
+                      <DockPanel>
+                        <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}" ToolTip.Tip="{Binding WaitingTip}">
+                          <TextBlock Text="{Binding Waiting}" />
+                        </Border>
+                        <c:Icon DockPanel.Dock="Right" Classes="state" Classes.g-ok="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                                Classes.g-stale="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=stale}"
+                                Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                                Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
+                                Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      </DockPanel>
+                    </c:AppLink>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <c:AppLink Classes="nav member" Href="{Binding MoreHref}" IsVisible="{Binding HasMore}">
+                <TextBlock Classes="muted" Text="{Binding MoreText}" />
+              </c:AppLink>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Classes="nhead" Text="PROJECTS" IsVisible="{Binding HasOutside}" />
+      <ItemsControl Name="ProjectList" ItemsSource="{Binding Outside}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:NavProject">
+            <c:AppLink Classes="nav" Classes.current="{Binding Current}" Href="{Binding Href}"
+                       AutomationProperties.Name="{Binding Name}">
+              <DockPanel>
+                <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}" ToolTip.Tip="{Binding WaitingTip}">
+                  <TextBlock Text="{Binding Waiting}" />
+                </Border>
+                <c:Icon DockPanel.Dock="Right" Classes="state" Classes.g-ok="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                        Classes.g-stale="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=stale}"
+                        Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                        Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
+                        Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              </DockPanel>
+            </c:AppLink>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="nempty" Text="{Binding SidebarEmpty}" IsVisible="{Binding SidebarEmpty, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <Border Height="16" />
+      <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=knowledge}" Href="#/knowledge" AutomationProperties.Name="Your knowledge">
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="knowledge" /><TextBlock Text="Your knowledge" /></StackPanel>
+      </c:AppLink>
+      <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=machine}" Href="#/machine" AutomationProperties.Name="Machine">
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="machine" /><TextBlock Text="Machine" /></StackPanel>
+      </c:AppLink>
+      <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=docs}" Href="#/docs" AutomationProperties.Name="Docs">
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="docs" /><TextBlock Text="Docs" /></StackPanel>
+      </c:AppLink>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

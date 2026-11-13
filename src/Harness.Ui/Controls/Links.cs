@@ -72,25 +72,49 @@ public static class Links
         }
     }
 
-    private static ContextMenu Menu(HyperlinkButton link)
+    private static ContextMenu Menu(HyperlinkButton link) => MenuFor(link, () => link.NavigateUri);
+
+    /// <summary>Open in new tab and Copy link for any control that stands for <paramref name="uri"/>.</summary>
+    public static ContextMenu MenuFor(Control owner, Func<Uri?> uri)
     {
         var open = new MenuItem { Header = "Open in new tab" };
         open.Click += async (_, _) =>
         {
-            if (link.NavigateUri is { } uri)
+            if (uri() is { } target)
             {
-                await Opener(TopLevel.GetTopLevel(link), uri);
+                await Opener(TopLevel.GetTopLevel(owner), target);
             }
         };
         var copy = new MenuItem { Header = "Copy link" };
         copy.Click += async (_, _) =>
         {
-            if (link.NavigateUri is { } uri)
+            if (uri() is { } target)
             {
-                await CopyAsync(link, uri.ToString());
+                await CopyAsync(owner, target.ToString());
             }
         };
         return new ContextMenu { Items = { open, copy } };
+    }
+
+    /// <summary>A middle click on <paramref name="owner"/> opens <paramref name="uri"/> in a new tab.</summary>
+    public static void MiddleClickOpens(Control owner, Func<Uri?> uri)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        owner.AddHandler(
+            InputElement.PointerPressedEvent,
+            async (_, e) =>
+            {
+                if (
+                    e.GetCurrentPoint(owner).Properties.PointerUpdateKind is PointerUpdateKind.MiddleButtonPressed
+                    && uri() is { } target
+                )
+                {
+                    e.Handled = true;
+                    await Opener(TopLevel.GetTopLevel(owner), target);
+                }
+            },
+            RoutingStrategies.Tunnel
+        );
     }
 
     private static async void MiddleClick(object? sender, PointerPressedEventArgs e)

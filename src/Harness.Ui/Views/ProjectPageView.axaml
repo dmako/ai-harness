@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.ProjectPageView"
+             x:DataType="vm:ProjectPage">
+  <!-- a project's page (app.js projectHead): its name, rename, the short name to copy, where it lives, what it is in,
+       what changed; the view tabs with what waits; then the view -->
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Classes="phead">
+      <WrapPanel ItemSpacing="10" LineSpacing="4">
+        <TextBlock Classes="kind" Text="PROJECT" />
+        <TextBlock Classes="h2" Text="{Binding Project.DisplayName}" />
+        <Button Name="Rename" Classes="icon" Command="{Binding RenameCommand}" ToolTip.Tip="Rename: change the display name or the short name"
+                AutomationProperties.Name="Rename this project" VerticalAlignment="Center">
+          <c:Icon Kind="edit" />
+        </Button>
+        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
+                ToolTip.Tip="Agents and commands name this project so. Click to copy." />
+      </WrapPanel>
+      <WrapPanel ItemSpacing="12" LineSpacing="2">
+        <SelectableTextBlock Classes="mono path" Text="{Binding Project.Root}" />
+        <TextBlock Classes="muted small" Text="{Binding ShortNote}" IsVisible="{Binding ShortNote, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Center" />
+        <ItemsControl ItemsSource="{Binding Project.Workspaces}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <c:AppLink Classes="link" Href="{Binding Converter={x:Static c:Converters.WorkspaceHref}}" ToolTip.Tip="Open this workspace">
+                <TextBlock Text="{Binding StringFormat='in {0}'}" />
+              </c:AppLink>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </WrapPanel>
+      <TextBlock Classes="facts" Text="{Binding Facts}" IsVisible="{Binding HasFacts}" />
+      <TextBlock Classes="facts" Text="{Binding Detail}" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+    <Border DockPanel.Dock="Top" Classes="tabs">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl Name="Tabs" ItemsSource="{Binding Tabs}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TabItem">
+              <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}"
+                         AutomationProperties.Name="{Binding Label}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Label}" />
+                  <Border Classes="badge" IsVisible="{Binding HasBadge}"><TextBlock Text="{Binding Badge}" /></Border>
+                </StackPanel>
+              </c:AppLink>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+    <ContentControl Name="Body" Content="{Binding Body}" />
+  </DockPanel>
+</UserControl>

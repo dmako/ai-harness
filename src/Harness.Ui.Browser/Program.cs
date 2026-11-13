@@ -2,8 +2,10 @@ using System.Runtime.InteropServices.JavaScript;
 using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Browser;
+using Avalonia.Threading;
 using Harness.Ui;
 using Harness.Ui.Api;
+using Harness.Ui.Navigation;
 using Harness.Ui.ViewModels;
 
 [assembly: SupportedOSPlatform("browser")]
@@ -11,8 +13,8 @@ using Harness.Ui.ViewModels;
 namespace Harness.Ui.Browser;
 
 /// <summary>
-/// Starts the shared UI in the page's #out element. The API is this page's origin; a deep link
-/// (/next/#/p/&lt;project id&gt;/board) chooses the project and follows the project shown.
+/// Starts the shared UI in the page's #out element. The API is this page's origin; the page's address is the shell's
+/// history (<see cref="BrowserNavigation"/>), so links are shareable and Back/Forward work.
 /// </summary>
 internal static partial class Program
 {
@@ -37,31 +39,90 @@ internal static partial class Program
             Host = new UiHostContext
             {
                 Server = server,
-                Navigated = id => Location.SetHash($"#/p/{Uri.EscapeDataString(id)}/board"),
+                Page = new Uri(location.GetLeftPart(UriPartial.Path)),
+                Navigation = BrowserNavigation.Instance,
                 BoardShown = () => Location.Mark("board"),
                 LiveReloaded = () => Location.Count("liveReloads"),
             },
-            ProjectId = ProjectFromHash(location.Fragment),
         };
         return AppBuilder.Configure<App>().WithInterFont().StartBrowserAppAsync("out");
     }
+}
 
-    /// <summary>The project id of a hash like #/p/&lt;id&gt;/board, else null.</summary>
-    private static string? ProjectFromHash(string hash)
+/// <summary>
+/// The shell's history in the address bar: going somewhere pushes the hash (history.pushState), and the browser's
+/// Back/Forward or an edited address come back as hash changes (main.js calls <see cref="HashChanged"/>).
+/// </summary>
+internal sealed partial class BrowserNavigation : INavigation
+{
+    private BrowserNavigation() => Current = Route.Parse(Location.Hash());
+
+    public static BrowserNavigation Instance { get; } = new();
+
+    public Route Current { get; private set; }
+
+    public event EventHandler? Changed;
+
+    public void Go(string href)
     {
-        var parts = hash.TrimStart('#', '/').Split('/');
-        return parts is ["p", { Length: > 0 } id, ..] ? Uri.UnescapeDataString(id) : null;
+        var route = Route.Parse(href);
+        if (route.Href != Current.Href)
+        {
+            Location.Push(route.Href);
+        }
+        Show(route);
+    }
+
+    public void Replace(string href)
+    {
+        var route = Route.Parse(href);
+        Location.Replace(route.Href);
+        Show(route);
+    }
+
+    public void Back() => Location.Back();
+
+    public void Forward() => Location.Forward();
+
+    /// <summary>The address's hash changed by the browser (Back, Forward, an edited address).</summary>
+    [JSExport]
+    internal static void HashChanged(string hash) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            var route = Route.Parse(hash);
+            if (route.Href != Instance.Current.Href || route.Moved)
+            {
+                Instance.Show(route);
+            }
+        });
+
+    private void Show(Route route)
+    {
+        Current = route;
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }
 
-/// <summary>The page's address (globalThis.location), through main.js's exports.</summary>
+/// <summary>The page's address and history (globalThis.harnessLocation in main.js).</summary>
 internal static partial class Location
 {
     [JSImport("globalThis.harnessLocation.href")]
     internal static partial string Href();
 
-    [JSImport("globalThis.harnessLocation.setHash")]
-    internal static partial void SetHash(string hash);
+    [JSImport("globalThis.harnessLocation.hash")]
+    internal static partial string Hash();
+
+    [JSImport("globalThis.harnessLocation.push")]
+    internal static partial void Push(string hash);
+
+    [JSImport("globalThis.harnessLocation.replace")]
+    internal static partial void Replace(string hash);
+
+    [JSImport("globalThis.harnessLocation.back")]
+    internal static partial void Back();
+
+    [JSImport("globalThis.harnessLocation.forward")]
+    internal static partial void Forward();
 
     [JSImport("globalThis.harnessLocation.mark")]
     internal static partial void Mark(string name);

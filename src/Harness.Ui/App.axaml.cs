@@ -13,9 +13,6 @@ public sealed class UiStartup
 {
     public required Api.HarnessApi Api { get; init; }
     public required UiHostContext Host { get; init; }
-
-    /// <summary>The project to show first (a deep link), else the first listed.</summary>
-    public string? ProjectId { get; init; }
 }
 
 /// <summary>harness ui's Avalonia application: resources, styles and the main view, the same for every host.</summary>
@@ -43,7 +40,7 @@ public sealed partial class App : Application
                 default:
                     break;
             }
-            _ = model.StartAsync(startup.ProjectId, CancellationToken.None);
+            _ = model.StartAsync(CancellationToken.None);
         }
         base.OnFrameworkInitializationCompleted();
     }

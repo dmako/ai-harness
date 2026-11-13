@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Harness.Ui.Api;
+using Harness.Ui.Navigation;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
@@ -57,7 +58,8 @@ internal static class Ui
         int height,
         string? board = null,
         FixtureApi? api = null,
-        bool fastLive = false
+        bool fastLive = false,
+        string? address = null
     )
     {
         api ??= new FixtureApi();
@@ -70,7 +72,7 @@ internal static class Ui
         var http = new HttpClient(api) { BaseAddress = Server };
 #pragma warning restore CA2000
 #pragma warning disable CA2000 // disposed by the window's Closed handler
-        var services = Services(http, fastLive);
+        var services = Services(http, fastLive, new InMemoryNavigation(address ?? $"#/p/{Fixtures.ProjectId}/board"));
 #pragma warning restore CA2000
         var model = new MainViewModel(services);
         var window = Show(new MainView { DataContext = model }, width, height);
@@ -80,8 +82,11 @@ internal static class Ui
             services.Dispose();
             http.Dispose();
         };
-        await model.StartAsync(Fixtures.ProjectId, TestContext.Current.CancellationToken);
-        await UntilAsync(() => model.Board is { Loading: false, Columns.Count: > 0 });
+        await model.StartAsync(TestContext.Current.CancellationToken);
+        await UntilAsync(() =>
+            model.Page is not null
+            && (model.Page is not ProjectPage { View: "board" } || model.Board is { Loading: false, Columns.Count: > 0 })
+        );
         return (window, api, model);
     }
 
@@ -89,10 +94,10 @@ internal static class Ui
     /// The page's services over <paramref name="http"/> as a desktop host has them (writes carry the Origin). With
     /// <paramref name="fastLive"/> live updates use test timings: 100 ms quiet, 600 ms gap, 200 ms reconnect.
     /// </summary>
-    public static UiServices Services(HttpClient http, bool fastLive = false)
+    public static UiServices Services(HttpClient http, bool fastLive = false, Harness.Ui.Navigation.INavigation? navigation = null)
     {
         var api = new HarnessApi(http) { Origin = Server.GetLeftPart(UriPartial.Authority) };
-        var host = new UiHostContext { Server = Server };
+        var host = new UiHostContext { Server = Server, Navigation = navigation ?? new InMemoryNavigation() };
         if (!fastLive)
         {
             return new UiServices(api, host);

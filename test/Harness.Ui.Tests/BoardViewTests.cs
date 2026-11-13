@@ -57,7 +57,7 @@ public sealed class BoardViewTests
         var gets = api.Gets.Count(g => g.EndsWith("/board", StringComparison.Ordinal));
         api.Answers[$"/api/projects/{Fixtures.ProjectId}/board"] = Fixtures.Board(sort: "id");
 
-        ((MainView)window.Content!).FindControl<BoardView>("Board")!.FindControl<ComboBox>("SortPicker")!.SelectedIndex = 1;
+        window.GetVisualDescendants().OfType<BoardView>().Single().FindControl<ComboBox>("SortPicker")!.SelectedIndex = 1;
         await model.Board!.SaveCommand.ExecutionTask!;
 
         var post = api.Posts.Should().ContainSingle().Subject;
@@ -126,14 +126,14 @@ public sealed class BoardViewTests
     {
         var (window, _, _) = await Ui.OpenMainAsync(1280, 800);
         var focused = new List<string>();
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 40; i++)
         {
             window.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null);
             Dispatcher.UIThread.RunJobs();
             focused.Add(Name((Control)window.FocusManager.GetFocusedElement()!));
         }
 
-        focused.Take(4).Should().Equal("ProjectPicker", "SortPicker", "HideDonePicker", "BlueprintPicker");
+        focused.SkipWhile(f => f is not "SortPicker").Take(3).Should().Equal("SortPicker", "HideDonePicker", "BlueprintPicker");
     });
 
     private static List<TaskCard> Cards(Window window)

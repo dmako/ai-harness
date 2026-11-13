@@ -3,15 +3,15 @@
      Icon.<name> is stroked, IconFill.<name> (optional) filled. -->
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <StreamGeometry x:Key="Icon.home">M3 10.5 12 3l9 7.5 M5 9.5V21h5v-6h4v6h5V9.5</StreamGeometry>
-  <StreamGeometry x:Key="Icon.search">M10.5 3a7.5 7.5 0 1 0 0 15a7.5 7.5 0 0 0 0-15z m16 16 5 5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.search">M10.5 3a7.5 7.5 0 1 0 0 15a7.5 7.5 0 0 0 0-15z M16 16 l5 5</StreamGeometry>
   <StreamGeometry x:Key="Icon.knowledge">M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5 M9 8h7M9 12h5</StreamGeometry>
   <StreamGeometry x:Key="Icon.machine">M3 4h18v12H3z M8 20h8M12 16v4</StreamGeometry>
   <StreamGeometry x:Key="Icon.docs">M6 2h9l5 5v15H6z M14 2v6h6 M9 13h7M9 17h7</StreamGeometry>
-  <StreamGeometry x:Key="Icon.workspace">m12 3 9 4.5-9 4.5-9-4.5z m3 12 9 4.5 9-4.5 m3 16.5 9 4.5 9-4.5</StreamGeometry>
-  <StreamGeometry x:Key="Icon.edit">M4 20h4L19 9l-4-4L4 16z m13.5 6.5 4 4</StreamGeometry>
+  <StreamGeometry x:Key="Icon.workspace">M12 3 l9 4.5-9 4.5-9-4.5z M3 12 l9 4.5 9-4.5 M3 16.5 l9 4.5 9-4.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.edit">M4 20h4L19 9l-4-4L4 16z M13.5 6.5 l4 4</StreamGeometry>
   <StreamGeometry x:Key="Icon.refresh">M20 11a8 8 0 1 0-2.3 5.7 M20 4v7h-7</StreamGeometry>
   <StreamGeometry x:Key="Icon.close">M6 6l12 12 M18 6 6 18</StreamGeometry>
-  <StreamGeometry x:Key="Icon.st-ok">m5 12.5 4.5 4.5L19 7.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.st-ok">M5 12.5 l4.5 4.5L19 7.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.st-warn">M12 4.5 21 19.5H3z M12 10v4.5 M12 17h.01</StreamGeometry>
   <StreamGeometry x:Key="Icon.st-fail">M7 7l10 10 M17 7 7 17</StreamGeometry>
   <StreamGeometry x:Key="Icon.trash">M4 7h16 M10 11v6M14 11v6 M6 7l1 13h10l1-13 M9 7V4h6v3</StreamGeometry>
@@ -23,13 +23,13 @@
   <StreamGeometry x:Key="Icon.test">M9 3h6 M10 3v6l-5 9.5A2 2 0 0 0 6.8 21h10.4a2 2 0 0 0 1.8-2.5L14 9V3 M7.5 15h9</StreamGeometry>
   <StreamGeometry x:Key="Icon.process">M20 11a8 8 0 0 0-14.3-4.9 M4 4v4h4 M4 13a8 8 0 0 0 14.3 4.9 M20 20v-4h-4</StreamGeometry>
   <StreamGeometry x:Key="Icon.type-other">M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8z</StreamGeometry>
-  <StreamGeometry x:Key="Icon.up">M12 19V5 m6 11 6-6 6 6</StreamGeometry>
-  <StreamGeometry x:Key="Icon.down">M12 5v14 m6 13 6 6 6-6</StreamGeometry>
-  <StreamGeometry x:Key="Icon.p-low">M12 5v14 m6 13 6 6 6-6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.up">M12 19V5 M6 11 l6-6 6 6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.down">M12 5v14 M6 13 l6 6 6-6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.p-low">M12 5v14 M6 13 l6 6 6-6</StreamGeometry>
   <StreamGeometry x:Key="Icon.p-medium">M5 9h14 M5 15h14</StreamGeometry>
-  <StreamGeometry x:Key="Icon.p-high">M12 19V5 m6 11 6-6 6 6</StreamGeometry>
-  <StreamGeometry x:Key="Icon.p-critical">M12 21V9 m6 15 6-6 6 6 m6 9 6-6 6 6</StreamGeometry>
-  <StreamGeometry x:Key="Icon.check">M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z m8 12.5 2.7 2.7L16.5 9.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.p-high">M12 19V5 M6 11 l6-6 6 6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.p-critical">M12 21V9 M6 15 l6-6 6 6 M6 9 l6-6 6 6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.check">M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z M8 12.5 l2.7 2.7L16.5 9.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.inbox">M3 13h5l1.5 3h5L16 13h5 M5.5 5h13L21 13v6H3v-6z</StreamGeometry>
   <StreamGeometry x:Key="Icon.calm">M3 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0 M3 17c2-3 4-3 6 0s4 3 6 0 4-3 6 0 M12 3v3</StreamGeometry>
   <StreamGeometry x:Key="IconFill.status-ready">M12 6.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 0 0 0-11z</StreamGeometry>

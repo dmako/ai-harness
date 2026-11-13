@@ -9,6 +9,8 @@ namespace Harness.Ui.Api;
     GenerationMode = JsonSourceGenerationMode.Metadata
 )]
 [JsonSerializable(typeof(ProjectList))]
+[JsonSerializable(typeof(WorkspaceList))]
+[JsonSerializable(typeof(RenameChange))]
 [JsonSerializable(typeof(BoardResponse))]
 [JsonSerializable(typeof(BoardChange))]
 [JsonSerializable(typeof(LiveChange))]

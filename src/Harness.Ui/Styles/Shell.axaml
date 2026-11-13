@@ -1,0 +1,120 @@
+<!-- The page frame (style.css #projects nav, .phead, .tiles): the sidebar and its rows, in-page links, page headers,
+     Home's tiles and cards, and the state shapes. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <Style Selector="Border.sidebar">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="Width" Value="264" />
+  </Style>
+  <Style Selector="Border.sidebar.overlay">
+    <Setter Property="BoxShadow" Value="{DynamicResource Shadow2}" />
+  </Style>
+  <Style Selector="TextBlock.nhead">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="LetterSpacing" Value="1" />
+    <Setter Property="Margin" Value="12,16,0,4" />
+  </Style>
+  <Style Selector="TextBlock.nempty">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="12,4" />
+  </Style>
+
+  <!-- a sidebar row: an AppLink, the current page's row in the accent wash -->
+  <Style Selector="Button.nav">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="Margin" Value="4,0" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+  <Style Selector="Button.nav.current">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.nav.current:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+  </Style>
+  <Style Selector="Button.nav.member">
+    <Setter Property="Margin" Value="20,0,4,0" />
+  </Style>
+
+  <!-- a text link inside a page -->
+  <Style Selector="Button.link">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <!-- state shapes (app.js stateGlyph): a shape per state, never colour alone -->
+  <Style Selector="c|Icon.state">
+    <Setter Property="Size" Value="14" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="c|Icon.g-ok">
+    <Setter Property="Foreground" Value="{DynamicResource Good}" />
+  </Style>
+  <Style Selector="c|Icon.g-stale">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="c|Icon.g-warn">
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="c|Icon.g-bad">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+
+  <!-- the page's header bar and a page's own header -->
+  <Style Selector="Border.topbar">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="16,6" />
+  </Style>
+  <Style Selector="StackPanel.phead">
+    <Setter Property="Spacing" Value="4" />
+  </Style>
+  <Style Selector="TextBlock.facts">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Home -->
+  <Style Selector="Border.tile">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="Width" Value="220" />
+  </Style>
+  <Style Selector="Border.tile TextBlock.value">
+    <Setter Property="FontSize" Value="{StaticResource TextXl}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Border.wscard">
+    <Setter Property="Width" Value="300" />
+  </Style>
+</Styles>
