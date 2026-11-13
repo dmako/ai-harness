@@ -134,8 +134,8 @@
       "harness.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.12.0-localbuild, )",
-          "Harness.Scm": "[0.12.0-localbuild, )",
+          "Harness.Core": "[0.13.0-localbuild, )",
+          "Harness.Scm": "[0.13.0-localbuild, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[11.0.0, )",
           "Microsoft.Data.Sqlite": "[11.0.0, )",
           "Tomlyn": "[2.11.1, )",
@@ -145,15 +145,15 @@
       "harness.mcp": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.12.0-localbuild, )",
-          "Harness.Scm": "[0.12.0-localbuild, )",
+          "Harness.Core": "[0.13.0-localbuild, )",
+          "Harness.Scm": "[0.13.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
       },
       "harness.providers": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.12.0-localbuild, )",
+          "Harness.Core": "[0.13.0-localbuild, )",
           "ModelContextProtocol.Core": "[2.4.0, )"
         }
       },
@@ -163,25 +163,25 @@
       "harness.scm.forgejo": {
         "type": "Project",
         "dependencies": {
-          "Harness.Scm": "[0.12.0-localbuild, )"
+          "Harness.Scm": "[0.13.0-localbuild, )"
         }
       },
       "harness.scm.github": {
         "type": "Project",
         "dependencies": {
-          "Harness.Scm": "[0.12.0-localbuild, )"
+          "Harness.Scm": "[0.13.0-localbuild, )"
         }
       },
       "harness.scm.gitlab": {
         "type": "Project",
         "dependencies": {
-          "Harness.Scm": "[0.12.0-localbuild, )"
+          "Harness.Scm": "[0.13.0-localbuild, )"
         }
       },
       "harness.web": {
         "type": "Project",
         "dependencies": {
-          "Harness.Core": "[0.12.0-localbuild, )"
+          "Harness.Core": "[0.13.0-localbuild, )"
         }
       },
       "Microsoft.AspNetCore.DataProtection.Extensions": {
