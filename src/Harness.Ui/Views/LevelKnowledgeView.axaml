@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.LevelKnowledgeView"
+             x:DataType="vm:LevelKnowledgeViewModel">
+  <!-- a level's knowledge (app.js levelKnowledge): Add, then its memories by type; with none, what each type is for -->
+  <views:SectionView>
+    <views:SectionView.Body>
+      <StackPanel x:DataType="vm:LevelKnowledgeViewModel" Spacing="12">
+        <Button Name="AddLevel" Classes="primary" Content="Add" Command="{Binding AddCommand}" HorizontalAlignment="Left" />
+        <ItemsControl Name="LevelGroups" ItemsSource="{Binding Groups}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:MemoryGroup"><views:MemoryGroupView /></DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Spacing="8" IsVisible="{Binding IsEmpty}">
+          <TextBlock Classes="empty" TextWrapping="Wrap"
+                     Text="Nothing recorded yet: add a statement, or promote a project's memory from its Knowledge view. What each type is for:" />
+          <ItemsControl ItemsSource="{Binding TypeHelp}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TypeChoice">
+                <Border Classes="mem" c:StyleClass.Name="{Binding Type, StringFormat='ty-{0}'}" Width="240">
+                  <StackPanel Spacing="2">
+                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                    <TextBlock Classes="muted small" Text="{Binding Meaning}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+    </views:SectionView.Body>
+  </views:SectionView>
+</UserControl>

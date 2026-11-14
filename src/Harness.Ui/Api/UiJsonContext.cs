@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Harness.Ui.Api;
 
 /// <summary>
-/// Source-generated JSON metadata for the API contracts (one file per area: Projects, Workspaces, Tasks, Work, Overview, Live, Docs, Health):
+/// Source-generated JSON metadata for the API contracts (one file per area: Projects, Workspaces, Tasks, Work, Overview, Knowledge, Live, Docs, Health):
 /// no reflection, so trimming and AOT keep working. Strict: a required member missing from an answer, or null where
 /// the contract says it cannot be, fails deserialisation.
 /// </summary>
@@ -45,4 +45,17 @@ namespace Harness.Ui.Api;
 [JsonSerializable(typeof(ArchApproval))]
 [JsonSerializable(typeof(Rejection))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
+[JsonSerializable(typeof(MemoryList))]
+[JsonSerializable(typeof(LevelKnowledge))]
+[JsonSerializable(typeof(MemoryDetail))]
+[JsonSerializable(typeof(Applies))]
+[JsonSerializable(typeof(MemoryProposalList))]
+[JsonSerializable(typeof(MemoryAdd))]
+[JsonSerializable(typeof(MemoryAdded))]
+[JsonSerializable(typeof(MemoryChange))]
+[JsonSerializable(typeof(Promotion))]
+[JsonSerializable(typeof(Promoted))]
+[JsonSerializable(typeof(ShareResult))]
+[JsonSerializable(typeof(ProposalApproval))]
+[JsonSerializable(typeof(ProposalApproved))]
 internal sealed partial class UiJsonContext : JsonSerializerContext;

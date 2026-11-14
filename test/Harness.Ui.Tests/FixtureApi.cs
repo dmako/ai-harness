@@ -27,6 +27,9 @@ internal sealed class FixtureApi : HttpMessageHandler
     public List<(string Path, string Body, string? Origin, string? Ui)> Posts { get; } = [];
     public List<string> Gets { get; } = [];
 
+    /// <summary>Every GET with its query, in order.</summary>
+    public List<string> GetsWithQuery { get; } = [];
+
     /// <summary>The GETs sent with X-Harness-UI (harness ui's own page), with their query.</summary>
     public List<string> UiGets { get; } = [];
 
@@ -85,6 +88,7 @@ internal sealed class FixtureApi : HttpMessageHandler
             return Json(Reply?.Invoke(posted, body) ?? "{}");
         }
         Gets.Add(path);
+        GetsWithQuery.Add(path + request.RequestUri.Query);
         if (request.Headers.Contains("X-Harness-UI"))
         {
             UiGets.Add(path + request.RequestUri.Query);
@@ -93,13 +97,29 @@ internal sealed class FixtureApi : HttpMessageHandler
         {
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new EventStream(_events.Reader)) };
         }
-        return (Find(Answers, path) ?? Find(_files, path)) is { } answer
+        return (ByQuery(path, request.RequestUri.Query) ?? Find(Answers, path) ?? Find(_files, path)) is { } answer
             ? Json(answer)
             : new HttpResponseMessage(HttpStatusCode.NotFound)
             {
                 Content = new StringContent("{\"error\":\"unknown endpoint\"}"),
             };
     }
+
+    /// <summary>
+    /// An answer for one query of a path: a key "path?part" (path a concrete path or template) matches a request to
+    /// that path whose query contains part, e.g. /api/projects/{id}/memories?shared=removed.
+    /// </summary>
+    private string? ByQuery(string path, string query) =>
+        Answers
+            .Where(a => a.Key.Contains('?', StringComparison.Ordinal))
+            .Where(a =>
+            {
+                var at = a.Key.IndexOf('?', StringComparison.Ordinal);
+                var keyPath = a.Key[..at];
+                return (keyPath == path || Matches(keyPath, path)) && query.Contains(a.Key[(at + 1)..], StringComparison.Ordinal);
+            })
+            .Select(a => a.Value)
+            .FirstOrDefault();
 
     /// <summary>The value for <paramref name="path"/>: its own entry, else the first template entry it matches.</summary>
     private static T? Find<T>(Dictionary<string, T> entries, string path)

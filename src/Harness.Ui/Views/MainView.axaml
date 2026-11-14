@@ -3,6 +3,7 @@
              xmlns:vm="using:Harness.Ui.ViewModels"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
+             xmlns:api="using:Harness.Ui.Api"
              x:Class="Harness.Ui.Views.MainView"
              x:DataType="vm:MainViewModel"
              Classes="page">
@@ -49,6 +50,93 @@
     </DataTemplate>
     <DataTemplate DataType="vm:OverviewViewModel">
       <views:OverviewView Name="Overview" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:KnowledgeViewModel">
+      <views:KnowledgeView Name="Knowledge" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:LevelKnowledgeViewModel">
+      <views:LevelKnowledgeView Name="LevelKnowledge" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:UserKnowledgePage">
+      <StackPanel>
+        <StackPanel Classes="phead">
+          <TextBlock Classes="h2" Text="Your knowledge" />
+          <TextBlock Classes="path" Text="{x:Static vm:UserKnowledgePage.Intro}" />
+        </StackPanel>
+        <views:LevelKnowledgeView DataContext="{Binding Knowledge}" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:MemoryChangeDialog">
+      <StackPanel Spacing="10">
+        <StackPanel Classes="field" IsVisible="{Binding Correcting}">
+          <TextBlock Classes="label" Text="Corrected statement" />
+          <TextBox Name="ContentField" Text="{Binding Content}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
+                   AutomationProperties.Name="Corrected statement" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="{Binding ReasonLabel}" />
+          <TextBox Name="ReasonField" Text="{Binding Reason}" AutomationProperties.Name="{Binding ReasonLabel}" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:PromoteDialog">
+      <StackPanel Classes="field">
+        <TextBlock Classes="label" Text="Apply to" />
+        <ComboBox Name="PromoteTo" ItemsSource="{Binding Targets}" SelectedItem="{Binding To}" MinWidth="220" AutomationProperties.Name="Apply to" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:MemoryAddDialog">
+      <StackPanel Spacing="10">
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Type" />
+          <ComboBox Name="TypeField" ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" HorizontalAlignment="Stretch"
+                    AutomationProperties.Name="Type" />
+          <TextBlock Classes="muted small" Text="{Binding Type.Example}" TextWrapping="Wrap" />
+          <TextBlock Classes="muted small" Text="{Binding Type.Reach}" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Statement" />
+          <TextBox Name="StatementField" Text="{Binding Content}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
+                   AutomationProperties.Name="Statement" />
+        </StackPanel>
+        <StackPanel Classes="field" IsVisible="{Binding AsksScope}">
+          <TextBlock Classes="label" Text="Applies to (project, or path:src/ui, subsystem:sync, branch:main)" TextWrapping="Wrap" />
+          <TextBox Name="ScopeField" Text="{Binding Scope}" AutomationProperties.Name="Applies to" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Source (optional)" />
+          <TextBox Name="SourceField" Text="{Binding SourceRef}" AutomationProperties.Name="Source" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:ProposalEditDialog">
+      <StackPanel Classes="field">
+        <TextBlock Classes="label" Text="Statement" />
+        <TextBox Name="StatementField" Text="{Binding Content}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
+                 AutomationProperties.Name="Statement" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:SimilarDecisionDialog">
+      <ItemsControl ItemsSource="{Binding Similar}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="api:SimilarMemory">
+            <DockPanel Margin="0,0,0,6">
+              <Button DockPanel.Dock="Right" Content="Replace this one" Margin="8,0,0,0" VerticalAlignment="Top"
+                      Command="{Binding $parent[ItemsControl].((vm:SimilarDecisionDialog)DataContext).ReplaceCommand}" CommandParameter="{Binding}" />
+              <StackPanel>
+                <SelectableTextBlock Text="{Binding Memory.Content}" TextWrapping="Wrap" />
+                <TextBlock Classes="muted small" Text="{Binding Memory.Id}" />
+              </StackPanel>
+            </DockPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DataTemplate>
+    <DataTemplate DataType="vm:MemoryRejectDialog">
+      <StackPanel Classes="field">
+        <TextBlock Classes="label" Text="Note (optional)" />
+        <TextBox Name="NoteField" Text="{Binding Note}" AutomationProperties.Name="Note" />
+      </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:WorkViewModel">
       <views:WorkView Name="Work" />

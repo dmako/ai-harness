@@ -1,8 +1,10 @@
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
 using Harness.Core.Findings;
+using Harness.Core.Memory;
 using Harness.Core.Tasks;
 using Harness.Infrastructure.Findings;
+using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Tasks;
 using Harness.Integration.Sync;
 using Xunit;
@@ -39,6 +41,7 @@ public sealed class UiFixtureShapeTests
             "/api/workspaces",
             new JsonObject { ["name"] = "main", ["title"] = "Main workspace", ["project_ids"] = new JsonArray(id) }
         );
+        await KnowledgeAsync(server);
         var capture = Environment.GetEnvironmentVariable(CaptureVariable);
 
         var files = Directory.EnumerateFiles(FixtureFolder, "*.json", SearchOption.AllDirectories).ToArray();
@@ -47,8 +50,9 @@ public sealed class UiFixtureShapeTests
         foreach (var file in files)
         {
             var route = "/" + Path.GetRelativePath(FixtureFolder, file).Replace('\\', '/')[..^".json".Length];
-            // {id} is the project, {task} a task of it
-            var path = route.Replace("{id}", id, StringComparison.Ordinal).Replace("{task}", "TASK-0001", StringComparison.Ordinal);
+            // {id} is the project, {task} a task of it; a route that needs a query gets one
+            var path = route.Replace("{id}", id, StringComparison.Ordinal).Replace("{task}", "TASK-0001", StringComparison.Ordinal)
+                + Queries.GetValueOrDefault(route, "");
             var answer = await server.Client.GetStringAsync(path, Token);
             var served = Paths(JsonNode.Parse(answer));
             problems.AddRange(
@@ -70,6 +74,29 @@ public sealed class UiFixtureShapeTests
             }
         }
         problems.Should().BeEmpty();
+    }
+
+    /// <summary>The query a fixture's route is read with when the endpoint needs one.</summary>
+    private static readonly Dictionary<string, string> Queries = new(StringComparer.Ordinal)
+    {
+        ["/api/knowledge"] = "?level=user",
+        ["/api/projects/{id}/applies"] = "?scope=project",
+        ["/api/projects/{id}/memories"] = "?type=goal,constraint,decision,convention,warning,fact,open_question&limit=500&levels=1&inactive=1",
+    };
+
+    /// <summary>Knowledge at the wider levels: one for all the user's projects and one for the workspace.</summary>
+    internal static async Task KnowledgeAsync(UiFixture server)
+    {
+        await PostAsync(
+            server,
+            "/api/knowledge/memories",
+            new JsonObject { ["level"] = "user", ["type"] = "convention", ["content"] = "Write commit messages as one line", ["source_ref"] = "review" }
+        );
+        await PostAsync(
+            server,
+            "/api/knowledge/memories",
+            new JsonObject { ["level"] = "workspace:main", ["type"] = "decision", ["content"] = "The workspace ships together" }
+        );
     }
 
     /// <summary>Gives the project a display title through harness ui's own write, so title appears in its answers.</summary>
@@ -162,6 +189,34 @@ public sealed class UiFixtureShapeTests
             Token
         );
         tasks.ProposeBlueprint("", new("", "Proposed blueprint", "Its goal", ["Done when shipped"], "a note"), "why", "agent:test", Token);
+        // knowledge: one stated by the author, one an agent recorded for a path, one corrected, and a proposal
+        // resembling the first
+        var memories = new MemoryStore(database);
+        memories.Put(
+            new()
+            {
+                Type = "decision",
+                Content = "Live updates use Server-Sent Events: the page only needs to know what changed.",
+                Source = new("user", "design review", "human:dev"),
+            },
+            Token
+        );
+        memories.Put(
+            new()
+            {
+                Type = "convention",
+                Content = "Views use compiled bindings.",
+                Scope = MemoryScope.Parse("path:src/Harness.Ui"),
+                Confidence = 0.9,
+            },
+            Token
+        );
+        var old = memories.Put(new() { Type = "warning", Content = "The old warning" }, Token).Memory!;
+        memories.Supersede(old.Id, new() { Type = "warning", Content = "The corrected warning", SupersedeReason = "clearer" }, Token);
+        memories.Propose(
+            new("decision", "Live updates use Server-Sent Events, not WebSocket", Source: new("agent", "src/LiveUpdates.cs", "agent:test"), Rationale: "seen in the code"),
+            Token
+        );
         new FindingStore(database).Propose(
             new FindingProposal
             {

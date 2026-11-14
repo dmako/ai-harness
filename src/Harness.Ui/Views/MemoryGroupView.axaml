@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.MemoryGroupView"
+             x:DataType="vm:MemoryGroup">
+  <!-- a type's memories (app.js .mgroup): its name in its colour, the count, the cards -->
+  <StackPanel Spacing="6" Margin="0,0,0,12">
+    <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding Tip}">
+      <c:Swatch BrushKey="{Binding Brush}" Size="10" VerticalAlignment="Center" />
+      <TextBlock Classes="h3" Text="{Binding Title}" />
+      <TextBlock Classes="count" Text="{Binding Count}" />
+    </StackPanel>
+    <TextBlock Classes="empty small" Text="none" IsVisible="{Binding !Count}" />
+    <ItemsControl ItemsSource="{Binding Cards}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:MemoryCard">
+          <views:MemoryCardView />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

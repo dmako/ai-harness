@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.MemoryCardView"
+             x:DataType="vm:MemoryCard">
+  <!-- a memory (app.js memoryCard): its point first and the rest after it, its provenance, what it overrides or is
+       overridden by, what superseded it, its actions as the memory allows them, and its history on request -->
+  <Border Classes="mem" c:StyleClass.Name="{Binding Memory.Type, StringFormat='ty-{0}'}" Classes.inactive="{Binding Inactive}"
+          AutomationProperties.Name="{Binding Lead}">
+    <StackPanel Spacing="4">
+      <SelectableTextBlock TextWrapping="Wrap">
+        <Run FontWeight="SemiBold" Text="{Binding Lead, Mode=OneWay}" /><Run Text="{Binding Rest, Mode=OneWay, StringFormat=' {0}'}" />
+      </SelectableTextBlock>
+      <WrapPanel ItemSpacing="8" LineSpacing="2">
+        <Border Classes="tag" IsVisible="{Binding IsShared}" ToolTip.Tip="The team's: in .harness/knowledge.toml, shared through Git">
+          <TextBlock Text="PROJECT" />
+        </Border>
+        <Border Classes="tag removed" IsVisible="{Binding IsRemoved}"
+                ToolTip.Tip="A Git change took it out of .harness/knowledge.toml: keep it local or retire it in the Inbox">
+          <TextBlock Text="removed from project" />
+        </Border>
+        <TextBlock Classes="small mono" Text="{Binding ScopeText}" IsVisible="{Binding ShowsScope}" VerticalAlignment="Center" />
+        <TextBlock Classes="muted small" Text="{Binding Provenance}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </WrapPanel>
+      <TextBlock Classes="small" Text="{Binding OverridesText}" TextWrapping="Wrap"
+                 IsVisible="{Binding OverridesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Classes="small" Text="{Binding OverriddenText}" TextWrapping="Wrap"
+                 IsVisible="{Binding OverriddenText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Classes="small" Text="{Binding SupersededText}" TextWrapping="Wrap"
+                 IsVisible="{Binding SupersededText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <WrapPanel ItemSpacing="6" LineSpacing="6">
+        <Button Classes="ghost small" Content="Correct" Command="{Binding CorrectCommand}" IsVisible="{Binding CanChange}" />
+        <Button Classes="ghost small" Content="Retire" Command="{Binding RetireCommand}" IsVisible="{Binding CanChange}" />
+        <Button Classes="ghost small" Content="Promote" Command="{Binding PromoteCommand}" IsVisible="{Binding CanPromote}"
+                ToolTip.Tip="Record it for a workspace or for all your projects" />
+        <Button Classes="ghost small" Content="{Binding ShareLabel}" Command="{Binding ShareCommand}" IsVisible="{Binding CanShare}"
+                ToolTip.Tip="{Binding ShareTip}" />
+        <Button Classes="ghost small" Content="History" Command="{Binding HistoryCommand}" />
+      </WrapPanel>
+      <TextBlock Classes="error" Text="{Binding HistoryError}" IsVisible="{Binding HistoryError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <Border Classes="inset" IsVisible="{Binding HistoryShown}">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="label" Text="Versions (oldest first)" IsVisible="{Binding HasVersions}" />
+          <ItemsControl ItemsSource="{Binding Versions}" IsVisible="{Binding HasVersions}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:HistoryLine">
+                <SelectableTextBlock Classes="small" FontWeight="{Binding This, Converter={x:Static c:Converters.Bold}}" TextWrapping="Wrap">
+                  <Run Text="{Binding Text, Mode=OneWay}" /><Run Classes="mono" Text="{Binding Code, Mode=OneWay, StringFormat=' {0}'}" />
+                </SelectableTextBlock>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="label" Text="Audit trail" />
+          <ItemsControl ItemsSource="{Binding Trail}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:HistoryLine">
+                <StackPanel>
+                  <SelectableTextBlock Classes="small" TextWrapping="Wrap">
+                    <Run Text="{Binding Text, Mode=OneWay}" /><Run Classes="mono" Text="{Binding Code, Mode=OneWay, StringFormat=' → {0}'}" />
+                  </SelectableTextBlock>
+                  <SelectableTextBlock Classes="muted small" Text="{Binding Detail}" TextWrapping="Wrap" IsVisible="{Binding HasDetail}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </Border>
+</UserControl>

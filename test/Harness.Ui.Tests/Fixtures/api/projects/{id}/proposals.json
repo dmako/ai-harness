@@ -1,0 +1,15 @@
+{
+  "proposals": [
+    {
+      "id": "prop_489c48357aaf7443",
+      "type": "decision",
+      "content": "Live updates use Server-Sent Events, not WebSocket",
+      "scope": "project",
+      "source_ref": "src/LiveUpdates.cs",
+      "proposed_by": "agent:test",
+      "status": "pending",
+      "created_at": "2026-11-13T09:00:00Z",
+      "rationale": "seen in the code"
+    }
+  ]
+}

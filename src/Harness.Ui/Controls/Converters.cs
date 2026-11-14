@@ -17,6 +17,10 @@ public static class Converters
     /// <summary>A group's open state as its chevron: open points down, closed points right.</summary>
     public static IValueConverter Chevron { get; } = new FuncValueConverter<bool, string>(open => open ? "▾" : "▸");
 
+    /// <summary>true is semibold (the current one of a list), false normal.</summary>
+    public static IValueConverter Bold { get; } =
+        new FuncValueConverter<bool, Avalonia.Media.FontWeight>(on => on ? Avalonia.Media.FontWeight.SemiBold : Avalonia.Media.FontWeight.Normal);
+
     /// <summary>Whether the value's text is the parameter's (a style class for one state, one page).</summary>
     public static IValueConverter Is { get; } = new EqualsConverter();
 

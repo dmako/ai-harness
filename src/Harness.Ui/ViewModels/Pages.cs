@@ -221,6 +221,7 @@ public sealed partial class ProjectPage : PageViewModel
         Project = project;
         (Body as OverviewViewModel)?.Update(project);
         (Body as WorkViewModel)?.Update(project, route);
+        (Body as KnowledgeViewModel)?.Update(project, route);
         Tabs.Clear();
         foreach (var tab in TabsOf(project, route.View))
         {
@@ -235,6 +236,7 @@ public sealed partial class ProjectPage : PageViewModel
         if (View == route.View && Body is not null)
         {
             (Body as WorkViewModel)?.Show(route);
+            (Body as KnowledgeViewModel)?.Show(route);
             return;
         }
         View = route.View;
@@ -291,6 +293,12 @@ public sealed partial class ProjectPage : PageViewModel
             overview.Start();
             return overview;
         }
+        if (route.View is "knowledge")
+        {
+            var knowledge = new KnowledgeViewModel(_services, Project, route);
+            knowledge.Start();
+            return knowledge;
+        }
         if (route.View is "work")
         {
             var work = new WorkViewModel(_services, Project, route);
@@ -300,7 +308,6 @@ public sealed partial class ProjectPage : PageViewModel
         var (label, task) = route.View switch
         {
             "architecture" => ("Architecture", "TASK-0156"),
-            "knowledge" => ("Knowledge", "TASK-0153"),
             _ => ("Agents", "TASK-0154"),
         };
         return new PlaceholderPage(label, task, _services.Host.Current(route));
@@ -380,8 +387,24 @@ public sealed partial class WorkspacePage : PageViewModel
             Tabs,
             Route.WorkspaceViews.Select(v => new TabItem(v.View, v.Label, Route.WorkspaceHref(workspace.Name, v.View), 0, v.View == route.View))
         );
-        if (Body is not PlaceholderPage { } shown || shown.Title != Label(route.View))
+        if (route.View is "knowledge")
         {
+            if (Body is not LevelKnowledgeViewModel)
+            {
+                (Body as IDisposable)?.Dispose();
+                var knowledge = new LevelKnowledgeViewModel(
+                    _services,
+                    "workspace:" + workspace.Name,
+                    "Knowledge for every project of this workspace: it applies to each of them unless a project states otherwise (then the project's own takes precedence)."
+                );
+                knowledge.Follow(_services.Live);
+                _ = knowledge.LoadAsync();
+                Body = knowledge;
+            }
+        }
+        else if (Body is not PlaceholderPage { } shown || shown.Title != Label(route.View))
+        {
+            (Body as IDisposable)?.Dispose();
             Body = new PlaceholderPage(Label(route.View), "TASK-0158", _services.Host.Current(route));
         }
     }
@@ -399,6 +422,15 @@ public sealed partial class WorkspacePage : PageViewModel
         {
             _services.Host.Navigation.Replace(Route.WorkspaceHref(renamed));
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            (Body as IDisposable)?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     private static string Label(string view) => Route.WorkspaceViews.FirstOrDefault(v => v.View == view).Label ?? "Overview";

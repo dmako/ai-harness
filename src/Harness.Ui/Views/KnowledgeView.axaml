@@ -1,0 +1,181 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.KnowledgeView"
+             x:DataType="vm:KnowledgeViewModel">
+  <!-- a project's Knowledge (app.js "knowledge"): Memories or Inbox by the address -->
+  <StackPanel>
+    <Border Classes="subnav">
+      <ItemsControl ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TabItem">
+            <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}" AutomationProperties.Name="{Binding Label}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Label}" />
+                <Border Classes="badge" IsVisible="{Binding HasBadge}"><TextBlock Text="{Binding Badge}" /></Border>
+              </StackPanel>
+            </c:AppLink>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <views:SectionView Name="MemoriesSection" DataContext="{Binding Memories}"
+                       IsVisible="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).ShowsMemories}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:ProjectMemories" Spacing="12">
+          <Button Name="AddKnowledge" Classes="primary" Content="Add knowledge" Command="{Binding AddCommand}" HorizontalAlignment="Left" />
+          <!-- what applies here? -->
+          <Border Classes="card" Padding="14,10" DataContext="{Binding Applies}">
+            <StackPanel Spacing="8" x:DataType="vm:AppliesPanel">
+              <WrapPanel ItemSpacing="8" LineSpacing="6">
+                <TextBlock FontWeight="SemiBold" Text="What applies here?" VerticalAlignment="Center" />
+                <TextBox Name="AppliesScope" Text="{Binding Scope}" MinWidth="200" MaxWidth="420"
+                         PlaceholderText="path:src/ui, subsystem:sync or branch:main" AutomationProperties.Name="Scope" />
+                <Button Content="Show" Command="{Binding ShowCommand}" />
+                <Button Classes="ghost" Content="Clear" Command="{Binding ClearCommand}" />
+              </WrapPanel>
+              <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="hint" Text="{Binding Heading}" IsVisible="{Binding HasResult}" />
+              <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasResult}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MemoryGroup"><views:MemoryGroupView /></DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+          <!-- the type bar: the one type filter, a segment per type with memories -->
+          <ItemsControl Name="TypeBar" ItemsSource="{Binding Bar}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TypeFilter">
+                <ToggleButton Classes="chip" IsChecked="{Binding On}" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Label}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Swatch BrushKey="{Binding Brush}" Size="8" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Count}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Label}" />
+                  </StackPanel>
+                </ToggleButton>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <WrapPanel ItemSpacing="10" LineSpacing="6">
+            <TextBox Name="Search" Text="{Binding Query}" PlaceholderText="Search memories" MinWidth="200" AutomationProperties.Name="Search memories" />
+            <ComboBox Name="ScopePicker" ItemsSource="{Binding Scopes}" SelectedItem="{Binding Scope}" MinWidth="160" MaxWidth="320"
+                      AutomationProperties.Name="Scope" />
+            <CheckBox Name="Inactive" IsChecked="{Binding IncludeInactive}" Content="include superseded and expired" />
+            <TextBlock Classes="hint" Text="{Binding Summary}" VerticalAlignment="Center" Margin="0" />
+          </WrapPanel>
+          <TextBlock Classes="empty" Text="{Binding Empty}" IsVisible="{Binding Empty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <ItemsControl Name="Groups" ItemsSource="{Binding Groups}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MemoryGroup"><views:MemoryGroupView /></DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <views:SectionView Name="InboxSection" DataContext="{Binding Inbox}"
+                       IsVisible="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).ShowsInbox}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:MemoryInbox" Spacing="12">
+          <StackPanel Spacing="8" IsVisible="{Binding HasRemoved}">
+            <TextBlock Classes="h3" Text="Removed from project knowledge" />
+            <ItemsControl Name="Removed" ItemsSource="{Binding Removed}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RemovedCard">
+                  <Border Classes="mem" c:StyleClass.Name="{Binding Memory.Type, StringFormat='ty-{0}'}">
+                    <StackPanel Spacing="4">
+                      <SelectableTextBlock TextWrapping="Wrap">
+                        <Run FontWeight="SemiBold" Text="{Binding Lead, Mode=OneWay}" /><Run Text="{Binding Rest, Mode=OneWay, StringFormat=' {0}'}" />
+                      </SelectableTextBlock>
+                      <TextBlock Classes="muted small" Text="{Binding Meta}" TextWrapping="Wrap" />
+                      <TextBlock Classes="hint" Text="A Git change took it out of .harness/knowledge.toml. It still applies here until you decide." />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="primary" Content="Keep as local"
+                                Command="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).Inbox.KeepCommand}" CommandParameter="{Binding}" />
+                        <Button Content="Retire"
+                                Command="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).Inbox.RetireRemovedCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="h3" Text="Proposals" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding StatusChips}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FilterChip">
+                <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Classes="card" Padding="14,10" IsVisible="{Binding InboxZero}">
+            <DockPanel>
+              <c:Icon DockPanel.Dock="Left" Classes="lv" Kind="inbox" />
+              <StackPanel>
+                <TextBlock FontWeight="SemiBold" Text="Inbox zero" />
+                <TextBlock Classes="muted small" TextWrapping="Wrap" Text="No proposal waits for you: agents' suggestions appear here for you to approve." />
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <TextBlock Classes="empty" Text="{Binding Empty}" IsVisible="{Binding Empty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <ItemsControl Name="Proposals" ItemsSource="{Binding Proposals}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ProposalItem">
+                <Border Classes="mem" c:StyleClass.Name="{Binding Proposal.Type, StringFormat='ty-{0}'}" Classes.inactive="{Binding Rejected}">
+                  <StackPanel Spacing="4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <c:Swatch BrushKey="{Binding Brush}" Size="8" VerticalAlignment="Center" />
+                      <TextBlock Classes="label" Text="{Binding Kind}" />
+                    </StackPanel>
+                    <SelectableTextBlock Text="{Binding Proposal.Content}" TextWrapping="Wrap" />
+                    <SelectableTextBlock TextWrapping="Wrap" IsVisible="{Binding HasRationale}">
+                      <Run FontWeight="SemiBold" Text="Why: " /><Run Text="{Binding Proposal.Rationale, Mode=OneWay}" />
+                    </SelectableTextBlock>
+                    <TextBlock Classes="muted small" Text="{Binding Provenance}" TextWrapping="Wrap" />
+                    <StackPanel Spacing="2" IsVisible="{Binding HasSimilar}">
+                      <TextBlock Classes="label" TextWrapping="Wrap"
+                                 Text="Resembles current memories (approving asks whether to replace one or keep both):" />
+                      <ItemsControl ItemsSource="{Binding Similar}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String"><TextBlock Classes="small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                    <WrapPanel ItemSpacing="8" LineSpacing="6" IsVisible="{Binding Pending}">
+                      <Button Classes="primary" Content="Approve"
+                              Command="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).Inbox.ApproveCommand}" CommandParameter="{Binding}" />
+                      <Button Content="Edit and approve"
+                              Command="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).Inbox.EditAndApproveCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="ghost" Content="Reject"
+                              Command="{Binding $parent[views:KnowledgeView].((vm:KnowledgeViewModel)DataContext).Inbox.RejectCommand}" CommandParameter="{Binding}" />
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+  </StackPanel>
+</UserControl>

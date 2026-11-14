@@ -33,6 +33,7 @@ public sealed class UiContractTests
             "/api/workspaces",
             new JsonObject { ["name"] = "main", ["title"] = "Main workspace", ["project_ids"] = new JsonArray(id) }
         );
+        await UiFixtureShapeTests.KnowledgeAsync(server);
         var api = new HarnessApi(server.Client) { Origin = "http://" + server.Client.BaseAddress!.Authority };
 
         // projects and workspaces
@@ -144,6 +145,51 @@ public sealed class UiContractTests
             .Awaiting(() => api.EditTaskAsync(id, "TASK-0003", new TaskForm { Title = "Claimed" }, Token))
             .Should()
             .ThrowAsync<HarnessApiException>("a claimed task's definition is fixed");
+
+        // Knowledge: a project's memories with the levels', what applies, a memory's history, the proposals, the
+        // levels themselves, and every write
+        var memories = (await api.MemoriesAsync(id, null, inactive: true, Token)).Memories;
+        memories.Select(m => m.Scope).Should().Contain(["project", "path:src/Harness.Ui", "user", "workspace:main"]);
+        var decision = memories.Single(m => m.Type == "decision" && m.Scope == "project");
+        decision.SourceType.Should().Be("user");
+        var superseded = memories.Single(m => m.Content == "The old warning");
+        superseded.SupersededBy.Should().NotBeNullOrEmpty();
+        (await api.MemoriesAsync(id, "compiled", inactive: false, Token)).Memories.Should().ContainSingle(m => m.Type == "convention");
+        (await api.MemoriesAsync(id, null, false, Token, removed: true)).Memories.Should().BeEmpty();
+        var history = await api.MemoryAsync(id, superseded.SupersededBy, null, Token);
+        history.History.Select(m => m.Content).Should().Equal("The old warning", "The corrected warning");
+        history.Events.Should().NotBeEmpty();
+        var applies = await api.AppliesAsync(id, "path:src/Harness.Ui", Token);
+        applies.Decisions.Should().Contain(m => m.Content == "Views use compiled bindings.");
+        var memoryProposal = (await api.MemoryProposalsAsync(id, "pending", Token)).Proposals.Should().ContainSingle().Subject;
+        memoryProposal.Rationale.Should().Be("seen in the code");
+        var user = await api.LevelAsync("user", Token);
+        user.Memories.Should().ContainSingle(m => m.Content == "Write commit messages as one line" && m.SourceRef == "review");
+        (await api.LevelAsync("workspace:main", Token)).Memories.Should().ContainSingle(m => m.Content == "The workspace ships together");
+        (await api.MemoryAsync(null, user.Memories[0].Id, "user", Token)).Memory.Scope.Should().Be("user");
+
+        var added = await api.AddMemoryAsync(id, new MemoryAdd { Type = "fact", Content = "Tenant ids come from a table", Scope = "subsystem:tenants", SourceRef = "wiki" }, Token);
+        (added.Status, added.Memory!.Scope, added.Memory.SourceRef).Should().Be(("created", "subsystem:tenants", "wiki"));
+        await api.ChangeMemoryAsync(id, added.Memory.Id, new MemoryChange { Content = "Tenant ids come from the tenants table", Reason = "precise" }, Token);
+        var corrected = (await api.MemoriesAsync(id, "tenants table", false, Token)).Memories.Single();
+        await api.ChangeMemoryAsync(id, corrected.Id, new MemoryChange { Reason = "test complete" }, Token);
+        var dry = await api.PromoteAsync(id, decision.Id, new Promotion { To = "user", DryRun = true }, Token);
+        (dry.Status, dry.Level).Should().Be(("would_create", "user"));
+        var shared = await api.ShareAsync(id, decision.Id, share: true, Token);
+        shared.Shared.Should().Be("project");
+        (await api.ShareAsync(id, decision.Id, share: false, Token)).Shared.Should().NotBe("project");
+        var levelAdded = await api.AddMemoryAsync(null, new MemoryAdd { Type = "warning", Content = "Never push on Fridays", Level = "user", SourceRef = "team rule" }, Token);
+        levelAdded.Memory!.SourceRef.Should().Be("team rule", "the level endpoint takes source_ref as every other write does");
+        await api.ChangeMemoryAsync(null, levelAdded.Memory.Id, new MemoryChange { Content = "Never deploy on Fridays", Reason = "deploy, not push", Level = "user" }, Token);
+        // approved at once, or first asked which current memory it replaces
+        var approval = await api.ApproveMemoryAsync(id, memoryProposal.Id, new ProposalApproval(), Token);
+        if (approval.Status is "needs_decision")
+        {
+            approval.Similar.Should().NotBeNullOrEmpty();
+            approval = await api.ApproveMemoryAsync(id, memoryProposal.Id, new ProposalApproval { KeepBoth = true }, Token);
+        }
+        approval.Status.Should().NotBe("needs_decision");
+        (await api.MemoryProposalsAsync(id, "approved", Token)).Proposals.Should().ContainSingle(p => p.MemoryId != null);
 
         // the docs
         var docs = await api.DocsAsync(Token);

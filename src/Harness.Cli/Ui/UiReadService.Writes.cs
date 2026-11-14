@@ -553,7 +553,7 @@ internal sealed partial class UiReadService : IUiWriteApi
     {
         var adding = request.Route.Endpoint is "/api/knowledge/memories";
         var fields = adding
-            ? new UiWriteBody(request.Body, "level", "type", "content", "SourceRef")
+            ? new UiWriteBody(request.Body, "level", "type", "content", "source_ref", "SourceRef")
             : new UiWriteBody(request.Body, "level", "content", "reason");
         var scope = Wider(fields.Text("level"));
         var type = adding ? MemoryText.ParseType(fields.Text("type")) : "";
@@ -570,7 +570,9 @@ internal sealed partial class UiReadService : IUiWriteApi
                 ? RetireMemory(store, request.Route.Value("mid"), request.Body, scope, token)
                 : CorrectMemory(store, request.Route.Value("mid"), request.Body, scope, token);
         }
-        var reference = string.IsNullOrWhiteSpace(fields.Text("SourceRef")) ? "harness ui" : fields.Text("SourceRef");
+        // source_ref as every other write names it (SourceRef as this endpoint first took it)
+        var given = fields.Text("source_ref") is { Length: > 0 } snake ? snake : fields.Text("SourceRef");
+        var reference = string.IsNullOrWhiteSpace(given) ? "harness ui" : given;
         var result = store.Put(
             new()
             {

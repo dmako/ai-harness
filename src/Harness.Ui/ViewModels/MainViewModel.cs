@@ -160,7 +160,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 Replace(new MessagePage($"There is no workspace {route.Workspace} on this machine."));
                 break;
             case "knowledge":
-                Replace(new PlaceholderPage("Your knowledge", "TASK-0153", Services.Host.Current(route)));
+                if (Page is not UserKnowledgePage)
+                {
+                    Replace(new UserKnowledgePage(Services));
+                }
                 break;
             case "machine" or "search" or "docs":
                 Replace(
