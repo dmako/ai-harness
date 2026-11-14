@@ -51,4 +51,47 @@
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
     <Setter Property="Padding" Value="14,10" />
   </Style>
+
+  <!-- the build map's members (app.js .dep-node2): focused, used, using, dimmed, in a cycle, a library -->
+  <Style Selector="Button.dnode">
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+  </Style>
+  <Style Selector="Button.dnode.lib">
+    <Setter Property="BorderBrush" Value="{DynamicResource Axis}" />
+  </Style>
+  <Style Selector="Button.dnode.cycle">
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+  </Style>
+  <Style Selector="Button.dnode.focus">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+  <Style Selector="Button.dnode.uses">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.dnode.usedby">
+    <Setter Property="BorderBrush" Value="{DynamicResource CConvention}" />
+  </Style>
+  <Style Selector="Button.dnode.dim">
+    <Setter Property="Background" Value="{DynamicResource Page}" />
+  </Style>
+  <Style Selector="Button.dnode.dim TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+
+  <!-- a design issue in the list (app.js .irow): the one shown is marked -->
+  <Style Selector="ToggleButton.irow">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Margin" Value="0,0,0,2" />
+  </Style>
+  <Style Selector="ToggleButton.irow:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
 </Styles>

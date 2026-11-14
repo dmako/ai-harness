@@ -1,0 +1,343 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.WorkspaceArchitectureView"
+             x:DataType="vm:WorkspaceArchitectureViewModel">
+  <!-- a workspace's Architecture (app.js workspaceView "architecture"): Runtime: calls, Build: packages, or Libraries -->
+  <StackPanel>
+    <Border Classes="subnav">
+      <ItemsControl ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TabItem">
+            <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}" Content="{Binding Label}"
+                       AutomationProperties.Name="{Binding Label}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <!-- Runtime: calls -->
+    <views:SectionView Name="SystemSection" DataContext="{Binding System}" IsVisible="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).ShowsRuntime}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:SystemSection" Spacing="12">
+          <Border Classes="card" Padding="14,10">
+            <StackPanel Spacing="4">
+              <TextBlock Name="SystemSummary" TextWrapping="Wrap">
+                <Run FontWeight="SemiBold" Text="{Binding Summary, Mode=OneWay}" /><Run Classes="muted" Text="{Binding SummaryMore, Mode=OneWay}" />
+              </TextBlock>
+              <TextBlock Classes="muted small" TextWrapping="Wrap"
+                         Text="What the code and configuration declare, not a running system: gRPC contracts and who serves and uses them, the services each configuration names, databases from the code's contexts, messaging libraries. No addresses: they belong to an environment. Package dependencies are the Build lens." />
+            </StackPanel>
+          </Border>
+
+          <StackPanel Classes="section" Spacing="6">
+            <TextBlock Classes="h3" Text="System smells" />
+            <TextBlock Classes="hint" Text="Between the services, each with the files that show it. Chatty is a heuristic." TextWrapping="Wrap" />
+            <views:FindingsView Name="SystemFindings" DataContext="{Binding Board}" />
+          </StackPanel>
+
+          <StackPanel Classes="section" Spacing="8">
+            <TextBlock Classes="h3" Text="Communication" />
+            <TextBlock Classes="hint" TextWrapping="Wrap"
+                       Text="Who calls whom and how: callers above the services they call, lines pointing from the caller. Each service shows the databases its code owns." />
+            <ItemsControl ItemsSource="{Binding Legend}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="14" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StyleKey">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Swatch BrushKey="{Binding Tone}" VerticalAlignment="Center" />
+                    <TextBlock Classes="small" Text="{Binding Label}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="empty" Text="No service found in the members' code." IsVisible="{Binding !HasMap}" />
+            <Grid Name="SystemGrid" c:SidePanel.Follows="True" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" IsVisible="{Binding HasMap}">
+              <c:LayerGraph Name="SystemGraph" Rows="{Binding Rows}" Edges="{Binding Edges}" Selected="{Binding Selected}" Margin="0,0,12,0" />
+              <Border Name="SystemSide" Grid.Column="1" Classes="side" Width="300" VerticalAlignment="Top">
+                <StackPanel Spacing="6">
+                  <StackPanel Spacing="4" IsVisible="{Binding NoSelection}">
+                    <TextBlock Classes="label" Text="Services" />
+                    <ItemsControl ItemsSource="{Binding Services}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ServiceLine">
+                          <StackPanel Spacing="1" Margin="0,2">
+                            <Button Classes="ghost small" Content="{Binding Name}" HorizontalAlignment="Left"
+                                    Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).System.PickCommand}"
+                                    CommandParameter="{Binding Id}" />
+                            <TextBlock Classes="muted small" Text="{Binding Line}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="hint" Text="Select a service for how it calls (gRPC contracts, HTTP, messaging) and where in the code." TextWrapping="Wrap" />
+                  </StackPanel>
+                  <StackPanel Spacing="6" IsVisible="{Binding HasSelection}">
+                    <TextBlock Name="SystemSelected" Classes="h3" Text="{Binding SelectedName}" TextWrapping="Wrap" />
+                    <TextBlock Classes="muted small" Text="{Binding SelectedKind}" TextWrapping="Wrap" />
+                    <c:AppLink Classes="link small" Href="{Binding SelectedHref}" Content="Its project architecture →" IsVisible="{Binding HasSelectedHref}" />
+                    <TextBlock Classes="label" Text="{Binding CallsHead}" IsVisible="{Binding HasCalls}" />
+                    <ItemsControl ItemsSource="{Binding Calls}" ItemTemplate="{StaticResource CallTemplate}" />
+                    <TextBlock Classes="label" Text="{Binding CalledByHead}" IsVisible="{Binding HasCalledBy}" />
+                    <ItemsControl ItemsSource="{Binding CalledBy}" ItemTemplate="{StaticResource CallTemplate}" />
+                    <TextBlock Classes="label" Text="{Binding DatabasesHead}" IsVisible="{Binding HasDatabases}" />
+                    <ItemsControl ItemsSource="{Binding Databases}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DatabaseRow">
+                          <StackPanel Spacing="1" Margin="0,2">
+                            <TextBlock Classes="small" FontWeight="SemiBold" Text="{Binding Name}" />
+                            <TextBlock Classes="muted small" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted small" Text="{Binding Declared}" IsVisible="{Binding HasDeclared}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </Grid>
+            <TextBlock Classes="muted small" Text="{Binding Silent}" IsVisible="{Binding HasSilent}" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Classes="section" Spacing="6" IsVisible="{Binding HasContracts}">
+            <TextBlock Classes="h3" Text="gRPC contracts" />
+            <TextBlock Classes="hint" Text="Who uses whose service contracts: the caller, the member serving them, and each contract." TextWrapping="Wrap" />
+            <ItemsControl Name="ContractPairs" ItemsSource="{Binding Pairs}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ContractPair">
+                  <Border Classes="card" Padding="14,10" Margin="0,0,0,8">
+                    <StackPanel Spacing="6">
+                      <TextBlock TextWrapping="Wrap">
+                        <Run FontWeight="SemiBold" Text="{Binding Clients, Mode=OneWay}" /><Run Text=" → " /><Run FontWeight="SemiBold" Text="{Binding Servers, Mode=OneWay}" /><Run Classes="muted" Text="{Binding Line, Mode=OneWay}" />
+                      </TextBlock>
+                      <ItemsControl ItemsSource="{Binding Contracts}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String"><Border Classes="tag"><TextBlock Classes="mono small" Text="{Binding}" /></Border></DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Expander IsVisible="{Binding HasIdle}" HorizontalAlignment="Stretch">
+              <Expander.Header><TextBlock Text="{Binding IdleHead}" TextWrapping="Wrap" /></Expander.Header>
+              <ItemsControl ItemsSource="{Binding Idle}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ContractRow">
+                    <Border Classes="trow">
+                      <StackPanel Spacing="2">
+                        <SelectableTextBlock Classes="mono small" Text="{Binding Name}" ToolTip.Tip="{Binding Declared}" TextWrapping="Wrap" />
+                        <TextBlock Classes="muted small" TextWrapping="Wrap">
+                          <Run Text="declared in " /><Run Text="{Binding Owner, Mode=OneWay}" /><Run Text=" · served by " /><Run Text="{Binding Servers, Mode=OneWay}" /><Run Text=" · used by " /><Run Text="{Binding Clients, Mode=OneWay}" />
+                        </TextBlock>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Expander>
+          </StackPanel>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <!-- Build: packages -->
+    <views:SectionView Name="BuildSection" DataContext="{Binding Build}" IsVisible="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).ShowsBuild}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:BuildSection" Spacing="10">
+          <TextBlock Classes="hint" Text="{Binding MapHint}" TextWrapping="Wrap" />
+          <TextBlock Classes="empty" Text="{Binding Empty}" IsVisible="{Binding HasEmpty}" />
+          <StackPanel Spacing="10" IsVisible="{Binding HasMap}">
+            <WrapPanel ItemSpacing="10" LineSpacing="8">
+              <TextBox Name="BuildFilter" Text="{Binding Filter}" PlaceholderText="Filter projects" Width="220" AutomationProperties.Name="Filter projects" />
+              <CheckBox Name="Indirect" IsChecked="{Binding Indirect}" Content="include indirect" />
+            </WrapPanel>
+            <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding HasFoundations}">
+              <TextBlock Classes="label" Text="Foundations" VerticalAlignment="Center" />
+              <ItemsControl ItemsSource="{Binding Foundations}" ItemTemplate="{StaticResource ChipTemplate}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
+              <TextBlock Classes="hint" Text="used by most members, so their arrows are left out of the map" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </WrapPanel>
+            <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding HasCycles}">
+              <TextBlock Classes="label" Text="Cycles" VerticalAlignment="Center" />
+              <ItemsControl Name="Cycles" ItemsSource="{Binding Cycles}" ItemTemplate="{StaticResource ChipTemplate}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
+              <TextBlock Classes="hint" Text="projects that use each other; click to see how" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </WrapPanel>
+            <Grid Name="BuildGrid" c:SidePanel.Follows="True" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+              <Border Classes="card" Padding="8" Margin="0,0,12,0">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                  <c:DependencyMap Name="BuildMap" Model="{Binding Model}" Focused="{Binding Focused}" Indirect="{Binding Indirect}" Filter="{Binding Filter}" />
+                </ScrollViewer>
+              </Border>
+              <Border Name="BuildSide" Grid.Column="1" Classes="side" Width="300" VerticalAlignment="Top">
+                <StackPanel Spacing="6">
+                  <StackPanel Spacing="4" IsVisible="{Binding NoFocus}">
+                    <TextBlock Classes="hint" Text="Click a project to see what it uses and what uses it." TextWrapping="Wrap" />
+                    <TextBlock Classes="hint" Text="Projects with a dashed red border depend on each other in a cycle." IsVisible="{Binding HasCyclesHint}" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <StackPanel Spacing="6" IsVisible="{Binding HasFocus}">
+                    <DockPanel>
+                      <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding ClearCommand}" ToolTip.Tip="Stop highlighting it (Esc)"
+                              AutomationProperties.Name="Stop highlighting it">
+                        <c:Icon Kind="close" />
+                      </Button>
+                      <TextBlock Name="BuildFocus" Classes="h3" Text="{Binding FocusName}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <c:AppLink Classes="link small" Href="{Binding FocusHref}" Content="Open project →" />
+                    <TextBlock Classes="small" Text="{Binding CycleNote}" IsVisible="{Binding HasCycleNote}" TextWrapping="Wrap" />
+                    <TextBlock TextWrapping="Wrap">
+                      <Run FontWeight="SemiBold" Text="{Binding UsesHead, Mode=OneWay}" /><Run Classes="muted" Text="{Binding UsesNote, Mode=OneWay}" />
+                    </TextBlock>
+                    <ItemsControl Name="BuildUses" ItemsSource="{Binding Uses}" ItemTemplate="{StaticResource DepTemplate}" />
+                    <TextBlock TextWrapping="Wrap">
+                      <Run FontWeight="SemiBold" Text="{Binding UsedByHead, Mode=OneWay}" /><Run Classes="muted" Text=" · projects referencing its packages" />
+                    </TextBlock>
+                    <ItemsControl Name="BuildUsedBy" ItemsSource="{Binding UsedBy}" ItemTemplate="{StaticResource DepTemplate}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <!-- Libraries -->
+    <views:SectionView Name="LibrariesSection" DataContext="{Binding Libraries}" IsVisible="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).ShowsLibraries}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:LibrariesSection" Spacing="10">
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="Projects whose packages other projects use, and how much of each is used: read from the manifests and the code's imports." />
+          <TextBlock Classes="empty" Text="No project here uses another project's packages." IsVisible="{Binding IsEmpty}" />
+          <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding !IsEmpty}">
+            <ItemsControl Name="Libraries" ItemsSource="{Binding Libraries}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LibraryChoice">
+                  <ToggleButton Classes="chip" IsChecked="{Binding Selected, Mode=OneWay}"
+                                Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).Libraries.PickCommand}"
+                                CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
+                    <TextBlock><Run Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+                  </ToggleButton>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </WrapPanel>
+          <TextBlock Classes="empty" Text="{Binding DetailMessage}" IsVisible="{Binding HasDetailMessage}" TextWrapping="Wrap" />
+          <StackPanel Spacing="8" IsVisible="{Binding HasDetail}">
+            <TextBlock Name="LibraryTitle" Classes="h3" Text="{Binding Library.Label, FallbackValue=''}" />
+            <TextBlock Name="LibrarySummary" Text="{Binding Summary}" TextWrapping="Wrap" />
+            <TextBlock Classes="label" Text="Who uses what" />
+            <TextBlock Classes="hint" TextWrapping="Wrap"
+                       Text="A mark where a project references the package in its manifest; below, how many of its code files import the library and its own copies of the library's types." />
+            <Border Classes="card" Padding="8">
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="2">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Classes="th" Text="package" Width="220" />
+                    <ItemsControl ItemsSource="{Binding Columns}" ItemTemplate="{StaticResource HeadCell}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <TextBlock Classes="th" Text="used by" Width="90" />
+                  </StackPanel>
+                  <ItemsControl Name="LibraryMatrix" ItemsSource="{Binding Packages}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PackageUseRow">
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                          <TextBlock Classes="mono small" Classes.muted="{Binding Unused}" Text="{Binding Name}" Width="220" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                          <ItemsControl ItemsSource="{Binding Cells}" ItemTemplate="{StaticResource Cell}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                          </ItemsControl>
+                          <TextBlock Classes="small" Text="{Binding UsedBy}" Width="90" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Classes="small" FontWeight="SemiBold" Text="files importing" Width="220" />
+                    <ItemsControl ItemsSource="{Binding Imports}" ItemTemplate="{StaticResource Cell}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Classes="small" FontWeight="SemiBold" Text="own copies of its types" Width="220" />
+                    <ItemsControl ItemsSource="{Binding Copies}" ItemTemplate="{StaticResource Cell}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+            <TextBlock Classes="hint" Text="{Binding NotUsing}" IsVisible="{Binding HasNotUsing}" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+  </StackPanel>
+
+  <UserControl.Resources>
+    <DataTemplate x:Key="HeadCell" x:DataType="x:String">
+      <TextBlock Classes="th" Text="{Binding}" Width="110" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding}" />
+    </DataTemplate>
+    <DataTemplate x:Key="Cell" x:DataType="x:String">
+      <TextBlock Classes="small" Text="{Binding}" Width="110" />
+    </DataTemplate>
+    <DataTemplate x:Key="ChipTemplate" x:DataType="vm:DepChip">
+      <Button Classes="ghost small" Content="{Binding Text}"
+              Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).Build.PickCommand}"
+              CommandParameter="{Binding Id}" />
+    </DataTemplate>
+    <DataTemplate x:Key="DepTemplate" x:DataType="vm:DepLink">
+      <StackPanel Spacing="1" Margin="0,2">
+        <WrapPanel ItemSpacing="4">
+          <Button Classes="ghost small" Content="{Binding Name}"
+                  Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).Build.PickCommand}"
+                  CommandParameter="{Binding Id}" />
+          <TextBlock Classes="muted small" Text="(indirect)" IsVisible="{Binding Indirect}" VerticalAlignment="Center" />
+        </WrapPanel>
+        <TextBlock Classes="muted small" Text="{Binding Packages}" IsVisible="{Binding HasPackages}" TextWrapping="Wrap" />
+        <TextBlock Classes="muted small" Text="{Binding Via}" IsVisible="{Binding HasVia}" TextWrapping="Wrap" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="CallTemplate" x:DataType="vm:CallRow">
+      <StackPanel Spacing="2" Margin="0,2">
+        <WrapPanel ItemSpacing="6">
+          <Button Classes="ghost small" Content="{Binding Name}"
+                  Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).System.PickCommand}"
+                  CommandParameter="{Binding Other}" />
+          <c:Swatch BrushKey="{Binding Tone}" VerticalAlignment="Center" />
+          <TextBlock Classes="small" Text="{Binding Style}" VerticalAlignment="Center" />
+        </WrapPanel>
+        <TextBlock Classes="muted small" Text="{Binding ContractsLine}" IsVisible="{Binding HasContracts}" TextWrapping="Wrap" />
+        <TextBlock Classes="muted small" Text="{Binding DeclaredLine}" IsVisible="{Binding HasDeclared}" TextWrapping="Wrap" />
+        <Expander Header="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
+          <ItemsControl ItemsSource="{Binding Link.Evidence}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Expander>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+</UserControl>

@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:api="using:Harness.Ui.Api"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.FindingsView"
+             x:DataType="vm:FindingsBoard">
+  <!-- findings with their triage (app.js smellsSection): by kind, marked ones on request, the gone ones folded -->
+  <StackPanel Spacing="6">
+      <CheckBox Name="ShowMarked" IsChecked="{Binding ShowMarked}" Content="{Binding MarkedLabel}" IsVisible="{Binding HasMarked}" />
+      <TextBlock Name="Snapshot" Classes="hint" Text="{Binding SnapshotLine}" TextWrapping="Wrap"
+                 IsVisible="{Binding HasSnapshot}" />
+      <TextBlock Classes="okay" Text="{Binding Okay}" TextWrapping="Wrap" IsVisible="{Binding !HasFindings}" />
+      <ItemsControl Name="Groups" ItemsSource="{Binding Groups}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:FindingGroup">
+            <StackPanel>
+              <!-- fewer than three: one by one -->
+              <ItemsControl ItemsSource="{Binding Shown}" ItemTemplate="{StaticResource FindingRowTemplate}" IsVisible="{Binding !IsGroup}" />
+              <!-- three or more: one row opening to the list -->
+              <Border Classes="smell" IsVisible="{Binding IsGroup}">
+                <Expander HorizontalAlignment="Stretch" AutomationProperties.Name="{Binding Title}">
+                  <Expander.Header>
+                    <StackPanel Spacing="2">
+                      <WrapPanel ItemSpacing="8">
+                        <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" Margin="0,2,0,0" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+                        <Border Classes="tag" IsVisible="{Binding HasFresh}"><TextBlock Classes="small" Text="{Binding FreshTag}" /></Border>
+                      </WrapPanel>
+                      <TextBlock Classes="muted small" Text="{Binding Summary}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Expander.Header>
+                  <StackPanel Spacing="6">
+                    <SelectableTextBlock Classes="small" Text="{Binding Why}" TextWrapping="Wrap" />
+                    <SelectableTextBlock Classes="small" Text="{Binding SameFixLine}" IsVisible="{Binding HasSameFix}" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FilterChip">
+                          <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Shown}" ItemTemplate="{StaticResource FindingRowTemplate}" />
+                    <Expander Header="{Binding MoreHead}" IsVisible="{Binding HasMore}" HorizontalAlignment="Stretch">
+                      <ItemsControl ItemsSource="{Binding More}" ItemTemplate="{StaticResource FindingRowTemplate}" />
+                    </Expander>
+                  </StackPanel>
+                </Expander>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Expander Name="Gone" Header="{Binding GoneHead}" IsVisible="{Binding HasGone}" HorizontalAlignment="Stretch">
+        <ItemsControl ItemsSource="{Binding Gone}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="api:Finding">
+              <WrapPanel ItemSpacing="8" Margin="0,2">
+                <TextBlock Classes="small" Text="{Binding Title}" TextWrapping="Wrap" />
+                <TextBlock Classes="muted small" Text="{Binding Mark.TaskId, FallbackValue=''}" />
+              </WrapPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Expander>
+  </StackPanel>
+
+  <UserControl.Resources>
+    <DataTemplate x:Key="FindingRowTemplate" x:DataType="vm:FindingRow">
+      <Border Classes="smell" Classes.quiet="{Binding Quiet}">
+        <StackPanel Spacing="4">
+          <WrapPanel ItemSpacing="8" LineSpacing="4">
+            <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" Margin="0,2,0,0" />
+            <SelectableTextBlock FontWeight="SemiBold" Text="{Binding Finding.Title}" TextWrapping="Wrap" />
+            <Border Classes="tag" IsVisible="{Binding Fresh}"><TextBlock Classes="small" Text="{Binding Finding.Status}" /></Border>
+            <Border Classes="tag" IsVisible="{Binding HasMark}"><TextBlock Classes="small" Text="{Binding MarkTag}" /></Border>
+            <TextBlock Classes="muted small" Text="{Binding Basis}" IsVisible="{Binding HasBasis}" VerticalAlignment="Center" />
+          </WrapPanel>
+          <TextBlock Classes="small" Text="{Binding Risk}" IsVisible="{Binding HasRisk}" TextWrapping="Wrap" />
+          <SelectableTextBlock Classes="small" Text="{Binding Finding.Why}" IsVisible="{Binding HasWhy}" TextWrapping="Wrap" />
+          <SelectableTextBlock Classes="small" Text="{Binding FixLine}" IsVisible="{Binding HasFix}" TextWrapping="Wrap" />
+          <SelectableTextBlock Classes="small" Text="{Binding RuleLine}" IsVisible="{Binding HasRule}" TextWrapping="Wrap" />
+          <Expander Header="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
+            <ItemsControl ItemsSource="{Binding Finding.Evidence}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Expander>
+          <TextBlock Classes="muted small" Text="{Binding FoundBy}" IsVisible="{Binding HasFoundBy}" TextWrapping="Wrap" />
+          <TextBlock Classes="small" Text="{Binding MarkStory}" IsVisible="{Binding HasMarkStory}" TextWrapping="Wrap" />
+          <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding Triaged}">
+            <Button Classes="ghost small" Content="{Binding MarkLabel}" IsVisible="{Binding CanMark}"
+                    Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).MarkCommand}" CommandParameter="{Binding}" />
+            <Button Classes="ghost small" Content="{Binding TaskLabel}" IsVisible="{Binding CanTask}"
+                    Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).TaskCommand}" CommandParameter="{Binding}" />
+            <Button Classes="ghost small" Content="{Binding ChangeLabel}" IsVisible="{Binding CanChangeKnowledge}"
+                    Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).ChangeKnowledgeCommand}" CommandParameter="{Binding}" />
+            <Button Classes="ghost small" Content="Retire it" IsVisible="{Binding CanRetireKnowledge}"
+                    Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).RetireKnowledgeCommand}" CommandParameter="{Binding}" />
+            <Button Classes="ghost small" Content="{Binding UnmarkLabel}" IsVisible="{Binding CanUnmark}"
+                    Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).UnmarkCommand}" CommandParameter="{Binding}" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+</UserControl>

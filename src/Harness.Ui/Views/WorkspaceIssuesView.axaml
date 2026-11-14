@@ -1,0 +1,279 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.WorkspaceIssuesView"
+             x:DataType="vm:WorkspaceIssuesViewModel">
+  <!-- a workspace's Issues (app.js workspaceView "issues"): Findings (rollup, design issues, shared code) or Version drift -->
+  <StackPanel>
+    <Border Classes="subnav">
+      <ItemsControl ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TabItem">
+            <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}" Content="{Binding Label}"
+                       AutomationProperties.Name="{Binding Label}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <StackPanel IsVisible="{Binding ShowsFindings}">
+      <views:SectionView Name="RollupSection" DataContext="{Binding Rollup}">
+        <views:SectionView.Body>
+          <Border x:DataType="vm:RollupSection" Classes="card" Padding="14,10">
+            <StackPanel Spacing="4">
+              <ItemsControl Name="RollupMembers" ItemsSource="{Binding Members}" ItemTemplate="{StaticResource RollupTemplate}" />
+              <TextBlock Classes="muted small" Text="Between the members" IsVisible="{Binding HasBetween}" Margin="0,6,0,0" />
+              <ItemsControl Name="RollupBetween" ItemsSource="{Binding Between}" ItemTemplate="{StaticResource RollupTemplate}" />
+            </StackPanel>
+          </Border>
+        </views:SectionView.Body>
+      </views:SectionView>
+
+      <views:SectionView Name="IssuesSection" DataContext="{Binding Issues}">
+        <views:SectionView.Body>
+          <ContentControl x:DataType="vm:DesignIssuesSection" Content="{Binding}" ContentTemplate="{StaticResource IssuesBody}" />
+        </views:SectionView.Body>
+      </views:SectionView>
+
+      <views:SectionView Name="SharedSection" DataContext="{Binding Shared}">
+        <views:SectionView.Body>
+          <StackPanel x:DataType="vm:SharedCodeSection" Spacing="10">
+            <views:FindingsView Name="SharedFindings" DataContext="{Binding Board}" />
+            <Expander Name="AllCode" HorizontalAlignment="Stretch">
+              <Expander.Header><TextBlock Text="{Binding AllHead}" TextWrapping="Wrap" /></Expander.Header>
+              <StackPanel Spacing="8">
+                <TextBlock Classes="hint" TextWrapping="Wrap"
+                           Text="The same code in several projects, whether or not a library is involved: types declared in two or more projects, compared by their code, and files with the same content. How alike: the share of code lines the copies have in common (comments, imports and namespaces ignored)." />
+                <WrapPanel ItemSpacing="6" LineSpacing="6">
+                  <ItemsControl ItemsSource="{Binding Chips}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:FilterChip">
+                        <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
+                          <TextBlock><Run Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+                        </ToggleButton>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBox Name="SharedFilter" Text="{Binding Query}" PlaceholderText="Filter by name or project" Width="220" AutomationProperties.Name="Filter shared code" />
+                </WrapPanel>
+                <TextBlock Classes="empty" Text="{Binding Empty}" IsVisible="{Binding !HasRows}" />
+                <ItemsControl Name="SharedRows" ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DuplicateRow">
+                      <Border Classes="trow">
+                        <StackPanel Spacing="3">
+                          <WrapPanel ItemSpacing="8">
+                            <SelectableTextBlock Classes="mono" FontWeight="SemiBold" Text="{Binding Name}" />
+                            <TextBlock Classes="muted small" Text="{Binding Kind}" VerticalAlignment="Center" />
+                            <Border Classes="tag"><TextBlock Classes="small" Text="{Binding Verdict}" /></Border>
+                            <TextBlock Classes="muted small" Text="{Binding Alike}" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted small" Text="{Binding Copies, StringFormat='{}{0} projects'}" VerticalAlignment="Center" />
+                          </WrapPanel>
+                          <TextBlock Classes="muted small" Text="{Binding Names}" IsVisible="{Binding HasNames}" TextWrapping="Wrap" />
+                          <ItemsControl ItemsSource="{Binding Where}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock Classes="small" TextWrapping="Wrap">
+                            <Run Text="could live in " /><Run FontWeight="SemiBold" Text="{Binding Home, Mode=OneWay}" />
+                          </TextBlock>
+                          <TextBlock Classes="muted small" Text="{Binding HomeReason}" IsVisible="{Binding HasHomeReason}" TextWrapping="Wrap" />
+                          <ItemsControl ItemsSource="{Binding Knowledge}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String"><TextBlock Classes="muted small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl ItemsSource="{Binding Notes}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String"><TextBlock Classes="hint" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+        </views:SectionView.Body>
+      </views:SectionView>
+    </StackPanel>
+
+    <StackPanel IsVisible="{Binding ShowsVersions}">
+      <views:SectionView Name="DriftSection" DataContext="{Binding Drift}">
+        <views:SectionView.Body>
+          <ContentControl x:DataType="vm:DesignIssuesSection" Content="{Binding}" ContentTemplate="{StaticResource IssuesBody}" />
+        </views:SectionView.Body>
+      </views:SectionView>
+
+      <views:SectionView Name="VersionsSection" DataContext="{Binding Versions}">
+        <views:SectionView.Body>
+          <StackPanel x:DataType="vm:VersionsSection" Spacing="6">
+            <TextBlock Classes="empty" Text="No member's stack could be read." IsVisible="{Binding IsEmpty}" />
+            <Border Classes="card" Padding="8" IsVisible="{Binding !IsEmpty}">
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="2">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Classes="th" Text="" Width="220" />
+                    <ItemsControl ItemsSource="{Binding Columns}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String"><TextBlock Classes="th" Text="{Binding}" Width="130" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding}" /></DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="th" Text="declared by its owner" Width="160" />
+                  </StackPanel>
+                  <ItemsControl Name="VersionRows" ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:VersionRow">
+                        <StackPanel>
+                          <TextBlock Classes="label" Text="{Binding Group}" IsVisible="{Binding IsGroup}" Margin="0,8,0,2" />
+                          <StackPanel Orientation="Horizontal" IsVisible="{Binding IsRow}" Margin="0,2">
+                            <StackPanel Width="220" Spacing="1">
+                              <TextBlock Classes="mono small" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                              <TextBlock Classes="muted small" Text="{Binding More}" IsVisible="{Binding HasMore}" />
+                              <TextBlock Classes="muted small" Text="{Binding Owner}" IsVisible="{Binding HasOwner}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding Cells}">
+                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VersionCell">
+                                  <StackPanel Width="130" Spacing="1">
+                                    <TextBlock Classes="mono small" Classes.gold="{Binding Behind}" Classes.muted="{Binding !Used}"
+                                               Text="{Binding Text}" TextWrapping="Wrap" />
+                                    <TextBlock Classes="small" Classes.critical="{Binding Severe}" Text="{Binding Marks}" IsVisible="{Binding HasMarks}" TextWrapping="Wrap" />
+                                  </StackPanel>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Width="160" Orientation="Horizontal" Spacing="6">
+                              <TextBlock Classes="mono small" Text="{Binding Declared}" />
+                              <TextBlock Classes="small" Text="stale?" IsVisible="{Binding Stale}"
+                                         ToolTip.Tip="A member uses a newer version than the owner's files declare: the declaration may be stale (CI may set the version)." />
+                            </StackPanel>
+                          </StackPanel>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+          </StackPanel>
+        </views:SectionView.Body>
+      </views:SectionView>
+    </StackPanel>
+  </StackPanel>
+
+  <UserControl.Resources>
+    <DataTemplate x:Key="RollupTemplate" x:DataType="vm:RollupLine">
+      <StackPanel Spacing="3" Margin="0,4">
+        <c:AppLink Classes="link" Href="{Binding Href}" HorizontalAlignment="Left">
+          <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+        </c:AppLink>
+        <StackPanel Spacing="2">
+          <TextBlock Classes="muted small" Text="{Binding Row.Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap" />
+          <TextBlock Classes="okay small" Text="✓ nothing open" IsVisible="{Binding Clear}" />
+          <c:StackBar Segments="{Binding Bar}" IsVisible="{Binding HasBar}" AutomationProperties.Name="{Binding Counts}" />
+        </StackPanel>
+        <WrapPanel ItemSpacing="8">
+          <TextBlock Classes="small" Text="{Binding Counts}" TextWrapping="Wrap" />
+          <Border Classes="tag" IsVisible="{Binding HasMarks}"><TextBlock Classes="small" Text="{Binding Marks}" /></Border>
+          <TextBlock Classes="muted small" Text="{Binding When}" />
+        </WrapPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="IssueRowTemplate" x:DataType="vm:IssueRow">
+      <ToggleButton Classes="irow" IsChecked="{Binding Selected, Mode=OneWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Command="{Binding $parent[ContentControl].((vm:DesignIssuesSection)DataContext).ChooseCommand}" CommandParameter="{Binding}"
+                    AutomationProperties.Name="{Binding Subject}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" />
+          <StackPanel Spacing="1">
+            <TextBlock FontWeight="SemiBold" Text="{Binding Subject}" TextWrapping="Wrap" />
+            <TextBlock Classes="muted small" Text="{Binding Summary}" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </ToggleButton>
+    </DataTemplate>
+
+    <DataTemplate x:Key="IssueDetailTemplate" x:DataType="vm:DesignIssuesSection">
+      <StackPanel Spacing="6" IsVisible="{Binding HasSelection}">
+        <TextBlock Classes="label" Text="{Binding KindLabel}" />
+        <TextBlock Classes="h3" Text="{Binding Selection.Issue.Title, FallbackValue=''}" TextWrapping="Wrap" />
+        <TextBlock Classes="label" Text="Why it matters" />
+        <TextBlock Text="{Binding Selection.Issue.Why, FallbackValue=''}" TextWrapping="Wrap" />
+        <TextBlock Classes="label" Text="What to do" IsVisible="{Binding HasTodo}" />
+        <TextBlock Text="{Binding Todo}" IsVisible="{Binding HasTodo}" TextWrapping="Wrap" />
+        <TextBlock Classes="label" Text="Where" IsVisible="{Binding HasPlaces}" />
+        <ItemsControl ItemsSource="{Binding Places}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:IssuePlace">
+              <StackPanel Spacing="1" Margin="0,2">
+                <TextBlock TextWrapping="Wrap"><Run FontWeight="SemiBold" Text="{Binding Project, Mode=OneWay}" /><Run Classes="muted" Text="{Binding Note, Mode=OneWay}" /></TextBlock>
+                <SelectableTextBlock Classes="mono small muted" Text="{Binding Where}" IsVisible="{Binding HasWhere}" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="label" Text="Projects" IsVisible="{Binding HasProjects}" />
+        <ItemsControl ItemsSource="{Binding Projects}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String"><Border Classes="tag"><TextBlock Classes="small" Text="{Binding}" /></Border></DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="IssueListTemplate" x:DataType="vm:DesignIssuesSection">
+      <ItemsControl ItemsSource="{Binding Groups}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:IssueGroup">
+            <StackPanel Spacing="4" Margin="0,0,0,10">
+              <TextBlock><Run FontWeight="SemiBold" Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Classes="muted" Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+              <TextBlock Classes="hint" Text="{Binding Why}" TextWrapping="Wrap" />
+              <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource IssueRowTemplate}" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="IssuesBody" x:DataType="vm:DesignIssuesSection">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="okay" Text="{Binding Okay}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap" />
+        <StackPanel Spacing="8" IsVisible="{Binding !IsEmpty}">
+          <TextBlock Classes="small" Text="{Binding Counts}" />
+          <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FilterChip">
+                <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
+                  <TextBlock><Run Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+                </ToggleButton>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Grid c:SidePanel.Follows="True" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource IssueListTemplate}" Margin="0,0,12,0" />
+            <Border Grid.Column="1" Classes="side" Width="360" VerticalAlignment="Top">
+              <ContentControl Content="{Binding}" ContentTemplate="{StaticResource IssueDetailTemplate}" />
+            </Border>
+          </Grid>
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+</UserControl>

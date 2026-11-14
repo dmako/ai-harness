@@ -28,8 +28,13 @@
     </ItemsControl>
 
     <StackPanel Classes="section">
-      <TextBlock Classes="h3" Text="Workspaces" />
-      <TextBlock Classes="hint" Text="Repositories searched and reasoned about together." />
+      <DockPanel>
+        <Button Name="NewWorkspace" DockPanel.Dock="Right" Classes="primary" Content="New workspace" Command="{Binding NewWorkspaceCommand}" />
+        <StackPanel>
+          <TextBlock Classes="h3" Text="Workspaces" />
+          <TextBlock Classes="hint" Text="Repositories searched and reasoned about together." />
+        </StackPanel>
+      </DockPanel>
       <TextBlock Classes="empty" Text="No workspaces yet." IsVisible="{Binding !HasWorkspaces}" />
       <ItemsControl Name="WorkspaceCards" ItemsSource="{Binding WorkspaceCards}">
         <ItemsControl.ItemsPanel>

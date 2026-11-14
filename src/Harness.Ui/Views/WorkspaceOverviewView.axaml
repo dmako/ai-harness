@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.WorkspaceOverviewView"
+             x:DataType="vm:WorkspaceOverviewViewModel">
+  <!-- a workspace's Overview (app.js workspaceView "overview"): a card per member, then the workspace at a glance -->
+  <StackPanel>
+    <StackPanel Classes="section" Spacing="8">
+      <TextBlock Classes="h3" Text="Projects" />
+      <TextBlock Classes="empty" Text="No projects yet: add them on Members." IsVisible="{Binding NoMembers}" />
+      <ItemsControl Name="Tiles" ItemsSource="{Binding Tiles}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:MemberTile">
+            <c:AppLink Classes="tilelink" Width="240" Href="{Binding Href}" AutomationProperties.Name="{Binding Name}">
+              <StackPanel Spacing="4">
+                <WrapPanel ItemSpacing="6">
+                  <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="180" />
+                  <c:Icon Kind="{Binding StateIcon}" />
+                </WrapPanel>
+                <WrapPanel ItemSpacing="6" IsVisible="{Binding HasWaiting}">
+                  <Border Classes="badge"><TextBlock Text="{Binding WaitingText}" /></Border>
+                  <TextBlock Classes="muted small" Text="{Binding WaitParts}" VerticalAlignment="Center" />
+                </WrapPanel>
+                <TextBlock Classes="okay small" Text="✓ nothing waiting" IsVisible="{Binding !HasWaiting}" />
+                <TextBlock Classes="small" Text="{Binding ContextLine}" IsVisible="{Binding HasContext}" />
+                <TextBlock Classes="muted small" Text="no scored answers yet" IsVisible="{Binding !HasContext}" />
+                <TextBlock Classes="muted small" Text="{Binding Agents}" IsVisible="{Binding HasAgents}" />
+              </StackPanel>
+            </c:AppLink>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <c:AppLink Classes="link small" Href="{Binding AllHref}" Content="{Binding AllLabel}" IsVisible="{Binding HasAll}" />
+    </StackPanel>
+
+    <views:SectionView Name="GlanceSection" DataContext="{Binding Glance}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:GlanceSection" Spacing="6">
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="What the workspace is made of and how its parts depend on each other; details on Architecture and Members." />
+          <TextBlock Classes="empty" Text="Nothing read yet." IsVisible="{Binding IsEmpty}" />
+          <Border Classes="card" Padding="14,10" IsVisible="{Binding !IsEmpty}">
+            <ItemsControl Name="Glance" ItemsSource="{Binding Lines}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:GlanceLine">
+                  <DockPanel Margin="0,3">
+                    <TextBlock DockPanel.Dock="Left" Text="{Binding Icon}" Width="22" />
+                    <c:AppLink DockPanel.Dock="Right" Classes="link small" Href="{Binding Href}" Content="details →" IsVisible="{Binding HasHref}" Margin="8,0,0,0" />
+                    <TextBlock TextWrapping="Wrap">
+                      <Run Text="{Binding Text, Mode=OneWay}" /><Run Text=" " /><Run Classes="muted" Text="{Binding More, Mode=OneWay}" />
+                    </TextBlock>
+                  </DockPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+  </StackPanel>
+</UserControl>

@@ -273,6 +273,26 @@ public sealed class UiContractTests
         coupling.Hotspots.Should().Contain(h => h.Path == "src/Fixture.Core/Rules.cs");
         (await api.PackageMarksAsync(id, [], Token)).Packages.Should().BeEmpty();
 
+        // the workspace pages: system, build dependencies, stack, findings rollup, issues, shared code, a library, members
+        var system = await api.SystemAsync("main", Token);
+        system.Nodes.Should().NotBeNull();
+        system.Links.Should().NotBeNull();
+        var member = (await api.DependenciesAsync("main", Token)).Nodes.Should().ContainSingle(n => n.ProjectId == id).Subject;
+        (await api.WorkspaceStackAsync("main", Token)).Stacks.Should().ContainKey(id);
+        (await api.RollupAsync("main", Token)).Rows.Select(r => r.Kind).Should().Equal("member", "system", "shared");
+        (await api.IssuesAsync("main", Token)).Issues.Should().NotBeNull();
+        (await api.DuplicatesAsync("main", Token)).Groups.Should().NotBeNull();
+        (await api.AdoptionAsync("main", member.Project, Token)).Library.Should().Be(member.Project);
+        var discovered = await api.DiscoverAsync(Path.GetDirectoryName(fixture.Root)!, Token);
+        discovered.Projects.Should().Contain(p => p.ProjectId == id);
+        var spare = await api.CreateWorkspaceAsync(new WorkspaceCreate { Name = "spare", Title = "Spare", ProjectIds = [] }, Token);
+        spare.Workspace.Should().Be("spare");
+        (await api.JoinAsync("spare", [id], Token)).Added.Should().Equal(id);
+        await api.LeaveAsync("spare", id, Token);
+        (await api.WorkspacesAsync(Token)).Single(w => w.Name == "spare").Members.Should().BeEmpty();
+        await api.DeleteWorkspaceAsync("spare", Token);
+        (await api.WorkspacesAsync(Token)).Select(w => w.Name).Should().Equal("main");
+
         // the docs
         var docs = await api.DocsAsync(Token);
         docs.Docs.Select(d => d.Name).Should().Equal("guide", "reference");

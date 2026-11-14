@@ -13,8 +13,11 @@ public sealed record GraphNode(string Id, string Label, string? Meta = null, str
 /// <summary>A row of the graph, labelled (tests, layer 2, …), its nodes left to right.</summary>
 public sealed record GraphRow(string Label, IReadOnlyList<GraphNode> Nodes);
 
-/// <summary>A line from a node to one it references; dashed when it only builds first; quiet when shown only in focus.</summary>
-public sealed record GraphEdge(string From, string To, bool Dashed = false, bool Quiet = false);
+/// <summary>
+/// A line from a node to one it references; dashed when it only builds first; quiet when shown only in focus; in its
+/// own colour token (a call's style) when it has a <paramref name="Tone"/>, else the axis colour, lit in focus.
+/// </summary>
+public sealed record GraphEdge(string From, string To, bool Dashed = false, bool Quiet = false, string? Tone = null, string? Tip = null);
 
 /// <summary>
 /// A layered graph (app.js's layer map, a workspace's maps): rows of nodes, the highest first, and lines from a node to
@@ -116,11 +119,11 @@ public sealed class LayerGraph : Panel
                     var meta = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
                     if (node.Meta is { Length: > 0 } m)
                     {
-                        meta.Children.Add(new TextBlock { Text = m, Classes = { "small" } });
+                        meta.Children.Add(new TextBlock { Text = m, Classes = { "small" }, TextTrimming = TextTrimming.CharacterEllipsis });
                     }
                     if (node.Badge is { Length: > 0 } b)
                     {
-                        meta.Children.Add(new TextBlock { Text = b, Classes = { "small" } });
+                        meta.Children.Add(new TextBlock { Text = b, Classes = { "small" }, TextTrimming = TextTrimming.CharacterEllipsis });
                     }
                     text.Children.Add(meta);
                 }
@@ -252,8 +255,8 @@ public sealed class LayerGraph : Panel
             var start = new Point(a.Center.X, down ? a.Bottom : a.Top);
             var end = new Point(b.Center.X, down ? b.Top : b.Bottom);
             var middle = (start.Y + end.Y) / 2;
-            var brush = axis;
-            if (hot)
+            var brush = edge.Tone is { } tone ? Brush(tone) : axis;
+            if (hot && edge.Tone is null)
             {
                 brush = edge.From == focus ? outBrush : inBrush;
             }

@@ -85,6 +85,9 @@ public sealed class PlaceholderPage(string title, string task, Uri current) : Pa
 /// <summary>Home (app.js renderHome): the tiles, the workspaces' cards and the projects outside workspaces.</summary>
 public sealed partial class HomePage : PageViewModel
 {
+    /// <summary>Opens the new workspace wizard.</summary>
+    public System.Windows.Input.ICommand? NewWorkspaceCommand { get; init; }
+
     public ObservableCollection<Tile> Tiles { get; } = [];
     public ObservableCollection<NavWorkspace> WorkspaceCards { get; } = [];
     public ObservableCollection<NavProject> Outside { get; } = [];
@@ -357,6 +360,7 @@ public sealed class UnreadableBody(string healthHref)
 public sealed partial class WorkspacePage : PageViewModel
 {
     private readonly UiServices _services;
+    private WorkspaceContext? _context;
 
     public WorkspacePage(UiServices services, WorkspaceInfo workspace, IReadOnlyList<ProjectInfo> projects, Route route)
     {
@@ -392,25 +396,61 @@ public sealed partial class WorkspacePage : PageViewModel
             Tabs,
             Route.WorkspaceViews.Select(v => new TabItem(v.View, v.Label, Route.WorkspaceHref(workspace.Name, v.View), 0, v.View == route.View))
         );
-        if (route.View is "knowledge")
+        _context ??= new WorkspaceContext(_services, workspace, projects);
+        _context.Update(workspace, projects);
+        Show(route);
+    }
+
+    /// <summary>The view the address names: the same view keeps its body and follows the address and the members.</summary>
+    private void Show(Route route)
+    {
+        var context = _context!;
+        switch (route.View, Body)
         {
-            if (Body is not LevelKnowledgeViewModel)
-            {
-                (Body as IDisposable)?.Dispose();
+            case ("knowledge", LevelKnowledgeViewModel):
+                return;
+            case ("overview", WorkspaceOverviewViewModel overview):
+                overview.Update();
+                return;
+            case ("members", WorkspaceMembersViewModel members):
+                members.Update();
+                return;
+            case ("architecture", WorkspaceArchitectureViewModel architecture):
+                architecture.Show(route);
+                return;
+            case ("issues", WorkspaceIssuesViewModel issues):
+                issues.Show(route);
+                return;
+        }
+        (Body as IDisposable)?.Dispose();
+        switch (route.View)
+        {
+            case "knowledge":
                 var knowledge = new LevelKnowledgeViewModel(
                     _services,
-                    "workspace:" + workspace.Name,
+                    "workspace:" + context.Name,
                     "Knowledge for every project of this workspace: it applies to each of them unless a project states otherwise (then the project's own takes precedence)."
                 );
                 knowledge.Follow(_services.Live);
                 _ = knowledge.LoadAsync();
                 Body = knowledge;
-            }
-        }
-        else if (Body is not PlaceholderPage { } shown || shown.Title != Label(route.View))
-        {
-            (Body as IDisposable)?.Dispose();
-            Body = new PlaceholderPage(Label(route.View), "TASK-0158", _services.Host.Current(route));
+                break;
+            case "members":
+                var members = new WorkspaceMembersViewModel(context);
+                _ = members.StartAsync();
+                Body = members;
+                break;
+            case "architecture":
+                Body = new WorkspaceArchitectureViewModel(context, route);
+                break;
+            case "issues":
+                Body = new WorkspaceIssuesViewModel(context, route);
+                break;
+            default:
+                var overview = new WorkspaceOverviewViewModel(context);
+                overview.Start();
+                Body = overview;
+                break;
         }
     }
 
@@ -438,7 +478,6 @@ public sealed partial class WorkspacePage : PageViewModel
         base.Dispose(disposing);
     }
 
-    private static string Label(string view) => Route.WorkspaceViews.FirstOrDefault(v => v.View == view).Label ?? "Overview";
 }
 
 /// <summary>

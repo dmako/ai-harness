@@ -75,9 +75,9 @@ public sealed class ArchitectureViewTests
         s.Parts.Select(p => p.Name).Should().Equal(".NET");
         s.Summary.Should().Be("2 projects in 2 layers · 1 test projects");
         s.Detail.Should().Be("solution: Fixture.slnx · graphify loads: solution at the repository root");
-        s.SnapshotLine.Should().StartWith("Since the last change (").And.EndWith("): 1 new, 0 changed, 1 gone");
-        s.Groups.Select(g => (g.Kind, g.IsGroup)).Should().Equal(("complexity", true), ("boundary", false));
-        var cx = s.Groups[0];
+        s.Board.SnapshotLine.Should().StartWith("Since the last change (").And.EndWith("): 1 new, 0 changed, 1 gone");
+        s.Board.Groups.Select(g => (g.Kind, g.IsGroup)).Should().Equal(("complexity", true), ("boundary", false));
+        var cx = s.Board.Groups[0];
         cx.Title.Should().Be("3 × functions with many paths through them");
         cx.FreshTag.Should().Be("1 new or changed");
         cx.HasSameFix.Should().BeTrue();
@@ -90,17 +90,17 @@ public sealed class ArchitectureViewTests
         cx.Chips[1].On = false;
         cx.Shown.Select(r => r.Finding.Key).Should().Equal("cx:1");
 
-        var boundary = s.Groups[1].Shown.Single();
+        var boundary = s.Board.Groups[1].Shown.Single();
         boundary.RuleLine.Should().Be("Rule: Core must not reference App — constraint (mem_1)");
         (boundary.CanMark, boundary.CanTask, boundary.CanChangeKnowledge, boundary.CanUnmark).Should().Be((true, true, true, false));
         boundary.TaskLabel.Should().Be("Fix the code (task)…");
 
-        s.MarkedCount.Should().Be(1);
-        s.ShowMarked = true;
-        s.Groups.Select(g => g.Kind).Should().Equal("complexity", "boundary", "unused");
-        var marked = s.Groups[2].Shown.Single();
+        s.Board.MarkedCount.Should().Be(1);
+        s.Board.ShowMarked = true;
+        s.Board.Groups.Select(g => g.Kind).Should().Equal("complexity", "boundary", "unused");
+        var marked = s.Board.Groups[2].Shown.Single();
         (marked.MarkTag, marked.Quiet, marked.CanMark, marked.UnmarkLabel).Should().Be(("by design", true, false, "Take the mark back"));
-        s.Gone.Select(g => g.Key).Should().Equal("c:1");
+        s.Board.Gone.Select(g => g.Key).Should().Equal("c:1");
     });
 
     [Fact]
@@ -109,9 +109,9 @@ public sealed class ArchitectureViewTests
         var api = Api();
         var (_, _, model) = await OpenAsync("architecture", api);
         var s = Architecture(model).Structure;
-        var boundary = s.Groups[1].Shown.Single();
+        var boundary = s.Board.Groups[1].Shown.Single();
 
-        _ = s.MarkCommand.ExecuteAsync(boundary);
+        _ = s.Board.MarkCommand.ExecuteAsync(boundary);
         var mark = await DialogAsync<FindingMarkDialog>(model);
         await mark.AcceptCommand.ExecuteAsync(null);
         model.Services.Dialogs.Current.Should().BeSameAs(mark, "the reason is required");
@@ -119,14 +119,14 @@ public sealed class ArchitectureViewTests
         await mark.AcceptCommand.ExecuteAsync(null);
         api.Posts[^1].Should().Be((Root + "/findings/mark", """{"key":"b:1","reason":"kept on purpose"}""", api.Posts[^1].Origin, "1"));
 
-        _ = s.TaskCommand.ExecuteAsync(boundary);
+        _ = s.Board.TaskCommand.ExecuteAsync(boundary);
         var confirm = await DialogAsync<ConfirmDialog>(model);
         await confirm.AcceptCommand.ExecuteAsync(null);
         await Ui.UntilAsync(() => api.Posts.Count == 2);
         api.Posts[^1].Should().Be((Root + "/findings/task", """{"key":"b:1","project":""}""", api.Posts[^1].Origin, "1"));
 
-        s.ShowMarked = true;
-        await s.UnmarkCommand.ExecuteAsync(s.Groups[2].Shown.Single());
+        s.Board.ShowMarked = true;
+        await s.Board.UnmarkCommand.ExecuteAsync(s.Board.Groups[2].Shown.Single());
         api.Posts[^1].Should().Be((Root + "/findings/unmark", """{"key":"u:1"}""", api.Posts[^1].Origin, "1"));
         await Ui.UntilAsync(() => model.Services.Toasts.Items.Any(t => t.Text == "Mark taken back"));
     });
@@ -139,7 +139,7 @@ public sealed class ArchitectureViewTests
         var (_, _, model) = await OpenAsync("architecture", api);
 
         Architecture(model).Structure.Known.Should().BeFalse();
-        Architecture(model).Structure.Groups.Should().BeEmpty();
+        Architecture(model).Structure.Board.Groups.Should().BeEmpty();
     });
 
     [Fact]

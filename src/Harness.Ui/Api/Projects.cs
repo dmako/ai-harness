@@ -86,6 +86,13 @@ public sealed class ProjectLive
     public string? Commit { get; init; }
     public string? SyncedAt { get; init; }
 
+    /// <summary>get_context answers scored in 30 days, and the share that hit.</summary>
+    [JsonPropertyName("context_answers_30d")]
+    public int ContextAnswers30d { get; init; }
+
+    [JsonPropertyName("context_hit_rate_30d")]
+    public double ContextHitRate30d { get; init; }
+
     /// <summary>The Knowledge Inbox (app.js knowledgeWaiting): proposals, and memories a Git change took out.</summary>
     [JsonIgnore]
     public int KnowledgeWaiting => PendingProposals + RemovedFromProject;

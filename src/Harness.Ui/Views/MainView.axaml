@@ -225,6 +225,85 @@
     <DataTemplate DataType="vm:ArchitectureViewModel">
       <views:ArchitectureView Name="Architecture" />
     </DataTemplate>
+    <DataTemplate DataType="vm:WorkspaceOverviewViewModel">
+      <views:WorkspaceOverviewView Name="WorkspaceOverview" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:WorkspaceArchitectureViewModel">
+      <views:WorkspaceArchitectureView Name="WorkspaceArchitecture" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:WorkspaceIssuesViewModel">
+      <views:WorkspaceIssuesView Name="WorkspaceIssues" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:WorkspaceMembersViewModel">
+      <views:WorkspaceMembersView Name="WorkspaceMembers" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:WorkspaceFormDialog">
+      <StackPanel Spacing="10">
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Display name" />
+          <TextBox Name="WorkspaceTitle" Text="{Binding DisplayTitle}" PlaceholderText="e.g. Company services" MaxLength="80" AutomationProperties.Name="Display name" />
+          <TextBlock Classes="hint" Text="Any text, shown in the sidebar and on its page (optional)." TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Short name" />
+          <TextBox Name="WorkspaceName" Classes="mono" Text="{Binding ShortName}" PlaceholderText="e.g. company" AutomationProperties.Name="Short name" />
+          <TextBlock Classes="hint" Text="What agents and commands use: workspace:&lt;short name&gt;. Follows the display name until you edit it." TextWrapping="Wrap" />
+          <TextBlock Classes="muted small mono" Text="{Binding Preview}" />
+        </StackPanel>
+        <TextBlock Classes="label" Text="Projects (now, or none and add them later)" />
+        <ContentControl Content="{Binding Picker}" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:AddProjectsDialog">
+      <ContentControl Content="{Binding Picker}" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ProjectPicker">
+      <StackPanel Spacing="8">
+        <WrapPanel ItemSpacing="6" LineSpacing="6">
+          <TextBox Name="PickFilter" Text="{Binding Query}" PlaceholderText="Filter by name or folder" Width="220" AutomationProperties.Name="Filter projects" />
+          <Button Classes="ghost small" Content="Choose all shown" Command="{Binding ChooseShownCommand}" />
+          <Button Classes="ghost small" Content="None" Command="{Binding ChooseNoneCommand}" />
+          <TextBlock Classes="muted small" Text="{Binding ChosenLine}" VerticalAlignment="Center" />
+        </WrapPanel>
+        <Border Classes="inset">
+          <ScrollViewer MaxHeight="260">
+            <StackPanel>
+              <TextBlock Classes="muted small" Text="No project matches." IsVisible="{Binding IsEmpty}" />
+              <ItemsControl Name="PickRows" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PickRow">
+                    <CheckBox IsChecked="{Binding Chosen}" AutomationProperties.Name="{Binding Name}">
+                      <StackPanel Spacing="1">
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                        <TextBlock Classes="muted small mono" Text="{Binding Root}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="label" Text="Or choose those under a folder" />
+        <WrapPanel ItemSpacing="6" LineSpacing="6">
+          <TextBox Name="PickFolder" Classes="mono" Text="{Binding Folder}" PlaceholderText="/path/to/folder" Width="300" AutomationProperties.Name="Folder" />
+          <Button Classes="small" Content="Find" Command="{Binding FindCommand}" />
+        </WrapPanel>
+        <TextBlock Classes="muted small" Text="{Binding FolderMessage}" TextWrapping="Wrap"
+                   IsVisible="{Binding FolderMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:FindingTaskDialog">
+      <StackPanel Classes="field">
+        <TextBlock Classes="label" Text="The member it belongs to" />
+        <ComboBox Name="TaskMember" ItemsSource="{Binding Members}" SelectedItem="{Binding Member}" MinWidth="240" AutomationProperties.Name="The member it belongs to">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:MemberChoice"><TextBlock Text="{Binding Name}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Classes="hint" Text="{x:Static vm:FindingTaskDialog.Note}" TextWrapping="Wrap" />
+      </StackPanel>
+    </DataTemplate>
     <DataTemplate DataType="vm:FindingMarkDialog">
       <StackPanel Classes="field">
         <TextBlock Classes="label" Text="Why it is intended" />

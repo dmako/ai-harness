@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.WorkspaceMembersView"
+             x:DataType="vm:WorkspaceMembersViewModel">
+  <!-- a workspace's Members (app.js membersManage): filter, choose and remove, add projects, delete the workspace -->
+  <StackPanel Classes="section" Spacing="10">
+    <WrapPanel ItemSpacing="8" LineSpacing="8">
+      <TextBox Name="Filter" Text="{Binding Query}" PlaceholderText="Filter members" Width="220" AutomationProperties.Name="Filter members" />
+      <Button Name="RemoveChosen" Classes="ghost" Content="{Binding RemoveLabel}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemove}" />
+      <Button Name="AddProjects" Content="Add projects" Command="{Binding AddCommand}" IsVisible="{Binding CanAdd}" />
+    </WrapPanel>
+    <TextBlock Classes="hint" Text="{Binding CommonLine}" IsVisible="{Binding HasCommon}" TextWrapping="Wrap" />
+    <Border Classes="card">
+      <StackPanel>
+        <Border Classes="thead">
+          <Grid ColumnDefinitions="32,*,64">
+            <CheckBox Name="ChooseAll" IsChecked="{Binding AllChosen}" AutomationProperties.Name="Select all shown" />
+            <TextBlock Grid.Column="1" Classes="th" Text="project" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="th num" Text="waiting" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+        <TextBlock Classes="empty" Text="No member matches." IsVisible="{Binding IsEmpty}" Margin="14,8" />
+        <ItemsControl Name="Members" ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:MemberRow">
+              <Border Classes="trow">
+                <Grid ColumnDefinitions="32,*,64" RowDefinitions="Auto,Auto">
+                  <CheckBox IsChecked="{Binding Chosen}" AutomationProperties.Name="{Binding Name, StringFormat='Select {0}'}" VerticalAlignment="Top" />
+                  <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,8,0">
+                    <c:AppLink Classes="link" Href="{Binding Href}" IsVisible="{Binding Registered}" HorizontalAlignment="Left">
+                      <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                    </c:AppLink>
+                    <TextBlock Classes="muted" Text="{Binding Id}" IsVisible="{Binding !Registered}" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap">
+                      <Run Text="{Binding State, Mode=OneWay}" /><Run Text=" · synced " /><Run Text="{Binding Synced, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock Classes="muted small" TextWrapping="Wrap">
+                      <Run Text="{Binding Stack, Mode=OneWay}" /><Run Text=" · agent used " /><Run Text="{Binding Used, Mode=OneWay}" /><Run Text=" · context hits " /><Run Text="{Binding Context, Mode=OneWay}" />
+                    </TextBlock>
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Classes="num small" Text="{Binding Waiting}" />
+                  <SelectableTextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="mono small muted" Text="{Binding Path}"
+                                       ToolTip.Tip="{Binding FullPath}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+    <Border Classes="card" Padding="14,10">
+      <DockPanel>
+        <Button Name="DeleteWorkspace" DockPanel.Dock="Right" Classes="ghost" Content="Delete workspace…" Command="{Binding DeleteCommand}" VerticalAlignment="Center" />
+        <StackPanel Spacing="2" Margin="0,0,12,0">
+          <TextBlock FontWeight="SemiBold" Text="Delete this workspace" />
+          <TextBlock Classes="muted small" TextWrapping="Wrap" Text="Its projects keep all their state; its workspace knowledge no longer applies." />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

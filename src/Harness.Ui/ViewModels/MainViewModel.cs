@@ -69,6 +69,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _ = Services.Live.FollowAsync(Services.Api, token);
     }
 
+    /// <summary>A new workspace (app.js workspaceWizard): its names and projects, reviewed before it is created.</summary>
+    [RelayCommand]
+    private Task<string?> NewWorkspaceAsync() =>
+        Services.Dialogs.ShowAsync(
+            new WorkspaceFormDialog(Services, _projects, _workspaces)
+            {
+                Title = "New workspace",
+                Sub = "Repositories searched and reasoned about together.",
+                Wide = true,
+                AcceptLabel = "Create workspace",
+            }
+        );
+
     /// <summary>Goes to <paramref name="href"/> (a sidebar row, a tab, a link inside a page).</summary>
     [RelayCommand]
     public void Navigate(string href) => Navigation.Go(href);
@@ -197,7 +210,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             default:
                 if (Page is not HomePage home)
                 {
-                    home = new HomePage();
+                    home = new HomePage { NewWorkspaceCommand = NewWorkspaceCommand };
                     Replace(home);
                 }
                 home.Update(_projects, _workspaces, route);
