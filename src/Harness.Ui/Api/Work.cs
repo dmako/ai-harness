@@ -77,6 +77,21 @@ public sealed class AgentSession : SessionUsage
     public string? Model { get; init; }
 }
 
+/// <summary>The read-only end of a session started outside harness.</summary>
+public sealed class TranscriptTail
+{
+    public required IReadOnlyList<TranscriptEntry> Entries { get; init; }
+    public required string Resume { get; init; }
+}
+
+public sealed class TranscriptEntry
+{
+    public required string Kind { get; init; }
+    public required string Text { get; init; }
+    public string? Tool { get; init; }
+    public string? At { get; init; }
+}
+
 /// <summary>A task as an agent proposed it, or as the author restates it (dependencies as ids).</summary>
 public sealed class TaskDraft
 {

@@ -32,6 +32,7 @@ namespace Harness.Ui.Api;
 [JsonSerializable(typeof(NextId))]
 [JsonSerializable(typeof(TaskEvents))]
 [JsonSerializable(typeof(TaskSessions))]
+[JsonSerializable(typeof(TranscriptTail))]
 [JsonSerializable(typeof(TaskProposalList))]
 [JsonSerializable(typeof(BlueprintProposalList))]
 [JsonSerializable(typeof(ArchProposalList))]

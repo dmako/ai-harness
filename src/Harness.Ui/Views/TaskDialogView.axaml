@@ -76,6 +76,10 @@
                   <TextBlock Classes="muted small" Text="{Binding Seen}" TextWrapping="Wrap" VerticalAlignment="Center" />
                 </WrapPanel>
                 <TextBlock Classes="muted small" Text="{Binding Usage}" TextWrapping="Wrap" />
+                <Button Classes="ghost" Content="Show transcript" Command="{Binding ShowTranscriptCommand}"
+                        IsVisible="{Binding CanShowTranscript}" HorizontalAlignment="Left" />
+                <SelectableTextBlock Text="{Binding Transcript}" TextWrapping="Wrap"
+                                     IsVisible="{Binding Transcript, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

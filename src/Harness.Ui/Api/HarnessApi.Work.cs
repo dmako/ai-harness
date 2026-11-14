@@ -18,6 +18,14 @@ public sealed partial class HarnessApi
     public Task<TaskSessions> TaskSessionsAsync(string projectId, string taskId, CancellationToken token) =>
         GetAsync(Project(projectId, $"tasks/{Uri.EscapeDataString(taskId)}/sessions"), UiJsonContext.Default.TaskSessions, token);
 
+    public Task<TranscriptTail> TranscriptTailAsync(
+        string projectId, string taskId, string client, string sessionId, CancellationToken token
+    ) => GetAsync(
+        Project(projectId, $"tasks/{Uri.EscapeDataString(taskId)}/sessions/{Uri.EscapeDataString(client)}/{Uri.EscapeDataString(sessionId)}/tail"),
+        UiJsonContext.Default.TranscriptTail,
+        token
+    );
+
     public Task<TaskProposalList> TaskProposalsAsync(string projectId, string status, CancellationToken token) =>
         GetAsync(Project(projectId, $"task-proposals?status={Uri.EscapeDataString(status)}"), UiJsonContext.Default.TaskProposalList, token);
 

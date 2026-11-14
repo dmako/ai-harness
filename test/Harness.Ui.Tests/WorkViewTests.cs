@@ -189,6 +189,12 @@ public sealed class WorkViewTests
         var session = dialog.Sessions.Should().ContainSingle().Subject;
         (session.Client, session.ShortId, session.Status).Should().Be(("Claude Code", "01234567", "working"));
         session.Usage.Should().Be("claude-fable-5-2 · 515.0k tokens · in 12.0k · cache read 500.0k · cache write 0 · out 3000 · $1.50 API-equivalent · active 10 min");
+        api.Answers[Root + "/tasks/TASK-0003/sessions/claude-code/0123456789abcdef/tail"] = """
+            {"entries":[{"kind":"user","text":"Hello"},{"kind":"tool","tool":"Read","text":"file.cs"}],
+             "resume":"claude --resume 0123456789abcdef"}
+            """;
+        await session.ShowTranscriptCommand.ExecuteAsync(null);
+        session.Transcript.Should().Be("You: Hello\n\nRead: file.cs\n\nResume in a terminal: claude --resume 0123456789abcdef");
         dialog.Editable.Should().BeFalse("a claimed task's definition is fixed");
     });
 

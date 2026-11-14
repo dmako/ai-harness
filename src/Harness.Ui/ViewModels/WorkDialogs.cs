@@ -64,7 +64,44 @@ public sealed record EventRow(string Event, string? From, string? To, string Who
 }
 
 /// <summary>An agent session in the task dialog: the client, its id, what it did, when and what it used.</summary>
-public sealed record SessionRow(string Client, string ShortId, string Status, string Seen, string Usage);
+public sealed partial class SessionRow(
+    HarnessApi api, string projectId, string taskId, AgentSession session, string seen, string usage
+) : ObservableObject
+{
+    public string Client => Agents.Client(session.Client);
+    public string ShortId => session.SessionId[..Math.Min(8, session.SessionId.Length)];
+    public string Status => session.Status;
+    public string Seen => seen;
+    public string Usage => usage;
+    public bool CanShowTranscript => session.Origin is not "harness";
+
+    [ObservableProperty]
+    public partial string? Transcript { get; private set; }
+
+    [RelayCommand]
+    private async Task ShowTranscriptAsync()
+    {
+        try
+        {
+            var tail = await api.TranscriptTailAsync(projectId, taskId, session.Client, session.SessionId, CancellationToken.None);
+            Transcript = tail.Entries.Count is 0
+                ? "Nothing read from its transcript."
+                : string.Join("\n\n", tail.Entries.Select(FormatEntry));
+            Transcript += "\n\nResume in a terminal: " + tail.Resume;
+        }
+        catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
+        {
+            Transcript = exception.Message;
+        }
+    }
+
+    private static string FormatEntry(TranscriptEntry entry) => entry.Kind switch
+    {
+        "user" => "You: " + entry.Text,
+        "tool" => (entry.Tool ?? "tool") + ": " + entry.Text,
+        _ => entry.Text,
+    };
+}
 
 /// <summary>
 /// A task (app.js taskDetail, auditBlock, sessionsBlock): why it is blocked or deferred, its goal, criteria,
@@ -337,9 +374,7 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
         Lists.Sync(
             Sessions,
             answer.Sessions.Select(s => new SessionRow(
-                Agents.Client(s.Client),
-                s.SessionId[..Math.Min(8, s.SessionId.Length)],
-                s.Status,
+                _services.Api, _projectId, _taskId, s,
                 $"{(s.Origin is "harness" ? "started by harness" : "seen by hooks")} · first {Shell.Ago(s.StartedAt)} · last {Shell.Ago(s.EndedAt)}",
                 (s.Model is { Length: > 0 } model ? model + " · " : "")
                     + Agents.Usage(s)
