@@ -1,0 +1,36 @@
+{
+  "languages": [],
+  "providers": null,
+  "architecture": [
+    {
+      "capability": "arch.dependencies",
+      "providers": [],
+      "without": "harness reads dependencies itself from build files and imports; nothing is missing"
+    },
+    {
+      "capability": "arch.cycles",
+      "providers": [],
+      "without": "harness finds circles in what it reads itself; nothing is missing"
+    },
+    {
+      "capability": "arch.change_coupling",
+      "providers": [],
+      "without": "hotspots still come from Git, but co-change partners and the missing-partner check need it (ripwire offers it)"
+    },
+    {
+      "capability": "arch.duplicates",
+      "providers": [],
+      "without": "harness still finds copied functions within a project and copies across a workspace; a provider adds pairs of its own (codebase-memory, on an indexed repository)"
+    },
+    {
+      "capability": "arch.dead_code",
+      "providers": [],
+      "without": "only harness's own 'not used' findings for projects and packages; no provider maps dead code yet"
+    },
+    {
+      "capability": "arch.complexity",
+      "providers": [],
+      "without": "harness counts cyclomatic complexity from source itself; exact .NET values need the Microsoft.CodeAnalysis.Metrics worker ([architecture.complexity.metrics] enabled = true, on Windows)"
+    }
+  ]
+}

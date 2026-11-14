@@ -19,6 +19,58 @@ public sealed class ProjectReport
 
     /// <summary>Absent when there is nothing to act on.</summary>
     public IReadOnlyList<ReportFinding>? Findings { get; init; }
+
+    /// <summary>What agents called (tools, hooks) over the window.</summary>
+    public ReportMetrics? Metrics { get; init; }
+
+    public KnowledgeUsage? Knowledge { get; init; }
+    public int KnowledgeReads { get; init; }
+    public int KnowledgeWrites { get; init; }
+}
+
+public sealed class ReportMetrics
+{
+    public IReadOnlyList<ToolUse> Tools { get; init; } = [];
+    public HookSummary? Hooks { get; init; }
+}
+
+/// <summary>A harness tool's calls over the window, and which clients called it.</summary>
+public sealed class ToolUse
+{
+    public required string Tool { get; init; }
+    public int Calls { get; init; }
+    public int Errors { get; init; }
+    public double ErrorRate { get; init; }
+    public IReadOnlyList<string>? Clients { get; init; }
+    public string? LastAt { get; init; }
+}
+
+/// <summary>The client hooks' events: how many, in how many sessions, the last.</summary>
+public sealed class HookSummary
+{
+    public int Events { get; init; }
+    public int Sessions { get; init; }
+    public string? LastAt { get; init; }
+}
+
+public sealed class KnowledgeUsage
+{
+    public int CurrentMemories { get; init; }
+}
+
+/// <summary>A day of calls: how many, failed and slow.</summary>
+public sealed class DayCalls
+{
+    public required string Day { get; init; }
+    public int Calls { get; init; }
+    public int Errors { get; init; }
+    public int Slow { get; init; }
+}
+
+/// <summary>A provider capability's or a tool family's days.</summary>
+public sealed class CallTrend
+{
+    public IReadOnlyList<DayCalls> Days { get; init; } = [];
 }
 
 /// <summary>How well get_context's answers held the files agents then changed (hits per changed file).</summary>
@@ -51,6 +103,11 @@ public sealed class ReportFinding
     public required string Area { get; init; }
     public required string Message { get; init; }
     public string? Action { get; init; }
+
+    /// <summary>How the problem went over the days (a provider's), else its history as text.</summary>
+    public CallTrend? Trend { get; init; }
+
+    public string? History { get; init; }
 }
 
 /// <summary>GET /api/projects/{id}/trends: the window's days, oldest first.</summary>

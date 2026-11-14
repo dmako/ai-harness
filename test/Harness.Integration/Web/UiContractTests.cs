@@ -222,6 +222,25 @@ public sealed class UiContractTests
         (doc.Doc, doc.Slug).Should().Be(("guide", "guide"));
         doc.Body.Should().StartWith("# ");
 
+        // Agents: the report's use, the providers and architecture evidence, the project's SCM card and its writes, hooks
+        var serving = await api.ReportAsync(id, 30, Token);
+        serving.Metrics.Should().NotBeNull();
+        serving.Knowledge!.CurrentMemories.Should().BePositive();
+        var providers = await api.ProvidersAsync(id, 30, Token);
+        providers.Architecture.Should().Contain(c => c.Capability == "arch.dependencies");
+        (await api.ArchitectureRawAsync(id, Token)).ValueKind.Should().Be(System.Text.Json.JsonValueKind.Object);
+        var card = await api.ProjectScmAsync(id, 30, Token);
+        (card.Configured, card.Repository, card.Scm!.Status).Should().Be((true, true, "no_remote"));
+        card.Stats!.Days.Should().Be(30);
+        card.Stats.Trend!.Days.Should().NotBeEmpty();
+        (await api.ChooseScmAsync(id, "", Token)).Choice.Should().BeNull();
+        (await FluentActions.Awaiting(() => api.TestProjectScmAsync(id, Token)).Should().ThrowAsync<HarnessApiException>())
+            .Which.Message.Should().Contain("no SCM to test");
+        var hooks = await api.HooksAsync(id, Token);
+        hooks.Git.Should().Contain(g => g.Name == "post-commit");
+        hooks.Clients.Should().Contain(c => c.Client == "codex");
+        hooks.Events.Should().NotBeNull();
+
         // the docs
         var docs = await api.DocsAsync(Token);
         docs.Docs.Select(d => d.Name).Should().Equal("guide", "reference");

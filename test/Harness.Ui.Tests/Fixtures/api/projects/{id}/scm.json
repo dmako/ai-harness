@@ -1,0 +1,209 @@
+{
+  "configured": true,
+  "repository": true,
+  "scm": {
+    "status": "no_remote",
+    "source": "auto",
+    "reason": "The repository has no remote; add one, or set [scm] name and project in the project's configuration.",
+    "remotes": []
+  },
+  "chosen": "detected from the remotes",
+  "choice": null,
+  "config_name": null,
+  "candidates": [],
+  "last_test": null,
+  "stats": {
+    "days": 30,
+    "tools": [],
+    "trend": {
+      "days": [
+        {
+          "day": "2026-11-01",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-02",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-03",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-04",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-05",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-06",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-07",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-08",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-09",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-10",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-11",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-12",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-13",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-14",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-15",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-16",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-17",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-18",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-19",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-20",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-21",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-22",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-23",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-24",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-25",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-26",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-27",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-28",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-01",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-02",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        },
+        {
+          "day": "2026-11-03",
+          "calls": 0,
+          "errors": 0,
+          "slow": 0
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,293 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:api="using:Harness.Ui.Api"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.AgentsView"
+             x:DataType="vm:AgentsViewModel">
+  <!-- a project's Agents (app.js "agents"): How harness serves them, or Tools & providers, by the address -->
+  <StackPanel>
+    <Border Classes="subnav">
+      <ItemsControl ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TabItem">
+            <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}" Content="{Binding Label}"
+                       AutomationProperties.Name="{Binding Label}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <!-- How harness serves them -->
+    <views:SectionView Name="ServingSection" DataContext="{Binding Serving}"
+                       IsVisible="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).ShowsServing}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:ServingSection" Spacing="12">
+          <Border Classes="card" Padding="14,10">
+            <TextBlock Name="Verdict" Classes.okay="{Binding VerdictOk}" FontWeight="SemiBold" Text="{Binding Verdict}" TextWrapping="Wrap" />
+          </Border>
+          <ItemsControl Name="ServingTiles" ItemsSource="{Binding Tiles}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:Tile">
+                <Border Classes="tile">
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="label" Text="{Binding Label}" />
+                    <TextBlock Classes="value" Text="{Binding Value}" />
+                    <TextBlock Classes="muted small" Text="{Binding Note}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <StackPanel Spacing="6">
+            <TextBlock Classes="h3" Text="What to change" />
+            <TextBlock Classes="hint" Text="{Binding FindingsHint}" />
+            <Border Classes="card" Padding="14,10" IsVisible="{Binding !HasFindings}">
+              <StackPanel>
+                <TextBlock FontWeight="SemiBold" Text="Nothing to change" />
+                <TextBlock Classes="muted small" Text="Harness serves your agents as it should over this window." TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <ItemsControl Name="Findings" ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}" />
+            <Expander Header="{Binding ResolvedHead}" IsVisible="{Binding HasResolved}" HorizontalAlignment="Stretch">
+              <ItemsControl ItemsSource="{Binding Resolved}" ItemTemplate="{StaticResource FindingTemplate}" />
+            </Expander>
+          </StackPanel>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <!-- Tools & providers -->
+    <StackPanel IsVisible="{Binding ShowsTools}">
+      <views:SectionView Name="ToolsSection" DataContext="{Binding Tools}">
+        <views:SectionView.Body>
+          <StackPanel x:DataType="vm:ToolsSection" Spacing="12">
+            <WrapPanel>
+              <TextBlock Classes="hint" Text="{Binding Hint2}" TextWrapping="Wrap" Margin="0,0,6,0" />
+              <c:AppLink Classes="link small" Href="{Binding HealthHref}" Content="Whether they start: Health → Check providers" />
+            </WrapPanel>
+            <TextBlock Classes="h3" Text="Used here" />
+            <!-- the project's SCM: a section of its own, first among what serves it -->
+            <views:SectionView Classes="page" DataContext="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Scm}">
+              <views:SectionView.Body>
+                <Border Name="ScmCard" Classes="card" Padding="14,10" x:DataType="vm:ScmCardSection">
+                  <StackPanel Spacing="6">
+                    <WrapPanel ItemSpacing="8">
+                      <TextBlock Classes="h3" Text="SCM" />
+                      <Border Classes="pill" IsVisible="{Binding HasType}"><TextBlock Text="{Binding TypeTag}" /></Border>
+                      <TextBlock Classes="muted small" Text="{Binding Use}" VerticalAlignment="Center" />
+                    </WrapPanel>
+                    <WrapPanel IsVisible="{Binding NotConfigured}">
+                      <TextBlock Text="No SCM is configured on this machine: add one under " TextWrapping="Wrap" />
+                      <c:AppLink Classes="link" Href="#/machine" Content="Machine › SCM connections" />
+                      <TextBlock Text=" to let agents review this project's merge requests." TextWrapping="Wrap" />
+                    </WrapPanel>
+                    <StackPanel Spacing="6" IsVisible="{Binding Configured}">
+                      <SelectableTextBlock Classes="mono small" Text="{Binding Connection}" IsVisible="{Binding Matched}" TextWrapping="Wrap" />
+                      <TextBlock Classes="small" Text="{Binding ProjectLine}" IsVisible="{Binding Matched}" TextWrapping="Wrap" />
+                      <TextBlock Classes="small" Text="{Binding Reason}" IsVisible="{Binding !Matched}" TextWrapping="Wrap" />
+                      <StackPanel Spacing="2" IsVisible="{Binding HasPicker}">
+                        <TextBlock Classes="label" Text="Connection" />
+                        <ComboBox Name="ScmPicker" ItemsSource="{Binding Picks}" SelectedItem="{Binding Pick}" IsEnabled="{Binding CanPick}"
+                                  MinWidth="220" MaxWidth="480" HorizontalAlignment="Stretch" AutomationProperties.Name="SCM connection">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ScmPick">
+                              <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Classes="muted small" Text="{Binding PickNote}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <Button Name="ScmTest" Classes="ghost" Content="Test connection" Command="{Binding TestCommand}" IsVisible="{Binding Matched}"
+                              HorizontalAlignment="Left" />
+                      <TextBlock Classes="small" Text="{Binding TestLine}" TextWrapping="Wrap" />
+                      <TextBlock Classes="small" Text="{Binding ProjectCheck}" TextWrapping="Wrap" IsVisible="{Binding HasProjectCheck}" />
+                      <TextBlock Classes="muted small" Text="{Binding ProjectFix}" TextWrapping="Wrap" IsVisible="{Binding HasProjectFix}" />
+                      <ItemsControl ItemsSource="{Binding Tools}" IsVisible="{Binding HasTools}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="api:ToolUse">
+                            <WrapPanel ItemSpacing="8">
+                              <TextBlock Classes="mono small" Text="{Binding Tool}" />
+                              <TextBlock Classes="muted small" Text="{Binding Calls, StringFormat='{}{0} calls'}" />
+                              <TextBlock Classes="muted small" Text="{Binding Errors, StringFormat='{}{0} failed'}" />
+                            </WrapPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <c:DayBars Days="{Binding Bars}" IsVisible="{Binding HasTools}" />
+                      <TextBlock Classes="muted small" Text="{Binding NoTools}" IsVisible="{Binding !HasTools}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </views:SectionView.Body>
+            </views:SectionView>
+            <TextBlock Classes="empty" Text="No provider serves this project's languages." IsVisible="{Binding !HasUsed}" />
+            <ItemsControl Name="Providers" ItemsSource="{Binding Used}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProviderCard">
+                  <Border Classes="card" Padding="14,10">
+                    <StackPanel Spacing="4">
+                      <WrapPanel ItemSpacing="8" LineSpacing="4">
+                        <TextBlock Classes="h3" Text="{Binding Info.Name}" />
+                        <Border Classes="pill"><TextBlock Text="{Binding Kind}" /></Border>
+                        <Border Classes="pill" IsVisible="{Binding HasPack}"><TextBlock Text="{Binding PackTag}" /></Border>
+                        <TextBlock Classes="muted small" Text="{Binding Summary}" VerticalAlignment="Center" />
+                      </WrapPanel>
+                      <SelectableTextBlock Classes="mono small muted" Text="{Binding Info.Command}" TextWrapping="Wrap" />
+                      <TextBlock Classes="small" Text="{Binding OnlyLine}" IsVisible="{Binding HasOnly}" TextWrapping="Wrap" />
+                      <TextBlock Classes="muted small" Text="{Binding Quiet}" IsVisible="{Binding HasQuiet}" TextWrapping="Wrap" />
+                      <Border Classes="callout" IsVisible="{Binding HasCheck}">
+                        <StackPanel Spacing="4">
+                          <SelectableTextBlock TextWrapping="Wrap">
+                            <Run FontWeight="SemiBold" Text="{Binding Info.Check.Name, Mode=OneWay, StringFormat='{}{0}: '}" /><Run Text="{Binding Info.Check.Detail, Mode=OneWay}" />
+                          </SelectableTextBlock>
+                          <SelectableTextBlock Classes="small" Text="{Binding Info.Check.Fix, StringFormat='Fix: {0}'}" TextWrapping="Wrap" />
+                          <Button Classes="primary small" Content="Fix" Command="{Binding FixCommand}" IsVisible="{Binding Info.Check.Fixable}"
+                                  HorizontalAlignment="Left" />
+                        </StackPanel>
+                      </Border>
+                      <Expander Header="What it has indexed" IsVisible="{Binding CanIndex}" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="hint" TextWrapping="Wrap"
+                                     Text="Counts of what the provider found in the code: a check that it indexed the project, not the architecture. Loading starts it." />
+                          <Button Content="Load" Command="{Binding LoadIndexCommand}" HorizontalAlignment="Left" />
+                          <SelectableTextBlock Classes="small mono" Text="{Binding Indexed}" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Expander>
+                      <StackPanel Spacing="4" IsVisible="{Binding IsGraphify}">
+                        <TextBlock Classes="label" Text="Warm session" />
+                        <ItemsControl ItemsSource="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.Rows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GraphifyRow">
+                              <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                  <Button Classes="ghost small" Content="Restart"
+                                          Command="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.RestartCommand}" CommandParameter="{Binding}" />
+                                  <Button Classes="ghost small" Content="Stop"
+                                          Command="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.StopCommand}" CommandParameter="{Binding}" />
+                                </StackPanel>
+                                <TextBlock Classes="small" Text="{Binding Session.Summary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                              </DockPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="ghost small" Content="Start a session" HorizontalAlignment="Left"
+                                Command="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.StartCommand}"
+                                IsVisible="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.IsEmpty}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <StackPanel Spacing="4" IsVisible="{Binding HasIdle}">
+              <TextBlock Classes="h3" Text="Not used here" />
+              <TextBlock Classes="hint" Text="Configured on this machine, but disabled or serving other languages." />
+              <Border Classes="card" Padding="12,8">
+                <ItemsControl ItemsSource="{Binding Idle}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:IdleProvider">
+                      <WrapPanel ItemSpacing="8" Margin="0,2">
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Info.Name}" />
+                        <Border Classes="pill"><TextBlock Text="{Binding Kind}" /></Border>
+                        <TextBlock Classes="small" Text="{Binding Reason}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock Classes="muted small" Text="{Binding Languages}" VerticalAlignment="Center" />
+                      </WrapPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+            </StackPanel>
+
+            <StackPanel Name="ArchitectureEvidence" Spacing="4" IsVisible="{Binding HasArchitecture}">
+              <TextBlock Classes="h3" Text="Architecture evidence" />
+              <TextBlock Classes="hint" Text="What a provider would add to the Architecture view; nothing fails without one." TextWrapping="Wrap" />
+              <Border Classes="card" Padding="12,8" IsVisible="{Binding HasMissing}">
+                <ItemsControl ItemsSource="{Binding Missing}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CoverageRow">
+                      <Grid ColumnDefinitions="160,*" Margin="0,3">
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Capability}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                        <TextBlock Grid.Column="1" Classes="muted small" Text="{Binding Without}" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+              <TextBlock Classes="okay small" Text="{Binding Complete}" TextWrapping="Wrap"
+                         IsVisible="{Binding Complete, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </StackPanel>
+        </views:SectionView.Body>
+      </views:SectionView>
+
+      <views:SectionView Name="HooksSection" DataContext="{Binding Hooks}">
+        <views:SectionView.Body>
+          <StackPanel x:DataType="vm:HooksSection" Spacing="6">
+            <TextBlock Classes="hint" Text="Installed hooks tell harness what agents read and when sessions start." />
+            <Border Classes="card" Padding="14,10">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="label" Text="Git sync hooks" />
+                <TextBlock Classes="small" Classes.okay="{Binding GitOk}" Text="{Binding GitLine}" TextWrapping="Wrap" />
+                <TextBlock Classes="label" Text="Client hooks" />
+                <ItemsControl ItemsSource="{Binding Clients}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HookRow">
+                      <WrapPanel ItemSpacing="12" Margin="0,2" ToolTip.Tip="{Binding Hook.Path}">
+                        <TextBlock Classes="small" FontWeight="SemiBold" Text="{Binding Client}" />
+                        <TextBlock Classes="small" Classes.okay="{Binding ToolOn}" Text="{Binding Tool}" />
+                        <TextBlock Classes="small" Classes.okay="{Binding SessionOn}" Text="{Binding Session}" IsVisible="{Binding ShowsSession}" />
+                        <TextBlock Classes="small" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
+                      </WrapPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="small" Text="{Binding EventsLine}" TextWrapping="Wrap" />
+                <Expander Header="Files" HorizontalAlignment="Stretch">
+                  <ItemsControl ItemsSource="{Binding Files}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Expander>
+                <TextBlock Classes="small" Text="{Binding Note}" TextWrapping="Wrap" IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </views:SectionView.Body>
+      </views:SectionView>
+    </StackPanel>
+  </StackPanel>
+
+  <UserControl.Resources>
+    <DataTemplate x:Key="FindingTemplate" x:DataType="vm:FindingItem">
+      <Border Classes="card" Padding="14,10" Margin="0,0,0,8">
+        <StackPanel Spacing="4">
+          <WrapPanel ItemSpacing="8">
+            <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" Margin="0,2,0,0" />
+            <TextBlock Classes="small" Text="{Binding Finding.Level}" />
+            <TextBlock Classes="muted small" Text="{Binding Finding.Area}" />
+          </WrapPanel>
+          <SelectableTextBlock Text="{Binding Finding.Message}" TextWrapping="Wrap" />
+          <StackPanel Spacing="2" IsVisible="{Binding HasTrend}">
+            <c:DayBars Days="{Binding Bars}" />
+            <TextBlock Classes="muted small" Text="{Binding TrendNote}" />
+          </StackPanel>
+          <SelectableTextBlock Classes="mono small" Text="{Binding Finding.History}" IsVisible="{Binding HasHistory}" TextWrapping="Wrap" />
+          <SelectableTextBlock Classes="small" Text="{Binding ActionLine}" IsVisible="{Binding HasAction}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+</UserControl>

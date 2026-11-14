@@ -1,0 +1,52 @@
+{
+  "git": [
+    {
+      "name": "post-commit",
+      "installed": false
+    },
+    {
+      "name": "post-checkout",
+      "installed": false
+    },
+    {
+      "name": "post-merge",
+      "installed": false
+    },
+    {
+      "name": "post-rewrite",
+      "installed": false
+    }
+  ],
+  "clients": [
+    {
+      "client": "claude-code",
+      "scope": "user",
+      "path": "C:\\Users\\dev\\claude\\settings.json"
+    },
+    {
+      "client": "claude-code",
+      "scope": "project",
+      "path": "C:\\repos\\fixture\\.claude\\settings.json"
+    },
+    {
+      "client": "claude-code",
+      "scope": "local",
+      "path": "C:\\repos\\fixture\\.claude\\settings.local.json"
+    },
+    {
+      "client": "codex",
+      "scope": "user",
+      "path": "C:\\Users\\dev\\codex\\hooks.json"
+    },
+    {
+      "client": "codex",
+      "scope": "project",
+      "path": "C:\\repos\\fixture\\.codex\\hooks.json"
+    }
+  ],
+  "git_dir": "C:\\repos\\fixture\\.git\\hooks",
+  "events": {
+    "events": 0,
+    "sessions": 0
+  }
+}

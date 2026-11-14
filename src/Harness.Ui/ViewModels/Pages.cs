@@ -237,6 +237,7 @@ public sealed partial class ProjectPage : PageViewModel
         {
             (Body as WorkViewModel)?.Show(route);
             (Body as KnowledgeViewModel)?.Show(route);
+            (Body as AgentsViewModel)?.Show(route);
             return;
         }
         View = route.View;
@@ -293,6 +294,12 @@ public sealed partial class ProjectPage : PageViewModel
             overview.Start();
             return overview;
         }
+        if (route.View is "agents")
+        {
+            var agents = new AgentsViewModel(_services, Id, route);
+            agents.Start();
+            return agents;
+        }
         if (route.View is "knowledge")
         {
             var knowledge = new KnowledgeViewModel(_services, Project, route);
@@ -305,12 +312,8 @@ public sealed partial class ProjectPage : PageViewModel
             work.Start();
             return work;
         }
-        var (label, task) = route.View switch
-        {
-            "architecture" => ("Architecture", "TASK-0156"),
-            _ => ("Agents", "TASK-0154"),
-        };
-        return new PlaceholderPage(label, task, _services.Host.Current(route));
+        // Architecture is the one view still to port
+        return new PlaceholderPage("Architecture", "TASK-0156", _services.Host.Current(route));
     }
 
     private async Task ShowBoardAsync(BoardViewModel board)

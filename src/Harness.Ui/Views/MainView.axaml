@@ -51,6 +51,9 @@
     <DataTemplate DataType="vm:OverviewViewModel">
       <views:OverviewView Name="Overview" />
     </DataTemplate>
+    <DataTemplate DataType="vm:AgentsViewModel">
+      <views:AgentsView Name="Agents" />
+    </DataTemplate>
     <DataTemplate DataType="vm:MachinePage">
       <views:MachineView Name="Machine" />
     </DataTemplate>
