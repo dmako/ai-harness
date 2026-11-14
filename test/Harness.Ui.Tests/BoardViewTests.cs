@@ -28,7 +28,7 @@ public sealed class BoardViewTests
     {
         var (window, _, _) = await Ui.OpenMainAsync(1280, 800);
 
-        var columns = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("column")).ToArray();
+        var columns = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("bcol")).ToArray();
         columns.Select(c => ((BoardColumnViewModel)c.DataContext!).Label)
             .Should()
             .Equal("backlog", "ready", "claimed", "in progress", "review", "done", "blocked");
@@ -92,7 +92,7 @@ public sealed class BoardViewTests
         var done = window
             .GetVisualDescendants()
             .OfType<Border>()
-            .Single(b => b.Classes.Contains("column") && ((BoardColumnViewModel)b.DataContext!).Status is "done");
+            .Single(b => b.Classes.Contains("bcol") && ((BoardColumnViewModel)b.DataContext!).Status is "done");
         var scroller = done.GetVisualDescendants().OfType<ScrollViewer>().First();
         scroller.Extent.Height.Should().BeGreaterThan(scroller.Viewport.Height, "the done column must scroll");
         scroller.Offset = new Vector(0, 300);
@@ -115,6 +115,89 @@ public sealed class BoardViewTests
         cardsAfter["TASK-0002"].FindControl<SelectableTextBlock>("Title")!.Text.Should().Be("Changed elsewhere");
         scroller.Offset.Y.Should().Be(300);
         selected.SelectedText.Should().Be("the");
+    });
+
+    [Fact]
+    public Task ACardsIdOpensTheTaskDialogWithEditAndDeleteAsWorkAllowsThem() => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800);
+        var card = Cards(window).Single(c => ((TaskCardViewModel)c.DataContext!).Id == "TASK-0002");
+        var open = card.FindControl<Button>("OpenTask")!;
+
+        open.Command!.Execute(open.CommandParameter);
+        await Ui.UntilAsync(() => model.Services.Dialogs.Current is TaskDialog);
+        var dialog = (TaskDialog)model.Services.Dialogs.Current!;
+        await dialog.Loaded;
+
+        dialog.Title.Should().Be("TASK-0002 · Port the Board to Avalonia");
+        dialog.Sub.Should().StartWith("In blueprint ");
+        dialog.EditCommand.Should().NotBeNull();
+        dialog.DeleteCommand.Should().NotBeNull();
+        dialog.HasCancel.Should().BeFalse();
+    });
+
+    [Fact]
+    public Task ACardKeepsItsTypeMarkAndPriorityIcon() => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(1280, 800);
+        var card = Cards(window).Single(c => ((TaskCardViewModel)c.DataContext!).Id == "TASK-0002");
+
+        var type = card.FindControl<Harness.Ui.Controls.Icon>("TypeMark")!;
+        type.Kind.Should().Be(((TaskCardViewModel)card.DataContext!).TypeIcon);
+        type.Classes.Should().Contain("ty-" + type.Kind);
+        card.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().Should().Contain(i => i.Kind == "p-critical" && i.Classes.Contains("p-critical"));
+    });
+
+    [Fact]
+    public Task OnANarrowScreenEachColumnIsMostOfTheWidth() => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(390, 844);
+        var columns = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("bcol")).ToArray();
+
+        columns[0].Bounds.Width.Should().BeApproximately(Math.Max(240, 390 * 0.85), 1);
+        var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "BoardScroller");
+        scroller.Extent.Width.Should().BeGreaterThan(scroller.Viewport.Width, "the next column is in reach sideways");
+    });
+
+    [Fact]
+    public Task OnAWideScreenTheColumnsShareTheWidth() => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(2400, 900);
+        var columns = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("bcol")).ToArray();
+        var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "BoardScroller");
+
+        columns.Select(c => Math.Round(c.Bounds.Width, MidpointRounding.AwayFromZero)).Distinct().Should().ContainSingle();
+        columns[0].Bounds.Width.Should().BeGreaterThan(216);
+        scroller.Extent.Width.Should().BeLessThanOrEqualTo(scroller.Viewport.Width, "seven columns fit side by side");
+        scroller.Extent.Width.Should().BeGreaterThan(scroller.Viewport.Width - 20, "they use the width");
+    });
+
+    [Fact]
+    public Task ABoardThatCannotBeReadIsTheSectionsErrorWithRetry() => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Failures[$"/api/projects/{Fixtures.ProjectId}/board"] = System.Net.HttpStatusCode.InternalServerError;
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800, api: api, address: $"#/p/{Fixtures.ProjectId}/health");
+        model.Navigation.Go($"#/p/{Fixtures.ProjectId}/board");
+        await Ui.UntilAsync(() => model.Board is { HasError: true });
+        var board = model.Board!;
+
+        window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "Failure").IsEffectivelyVisible.Should().BeTrue();
+        api.Failures.Clear();
+        await board.RetryCommand.ExecuteAsync(null);
+        board.Columns.Should().HaveCount(7);
+    });
+
+    [Fact]
+    public Task AChoiceTheServerRefusesIsAToast() => Ui.RunAsync(async () =>
+    {
+        var (window, api, model) = await Ui.OpenMainAsync(1280, 800);
+        api.Failures[$"/api/projects/{Fixtures.ProjectId}/board"] = System.Net.HttpStatusCode.BadRequest;
+
+        window.GetVisualDescendants().OfType<BoardView>().Single().FindControl<ComboBox>("SortPicker")!.SelectedIndex = 1;
+        await model.Board!.SaveCommand.ExecutionTask!;
+
+        model.Services.Toasts.Items.Should().ContainSingle(t => t.Bad && t.Text == "The Board's choice was not saved");
     });
 
     [Fact]

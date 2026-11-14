@@ -35,13 +35,12 @@ public sealed record BoardItem(
 /// <summary>
 /// A project's Board: one column per status, sorted and filtered by the server (TaskBoard). The tasks live in a
 /// SourceCache keyed by id: a reload applies only the differences, so unchanged cards keep their controls, scroll
-/// position and text selection. Changing a picker saves this machine's choice for the project and reloads. It
-/// follows live changes to its project's tasks.
+/// position and text selection. Changing a picker saves this machine's choice for the project and reloads. It is a
+/// section like any other (loading, its error with Retry, live updates of its project's tasks); a card's id opens
+/// the task's dialog.
 /// </summary>
 public sealed partial class BoardViewModel(UiServices services, string projectId, Func<string, string> taskLink)
-    : ObservableObject,
-        ILiveSection,
-        IDisposable
+    : SectionViewModel("", projectId, LiveKinds)
 {
     private static readonly string[] LiveKinds = ["tasks"];
 
@@ -57,11 +56,6 @@ public sealed partial class BoardViewModel(UiServices services, string projectId
     private readonly SourceCache<BoardItem, string> _items = new(item => item.Id);
     private bool _applying;
 
-    public string ProjectId { get; } = projectId;
-
-    public IReadOnlyList<string> Kinds => LiveKinds;
-
-    Task ILiveSection.RefreshAsync(bool force) => LoadAsync(CancellationToken.None);
     public ObservableCollection<BoardColumnViewModel> Columns { get; } = [];
     public ObservableCollection<Choice> Sorts { get; } = [];
     public ObservableCollection<Choice> HideDoneOptions { get; } = [];
@@ -76,43 +70,25 @@ public sealed partial class BoardViewModel(UiServices services, string projectId
     [ObservableProperty]
     public partial Choice? Blueprint { get; set; }
 
-    [ObservableProperty]
-    public partial string? Error { get; private set; }
-
-    [ObservableProperty]
-    public partial bool Loading { get; private set; }
-
     /// <summary>A card's id: the task's dialog, as Work › Tasks opens it.</summary>
     [RelayCommand]
-    private async Task OpenTaskAsync(string id) =>
+    private async Task OpenTaskAsync(string id)
+    {
+        var item = _items.Lookup(id);
         await services.Dialogs.ShowAsync(
-            new TaskDialog(services, ProjectId, id)
+            new TaskDialog(services, ProjectId!, id)
             {
-                Title = id,
+                Title = item.HasValue ? $"{id} · {item.Value.Title}" : id,
+                Sub = item.HasValue && item.Value.BlueprintId is { } blueprint ? $"In blueprint {blueprint}" : "Without a blueprint",
                 Wide = true,
                 HasCancel = false,
                 AcceptLabel = "Close",
             }
         );
-
-    /// <summary>Fetches the Board and shows it; a failure is shown, not thrown.</summary>
-    public async Task LoadAsync(CancellationToken token)
-    {
-        Loading = true;
-        try
-        {
-            Apply(await services.Api.BoardAsync(ProjectId, token));
-            Error = null;
-        }
-        catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
-        {
-            Error = exception.Message;
-        }
-        finally
-        {
-            Loading = false;
-        }
     }
+
+    protected override async Task LoadCoreAsync(CancellationToken token) =>
+        Apply(await services.Api.BoardAsync(ProjectId!, token));
 
     /// <summary>Shows <paramref name="board"/>: pickers set to its settings without saving them back.</summary>
     public void Apply(BoardResponse board)
@@ -151,13 +127,17 @@ public sealed partial class BoardViewModel(UiServices services, string projectId
         }
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        foreach (var column in Columns)
+        if (disposing)
         {
-            column.Dispose();
+            foreach (var column in Columns)
+            {
+                column.Dispose();
+            }
+            _items.Dispose();
         }
-        _items.Dispose();
+        base.Dispose(disposing);
     }
 
     partial void OnSortChanged(Choice? value) => Save(value, v => new BoardChange { Sort = v });
@@ -173,8 +153,8 @@ public sealed partial class BoardViewModel(UiServices services, string projectId
     {
         try
         {
-            await services.Api.SetBoardAsync(ProjectId, change, CancellationToken.None);
-            await LoadAsync(CancellationToken.None);
+            await services.Api.SetBoardAsync(ProjectId!, change, CancellationToken.None);
+            await RefreshAsync(force: true);
         }
         catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
         {
@@ -282,6 +262,8 @@ public sealed partial class BoardColumnViewModel : ObservableObject, IDisposable
 
     public string Status { get; }
     public string Label { get; }
+    public string StatusClass => "st-" + Status;
+    public string StatusIcon => TaskStates.Icon(Status);
     public ReadOnlyObservableCollection<TaskCardViewModel> Tasks => _cards;
     public int Count => _cards.Count;
     public bool IsEmpty => _cards.Count is 0;
@@ -310,10 +292,11 @@ public sealed partial class TaskCardViewModel : ObservableObject
     public partial string Title { get; private set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PriorityTip))]
+    [NotifyPropertyChangedFor(nameof(PriorityTip), nameof(PriorityIcon))]
     public partial string Priority { get; private set; } = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TypeIcon), nameof(TypeClass))]
     public partial string Type { get; private set; } = "";
 
     [ObservableProperty]
@@ -330,6 +313,12 @@ public sealed partial class TaskCardViewModel : ObservableObject
 
     public bool HasBlueprint => BlueprintText is not null;
     public string PriorityTip => Priority + " priority";
+
+    /// <summary>The type's mark (app.js typeMark): its icon, in its own colour (ty-&lt;type&gt;).</summary>
+    public string TypeIcon => TaskStates.TypeIcon(Type);
+
+    public string TypeClass => "ty-" + TaskStates.TypeIcon(Type);
+    public string PriorityIcon => "p-" + Priority;
 
     /// <summary>Takes a reload's values; only those that changed notify, so only they redraw.</summary>
     public void Update(BoardItem item)

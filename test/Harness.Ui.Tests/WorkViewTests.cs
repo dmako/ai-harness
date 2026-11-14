@@ -314,7 +314,8 @@ public sealed class WorkViewTests
 
         var dialog = await DialogAsync<TaskDialog>(model);
         Work(model).Section.Should().Be("tasks");
-        dialog.Title.Should().Be("TASK-0001");
+        dialog.Title.Should().Be("TASK-0001 · Ready one");
+        dialog.Sub.Should().Be("In blueprint BP-009");
     });
 
     [Fact]

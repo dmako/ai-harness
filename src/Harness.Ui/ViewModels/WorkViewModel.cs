@@ -799,8 +799,20 @@ public sealed partial class WorkPlan : SectionViewModel
     }
 
     [RelayCommand]
-    private async Task OpenTaskAsync(string id) =>
-        await _services.Dialogs.ShowAsync(new TaskDialog(_services, ProjectId!, id, this) { Title = id, Wide = true, HasCancel = false, AcceptLabel = "Close" });
+    private async Task OpenTaskAsync(string id)
+    {
+        var task = _tasks.FirstOrDefault(t => t.Id == id);
+        await _services.Dialogs.ShowAsync(
+            new TaskDialog(_services, ProjectId!, id, this)
+            {
+                Title = task is null ? id : $"{id} · {task.Title}",
+                Sub = task?.Blueprint is { } blueprint ? $"In blueprint {blueprint}" : "Without a blueprint",
+                Wide = true,
+                HasCancel = false,
+                AcceptLabel = "Close",
+            }
+        );
+    }
 
     [RelayCommand]
     private Task NewTaskAsync(string? blueprint) => TaskFormDialog.NewAsync(_services, ProjectId!, _blueprints, _tasks, blueprint is "—" ? "" : blueprint ?? "");

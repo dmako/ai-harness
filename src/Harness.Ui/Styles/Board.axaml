@@ -1,91 +1,51 @@
-<!-- The Board: columns side by side, cards stacked in each; mirrors style.css .board/.bcol/.bcard (TASK-0084). -->
+<!-- The Board (style.css .board, .bcol, .bcard): columns side by side, cards stacked in each. Only the Board's own
+     classes (bcol, bcount, bnone, bcard) are styled here; status pills, priority and type marks and blueprint frames
+     are the shared component classes (Chips, BlueprintFrames). -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Style Selector="Border.column">
-    <Setter Property="Width" Value="{StaticResource ColumnWidth}" />
+  <Style Selector="Border.bcol">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
-    <Setter Property="Margin" Value="0,0,12,0" />
   </Style>
-  <Style Selector="TextBlock.colhead">
+  <Style Selector="TextBlock.bcount">
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
-  <Style Selector="Border.colpill">
-    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
-    <Setter Property="CornerRadius" Value="999" />
-    <Setter Property="Padding" Value="8,1" />
-  </Style>
-  <Style Selector="TextBlock.count">
+  <Style Selector="TextBlock.bnone">
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
-    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
-  </Style>
-  <Style Selector="TextBlock.empty">
-    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
-    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
-    <Setter Property="Margin" Value="4,0,0,8" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="Margin" Value="12,0,0,10" />
   </Style>
 
-  <Style Selector="Border.card">
+  <Style Selector="Border.bcard">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
     <Setter Property="Padding" Value="10,8" />
     <Setter Property="Margin" Value="0,0,0,8" />
   </Style>
-  <Style Selector="TextBlock.type">
-    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
-    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
-  </Style>
-  <Style Selector="Button.tid">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-  </Style>
-  <Style Selector="Button.tid:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
-  </Style>
-  <Style Selector="HyperlinkButton.tid, Button.tid">
+  <Style Selector="Border.bcard Button.tid">
     <Setter Property="FontFamily" Value="{StaticResource Mono}" />
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
-    <Setter Property="Padding" Value="0" />
+    <Setter Property="Padding" Value="2,0" />
     <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
   </Style>
-  <Style Selector="TextBlock.prio">
+  <Style Selector="Border.bcard Button.tid:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Border.bcard TextBlock.prio">
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
-  <Style Selector="TextBlock.prio.p-low">
-    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
-  </Style>
-  <Style Selector="TextBlock.prio.p-medium">
-    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
-  </Style>
-  <Style Selector="TextBlock.prio.p-high">
-    <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-  </Style>
-  <Style Selector="TextBlock.prio.p-critical">
-    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-  </Style>
-  <Style Selector="SelectableTextBlock.title">
+  <Style Selector="Border.bcard SelectableTextBlock.title">
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
     <Setter Property="TextWrapping" Value="Wrap" />
-  </Style>
-  <Style Selector="Border.bpframe">
-    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
-    <Setter Property="Padding" Value="6,1" />
-    <Setter Property="HorizontalAlignment" Value="Left" />
-  </Style>
-  <Style Selector="Border.bpframe TextBlock">
-    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
-    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
   </Style>
 </Styles>

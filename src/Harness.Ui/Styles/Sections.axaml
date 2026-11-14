@@ -2,7 +2,7 @@
      insets, empty and error states, and the small text roles. Critical text is drawn only on Surface or Page: on
      Surface2 the dark Critical is 4.38:1, under AA (TASK-0147). -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:c="using:Harness.Ui.Controls">
+        xmlns:c="using:Harness.Ui.Controls" xmlns:v="using:Harness.Ui.Views">
   <Style Selector="TextBlock.h2">
     <Setter Property="FontSize" Value="{StaticResource TextXl}" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -21,10 +21,20 @@
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
 
-  <!-- a section: StackPanel.section holding a TextBlock.h3, a TextBlock.hint and its content -->
+  <!-- a section: StackPanel.section (or DockPanel.section, SectionView's) holding a TextBlock.h3, a TextBlock.hint
+       and its content; a section that is the whole page (the Board) is SectionView.page, without the space above -->
   <Style Selector="StackPanel.section">
     <Setter Property="Margin" Value="0,24,0,0" />
     <Setter Property="Spacing" Value="4" />
+  </Style>
+  <Style Selector="DockPanel.section">
+    <Setter Property="Margin" Value="0,24,0,0" />
+  </Style>
+  <Style Selector="DockPanel.section > TextBlock.h3">
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+  <Style Selector="v|SectionView.page DockPanel.section">
+    <Setter Property="Margin" Value="0" />
   </Style>
   <Style Selector="TextBlock.h3">
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />

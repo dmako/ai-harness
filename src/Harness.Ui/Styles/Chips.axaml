@@ -93,6 +93,30 @@
   </Style>
 
   <!-- priorities: the mark in the priority's colour, the word in the inks -->
+  <!-- a task type's mark (app.js typeMark, .opt-<type>): its icon in the type's own colour -->
+  <Style Selector="c|Icon.type">
+    <Setter Property="Size" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="c|Icon.ty-feature">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="c|Icon.ty-bug">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+  <Style Selector="c|Icon.ty-spike">
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="c|Icon.ty-docs">
+    <Setter Property="Foreground" Value="{DynamicResource CConvention}" />
+  </Style>
+  <Style Selector="c|Icon.ty-test">
+    <Setter Property="Foreground" Value="{DynamicResource Good}" />
+  </Style>
+  <Style Selector="c|Icon.ty-process">
+    <Setter Property="Foreground" Value="{DynamicResource COpenQuestion}" />
+  </Style>
+
   <Style Selector="c|Icon.prio">
     <Setter Property="Size" Value="14" />
     <Setter Property="VerticalAlignment" Value="Center" />

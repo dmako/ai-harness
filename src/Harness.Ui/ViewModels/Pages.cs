@@ -157,7 +157,6 @@ public sealed partial class HomePage : PageViewModel
 public sealed partial class ProjectPage : PageViewModel
 {
     private readonly UiServices _services;
-    private IDisposable? _follow;
 
     public ProjectPage(UiServices services, ProjectInfo project, Route route)
     {
@@ -239,7 +238,6 @@ public sealed partial class ProjectPage : PageViewModel
             return;
         }
         View = route.View;
-        _follow?.Dispose();
         (Body as IDisposable)?.Dispose();
         Body = BodyOf(route);
     }
@@ -260,8 +258,7 @@ public sealed partial class ProjectPage : PageViewModel
     {
         if (disposing)
         {
-            _follow?.Dispose();
-            (Body as IDisposable)?.Dispose();
+                (Body as IDisposable)?.Dispose();
         }
         base.Dispose(disposing);
     }
@@ -277,14 +274,14 @@ public sealed partial class ProjectPage : PageViewModel
         if (route.View is "board")
         {
             var board = new BoardViewModel(_services, Id, task => _services.Host.TaskLink(Id, task));
-            _follow = _services.Live.Register(board);
+            board.Follow(_services.Live);
             _ = ShowBoardAsync(board);
             return board;
         }
         if (route.View is "health")
         {
             var health = new HealthViewModel(_services, Id);
-            _follow = _services.Live.Register(health);
+            health.Follow(_services.Live);
             _ = health.LoadAsync();
             return health;
         }
@@ -311,7 +308,7 @@ public sealed partial class ProjectPage : PageViewModel
 
     private async Task ShowBoardAsync(BoardViewModel board)
     {
-        await board.LoadAsync(CancellationToken.None);
+        await board.LoadAsync();
         if (_services.Host.BoardShown is { } shown)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(shown, Avalonia.Threading.DispatcherPriority.Background);

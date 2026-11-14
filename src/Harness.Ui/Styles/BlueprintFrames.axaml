@@ -1,5 +1,18 @@
 <!-- A blueprint's frame drawn in its colour: the card sets the class bp-<colour>. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- the frame itself, neutral (a blueprint without a colour, or only named by tasks) -->
+  <Style Selector="Border.bpframe">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Border.bpframe TextBlock">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
   <Style Selector="Border.bpframe.bp-teal">
     <Setter Property="BorderBrush" Value="{DynamicResource Bp.teal}" />
   </Style>

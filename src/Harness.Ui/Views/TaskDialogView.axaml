@@ -12,7 +12,6 @@
       <TextBlock Text="{Binding LoadError}" />
     </Border>
     <StackPanel Spacing="12" IsVisible="{Binding HasTask}">
-      <SelectableTextBlock Name="TaskTitle" Classes="h3" Text="{Binding Task.Title}" TextWrapping="Wrap" />
       <WrapPanel ItemSpacing="8" LineSpacing="8">
         <Button Name="Edit" IsEnabled="{Binding Editable}" ToolTip.Tip="{Binding EditTip}" Command="{Binding EditCommand}">
           <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="edit" /><TextBlock Text="Edit" /></StackPanel>

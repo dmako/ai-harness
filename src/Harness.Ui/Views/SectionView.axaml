@@ -7,15 +7,16 @@
   <!-- a section (app.js section()/mount()): its title and hint, then its content: the Body a view gives it, else the
        DataTemplate of its view model's type; the first load shows a loading line, a failure its error with Retry, a
        reload keeps the content -->
-  <StackPanel Classes="section">
-    <TextBlock Classes="h3" Text="{Binding Title}"
+  <!-- a DockPanel, so a view that fills the window (the Board) gets the height left under the title -->
+  <DockPanel Classes="section">
+    <TextBlock DockPanel.Dock="Top" Classes="h3" Text="{Binding Title}"
                IsVisible="{Binding Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-    <TextBlock Classes="hint" Text="{Binding Hint}" IsVisible="{Binding HasHint}" />
-    <StackPanel Name="Loading" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Loading}">
+    <TextBlock DockPanel.Dock="Top" Classes="hint" Text="{Binding Hint}" IsVisible="{Binding HasHint}" />
+    <StackPanel DockPanel.Dock="Top" Name="Loading" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Loading}">
       <ProgressBar IsIndeterminate="True" Width="80" MinWidth="0" VerticalAlignment="Center" />
       <TextBlock Classes="muted" Text="Loading…" />
     </StackPanel>
-    <Border Name="Failure" Classes="error" IsVisible="{Binding HasError}">
+    <Border DockPanel.Dock="Top" Name="Failure" Classes="error" IsVisible="{Binding HasError}" Margin="0,0,0,8">
       <DockPanel>
         <Button DockPanel.Dock="Right" Classes="ghost" Content="Retry" Command="{Binding RetryCommand}"
                 Margin="12,0,0,0" VerticalAlignment="Center" />
@@ -27,5 +28,5 @@
     </Border>
     <ContentControl Name="BodyHost" IsVisible="{Binding HasContent}"
                     Opacity="{Binding Refreshing, Converter={x:Static c:Converters.Dimmed}}" />
-  </StackPanel>
+  </DockPanel>
 </UserControl>
