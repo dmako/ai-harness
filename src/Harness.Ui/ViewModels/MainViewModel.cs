@@ -224,6 +224,9 @@ public sealed class UiHostContext
     /// </summary>
     public Dictionary<string, string> Visits { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>What the page remembers for its life (app.js state): the Work section last shown.</summary>
+    public Dictionary<string, string> Remembered { get; } = new(StringComparer.Ordinal);
+
     /// <summary>The window, in days, of the reports and trends (app.js state.days; the JavaScript UI sets it).</summary>
     public int Days =>
         int.TryParse(Preferences.Get("days"), System.Globalization.CultureInfo.InvariantCulture, out var days) && days > 0 ? days : 30;

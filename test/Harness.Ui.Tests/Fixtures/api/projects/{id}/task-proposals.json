@@ -1,0 +1,28 @@
+{
+  "proposals": [
+    {
+      "id": "tpr_d83fd9b21428d3a1",
+      "task": {
+        "id": "",
+        "title": "Proposed task",
+        "blueprint": "BP-009",
+        "type": "feature",
+        "priority": "medium",
+        "goal": "Its goal",
+        "scope": [
+          "src"
+        ],
+        "depends_on": [
+          "TASK-0001"
+        ],
+        "acceptance": [
+          "Checked"
+        ]
+      },
+      "status": "pending",
+      "proposed_by": "agent:test",
+      "proposed_at": "2026-11-13T09:00:00Z",
+      "reason": "seen while working"
+    }
+  ]
+}

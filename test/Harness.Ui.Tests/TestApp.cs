@@ -140,6 +140,14 @@ internal static class Ui
         return window;
     }
 
+    /// <summary>Runs the UI thread's jobs and a render tick: what changed is laid out.</summary>
+    public static void Settle()
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Dispatcher.UIThread.RunJobs();
+    }
+
     /// <summary>Runs the UI thread's jobs and render ticks until <paramref name="condition"/> holds, at most 5 s.</summary>
     public static async Task UntilAsync(Func<bool> condition)
     {

@@ -1,0 +1,454 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.WorkView"
+             x:DataType="vm:WorkViewModel">
+  <!-- a project's Work (app.js "work"): Blueprints, Tasks and the Inbox by the address. A task row or a blueprint's
+       header or card is dragged with the pointer (WorkView.axaml.cs): a task onto another blueprint moves it, a
+       blueprint onto another reorders them; Move to and the arrows do the same without a pointer. -->
+  <StackPanel>
+    <Border Classes="subnav">
+      <ItemsControl Name="Sections" ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TabItem">
+            <c:AppLink Classes="tablink" Classes.selected="{Binding Selected}" Href="{Binding Href}"
+                       AutomationProperties.Name="{Binding Label}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Label}" />
+                <Border Classes="badge" IsVisible="{Binding HasBadge}"><TextBlock Text="{Binding Badge}" /></Border>
+              </StackPanel>
+            </c:AppLink>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <views:SectionView Name="PlanSection" DataContext="{Binding Plan}" IsVisible="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).ShowsPlan}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:WorkPlan" Spacing="12">
+          <!-- the summary and whether anything is stuck -->
+          <WrapPanel ItemSpacing="12" LineSpacing="12" IsVisible="{Binding HasTasks}">
+            <Border Name="Summary" Classes="card" Padding="14,10" MinWidth="260" MaxWidth="520">
+              <StackPanel Spacing="8">
+                <WrapPanel>
+                  <TextBlock FontWeight="SemiBold" Text="{Binding DoneText}" Margin="0,0,6,0" />
+                  <TextBlock Classes="muted" Text="{Binding DonePct, StringFormat='· {0}'}" />
+                </WrapPanel>
+                <c:StackBar Segments="{Binding Segments}" />
+                <ItemsControl ItemsSource="{Binding Parts}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel ItemSpacing="12" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BarPart">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                        <c:Swatch BrushKey="{Binding Brush}" Size="8" VerticalAlignment="Center" />
+                        <TextBlock Classes="small" Text="{Binding Text}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+            <Border Name="StuckCard" Classes="card" Padding="14,10" MinWidth="180">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="label" Text="Blocked or stale" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Classes="lv" Classes.warn="{Binding HasStuck}" Kind="{Binding StuckIcon}" VerticalAlignment="Center" Margin="0" />
+                  <TextBlock FontSize="{StaticResource TextXl}" FontWeight="SemiBold" Text="{Binding StuckCount}" />
+                </StackPanel>
+                <TextBlock Classes="muted small" Text="{Binding StuckNote}" />
+              </StackPanel>
+            </Border>
+          </WrapPanel>
+          <StackPanel Name="Stuck" Spacing="4" IsVisible="{Binding HasStuck}">
+            <TextBlock Classes="h3" Text="Needs attention" />
+            <ItemsControl ItemsSource="{Binding Stuck}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StuckItem">
+                  <Button Classes="row" Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.OpenTaskCommand}"
+                          CommandParameter="{Binding Id}" AutomationProperties.Name="{Binding Id, StringFormat='Open {0}'}">
+                    <DockPanel>
+                      <c:Icon DockPanel.Dock="Left" Classes="lv warn" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" />
+                      <TextBlock DockPanel.Dock="Left" Classes="mono small" Text="{Binding Id}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                      <TextBlock TextWrapping="Wrap">
+                        <Run Text="{Binding Title, Mode=OneWay}" /><Run Classes="muted" Text="{Binding Why, Mode=OneWay, StringFormat=' — {0}'}" />
+                      </TextBlock>
+                    </DockPanel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <!-- Blueprints: the cards with their state filter -->
+          <StackPanel Name="Blueprints" Spacing="12" IsVisible="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).ShowsBlueprints}">
+            <DockPanel>
+              <Button Name="NewBlueprint" DockPanel.Dock="Right" Classes="primary" Content="New blueprint…"
+                      Command="{Binding NewBlueprintCommand}" VerticalAlignment="Top" />
+              <ItemsControl ItemsSource="{Binding CardChips}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FilterChip">
+                    <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="{Binding Label}" />
+                        <TextBlock Text="{Binding Count}" />
+                      </StackPanel>
+                    </ToggleButton>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DockPanel>
+            <TextBlock Classes="empty" Text="{Binding CardsEmpty}" IsVisible="{Binding CardsEmpty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <ItemsControl Name="Cards" ItemsSource="{Binding Cards}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:BlueprintCard">
+                  <Border Classes="card bpcard drag-blueprint drop-blueprint" Width="340" Padding="14,12"
+                          AutomationProperties.Name="{Binding Heading}">
+                    <StackPanel Spacing="8">
+                      <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" IsVisible="{Binding HasBlueprint}">
+                          <Button Classes="icon" IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="{Binding Id, StringFormat='Move up {0}'}"
+                                  Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.MoveCardUpCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="up" />
+                          </Button>
+                          <Button Classes="icon" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="{Binding Id, StringFormat='Move down {0}'}"
+                                  Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.MoveCardDownCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="down" />
+                          </Button>
+                          <Button Classes="icon" AutomationProperties.Name="{Binding Id, StringFormat='Edit blueprint {0}'}"
+                                  Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.EditBlueprintCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="edit" />
+                          </Button>
+                          <Button Classes="icon" AutomationProperties.Name="{Binding Id, StringFormat='Remove blueprint {0}'}"
+                                  Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.RemoveBlueprintCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="trash" />
+                          </Button>
+                        </StackPanel>
+                        <WrapPanel ItemSpacing="8" LineSpacing="4">
+                          <Border Classes="bpframe" c:StyleClass.Name="{Binding FrameClass}" IsVisible="{Binding HasBlueprint}">
+                            <TextBlock Classes="mono" Text="{Binding Id}" />
+                          </Border>
+                          <Border Classes="pill" c:StyleClass.Name="{Binding StateClass}">
+                            <StackPanel Orientation="Horizontal">
+                              <c:Icon Kind="{Binding StateIcon}" />
+                              <TextBlock Text="{Binding StateLabel}" />
+                            </StackPanel>
+                          </Border>
+                        </WrapPanel>
+                      </DockPanel>
+                      <TextBlock Classes="h3" Classes.muted="{Binding !Described}" Text="{Binding Heading}" />
+                      <TextBlock Text="{Binding Info.Goal}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding HasGoal}" />
+                      <StackPanel Spacing="4" IsVisible="{Binding HasTasks}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Right" Classes="muted small" Text="{Binding ProgressText}" Margin="8,0,0,0" />
+                          <c:Meter Value="{Binding Progress}" VerticalAlignment="Center" HorizontalAlignment="Stretch" />
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding Counts}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="4" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:StateCount">
+                              <Border Classes="pill" c:StyleClass.Name="{Binding Class}">
+                                <StackPanel Orientation="Horizontal">
+                                  <c:Icon Kind="{Binding Icon}" />
+                                  <TextBlock Text="{Binding Text}" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <StackPanel Spacing="2" IsVisible="{Binding HasExit}">
+                        <TextBlock Classes="label" Text="{Binding ExitHead}" />
+                        <ItemsControl ItemsSource="{Binding ExitShown}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <TextBlock Classes="small" Text="{Binding StringFormat='○ {0}'}" TextWrapping="Wrap" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="link small" Content="{Binding ExitToggle}" Command="{Binding ToggleExitCommand}"
+                                IsVisible="{Binding ExitMore}" />
+                      </StackPanel>
+                      <StackPanel Spacing="2" IsVisible="{Binding NotesAsList}">
+                        <TextBlock Classes="label" Text="Notes" />
+                        <ItemsControl ItemsSource="{Binding NoteItems}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <TextBlock Classes="small" Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <TextBlock Classes="muted small" Text="{Binding Info.Notes}" TextWrapping="Wrap" IsVisible="{Binding NotesAsText}" />
+                      <Button Classes="link" Content="{Binding ShowTasks}" IsVisible="{Binding HasTasks}"
+                              Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.ShowTasksOfCommand}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <!-- Tasks: the filters, then a group per blueprint -->
+          <StackPanel Name="Tasks" Spacing="10" IsVisible="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).ShowsTasks}">
+            <WrapPanel ItemSpacing="6" LineSpacing="6">
+              <ItemsControl ItemsSource="{Binding StatusChips}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FilterChip">
+                    <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Border Classes="pill" c:StyleClass.Name="{Binding StatusClass}" BorderThickness="0" Padding="0">
+                          <StackPanel Orientation="Horizontal">
+                            <c:Icon Kind="{Binding StatusIcon}" />
+                            <TextBlock Text="{Binding Label}" />
+                          </StackPanel>
+                        </Border>
+                        <TextBlock Text="{Binding Count}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </ToggleButton>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <ComboBox Name="BlueprintPicker" ItemsSource="{Binding BlueprintChoices}" SelectedItem="{Binding SelectedBlueprint}"
+                        AutomationProperties.Name="Blueprint" MinWidth="160" MaxWidth="320" />
+              <Button Name="NewTask" Classes="primary" Content="New task…" Command="{Binding NewTaskCommand}" />
+            </WrapPanel>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="Drag a task onto another blueprint, or use Move to in its dialog, to move it; 'harness tasks export' writes the moves into the backlog file. Drag a blueprint by its header, or use its arrows, to reorder the blueprints." />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding TasksEmpty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Classes="empty" Text="{Binding TasksEmpty}" VerticalAlignment="Center" />
+              <Button Content="Show done tasks" Command="{Binding ShowDoneCommand}" IsVisible="{Binding OffersDone}" />
+            </StackPanel>
+            <ItemsControl Name="Groups" ItemsSource="{Binding Groups}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TaskGroup">
+                  <Border Classes="card group drop-blueprint" Padding="8">
+                    <StackPanel Spacing="4">
+                      <DockPanel Classes="drag-blueprint" Classes.movable="{Binding Movable}">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" IsVisible="{Binding Movable}">
+                          <Button Classes="icon" IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="{Binding Id, StringFormat='Move up {0}'}"
+                                  Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.MoveGroupUpCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="up" />
+                          </Button>
+                          <Button Classes="icon" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="{Binding Id, StringFormat='Move down {0}'}"
+                                  Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.MoveGroupDownCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="down" />
+                          </Button>
+                        </StackPanel>
+                        <Button Classes="row" Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.ToggleCommand}"
+                                CommandParameter="{Binding}" AutomationProperties.Name="{Binding AccessibleName}">
+                          <WrapPanel ItemSpacing="10" LineSpacing="4">
+                            <TextBlock Text="{Binding Open, Converter={x:Static c:Converters.Chevron}}" VerticalAlignment="Center" />
+                            <Border Classes="bpframe" c:StyleClass.Name="{Binding FrameClass}" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Name}" />
+                            </Border>
+                            <TextBlock Classes="muted small" Text="{Binding CountText}" VerticalAlignment="Center" />
+                            <c:Meter Value="{Binding Progress}" Width="100" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted small" Text="{Binding ProgressText}" VerticalAlignment="Center" />
+                          </WrapPanel>
+                        </Button>
+                      </DockPanel>
+                      <TextBlock Classes="muted small" Text="{Binding Goal}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding HasGoal}" Margin="6,0" />
+                      <ItemsControl ItemsSource="{Binding Rows}" IsVisible="{Binding Open}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:TaskRow">
+                            <Border Classes="trow drag-task">
+                              <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2">
+                                  <Button Classes="icon" IsEnabled="{Binding Editable}" ToolTip.Tip="{Binding EditTip}"
+                                          AutomationProperties.Name="{Binding Id, StringFormat='Edit {0}'}"
+                                          Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.EditTaskCommand}" CommandParameter="{Binding Id}">
+                                    <c:Icon Kind="edit" />
+                                  </Button>
+                                  <Button Classes="icon" AutomationProperties.Name="{Binding Id, StringFormat='Delete {0}'}"
+                                          Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.DeleteTaskCommand}" CommandParameter="{Binding Id}">
+                                    <c:Icon Kind="trash" />
+                                  </Button>
+                                </StackPanel>
+                                <Button Classes="row" AutomationProperties.Name="{Binding AccessibleName}"
+                                        Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.OpenTaskCommand}" CommandParameter="{Binding Id}">
+                                  <DockPanel>
+                                    <Border DockPanel.Dock="Right" Classes="pill" c:StyleClass.Name="{Binding StatusClass}" Margin="8,0,0,0">
+                                      <StackPanel Orientation="Horizontal">
+                                        <c:Icon Kind="{Binding StatusIcon}" />
+                                        <TextBlock Text="{Binding StatusWords}" />
+                                      </StackPanel>
+                                    </Border>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0" VerticalAlignment="Center">
+                                      <c:Icon Classes="prio" c:StyleClass.Name="{Binding PriorityClass}" Kind="{Binding PriorityIcon}" />
+                                      <TextBlock Classes="small" Text="{Binding Priority}" />
+                                    </StackPanel>
+                                    <TextBlock DockPanel.Dock="Right" Classes="muted small" Text="{Binding Acceptance}" Margin="8,0,0,0"
+                                               VerticalAlignment="Center" ToolTip.Tip="acceptance criteria met" />
+                                    <TextBlock DockPanel.Dock="Left" Classes="mono small muted" Text="{Binding Id}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <c:Icon DockPanel.Dock="Left" Kind="{Binding TypeIcon}" ToolTip.Tip="{Binding Type}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <WrapPanel VerticalAlignment="Center" ItemSpacing="8">
+                                      <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                      <Border Classes="claimtag" Classes.warn="{Binding ClaimWarn}" Classes.bad="{Binding ClaimBad}" IsVisible="{Binding HasClaim}">
+                                        <TextBlock Classes="small" Text="{Binding Claim}" TextWrapping="Wrap" />
+                                      </Border>
+                                    </WrapPanel>
+                                  </DockPanel>
+                                </Button>
+                              </DockPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <ItemsControl ItemsSource="{Binding Deferred}" IsVisible="{Binding Open}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:DeferredLine">
+                            <WrapPanel ItemSpacing="8" Margin="6,2">
+                              <Border Classes="pill st-deferred">
+                                <StackPanel Orientation="Horizontal">
+                                  <c:Icon Kind="status-deferred" />
+                                  <TextBlock Text="deferred" />
+                                </StackPanel>
+                              </Border>
+                              <TextBlock Classes="small" Text="{Binding CountText}" VerticalAlignment="Center" />
+                              <TextBlock Classes="muted small" Text="{Binding Reason}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                              <Button Classes="link small" Content="show"
+                                      Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.ShowDeferredCommand}" />
+                            </WrapPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Button Classes="ghost small" IsVisible="{Binding Open}" HorizontalAlignment="Left"
+                              Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.NewTaskCommand}" CommandParameter="{Binding Id}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <c:Icon Kind="plus" />
+                          <TextBlock Text="Add task" />
+                        </StackPanel>
+                      </Button>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <!-- while a task is dragged: the blueprints with nothing shown, as targets -->
+            <WrapPanel Name="DropStrip" ItemSpacing="6" LineSpacing="6" IsVisible="False">
+              <TextBlock Classes="muted small" Text="Move to:" VerticalAlignment="Center" />
+              <ItemsControl ItemsSource="{Binding Targets}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TaskGroup">
+                    <Border Classes="bpframe drop-blueprint" c:StyleClass.Name="{Binding FrameClass}" Padding="8,4">
+                      <TextBlock Text="{Binding Name}" />
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </WrapPanel>
+          </StackPanel>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <views:SectionView Name="InboxSection" DataContext="{Binding Inbox}" IsVisible="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).ShowsInbox}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:InboxViewModel" Spacing="12">
+          <ItemsControl ItemsSource="{Binding StatusChips}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FilterChip">
+                <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Name="InboxZero" Classes="card" Padding="14,10" IsVisible="{Binding InboxZero}">
+            <DockPanel>
+              <c:Icon DockPanel.Dock="Left" Classes="lv" Kind="inbox" />
+              <StackPanel>
+                <TextBlock FontWeight="SemiBold" Text="Inbox zero" />
+                <TextBlock Classes="muted small" TextWrapping="Wrap"
+                           Text="No proposal waits for you: agents' suggestions appear here for you to approve." />
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <TextBlock Classes="empty" Text="{Binding Empty}" IsVisible="{Binding Empty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="h3" Text="Tasks" IsVisible="{Binding HasTaskCards}" />
+          <ItemsControl Name="TaskProposals" ItemsSource="{Binding TaskCards}" ItemTemplate="{StaticResource ProposalCardTemplate}" />
+          <TextBlock Classes="h3" Text="Blueprints" IsVisible="{Binding HasBlueprintCards}" />
+          <ItemsControl Name="BlueprintProposals" ItemsSource="{Binding BlueprintCards}" ItemTemplate="{StaticResource ProposalCardTemplate}" />
+          <TextBlock Classes="h3" Text="Architecture" IsVisible="{Binding HasArchCards}" />
+          <ItemsControl Name="ArchProposals" ItemsSource="{Binding ArchCards}" ItemTemplate="{StaticResource ProposalCardTemplate}" />
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+  </StackPanel>
+
+  <UserControl.Resources>
+    <DataTemplate x:Key="ProposalCardTemplate" x:DataType="vm:ProposalCard">
+      <Border Classes="card proposal" Classes.inactive="{Binding Rejected}" Padding="14,12" Margin="0,0,0,10"
+              AutomationProperties.Name="{Binding AccessibleName}">
+        <StackPanel Spacing="6">
+          <WrapPanel ItemSpacing="8" LineSpacing="4">
+            <TextBlock Classes="label" Text="{Binding Head}" VerticalAlignment="Center" />
+            <ItemsControl ItemsSource="{Binding Tags}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="6" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Border Classes="pill"><TextBlock Text="{Binding}" /></Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </WrapPanel>
+          <SelectableTextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+          <ItemsControl ItemsSource="{Binding Lines}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:Fact">
+                <SelectableTextBlock TextWrapping="Wrap">
+                  <Run FontWeight="SemiBold" Text="{Binding Label, Mode=OneWay, StringFormat='{}{0}: '}" /><Run Text="{Binding Value, Mode=OneWay}" />
+                </SelectableTextBlock>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Expander Header="{Binding ListHead}" IsVisible="{Binding HasList}" IsExpanded="True" HorizontalAlignment="Stretch">
+            <ItemsControl ItemsSource="{Binding List}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <SelectableTextBlock Classes="small" Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Expander>
+          <TextBlock Classes="muted small" Text="{Binding Provenance}" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Pending}">
+            <Button Classes="primary" Content="{Binding ApproveLabel}"
+                    Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Inbox.ApproveCommand}" CommandParameter="{Binding}" />
+            <Button Classes="ghost" Content="Reject…"
+                    Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Inbox.RejectCommand}" CommandParameter="{Binding}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+</UserControl>

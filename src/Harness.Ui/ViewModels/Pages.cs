@@ -221,6 +221,7 @@ public sealed partial class ProjectPage : PageViewModel
     {
         Project = project;
         (Body as OverviewViewModel)?.Update(project);
+        (Body as WorkViewModel)?.Update(project, route);
         Tabs.Clear();
         foreach (var tab in TabsOf(project, route.View))
         {
@@ -234,6 +235,7 @@ public sealed partial class ProjectPage : PageViewModel
         Lists.Sync(Tabs, TabsOf(Project, route.View));
         if (View == route.View && Body is not null)
         {
+            (Body as WorkViewModel)?.Show(route);
             return;
         }
         View = route.View;
@@ -292,11 +294,16 @@ public sealed partial class ProjectPage : PageViewModel
             overview.Start();
             return overview;
         }
+        if (route.View is "work")
+        {
+            var work = new WorkViewModel(_services, Project, route);
+            work.Start();
+            return work;
+        }
         var (label, task) = route.View switch
         {
             "architecture" => ("Architecture", "TASK-0156"),
             "knowledge" => ("Knowledge", "TASK-0153"),
-            "work" => ("Work", "TASK-0152"),
             _ => ("Agents", "TASK-0154"),
         };
         return new PlaceholderPage(label, task, _services.Host.Current(route));

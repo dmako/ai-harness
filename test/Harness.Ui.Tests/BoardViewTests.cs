@@ -41,11 +41,11 @@ public sealed class BoardViewTests
         critical.FindControl<Border>("BlueprintFrame")!.Classes.Should().Contain("bp-yellow");
         critical.FindControl<SelectableTextBlock>("Title")!.Text.Should().Be("Port the Board to Avalonia");
         cards[2].FindControl<Border>("BlueprintFrame")!.IsVisible.Should().BeFalse("TASK-0003 has no blueprint");
-        critical
-            .GetVisualDescendants()
-            .OfType<HyperlinkButton>()
-            .Single()
-            .NavigateUri!.ToString()
+        // the id opens the task's dialog; its context menu keeps the task's page in the current UI
+        var open = critical.FindControl<Button>("OpenTask")!;
+        open.CommandParameter.Should().Be("TASK-0002");
+        open.Command.Should().NotBeNull();
+        ((TaskCardViewModel)critical.DataContext!).Link.ToString()
             .Should()
             .Be("http://127.0.0.1:17477/#/p/prj_fixture/work/tasks/TASK-0002");
     });

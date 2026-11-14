@@ -1,0 +1,80 @@
+<!-- Work (style.css .mcard, .mstone, .trow, .claimtag, .aprop): blueprint cards, task groups and rows, a claim's tag
+     and the Inbox's proposals. While something is dragged (WorkView.axaml.cs) the targets are outlined. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <Style Selector="Border.trow">
+    <Setter Property="Padding" Value="4,4" />
+  </Style>
+  <Style Selector="Border.claimtag">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusPill}" />
+    <Setter Property="Padding" Value="8,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.claimtag TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="Border.claimtag.warn">
+    <Setter Property="BorderBrush" Value="{DynamicResource Warning}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.claimtag.bad">
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.proposal.inactive">
+    <Setter Property="Opacity" Value="0.7" />
+  </Style>
+  <Style Selector="DockPanel.drag-blueprint.movable, Border.bpcard">
+    <Setter Property="Cursor" Value="SizeAll" />
+  </Style>
+  <!-- while dragging: the targets outlined in the accent -->
+  <Style Selector="StackPanel.dragging Border.drop-blueprint">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Border.callout">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Warning}" />
+    <Setter Property="BorderThickness" Value="3,0,0,0" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="10,6" />
+  </Style>
+  <Style Selector="Border.callout.bad">
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+  </Style>
+  <Style Selector="TextBlock.mark">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.mark.pass">
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
+  </Style>
+  <Style Selector="TextBlock.mark.fail">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+  <!-- a picker of a few (Type, Priority, Colour): a ListBox of choices side by side -->
+  <Style Selector="ListBox.seg">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="ListBox.seg ListBoxItem">
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Margin" Value="0,0,4,4" />
+  </Style>
+  <Style Selector="ListBox.seg ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Border.swatch">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="BorderThickness" Value="6" />
+  </Style>
+</Styles>

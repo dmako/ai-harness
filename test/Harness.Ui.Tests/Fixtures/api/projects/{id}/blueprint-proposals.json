@@ -1,0 +1,19 @@
+{
+  "proposals": [
+    {
+      "id": "bpr_d5e2ea05446c7188",
+      "blueprint": {
+        "title": "Proposed blueprint",
+        "goal": "Its goal",
+        "exit": [
+          "Done when shipped"
+        ],
+        "notes": "a note"
+      },
+      "status": "pending",
+      "proposed_by": "agent:test",
+      "proposed_at": "2026-11-13T09:00:00Z",
+      "reason": "why"
+    }
+  ]
+}

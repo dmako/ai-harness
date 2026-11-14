@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             x:Class="Harness.Ui.Views.ArchApproveView"
+             x:DataType="vm:ArchApproveDialog">
+  <!-- approving an architecture proposal: the task's title and body, or the mark's reason -->
+  <StackPanel Spacing="10">
+    <StackPanel Classes="field" IsVisible="{Binding IsTask}">
+      <TextBlock Classes="label" Text="Title" />
+      <TextBox Name="TitleField" Text="{Binding TaskTitle}" AutomationProperties.Name="Title" />
+    </StackPanel>
+    <StackPanel Classes="field">
+      <TextBlock Classes="label" Text="{Binding BodyLabel}" />
+      <TextBox Name="BodyField" Text="{Binding Body}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
+               AutomationProperties.Name="{Binding BodyLabel}" />
+    </StackPanel>
+    <TextBlock Classes="muted small" Text="{Binding Explanation}" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

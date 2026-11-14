@@ -4,6 +4,8 @@ using Harness.Core.Tasks;
 using Harness.Integration.Sync;
 using Harness.Ui.Api;
 using Xunit;
+using BlueprintApproval = Harness.Ui.Api.BlueprintApproval;
+using BlueprintRemoval = Harness.Ui.Api.BlueprintRemoval;
 
 namespace Harness.Integration.Web;
 
@@ -55,7 +57,12 @@ public sealed class UiContractTests
 
         // the Overview: the tasks, the report and trends over a window, and the activity (the seeded claim)
         var tasks = (await api.TasksAsync(id, Token)).Tasks;
-        tasks.Select(t => (t.Id, t.Status)).Should().Equal(("TASK-0001", "ready"), ("TASK-0002", "done"), ("TASK-0003", "claimed"));
+        tasks.Select(t => (t.Id, t.Status))
+            .Should()
+            .BeEquivalentTo([("TASK-0001", "ready"), ("TASK-0002", "done"), ("TASK-0003", "claimed"), ("TASK-0004", "backlog")]);
+        tasks.Single(t => t.Id == "TASK-0001").Acceptance.Should().ContainSingle(c => c.Criterion == "It runs" && c.Result == "pending");
+        tasks.Single(t => t.Id == "TASK-0003").Claim!.Claimant.Should().Be("claude-code");
+        tasks.Single(t => t.Id == "TASK-0004").DependsOn.Should().ContainSingle(d => d.Id == "TASK-0001" && d.Status == "ready");
         tasks.Single(t => t.Id == "TASK-0002").Completion!.CompletedAt.Should().NotBeNullOrEmpty();
         var report = await api.ReportAsync(id, 14, Token);
         report.Days.Should().Be(14);
@@ -91,6 +98,52 @@ public sealed class UiContractTests
             .Awaiting(() => api.FixAsync(id, new FixRequest { Check = "config" }, Token))
             .Should()
             .ThrowAsync<HarnessApiException>();
+
+        // Work: the reads, then every write the view sends
+        var blueprints = (await api.BlueprintsAsync(id, Token)).Blueprints;
+        blueprints.Select(b => b.Id).Should().Equal("BP-009", "BP-008");
+        blueprints[0].Exit.Should().Equal("Released", "Documented");
+        blueprints[0].Tasks.Should().ContainKey("ready");
+        (await api.NextTaskIdAsync(id, Token)).Id.Should().Be("TASK-0005");
+        (await api.NextBlueprintIdAsync(id, Token)).Id.Should().Be("BP-010");
+        (await api.TaskEventsAsync(id, "TASK-0001", Token)).Events.Should().Contain(e => e.Event == "unlocked" && e.To == "ready");
+        (await api.TaskSessionsAsync(id, "TASK-0001", Token)).Sessions.Should().BeEmpty();
+        var taskProposal = (await api.TaskProposalsAsync(id, "pending", Token)).Proposals.Should().ContainSingle().Subject;
+        taskProposal.Task.DependsOn.Should().Equal("TASK-0001");
+        var blueprintProposal = (await api.BlueprintProposalsAsync(id, "pending", Token)).Proposals.Should().ContainSingle().Subject;
+        blueprintProposal.Blueprint.Exit.Should().Equal("Done when shipped");
+        var archProposal = (await api.ArchProposalsAsync(id, "pending", Token)).Proposals.Should().ContainSingle().Subject;
+        archProposal.Basis.Should().Be("observation");
+
+        await api.CreateBlueprintAsync(id, new BlueprintForm { Id = "BP-010", Title = "Offline", Exit = ["Works offline"], Color = "teal" }, Token);
+        await api.EditBlueprintAsync(id, "BP-010", new BlueprintForm { Title = "Offline search", Notes = "- one\n- two" }, Token);
+        await api.CreateTaskAsync(
+            id,
+            new TaskForm { Title = "Search offline", Type = "bug", Priority = "high", Blueprint = "BP-010", DependsOn = ["TASK-0001"], Acceptance = ["Works"], Scope = ["src"] },
+            Token
+        );
+        await api.EditTaskAsync(id, "TASK-0005", new TaskForm { Title = "Search offline, restated", Blueprint = "BP-010", Acceptance = ["Works"] }, Token);
+        await api.MoveTaskAsync(id, "TASK-0005", "BP-009", Token);
+        await api.OrderBlueprintsAsync(id, ["BP-010", "BP-009", "BP-008"], Token);
+        var created = (await api.TasksAsync(id, Token)).Tasks.Single(t => t.Id == "TASK-0005");
+        (created.Title, created.Blueprint, created.Type, created.Priority).Should().Be(("Search offline, restated", "BP-009", "feature", "medium"));
+        var ordered = (await api.BlueprintsAsync(id, Token)).Blueprints;
+        ordered.Select(b => b.Id).Should().Equal("BP-010", "BP-009", "BP-008");
+        (ordered[0].Title, ordered[0].Color, ordered[0].Notes).Should().Be(("Offline search", "teal", "- one\n- two"));
+        await api.RemoveBlueprintAsync(id, "BP-010", new BlueprintRemoval(), Token);
+        await api.DeleteTaskAsync(id, "TASK-0005", Token);
+        (await api.TasksAsync(id, Token)).Tasks.Should().NotContain(t => t.Id == "TASK-0005");
+
+        await api.ApproveTaskAsync(id, taskProposal.Id, new TaskForm { Title = "Proposed task", Blueprint = "BP-009", Acceptance = ["Checked"] }, Token);
+        await api.ApproveBlueprintAsync(id, blueprintProposal.Id, new BlueprintApproval { Edit = new BlueprintForm { Title = "Proposed blueprint" } }, Token);
+        await api.RejectAsync(id, "arch", archProposal.Id, "not now", Token);
+        (await api.TaskProposalsAsync(id, "approved", Token)).Proposals.Should().ContainSingle(p => p.Result != null);
+        (await api.BlueprintProposalsAsync(id, "approved", Token)).Proposals.Should().ContainSingle();
+        (await api.ArchProposalsAsync(id, "rejected", Token)).Proposals.Should().ContainSingle(p => p.Note == "not now");
+        await FluentActions
+            .Awaiting(() => api.EditTaskAsync(id, "TASK-0003", new TaskForm { Title = "Claimed" }, Token))
+            .Should()
+            .ThrowAsync<HarnessApiException>("a claimed task's definition is fixed");
 
         // the docs
         var docs = await api.DocsAsync(Token);

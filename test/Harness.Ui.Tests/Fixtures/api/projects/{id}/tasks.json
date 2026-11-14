@@ -6,7 +6,22 @@
       "status": "ready",
       "priority": "high",
       "type": "spike",
-      "blueprint": "BP-009"
+      "blueprint": "BP-009",
+      "goal": "Try it out",
+      "scope": [
+        "src"
+      ],
+      "validation": [
+        "dotnet test"
+      ],
+      "notes": "A note",
+      "acceptance": [
+        {
+          "index": 1,
+          "criterion": "It runs",
+          "result": "pending"
+        }
+      ]
     },
     {
       "id": "TASK-0002",

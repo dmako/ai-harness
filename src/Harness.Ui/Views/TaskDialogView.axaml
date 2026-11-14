@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.TaskDialogView"
+             x:DataType="vm:TaskDialog">
+  <!-- a task (app.js taskDetail): why blocked or deferred, goal, criteria, completion, notes, sessions, audit trail,
+       and the facts; Edit, Move to, Delete -->
+  <StackPanel Spacing="12">
+    <TextBlock Classes="muted" Text="Loading…" IsVisible="{Binding !HasTask}" />
+    <Border Classes="error" IsVisible="{Binding LoadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding LoadError}" />
+    </Border>
+    <StackPanel Spacing="12" IsVisible="{Binding HasTask}">
+      <SelectableTextBlock Name="TaskTitle" Classes="h3" Text="{Binding Task.Title}" TextWrapping="Wrap" />
+      <WrapPanel ItemSpacing="8" LineSpacing="8">
+        <Button Name="Edit" IsEnabled="{Binding Editable}" ToolTip.Tip="{Binding EditTip}" Command="{Binding EditCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="edit" /><TextBlock Text="Edit" /></StackPanel>
+        </Button>
+        <WrapPanel ItemSpacing="6" LineSpacing="6">
+          <TextBlock Classes="label" Text="Move to" />
+          <ComboBox Name="MoveTo" ItemsSource="{Binding MoveChoices}" SelectedItem="{Binding MoveTo}" MinWidth="160" MaxWidth="280"
+                    AutomationProperties.Name="Move to blueprint" />
+          <Button Name="Move" Content="Move" Command="{Binding MoveCommand}" />
+        </WrapPanel>
+        <Button Name="Delete" Classes="ghost" Command="{Binding DeleteCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="trash" /><TextBlock Text="Delete" /></StackPanel>
+        </Button>
+      </WrapPanel>
+      <Border Classes="callout" Classes.bad="{Binding CalloutBad}" IsVisible="{Binding HasCallout}">
+        <SelectableTextBlock Text="{Binding Callout}" TextWrapping="Wrap" />
+      </Border>
+      <StackPanel Spacing="2" IsVisible="{Binding HasGoal}">
+        <TextBlock Classes="label" Text="Goal" />
+        <SelectableTextBlock Text="{Binding Task.Goal}" TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel Spacing="2" IsVisible="{Binding HasCriteria}">
+        <TextBlock Classes="label" Text="{Binding CriteriaHead}" />
+        <ItemsControl Name="Criteria" ItemsSource="{Binding Criteria}" ItemTemplate="{StaticResource CheckRowTemplate}" />
+      </StackPanel>
+      <StackPanel Spacing="2" IsVisible="{Binding HasCompletion}">
+        <TextBlock Classes="label" Text="Completed" />
+        <SelectableTextBlock Text="{Binding Task.Completion.Summary}" TextWrapping="Wrap" />
+        <ItemsControl ItemsSource="{Binding Checks}" ItemTemplate="{StaticResource CheckRowTemplate}" IsVisible="{Binding HasChecks}" />
+      </StackPanel>
+      <StackPanel Spacing="2" IsVisible="{Binding HasNotes}">
+        <TextBlock Classes="label" Text="Notes" />
+        <SelectableTextBlock Classes="muted" Text="{Binding Task.Notes}" TextWrapping="Wrap" />
+      </StackPanel>
+      <Border Classes="inset">
+        <Grid Name="Facts">
+          <ItemsControl ItemsSource="{Binding Facts}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:Fact">
+                <Grid ColumnDefinitions="110,*" Margin="0,2">
+                  <TextBlock Classes="muted small" Text="{Binding Label}" Margin="0,0,8,0" />
+                  <SelectableTextBlock Grid.Column="1" Classes="small" Text="{Binding Value}" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+      </Border>
+      <StackPanel Name="Sessions" Spacing="4">
+        <TextBlock Classes="label" Text="Agent sessions" />
+        <TextBlock Classes="small" Text="{Binding SessionsUsage}" TextWrapping="Wrap" IsVisible="{Binding HasSessionsUsage}" />
+        <TextBlock Classes="muted small" Text="{Binding SessionsNote}" TextWrapping="Wrap"
+                   IsVisible="{Binding SessionsNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <ItemsControl ItemsSource="{Binding Sessions}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SessionRow">
+              <StackPanel Margin="0,2">
+                <WrapPanel ItemSpacing="8">
+                  <TextBlock FontWeight="SemiBold" Text="{Binding Client}" />
+                  <TextBlock Classes="mono small" Text="{Binding ShortId}" VerticalAlignment="Center" />
+                  <TextBlock Classes="small" Text="{Binding Status}" VerticalAlignment="Center" />
+                  <TextBlock Classes="muted small" Text="{Binding Seen}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </WrapPanel>
+                <TextBlock Classes="muted small" Text="{Binding Usage}" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <StackPanel Name="Trail" Spacing="4">
+        <Button Name="ShowTrail" Classes="ghost" Content="Show audit trail" Command="{Binding ShowTrailCommand}"
+                IsVisible="{Binding !TrailShown}" HorizontalAlignment="Left" />
+        <TextBlock Classes="label" Text="Audit trail" IsVisible="{Binding TrailShown}" />
+        <TextBlock Classes="error" Text="{Binding TrailError}" IsVisible="{Binding TrailError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <ItemsControl ItemsSource="{Binding Trail}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:EventRow">
+              <StackPanel Margin="0,2">
+                <WrapPanel ItemSpacing="8">
+                  <TextBlock FontWeight="SemiBold" Text="{Binding Event}" />
+                  <TextBlock Classes="small" Text="{Binding Move}" IsVisible="{Binding Moved}" VerticalAlignment="Center" />
+                  <TextBlock Classes="muted small" Text="{Binding Who}" VerticalAlignment="Center" />
+                </WrapPanel>
+                <SelectableTextBlock Classes="muted small" Text="{Binding Detail}" TextWrapping="Wrap" IsVisible="{Binding HasDetail}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+  <UserControl.Resources>
+    <DataTemplate x:Key="CheckRowTemplate" x:DataType="vm:CheckRow">
+      <DockPanel Margin="0,2">
+        <TextBlock DockPanel.Dock="Left" Classes="mark" Classes.pass="{Binding Passed}" Classes.fail="{Binding Failed}"
+                   Text="{Binding Mark}" ToolTip.Tip="{Binding Result}" />
+        <StackPanel>
+          <SelectableTextBlock Classes.mono="{Binding Mono}" Text="{Binding Text}" TextWrapping="Wrap" />
+          <SelectableTextBlock Classes="muted small" Text="{Binding Evidence}" TextWrapping="Wrap" IsVisible="{Binding HasEvidence}" />
+        </StackPanel>
+      </DockPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+</UserControl>

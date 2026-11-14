@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             x:Class="Harness.Ui.Views.RemoveBlueprintView"
+             x:DataType="vm:RemoveBlueprintDialog">
+  <!-- removing a blueprint with tasks (app.js removeBlueprintDialog): move them, or delete them with it -->
+  <StackPanel Spacing="10">
+    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" IsVisible="{Binding HasName}" />
+    <DockPanel>
+      <RadioButton Name="MoveChoice" GroupName="tasks" Content="Move them to" IsChecked="{Binding Move}" Margin="0,0,8,0" />
+      <ComboBox Name="MoveTo" ItemsSource="{Binding Targets}" SelectedItem="{Binding MoveTo}" MinWidth="180" MaxWidth="320"
+                AutomationProperties.Name="Move to" />
+    </DockPanel>
+    <RadioButton Name="DeleteChoice" GroupName="tasks" Content="Delete them, with their audit trail" IsChecked="{Binding Delete}" />
+    <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{x:Static vm:RemoveBlueprintDialog.Note}" />
+    <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{x:Static vm:RemoveBlueprintDialog.Backlog}" />
+  </StackPanel>
+</UserControl>

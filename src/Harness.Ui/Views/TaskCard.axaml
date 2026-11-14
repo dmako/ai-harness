@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
              x:Class="Harness.Ui.Views.TaskCard"
              x:DataType="vm:TaskCardViewModel">
-  <!-- a card (TASK-0084): type and id left, priority right on one line; the title below, wrapping; the blueprint's
+  <!-- a card (TASK-0084): type and id left (the id opens the task's dialog), priority right on one line; the title below, wrapping; the blueprint's
        title on one line under it, cut with an ellipsis -->
   <Border Classes="card" AutomationProperties.Name="{Binding Id}">
     <StackPanel Spacing="6">
@@ -12,8 +13,9 @@
                    Text="{Binding Priority}" ToolTip.Tip="{Binding PriorityTip}" />
         <StackPanel Orientation="Horizontal" Spacing="8">
           <TextBlock Classes="type" Text="{Binding Type}" VerticalAlignment="Center" />
-          <HyperlinkButton Classes="tid" Content="{Binding Id}" NavigateUri="{Binding Link}"
-                           AutomationProperties.Name="{Binding Id, StringFormat='Open {0}'}" />
+          <Button Name="OpenTask" Classes="tid" Content="{Binding Id}" CommandParameter="{Binding Id}"
+                  Command="{Binding $parent[views:BoardView].((vm:BoardViewModel)DataContext).OpenTaskCommand}"
+                  AutomationProperties.Name="{Binding Id, StringFormat='Open {0}'}" />
         </StackPanel>
       </DockPanel>
       <SelectableTextBlock Name="Title" Classes="title" Text="{Binding Title}" />

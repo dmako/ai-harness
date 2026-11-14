@@ -14,6 +14,9 @@ public static class Converters
     public static IValueConverter WorkspaceHref { get; } =
         new FuncValueConverter<string?, string?>(name => name is null ? null : Navigation.Route.WorkspaceHref(name));
 
+    /// <summary>A group's open state as its chevron: open points down, closed points right.</summary>
+    public static IValueConverter Chevron { get; } = new FuncValueConverter<bool, string>(open => open ? "▾" : "▸");
+
     /// <summary>Whether the value's text is the parameter's (a style class for one state, one page).</summary>
     public static IValueConverter Is { get; } = new EqualsConverter();
 

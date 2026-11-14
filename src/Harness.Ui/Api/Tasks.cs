@@ -43,7 +43,7 @@ public sealed class BoardColumn
     public required IReadOnlyList<TaskSummary> Tasks { get; init; }
 }
 
-/// <summary>A task as the Board and lists show it (TaskViews.Task).</summary>
+/// <summary>A task as the Board and lists show it (TaskViews.Task): its definition, state, claim and completion.</summary>
 public sealed class TaskSummary
 {
     public required string Id { get; init; }
@@ -54,21 +54,70 @@ public sealed class TaskSummary
     public string? Blueprint { get; init; }
     public string? Goal { get; init; }
     public string? BlockedReason { get; init; }
+    public string? Notes { get; init; }
+    public IReadOnlyList<string> Scope { get; init; } = [];
+    public IReadOnlyList<string> Validation { get; init; } = [];
+    public IReadOnlyList<AcceptanceCriterion> Acceptance { get; init; } = [];
+    public IReadOnlyList<Dependency> DependsOn { get; init; } = [];
+    public TaskClaim? Claim { get; init; }
     public TaskCompletion? Completion { get; init; }
 }
 
-/// <summary>How a done task was completed.</summary>
+/// <summary>An acceptance criterion and how it went: pass, fail, n/a or pending, with its evidence.</summary>
+public sealed class AcceptanceCriterion
+{
+    public required int Index { get; init; }
+    public required string Criterion { get; init; }
+    public required string Result { get; init; }
+    public string? Evidence { get; init; }
+}
+
+/// <summary>A task this one waits for, and its state ("project:TASK-1" for another project's).</summary>
+public sealed class Dependency
+{
+    public required string Id { get; init; }
+    public string? Status { get; init; }
+}
+
+/// <summary>Who holds a task and until when.</summary>
+public sealed class TaskClaim
+{
+    public required string Claimant { get; init; }
+    public string? ClaimedAt { get; init; }
+    public string? LeaseUntil { get; init; }
+}
+
+/// <summary>How a done task was completed: the summary, who, when, the commit and the validation run.</summary>
 public sealed class TaskCompletion
 {
     public string? Summary { get; init; }
     public string? CompletedBy { get; init; }
     public string? CompletedAt { get; init; }
+    public string? Commit { get; init; }
+    public IReadOnlyList<CompletionCheck> Checks { get; init; } = [];
 }
 
-/// <summary>A blueprint as the Board names it (TaskViews.Blueprint).</summary>
+/// <summary>A validation command a completion reported, and how it went.</summary>
+public sealed class CompletionCheck
+{
+    public required string Command { get; init; }
+    public required string Result { get; init; }
+    public string? Output { get; init; }
+}
+
+/// <summary>
+/// A blueprint (TaskViews.Blueprint): its description when the backlog defines it, its colour, and its tasks counted
+/// by status.
+/// </summary>
 public sealed class BlueprintInfo
 {
     public required string Id { get; init; }
     public string? Title { get; init; }
     public string? Color { get; init; }
+    public bool Defined { get; init; }
+    public string? Goal { get; init; }
+    public IReadOnlyList<string> Exit { get; init; } = [];
+    public string? Notes { get; init; }
+    public IReadOnlyDictionary<string, int> Tasks { get; init; } = new Dictionary<string, int>();
+    public int Total { get; init; }
 }

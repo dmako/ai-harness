@@ -18,6 +18,12 @@
     <Setter Property="Padding" Value="8,6" />
     <Setter Property="MinHeight" Value="32" />
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />
+    <!-- the hint inside an empty field is read too: the muted ink, which keeps 4.5:1 -->
+    <Setter Property="PlaceholderForeground" Value="{DynamicResource Muted}" />
+  </Style>
+  <!-- the theme draws the hint at half opacity from its template; a selector with a pseudo-class outranks that -->
+  <Style Selector="TextBox:not(:disabled) /template/ TextBlock#PART_Placeholder">
+    <Setter Property="Opacity" Value="1" />
   </Style>
   <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="{DynamicResource Surface}" />

@@ -1,0 +1,31 @@
+{
+  "blueprints": [
+    {
+      "id": "BP-009",
+      "title": "V13 Features and bugfixes",
+      "defined": true,
+      "tasks": {
+        "ready": 1,
+        "claimed": 1
+      },
+      "total": 2,
+      "goal": "Ship v13",
+      "exit": [
+        "Released",
+        "Documented"
+      ],
+      "notes": "- one\n- two",
+      "color": "yellow"
+    },
+    {
+      "id": "BP-008",
+      "title": "V12",
+      "defined": true,
+      "tasks": {
+        "done": 1
+      },
+      "total": 1,
+      "color": "lime"
+    }
+  ]
+}

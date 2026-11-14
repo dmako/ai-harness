@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.BlueprintFormView"
+             x:DataType="vm:BlueprintFormDialog">
+  <!-- a blueprint's description (app.js blueprintFields): id (new), title, goal, Done when, notes and colour; for a
+       proposal titled as an existing blueprint, merge or new -->
+  <StackPanel Spacing="12">
+    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+      <StackPanel Classes="field" Width="130" IsVisible="{Binding AsksId}">
+        <TextBlock Classes="label" Text="Id" />
+        <TextBox Name="IdField" Classes="mono" Text="{Binding BlueprintId}" AutomationProperties.Name="Id" />
+        <TextBlock Classes="muted small" Text="Suggested: the next one." TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Classes="field">
+        <TextBlock Classes="label" Text="Title" />
+        <TextBox Name="TitleField" Text="{Binding BlueprintTitle}" PlaceholderText="e.g. Search works offline" AutomationProperties.Name="Title" />
+      </StackPanel>
+    </Grid>
+    <StackPanel Classes="field">
+      <TextBlock Classes="label" Text="Goal" />
+      <TextBox Name="GoalField" Text="{Binding Goal}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
+               PlaceholderText="What it is for: the outcome, and why now" AutomationProperties.Name="Goal" />
+    </StackPanel>
+    <StackPanel Classes="field">
+      <TextBlock Classes="label" Text="Done when" />
+      <ItemsControl Name="ExitField" ItemsSource="{Binding Exit}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:LineItem">
+            <DockPanel Margin="0,0,0,4">
+              <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Remove"
+                      Command="{Binding $parent[ItemsControl].((vm:BlueprintFormDialog)DataContext).RemoveExitCommand}" CommandParameter="{Binding}">
+                <c:Icon Kind="close" />
+              </Button>
+              <TextBox Text="{Binding Text}" PlaceholderText="A criterion that says it is done" AutomationProperties.Name="Done when" />
+            </DockPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button Classes="ghost small" Command="{Binding AddExitCommand}" HorizontalAlignment="Left">
+        <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add another" /></StackPanel>
+      </Button>
+    </StackPanel>
+    <StackPanel Classes="field">
+      <TextBlock Classes="label" Text="Notes" />
+      <TextBox Name="NotesField" Text="{Binding Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" AutomationProperties.Name="Notes" />
+    </StackPanel>
+    <StackPanel Classes="field">
+      <TextBlock Classes="label" Text="Colour" />
+      <ListBox Name="ColorPicker" Classes="seg" ItemsSource="{Binding Colors}" SelectedItem="{Binding Color}" AutomationProperties.Name="Colour">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ColorChoice">
+            <Panel ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Label}">
+              <TextBlock Classes="small" Text="auto" IsVisible="{Binding IsAuto}" />
+              <Border Classes="bpframe swatch" c:StyleClass.Name="{Binding Class}" IsVisible="{Binding !IsAuto}" />
+            </Panel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </StackPanel>
+    <StackPanel Spacing="6" IsVisible="{Binding AsksSameName}">
+      <TextBlock Classes="hint" Text="{Binding SameNameQuestion}" />
+      <RadioButton GroupName="same" Content="{Binding MergeLabel}" IsChecked="{Binding Merge}" />
+      <RadioButton GroupName="same" Content="Create a separate blueprint" IsChecked="{Binding Separate}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

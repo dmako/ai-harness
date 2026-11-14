@@ -82,6 +82,19 @@ public sealed partial class BoardViewModel(UiServices services, string projectId
     [ObservableProperty]
     public partial bool Loading { get; private set; }
 
+    /// <summary>A card's id: the task's dialog, as Work › Tasks opens it.</summary>
+    [RelayCommand]
+    private async Task OpenTaskAsync(string id) =>
+        await services.Dialogs.ShowAsync(
+            new TaskDialog(services, ProjectId, id)
+            {
+                Title = id,
+                Wide = true,
+                HasCancel = false,
+                AcceptLabel = "Close",
+            }
+        );
+
     /// <summary>Fetches the Board and shows it; a failure is shown, not thrown.</summary>
     public async Task LoadAsync(CancellationToken token)
     {

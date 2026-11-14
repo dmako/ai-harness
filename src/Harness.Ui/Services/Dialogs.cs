@@ -55,6 +55,9 @@ public abstract partial class DialogViewModel : ObservableObject
     /// <summary>The label of the button that accepts.</summary>
     public string AcceptLabel { get; init; } = "OK";
 
+    /// <summary>Whether it has a Cancel button (a detail that only closes has none: its accept button closes it).</summary>
+    public bool HasCancel { get; init; } = true;
+
     /// <summary>Whether accepting destroys something (the accept button is a danger button).</summary>
     public bool Danger { get; init; }
 

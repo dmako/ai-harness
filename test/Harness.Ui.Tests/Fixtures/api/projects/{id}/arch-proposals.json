@@ -1,0 +1,18 @@
+{
+  "proposals": [
+    {
+      "id": "apr_94991f3b07840fe6",
+      "kind": "task",
+      "scope": "project",
+      "basis": "observation",
+      "title": "Split the service",
+      "body": "It does two things",
+      "evidence": [
+        "src/Service.cs:12"
+      ],
+      "status": "pending",
+      "proposed_by": "agent:test",
+      "proposed_at": "2026-11-13T09:00:00Z"
+    }
+  ]
+}

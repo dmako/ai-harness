@@ -25,5 +25,6 @@
     <StyleInclude Source="avares://Harness.Ui/Styles/Board.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/BlueprintFrames.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Overview.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Work.axaml" />
   </Application.Styles>
 </Application>

@@ -39,7 +39,15 @@
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
-  <Style Selector="HyperlinkButton.tid">
+  <Style Selector="Button.tid">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Button.tid:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="HyperlinkButton.tid, Button.tid">
     <Setter Property="FontFamily" Value="{StaticResource Mono}" />
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
     <Setter Property="Padding" Value="0" />

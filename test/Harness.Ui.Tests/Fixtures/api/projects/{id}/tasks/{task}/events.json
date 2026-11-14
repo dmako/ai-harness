@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "event": "imported",
+      "actor": "import",
+      "at": "2026-11-13T09:00:00Z",
+      "to": "backlog",
+      "detail": "test"
+    },
+    {
+      "event": "unlocked",
+      "actor": "system",
+      "at": "2026-11-13T09:00:00Z",
+      "from": "backlog",
+      "to": "ready",
+      "detail": "all dependencies done"
+    }
+  ]
+}

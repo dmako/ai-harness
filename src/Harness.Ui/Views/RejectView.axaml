@@ -1,0 +1,11 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             x:Class="Harness.Ui.Views.RejectView"
+             x:DataType="vm:RejectDialog">
+  <!-- rejecting a proposal: why not, optional -->
+  <StackPanel Classes="field">
+    <TextBlock Classes="label" Text="Why not (optional)" />
+    <TextBox Name="NoteField" Text="{Binding Note}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" AutomationProperties.Name="Why not" />
+  </StackPanel>
+</UserControl>

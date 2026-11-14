@@ -50,6 +50,27 @@
     <DataTemplate DataType="vm:OverviewViewModel">
       <views:OverviewView Name="Overview" />
     </DataTemplate>
+    <DataTemplate DataType="vm:WorkViewModel">
+      <views:WorkView Name="Work" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:TaskDialog">
+      <views:TaskDialogView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:TaskFormDialog">
+      <views:TaskFormView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:BlueprintFormDialog">
+      <views:BlueprintFormView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:RemoveBlueprintDialog">
+      <views:RemoveBlueprintView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ArchApproveDialog">
+      <views:ArchApproveView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:RejectDialog">
+      <views:RejectView />
+    </DataTemplate>
     <DataTemplate DataType="vm:HealthViewModel">
       <views:HealthView Name="Health" />
     </DataTemplate>

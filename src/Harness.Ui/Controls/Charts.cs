@@ -315,3 +315,74 @@ public sealed class Dots : Chart
         }
     }
 }
+
+/// <summary>A part of a stacked bar: its colour token and how much of the whole it is.</summary>
+public sealed record BarSegment(string Brush, int Count);
+
+/// <summary>
+/// How a whole divides (app.js taskBar): one rounded bar, a segment per part as wide as its share, in order. The
+/// legend beside it names the parts in words.
+/// </summary>
+public sealed class StackBar : Chart
+{
+    public static readonly StyledProperty<IReadOnlyList<BarSegment>?> SegmentsProperty = AvaloniaProperty.Register<
+        StackBar,
+        IReadOnlyList<BarSegment>?
+    >(nameof(Segments));
+
+    static StackBar() => AffectsRender<StackBar>(SegmentsProperty);
+
+    public IReadOnlyList<BarSegment>? Segments
+    {
+        get => GetValue(SegmentsProperty);
+        set => SetValue(SegmentsProperty, value);
+    }
+
+    protected override Size MeasureOverride(Size availableSize) =>
+        new(double.IsInfinity(availableSize.Width) ? 200 : availableSize.Width, 8);
+
+    public override void Render(DrawingContext context)
+    {
+        var parts = (Segments ?? []).Where(s => s.Count > 0).ToArray();
+        var total = parts.Sum(s => s.Count);
+        var bounds = new Rect(Bounds.Size);
+        using (context.PushClip(new RoundedRect(bounds, 4)))
+        {
+            context.FillRectangle(Brush("Grid"), bounds);
+            var x = 0.0;
+            foreach (var part in parts)
+            {
+                var width = Bounds.Width * part.Count / total;
+                context.FillRectangle(Brush(part.Brush), new Rect(x, 0, width, Bounds.Height));
+                x += width;
+            }
+        }
+    }
+}
+
+/// <summary>A progress meter (app.js meter()): a track, filled as far as <see cref="Value"/> (0 to 1).</summary>
+public sealed class Meter : Chart
+{
+    public static readonly StyledProperty<double> ValueProperty = AvaloniaProperty.Register<Meter, double>(nameof(Value));
+
+    static Meter() => AffectsRender<Meter>(ValueProperty);
+
+    public double Value
+    {
+        get => GetValue(ValueProperty);
+        set => SetValue(ValueProperty, value);
+    }
+
+    protected override Size MeasureOverride(Size availableSize) => new(Math.Min(120, availableSize.Width), 6);
+
+    public override void Render(DrawingContext context)
+    {
+        var bounds = new Rect(Bounds.Size);
+        context.FillRectangle(Brush("Grid"), bounds, 3);
+        var value = Math.Clamp(Value, 0, 1);
+        if (value > 0)
+        {
+            context.FillRectangle(Brush("Good"), new Rect(0, 0, Bounds.Width * value, Bounds.Height), 3);
+        }
+    }
+}

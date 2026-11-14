@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
+using Harness.Core.Findings;
 using Harness.Core.Tasks;
+using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Tasks;
 using Harness.Integration.Sync;
 using Xunit;
@@ -45,7 +47,9 @@ public sealed class UiFixtureShapeTests
         foreach (var file in files)
         {
             var route = "/" + Path.GetRelativePath(FixtureFolder, file).Replace('\\', '/')[..^".json".Length];
-            var answer = await server.Client.GetStringAsync(route.Replace("{id}", id, StringComparison.Ordinal), Token);
+            // {id} is the project, {task} a task of it
+            var path = route.Replace("{id}", id, StringComparison.Ordinal).Replace("{task}", "TASK-0001", StringComparison.Ordinal);
+            var answer = await server.Client.GetStringAsync(path, Token);
             var served = Paths(JsonNode.Parse(answer));
             problems.AddRange(
                 Paths(JsonNode.Parse(await File.ReadAllTextAsync(file, Token)))
@@ -94,7 +98,10 @@ public sealed class UiFixtureShapeTests
         using var database = fixture.Database();
         var tasks = new TaskStore(database);
         tasks.ImportBlueprints(
-            [new("BP-009", "V13 Features and bugfixes", Color: "yellow"), new("BP-008", "V12", Color: "lime")],
+            [
+                new("BP-009", "V13 Features and bugfixes", "Ship v13", ["Released", "Documented"], "- one\n- two", Color: "yellow"),
+                new("BP-008", "V12", Color: "lime"),
+            ],
             "test",
             cancellationToken: Token
         );
@@ -108,6 +115,11 @@ public sealed class UiFixtureShapeTests
                     Priority = "high",
                     Type = "spike",
                     Status = "ready",
+                    Goal = "Try it out",
+                    Acceptance = ["It runs"],
+                    Scope = ["src"],
+                    Validation = ["dotnet test"],
+                    Notes = "A note",
                 },
                 new TaskDefinition
                 {
@@ -129,6 +141,40 @@ public sealed class UiFixtureShapeTests
         );
         // a claim, so the activity feed has a line
         tasks.Claim("TASK-0003", new("claude-code"), cancellationToken: Token);
+        // a task waiting on another, and a proposal of each kind for the Inbox
+        tasks.Import(
+            [new TaskDefinition { Id = "TASK-0004", Title = "Waits", Blueprint = "BP-009", DependsOn = ["TASK-0001"] }],
+            "test",
+            cancellationToken: Token
+        );
+        tasks.Propose(
+            new TaskDefinition
+            {
+                Title = "Proposed task",
+                Goal = "Its goal",
+                Blueprint = "BP-009",
+                Acceptance = ["Checked"],
+                DependsOn = ["TASK-0001"],
+                Scope = ["src"],
+            },
+            "seen while working",
+            "agent:test",
+            Token
+        );
+        tasks.ProposeBlueprint("", new("", "Proposed blueprint", "Its goal", ["Done when shipped"], "a note"), "why", "agent:test", Token);
+        new FindingStore(database).Propose(
+            new FindingProposal
+            {
+                Kind = "task",
+                Scope = "project",
+                Basis = "observation",
+                Title = "Split the service",
+                Body = "It does two things",
+                Evidence = ["src/Service.cs:12"],
+                ProposedBy = "agent:test",
+            },
+            Token
+        );
     }
 
     /// <summary>Every property path of <paramref name="node"/>; array items share their array's path ("columns[].tasks[].id").</summary>

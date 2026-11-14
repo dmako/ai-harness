@@ -6,13 +6,18 @@ namespace Harness.Ui.Views;
 
 /// <summary>
 /// A task's card; its priority and blueprint colour become style classes (p-high, bp-teal), kept current while the
-/// card is updated in place by live reloads.
+/// card is updated in place by live reloads. Its id opens the task's dialog.
 /// </summary>
 public sealed partial class TaskCard : UserControl
 {
     private TaskCardViewModel? _card;
 
-    public TaskCard() => InitializeComponent();
+    public TaskCard()
+    {
+        InitializeComponent();
+        // the id opens the dialog here; Open in new tab and Copy link give the task's page in the current UI
+        OpenTask.ContextMenu = Harness.Ui.Controls.Links.MenuFor(OpenTask, () => _card?.Link);
+    }
 
     protected override void OnDataContextChanged(EventArgs e)
     {
