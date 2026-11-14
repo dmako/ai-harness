@@ -1,0 +1,6 @@
+{
+  "doc": "guide",
+  "slug": "guide",
+  "title": "Using harness",
+  "body": "# Using harness\r\n\r\nA short guide for the owner of a project that uses harness: what it keeps\r\nfor you, how it gets filled, and how to give agents work. The reference\r\n(`harness docs` lists its sections) has the details of every command."
+}

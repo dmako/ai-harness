@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Harness.Ui.Api;
 
 /// <summary>
-/// Source-generated JSON metadata for the API contracts (one file per area: Projects, Workspaces, Tasks, Work, Overview, Knowledge, Live, Docs, Health):
+/// Source-generated JSON metadata for the API contracts (one file per area: Projects, Workspaces, Tasks, Work, Overview, Knowledge, Machine, Live, Docs, Health):
 /// no reflection, so trimming and AOT keep working. Strict: a required member missing from an answer, or null where
 /// the contract says it cannot be, fails deserialisation.
 /// </summary>
@@ -45,6 +45,18 @@ namespace Harness.Ui.Api;
 [JsonSerializable(typeof(ArchApproval))]
 [JsonSerializable(typeof(Rejection))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
+[JsonSerializable(typeof(MachineInfo))]
+[JsonSerializable(typeof(TelemetryChange))]
+[JsonSerializable(typeof(TelemetryAnswer))]
+[JsonSerializable(typeof(BoardDefaultsAnswer))]
+[JsonSerializable(typeof(BoardDefaultsChange))]
+[JsonSerializable(typeof(ScmList))]
+[JsonSerializable(typeof(ScmForm))]
+[JsonSerializable(typeof(ScmTestAnswer))]
+[JsonSerializable(typeof(GraphifySessions))]
+[JsonSerializable(typeof(GraphifyAction))]
+[JsonSerializable(typeof(SearchAnswer))]
+[JsonSerializable(typeof(DocText))]
 [JsonSerializable(typeof(MemoryList))]
 [JsonSerializable(typeof(LevelKnowledge))]
 [JsonSerializable(typeof(MemoryDetail))]

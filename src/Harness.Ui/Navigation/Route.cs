@@ -74,8 +74,9 @@ public sealed record Route
     /// Reads <paramref name="hash"/> (with or without '#'); a project page without a known view gets
     /// <paramref name="defaultProjectView"/> (the one the user last chose).
     /// </summary>
-    public static Route Parse(string? hash, string defaultProjectView = "overview")
+    public static Route Parse(string? hash, string? defaultProjectView = null)
     {
+        defaultProjectView ??= DefaultProjectView;
         var raw = (hash ?? "").TrimStart('#').TrimStart('/');
         var at = raw.IndexOf('?', StringComparison.Ordinal);
         var path = at < 0 ? raw : raw[..at];
@@ -154,6 +155,9 @@ public sealed record Route
 
     private static (string View, string Item) WorkspaceView(string view, string item) =>
         (WorkspaceViews.Any(v => v.View == view) ? view : "overview", item);
+
+    /// <summary>The view a project address without one opens on (Machine › Settings; Overview by default).</summary>
+    public static string DefaultProjectView { get; set; } = "overview";
 
     private static string DefaultView(string view) => ProjectViews.Any(v => v.View == view) ? view : "overview";
 

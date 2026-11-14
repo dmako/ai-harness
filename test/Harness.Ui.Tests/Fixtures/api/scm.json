@@ -1,0 +1,25 @@
+{
+  "file": "C:\\Users\\dev\\AppData\\Roaming\\harness\\scm.toml",
+  "types": [
+    "gitlab",
+    "forgejo",
+    "github"
+  ],
+  "scm": [
+    {
+      "name": "work",
+      "type": "gitlab",
+      "url": "https://gitlab.example.com",
+      "aliases": [
+        "ssh-gitlab"
+      ],
+      "token_source": "stored",
+      "token_env": null,
+      "token": "****oken",
+      "token_available": true,
+      "token_encrypted": true,
+      "token_error": null,
+      "last_test": null
+    }
+  ]
+}

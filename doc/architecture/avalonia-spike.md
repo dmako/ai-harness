@@ -193,6 +193,21 @@ has a reflection and AOT risk, and is harder to learn.
 - First load to a drawn Board in Edge: 1.9 s, as before.
 - The repository's central transitive pin resolves System.Reactive to **7.0.0**, although DynamicData asks for 6.1.0; all tests and the browser run pass with it.
 
+## Docs Markdown: a renderer of our own (TASK-0159)
+
+The Docs page renders `guide.md` and `reference.md` with `Controls/MarkdownBlock`, a small parser written for this
+UI, not a Markdown package.
+
+- **What it handles.** The same subset as app.js's `markdown()`, which is all the docs use: headings, paragraphs,
+  bullet and numbered lists, tables, fenced code, inline code, bold, and links.
+- **Links.** A `#slug` link opens that docs section in place. An http(s) link opens outside the UI. Any other link is
+  shown as plain text.
+- **Output.** It builds controls (selectable text with inline runs, grids for tables), never HTML.
+- **Why our own.** It has no reflection, so trimming and AOT stay clean, and it adds nothing to the bundle.
+  Markdown.Avalonia and similar packages bring an HTML/CSS layer and reflection-based styling the docs do not need.
+- **When to revisit.** If the docs ever need more than this subset (images, nested lists, block quotes), extend this
+  parser first. Adopt a package only if it publishes without trim warnings and stays within the 6.0 MB budget.
+
 ## Follow-up blueprint
 
 Proposed as a blueprint, "Avalonia harness ui: parity", for the user to approve. In order:

@@ -1,0 +1,6 @@
+{
+  "defaults": {
+    "sort": "priority",
+    "hide_done_days": 7
+  }
+}

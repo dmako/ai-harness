@@ -1,0 +1,236 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:views="using:Harness.Ui.Views"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.MachineView"
+             x:DataType="vm:MachinePage">
+  <!-- Machine (app.js renderMachine): this page's settings, the Board's defaults, SCM connections, telemetry,
+       graphify-csharp's sessions, where the state lives, and the build -->
+  <StackPanel>
+    <StackPanel Classes="phead">
+      <TextBlock Classes="h2" Text="Machine" />
+      <TextBlock Classes="path" Text="This harness installation, where its state lives, and this page's settings." />
+    </StackPanel>
+
+    <StackPanel Classes="section">
+      <TextBlock Classes="h3" Text="Settings" />
+      <TextBlock Classes="hint" Text="Kept for this page." />
+      <Border Classes="card" Padding="14,10">
+        <StackPanel Spacing="12">
+          <DockPanel>
+            <ComboBox Name="ThemePicker" DockPanel.Dock="Right" ItemsSource="{x:Static vm:MachinePage.Themes}" SelectedItem="{Binding Theme}"
+                      MinWidth="140" AutomationProperties.Name="Theme" />
+            <StackPanel Margin="0,0,12,0">
+              <TextBlock FontWeight="SemiBold" Text="Theme" />
+              <TextBlock Classes="muted small" Text="Follow the system, or always light or dark." TextWrapping="Wrap" />
+            </StackPanel>
+          </DockPanel>
+          <DockPanel>
+            <ComboBox Name="ViewPicker" DockPanel.Dock="Right" ItemsSource="{Binding ProjectViews}" SelectedItem="{Binding ProjectView}"
+                      MinWidth="140" AutomationProperties.Name="Default project view" />
+            <StackPanel Margin="0,0,12,0">
+              <TextBlock FontWeight="SemiBold" Text="Open projects on" />
+              <TextBlock Classes="muted small" Text="The view a project opens on from the sidebar." TextWrapping="Wrap" />
+            </StackPanel>
+          </DockPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <views:SectionView DataContext="{Binding Board}">
+      <views:SectionView.Body>
+        <Border Classes="card" Padding="14,10" x:DataType="vm:BoardDefaultsSection">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="hint" Text="Kept on this machine: how a project's Board starts until it is set there." />
+            <DockPanel>
+              <ComboBox Name="SortDefault" DockPanel.Dock="Right" ItemsSource="{Binding Sorts}" SelectedItem="{Binding Sort}"
+                        MinWidth="140" AutomationProperties.Name="Sort cards by" />
+              <StackPanel Margin="0,0,12,0">
+                <TextBlock FontWeight="SemiBold" Text="Sort cards by" />
+                <TextBlock Classes="muted small" Text="Within every column." />
+              </StackPanel>
+            </DockPanel>
+            <DockPanel>
+              <ComboBox Name="AgeDefault" DockPanel.Dock="Right" ItemsSource="{Binding Ages}" SelectedItem="{Binding Age}"
+                        MinWidth="140" AutomationProperties.Name="Hide done tasks older than" />
+              <StackPanel Margin="0,0,12,0">
+                <TextBlock FontWeight="SemiBold" Text="Hide done tasks older than" TextWrapping="Wrap" />
+                <TextBlock Classes="muted small" Text="By when each was done." />
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <views:SectionView DataContext="{Binding Scm}">
+      <views:SectionView.Body>
+        <StackPanel Spacing="8" x:DataType="vm:ScmSection">
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="GitLab, Forgejo and GitHub servers whose merge requests agents can work with. Kept on this machine in scm.toml, readable only by you; a token goes in but never comes back to this page." />
+          <Border Classes="card" Padding="14,10" IsVisible="{Binding IsEmpty}">
+            <StackPanel>
+              <TextBlock FontWeight="SemiBold" Text="No SCM yet" />
+              <TextBlock Classes="muted small" TextWrapping="Wrap"
+                         Text="Add a GitLab, Forgejo or GitHub server with an access token to let agents read and review its merge requests." />
+            </StackPanel>
+          </Border>
+          <ItemsControl Name="ScmRows" ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ScmRow">
+                <Border Classes="card" Padding="14,10">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                      <Button Classes="ghost small" Content="Test connection"
+                              Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.TestCommand}" CommandParameter="{Binding}" />
+                      <Button Classes="icon" AutomationProperties.Name="{Binding Entry.Name, StringFormat='Edit SCM {0}'}"
+                              Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.EditCommand}" CommandParameter="{Binding}">
+                        <c:Icon Kind="edit" />
+                      </Button>
+                      <Button Classes="icon" AutomationProperties.Name="{Binding Entry.Name, StringFormat='Remove SCM {0}'}"
+                              Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.RemoveCommand}" CommandParameter="{Binding}">
+                        <c:Icon Kind="trash" />
+                      </Button>
+                    </StackPanel>
+                    <StackPanel Spacing="3">
+                      <WrapPanel ItemSpacing="8">
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Entry.Name}" />
+                        <Border Classes="pill"><TextBlock Text="{Binding TypeLabel}" /></Border>
+                      </WrapPanel>
+                      <SelectableTextBlock Classes="mono small" Text="{Binding Entry.Address}" TextWrapping="Wrap" />
+                      <TextBlock Classes="muted small" Text="{Binding Aliases}" IsVisible="{Binding HasAliases}" TextWrapping="Wrap" />
+                      <TextBlock Classes="muted small" Text="{Binding TokenLine}" TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Classes="lv" Kind="st-ok" IsVisible="{Binding TestOk}" />
+                        <c:Icon Classes="lv problem" Kind="st-fail" IsVisible="{Binding TestFailed}" />
+                        <TextBlock Classes="small" Text="{Binding TestLine}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <TextBlock Classes="muted small" Text="{Binding TestHint}" IsVisible="{Binding HasTestHint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <WrapPanel ItemSpacing="10">
+            <Button Name="AddScm" Command="{Binding AddCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add SCM" /></StackPanel>
+            </Button>
+            <SelectableTextBlock Classes="muted small" Text="{Binding File, StringFormat='Stored in {0}'}" TextWrapping="Wrap" VerticalAlignment="Center"
+                                 IsVisible="{Binding File, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </WrapPanel>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <StackPanel Classes="section" DataContext="{Binding Telemetry}" x:DataType="vm:TelemetrySection">
+      <TextBlock Classes="h3" Text="Developer telemetry" />
+      <TextBlock Classes="hint" TextWrapping="Wrap"
+                 Text="Anonymous, aggregated numbers for the harness developer: how well harness serves agents. Never code, paths, queries or names." />
+      <Border Classes="card" Padding="14,10">
+        <StackPanel Spacing="10">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="ghost small" Content="Change…" Command="{Binding EditCommand}" IsVisible="{Binding CanChange}" />
+              <ToggleSwitch Name="TelemetrySwitch" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding ToggleCommand}"
+                            OnContent="" OffContent="" AutomationProperties.Name="Share telemetry" />
+            </StackPanel>
+            <StackPanel Margin="0,0,12,0">
+              <TextBlock FontWeight="SemiBold" Text="{Binding Heading}" />
+              <TextBlock Classes="muted small" Text="{Binding Note}" TextWrapping="Wrap" />
+            </StackPanel>
+          </DockPanel>
+          <StackPanel Spacing="8" IsVisible="{Binding Editing}">
+            <StackPanel Classes="field">
+              <TextBlock Classes="label" Text="Collector endpoint" />
+              <TextBox Name="EndpointField" Text="{Binding Endpoint}" PlaceholderText="http://collector.example:8766/v1/report"
+                       AutomationProperties.Name="Collector endpoint" />
+            </StackPanel>
+            <StackPanel Classes="field">
+              <TextBlock Classes="label" Text="Token" />
+              <TextBox Name="TokenField" Text="{Binding Token}" PasswordChar="•" PlaceholderText="{Binding TokenPlaceholder}"
+                       AutomationProperties.Name="Collector token" />
+            </StackPanel>
+            <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="primary" Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" />
+              <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+            </StackPanel>
+            <TextBlock Classes="muted small" Text="'harness telemetry preview' prints exactly what is sent." TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <views:SectionView DataContext="{Binding Graphify}">
+      <views:SectionView.Body>
+        <StackPanel Spacing="8" x:DataType="vm:GraphifySection">
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="Warm sessions keep a C# solution compiled for callers, references and impact; loading a large one takes minutes. Sessions harness starts stay warm for the next agent session and stop after 2 hours without queries; ones started by hand are left alone." />
+          <TextBlock Classes="error" Text="{Binding ServerError}" IsVisible="{Binding ServerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <Border Classes="card" Padding="0">
+            <StackPanel>
+              <ItemsControl Name="Sessions" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:GraphifyRow">
+                    <Border Classes="trow" Padding="12,8">
+                      <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                          <Button Classes="ghost small" Content="Restart" IsVisible="{Binding HasProject}"
+                                  Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Graphify.RestartCommand}" CommandParameter="{Binding}" />
+                          <Button Classes="ghost small" Content="Stop"
+                                  Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Graphify.StopCommand}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                        <c:Icon DockPanel.Dock="Left" Classes="lv" Classes.warn="{Binding Loading}" Classes.problem="{Binding Bad}" Kind="{Binding Icon}" />
+                        <StackPanel Spacing="2">
+                          <WrapPanel ItemSpacing="8">
+                            <c:AppLink Classes="link" Href="{Binding Href}" Content="{Binding Solution}" IsVisible="{Binding HasProject}" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding Solution}" IsVisible="{Binding !HasProject}" ToolTip.Tip="{Binding Session.Root}" />
+                            <TextBlock Classes="small" Text="{Binding StateWord}" VerticalAlignment="Center" />
+                            <TextBlock Classes="mono small muted" Text="{Binding ShortId}" VerticalAlignment="Center" ToolTip.Tip="{Binding Session.Id}" />
+                          </WrapPanel>
+                          <TextBlock Classes="muted small" Text="{Binding Detail}" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <DockPanel Margin="12,8">
+                <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Refresh" Command="{Binding RefreshNowCommand}">
+                  <c:Icon Kind="refresh" />
+                </Button>
+                <TextBlock Classes="muted small" Text="{Binding EmptyText}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap" VerticalAlignment="Center" />
+              </DockPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+
+    <views:SectionView DataContext="{Binding Info}">
+      <views:SectionView.Body>
+        <StackPanel Spacing="8" x:DataType="vm:MachineState">
+          <TextBlock Classes="hint" Text="Machine-wide files; each project keeps its own state in its .harness folder." />
+          <Border Classes="card" Padding="14,10">
+            <ItemsControl Name="StatePaths" ItemsSource="{Binding Paths}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:Fact">
+                  <Grid ColumnDefinitions="200,*" Margin="0,2">
+                    <TextBlock Classes="muted small" Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                    <SelectableTextBlock Grid.Column="1" Classes="mono small" Text="{Binding Value}" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+          <SelectableTextBlock Name="BuildLine" Classes="muted small" Text="{Binding BuildLine}" TextWrapping="Wrap" />
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+  </StackPanel>
+</UserControl>

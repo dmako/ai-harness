@@ -21,8 +21,15 @@ public abstract class Chart : Control
         FocusableProperty.OverrideDefaultValue<Chart>(false);
     }
 
-    protected IBrush Brush(string key) =>
-        this.TryFindResource(key, ActualThemeVariant, out var value) && value is IBrush brush ? brush : Brushes.Gray;
+    /// <summary>The token's brush; no token (a binding not set yet) draws nothing.</summary>
+    protected IBrush Brush(string? key)
+    {
+        if (key is not { Length: > 0 })
+        {
+            return Brushes.Transparent;
+        }
+        return this.TryFindResource(key, ActualThemeVariant, out var value) && value is IBrush brush ? brush : Brushes.Gray;
+    }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {

@@ -108,6 +108,7 @@ internal static class Ui
             Server = Server,
             Navigation = navigation ?? new InMemoryNavigation(),
             Preferences = preferences ?? new InMemoryPreferences(),
+            SessionSettle = TimeSpan.Zero,
         };
         if (!fastLive)
         {

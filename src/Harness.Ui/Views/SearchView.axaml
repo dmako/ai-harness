@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.SearchView"
+             x:DataType="vm:SearchPage">
+  <!-- Search (app.js renderSearch): the big box, then the kinds and the results by kind; with fewer than two
+       characters, what each kind is searched by -->
+  <StackPanel Spacing="12">
+    <StackPanel Classes="phead">
+      <TextBlock Classes="h2" Text="Search" />
+      <TextBlock Classes="path" Text="Projects, workspaces, knowledge, tasks and blueprints across the machine. Agents search the code." />
+    </StackPanel>
+    <DockPanel>
+      <Button DockPanel.Dock="Right" Classes="primary" Content="Search" Command="{Binding SubmitCommand}" Margin="8,0,0,0" />
+      <TextBox Name="SearchField" Text="{Binding Query}" PlaceholderText="Search everything…" AutomationProperties.Name="Search everything">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding SubmitCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+    </DockPanel>
+    <ItemsControl Name="KindCards" ItemsSource="{Binding Kinds}" IsVisible="{Binding ShowsKinds}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:SearchKind">
+          <Border Classes="card" Padding="12,8" Width="220">
+            <StackPanel>
+              <TextBlock FontWeight="SemiBold" Text="{Binding Label}" />
+              <TextBlock Classes="muted small" Text="{Binding Hint}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <TextBlock Classes="muted" Text="Searching…" IsVisible="{Binding Loading}" />
+    <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    <ItemsControl Name="KindChips" ItemsSource="{Binding Present}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:SearchKind">
+          <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding Label}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{Binding Label}" />
+              <TextBlock Text="{Binding Count}" />
+            </StackPanel>
+          </ToggleButton>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Border Classes="card" Padding="14,10" IsVisible="{Binding Nothing, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <StackPanel>
+        <TextBlock FontWeight="SemiBold" Text="{Binding Nothing}" TextWrapping="Wrap" />
+        <TextBlock Classes="muted small" Text="Try fewer or other words: names, ids, or a phrase from a memory." TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+    <ItemsControl Name="Results" ItemsSource="{Binding Groups}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:HitGroup">
+          <StackPanel Spacing="4" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="h3" Text="{Binding Label}" />
+              <TextBlock Classes="count" Text="{Binding Count}" />
+            </StackPanel>
+            <Border Classes="card" Padding="4">
+              <ItemsControl ItemsSource="{Binding Hits}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:HitRow">
+                    <c:AppLink Classes="row" Href="{Binding Href}" AutomationProperties.Name="{Binding Hit.Title}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Classes="muted small" Text="{Binding Where}" Margin="12,0,0,0"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4" Margin="0,0,8,0" IsVisible="{Binding HasTag}"
+                                    VerticalAlignment="Center">
+                          <c:Swatch BrushKey="{Binding Brush}" Size="8" IsVisible="{Binding HasBrush}" VerticalAlignment="Center" />
+                          <TextBlock Classes="small" Text="{Binding Tag}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Hit.Title}" TextWrapping="Wrap" />
+                      </DockPanel>
+                    </c:AppLink>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+          </StackPanel>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

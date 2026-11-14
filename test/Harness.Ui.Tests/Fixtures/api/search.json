@@ -1,0 +1,13 @@
+{
+  "query": "fixture",
+  "hits": [
+    {
+      "kind": "project",
+      "title": "Fixture project",
+      "detail": "C:\\repos\\fixture",
+      "project_id": "prj_fixture",
+      "project": "Fixture project"
+    }
+  ],
+  "per_kind": 20
+}

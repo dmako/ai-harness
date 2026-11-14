@@ -26,6 +26,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Navigation = services.Host.Navigation;
         Services.Live.Applied += Applied;
         Navigation.Changed += Navigated;
+        // this page's settings: the theme, and the view a project opens on
+        PageSettings.ApplyTheme(services.Host.Preferences);
+        Route.DefaultProjectView = PageSettings.ProjectView(services.Host.Preferences);
     }
 
     public UiServices Services { get; }
@@ -165,14 +168,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                     Replace(new UserKnowledgePage(Services));
                 }
                 break;
-            case "machine" or "search" or "docs":
-                Replace(
-                    new PlaceholderPage(
-                        char.ToUpperInvariant(route.Page[0]) + route.Page[1..],
-                        "TASK-0159",
-                        Services.Host.Current(route)
-                    )
-                );
+            case "machine":
+                if (Page is not MachinePage)
+                {
+                    Replace(new MachinePage(Services));
+                }
+                break;
+            case "search":
+                if (Page is SearchPage search)
+                {
+                    search.Show(route);
+                }
+                else
+                {
+                    Replace(new SearchPage(Services, route));
+                }
+                break;
+            case "docs":
+                if (Page is DocsPage docs)
+                {
+                    _ = docs.ShowAsync(route);
+                }
+                else
+                {
+                    Replace(new DocsPage(Services, route));
+                }
                 break;
             default:
                 if (Page is not HomePage home)
@@ -226,6 +246,9 @@ public sealed class UiHostContext
     /// the time the visit began from, while the stored one moves on to now.
     /// </summary>
     public Dictionary<string, string> Visits { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>How long a graphify session is given to change state after Start, Restart or Stop (1.5 s).</summary>
+    public TimeSpan SessionSettle { get; init; } = TimeSpan.FromMilliseconds(1500);
 
     /// <summary>What the page remembers for its life (app.js state): the Work section last shown.</summary>
     public Dictionary<string, string> Remembered { get; } = new(StringComparer.Ordinal);

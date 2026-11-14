@@ -34,6 +34,7 @@ public sealed class UiContractTests
             new JsonObject { ["name"] = "main", ["title"] = "Main workspace", ["project_ids"] = new JsonArray(id) }
         );
         await UiFixtureShapeTests.KnowledgeAsync(server);
+        await UiFixtureShapeTests.MachineAsync(server);
         var api = new HarnessApi(server.Client) { Origin = "http://" + server.Client.BaseAddress!.Authority };
 
         // projects and workspaces
@@ -190,6 +191,36 @@ public sealed class UiContractTests
         }
         approval.Status.Should().NotBe("needs_decision");
         (await api.MemoryProposalsAsync(id, "approved", Token)).Proposals.Should().ContainSingle(p => p.MemoryId != null);
+
+        // Machine, Search and Docs: the installation, Board defaults, telemetry, SCM connections and graphify; a search
+        // across the machine; a docs section
+        var machine = await api.MachineAsync(Token);
+        machine.Build.Version.Should().NotBeNullOrEmpty();
+        machine.Paths.Global.Should().NotBeNullOrEmpty();
+        machine.Telemetry.Enabled.Should().BeFalse();
+        (await api.BoardDefaultsAsync(Token)).Defaults.Sort.Should().Be("priority");
+        (await api.SetBoardDefaultsAsync(new BoardDefaultsChange { HideDoneDays = 3 }, Token)).HideDoneDays.Should().Be(3);
+        var on = await api.SetTelemetryAsync(new TelemetryChange { Enabled = true, Endpoint = "http://127.0.0.1:9/v1/report", Token = "t" }, Token);
+        (on.Enabled, on.Endpoint).Should().Be((true, "http://127.0.0.1:9/v1/report"));
+        (await api.SetTelemetryAsync(new TelemetryChange { Enabled = false }, Token)).Enabled.Should().BeFalse();
+        var scm = (await api.ScmAsync(Token)).Scm.Should().ContainSingle().Subject;
+        (scm.Name, scm.Type, scm.Address, scm.TokenAvailable).Should().Be(("work", "gitlab", "https://gitlab.example.com", true));
+        scm.Token.Should().NotContain("glpat-fixture-token", "a token never comes back");
+        scm.Aliases.Should().Equal("ssh-gitlab");
+        await api.SaveScmAsync("work", new ScmForm { Name = "work", Type = "gitlab", Address = "https://gitlab.example.org", Aliases = ["ssh-gitlab", "git.example.org"] }, Token);
+        var edited = (await api.ScmAsync(Token)).Scm.Single();
+        (edited.Address, edited.TokenAvailable).Should().Be(("https://gitlab.example.org", true), "an empty token keeps the stored one");
+        edited.Aliases.Should().Equal("ssh-gitlab", "git.example.org");
+        await api.SaveScmAsync(null, new ScmForm { Name = "spare", Type = "forgejo", Address = "https://forgejo.example.com", Token = "t" }, Token);
+        await api.RemoveScmAsync("spare", Token);
+        (await api.ScmAsync(Token)).Scm.Select(e => e.Name).Should().Equal("work");
+        (await api.GraphifySessionsAsync(id, Token)).Sessions.Should().NotBeNull();
+        var found = await api.SearchAsync("Fixture", Token);
+        found.Hits.Should().Contain(h => h.Kind == "project" && h.ProjectId == id);
+        found.PerKind.Should().BePositive();
+        var doc = await api.DocAsync("guide", Token);
+        (doc.Doc, doc.Slug).Should().Be(("guide", "guide"));
+        doc.Body.Should().StartWith("# ");
 
         // the docs
         var docs = await api.DocsAsync(Token);

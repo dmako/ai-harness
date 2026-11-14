@@ -1,0 +1,38 @@
+{
+  "sessions": [
+    {
+      "id": "11111111-2222-3333-4444-555555555555",
+      "pid": 4242,
+      "reachable": true,
+      "state": "ready",
+      "ready": true,
+      "stage": "",
+      "root": "C:\\repos\\fixture",
+      "input": "C:\\repos\\fixture\\Fixture.slnx",
+      "memory_bytes": 104857600,
+      "uptime_ms": 7200000,
+      "started_by": "harness",
+      "discovery_incomplete": "",
+      "last_query": "",
+      "load_took_ms": 0,
+      "summary": "ready, 0.1 GB, up 2h, started by harness"
+    },
+    {
+      "id": "99999999-8888-7777-6666-555555555555",
+      "pid": 4343,
+      "reachable": false,
+      "state": "unknown",
+      "ready": false,
+      "stage": "",
+      "root": "C:\\repos\\other",
+      "input": "C:\\repos\\other\\Other.slnx",
+      "memory_bytes": 0,
+      "uptime_ms": 0,
+      "started_by": "",
+      "discovery_incomplete": "",
+      "last_query": "",
+      "load_took_ms": 0,
+      "summary": "not reachable (process gone), started outside harness"
+    }
+  ]
+}

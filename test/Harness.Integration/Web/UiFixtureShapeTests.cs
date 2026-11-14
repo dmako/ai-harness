@@ -42,6 +42,7 @@ public sealed class UiFixtureShapeTests
             new JsonObject { ["name"] = "main", ["title"] = "Main workspace", ["project_ids"] = new JsonArray(id) }
         );
         await KnowledgeAsync(server);
+        await MachineAsync(server);
         var capture = Environment.GetEnvironmentVariable(CaptureVariable);
 
         var files = Directory.EnumerateFiles(FixtureFolder, "*.json", SearchOption.AllDirectories).ToArray();
@@ -52,6 +53,7 @@ public sealed class UiFixtureShapeTests
             var route = "/" + Path.GetRelativePath(FixtureFolder, file).Replace('\\', '/')[..^".json".Length];
             // {id} is the project, {task} a task of it; a route that needs a query gets one
             var path = route.Replace("{id}", id, StringComparison.Ordinal).Replace("{task}", "TASK-0001", StringComparison.Ordinal)
+                    .Replace("{slug}", "guide", StringComparison.Ordinal)
                 + Queries.GetValueOrDefault(route, "");
             var answer = await server.Client.GetStringAsync(path, Token);
             var served = Paths(JsonNode.Parse(answer));
@@ -80,6 +82,7 @@ public sealed class UiFixtureShapeTests
     private static readonly Dictionary<string, string> Queries = new(StringComparer.Ordinal)
     {
         ["/api/knowledge"] = "?level=user",
+        ["/api/search"] = "?q=fixture",
         ["/api/projects/{id}/applies"] = "?scope=project",
         ["/api/projects/{id}/memories"] = "?type=goal,constraint,decision,convention,warning,fact,open_question&limit=500&levels=1&inactive=1",
     };
@@ -98,6 +101,21 @@ public sealed class UiFixtureShapeTests
             new JsonObject { ["level"] = "workspace:main", ["type"] = "decision", ["content"] = "The workspace ships together" }
         );
     }
+
+    /// <summary>An SCM connection on the machine, so Machine's list has one (its token is never answered back).</summary>
+    internal static Task MachineAsync(UiFixture server) =>
+        PostAsync(
+            server,
+            "/api/scm",
+            new JsonObject
+            {
+                ["name"] = "work",
+                ["type"] = "gitlab",
+                ["url"] = "https://gitlab.example.com",
+                ["token"] = "glpat-fixture-token",
+                ["aliases"] = new JsonArray("ssh-gitlab"),
+            }
+        );
 
     /// <summary>Gives the project a display title through harness ui's own write, so title appears in its answers.</summary>
     internal static Task TitleAsync(UiFixture server, string id, string title) =>

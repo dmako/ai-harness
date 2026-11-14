@@ -1,0 +1,51 @@
+{
+  "docs": [
+    {
+      "Name": "guide",
+      "File": "guide.md",
+      "Title": "Using harness"
+    },
+    {
+      "Name": "reference",
+      "File": "reference.md",
+      "Title": "Reference"
+    }
+  ],
+  "sections": [
+    {
+      "doc": "guide",
+      "slug": "guide",
+      "title": "Using harness"
+    },
+    {
+      "doc": "guide",
+      "slug": "guide-what-harness-is-for",
+      "title": "What harness is for"
+    },
+    {
+      "doc": "guide",
+      "slug": "guide-how-knowledge-gets-into-memory",
+      "title": "How knowledge gets into memory"
+    },
+    {
+      "doc": "guide",
+      "slug": "guide-sharing-knowledge-with-the-team",
+      "title": "Sharing knowledge with the team"
+    },
+    {
+      "doc": "reference",
+      "slug": "reference",
+      "title": "Reference"
+    },
+    {
+      "doc": "reference",
+      "slug": "install-upgrade-uninstall",
+      "title": "Install, upgrade, uninstall"
+    },
+    {
+      "doc": "reference",
+      "slug": "commands",
+      "title": "Commands"
+    }
+  ]
+}

@@ -93,6 +93,14 @@
   <Style Selector="TextBlock.small">
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
   </Style>
+  <!-- inline code in the docs: the monospace font on a faint ground -->
+  <Style Selector="Run.code">
+    <Setter Property="FontFamily" Value="{StaticResource Mono}" />
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+  </Style>
+  <Style Selector="Border.tcell">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+  </Style>
   <Style Selector="TextBlock.mono, SelectableTextBlock.mono">
     <Setter Property="FontFamily" Value="{StaticResource Mono}" />
   </Style>

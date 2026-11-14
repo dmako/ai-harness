@@ -51,6 +51,66 @@
     <DataTemplate DataType="vm:OverviewViewModel">
       <views:OverviewView Name="Overview" />
     </DataTemplate>
+    <DataTemplate DataType="vm:MachinePage">
+      <views:MachineView Name="Machine" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:SearchPage">
+      <views:SearchView Name="Search" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:DocsPage">
+      <views:DocsView Name="Docs" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ScmFormDialog">
+      <StackPanel Spacing="10">
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Name" />
+          <TextBox Name="ScmName" Text="{Binding Name}" AutomationProperties.Name="Name" />
+          <TextBlock Classes="muted small" Text="How projects and the CLI refer to it: letters, digits, '-', '_' or '.'." TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Type" />
+          <ComboBox Name="ScmType" ItemsSource="{x:Static vm:ScmFormDialog.Types}" SelectedItem="{Binding Type}" PlaceholderText="Choose a type"
+                    MinWidth="180" AutomationProperties.Name="Type" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="URL" />
+          <TextBox Name="ScmUrl" Text="{Binding Address}" PlaceholderText="https://gitlab.example.com" AutomationProperties.Name="URL" />
+          <TextBlock Classes="muted small" TextWrapping="Wrap"
+                     Text="The server's base address; an instance under a path keeps it (https://host/gitlab). GitHub: https://github.com or the Enterprise Server's address." />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Token" />
+          <TextBox Name="ScmToken" Text="{Binding Token}" PasswordChar="•" PlaceholderText="{Binding TokenPlaceholder}" AutomationProperties.Name="Token" />
+          <TextBlock Classes="muted small" Text="{Binding TokenHint}" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Classes="field">
+          <TextBlock Classes="label" Text="Aliases" />
+          <ItemsControl ItemsSource="{Binding Aliases}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LineItem">
+                <DockPanel Margin="0,0,0,4">
+                  <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Remove alias"
+                          Command="{Binding $parent[ItemsControl].((vm:ScmFormDialog)DataContext).RemoveAliasCommand}" CommandParameter="{Binding}">
+                    <c:Icon Kind="trash" />
+                  </Button>
+                  <TextBox Text="{Binding Text}" PlaceholderText="https://git-alias.example.com or ssh-alias" AutomationProperties.Name="Alias" />
+                </DockPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Classes="ghost small" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add alias" /></StackPanel>
+          </Button>
+          <TextBlock Classes="muted small" TextWrapping="Wrap"
+                     Text="Other host names or base URLs this server's repositories are cloned from. They only match remotes; API calls use the URL above." />
+        </StackPanel>
+        <WrapPanel ItemSpacing="8">
+          <Button Name="ScmTest" Classes="ghost" Content="Test connection" Command="{Binding TestCommand}" />
+          <TextBlock Classes="small" Text="{Binding TestLine}" TextWrapping="Wrap" VerticalAlignment="Center"
+                     IsVisible="{Binding TestLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </WrapPanel>
+      </StackPanel>
+    </DataTemplate>
     <DataTemplate DataType="vm:KnowledgeViewModel">
       <views:KnowledgeView Name="Knowledge" />
     </DataTemplate>

@@ -1,0 +1,22 @@
+{
+  "build": {
+    "version": "0.13.0-localbuild",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "date": "2026-11-13T09:00:00Z",
+    "modified": false,
+    "runtime": ".NET 11.0.0",
+    "platform": "windows/amd64"
+  },
+  "paths": {
+    "global": "C:\\Users\\dev\\AppData\\Roaming\\harness",
+    "registry": "C:\\Users\\dev\\AppData\\Roaming\\harness\\projects.json",
+    "workspaces": "C:\\Users\\dev\\AppData\\Roaming\\harness\\workspaces.json",
+    "knowledge": "C:\\Users\\dev\\AppData\\Roaming\\harness\\knowledge"
+  },
+  "telemetry": {
+    "enabled": false,
+    "endpoint": "",
+    "last_sent": null,
+    "projects": 0
+  }
+}

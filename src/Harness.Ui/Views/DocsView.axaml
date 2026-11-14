@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:c="using:Harness.Ui.Controls"
+             x:Class="Harness.Ui.Views.DocsView"
+             x:DataType="vm:DocsPage">
+  <!-- Docs (app.js renderDocs): the sections beside the text when there is room, above it when narrow
+       (DocsView.axaml.cs), and the sections before and after -->
+  <StackPanel Spacing="12">
+    <StackPanel Classes="phead">
+      <TextBlock Classes="h2" Text="Docs" />
+      <TextBlock Classes="path" Text="The guide and the reference this harness carries; 'harness docs &lt;section&gt;' prints the same." />
+    </StackPanel>
+    <Grid Name="Columns" ColumnSpacing="24" RowSpacing="16">
+      <ItemsControl Name="DocList" ItemsSource="{Binding Groups}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:DocGroup">
+            <StackPanel Spacing="2" Margin="0,0,0,12">
+              <c:AppLink Classes="nav" Classes.current="{Binding Intro.Current}" Href="{Binding Intro.Href}" IsVisible="{Binding HasIntro}">
+                <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+              </c:AppLink>
+              <TextBlock FontWeight="SemiBold" Text="{Binding Title}" IsVisible="{Binding !HasIntro}" />
+              <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:DocLink">
+                    <c:AppLink Classes="nav" Classes.current="{Binding Current}" Href="{Binding Href}" AutomationProperties.Name="{Binding Title}">
+                      <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                    </c:AppLink>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <StackPanel Name="Article" Spacing="16">
+        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <c:MarkdownBlock Name="DocText" Source="{Binding Doc.Body}" />
+        <DockPanel>
+          <c:AppLink DockPanel.Dock="Right" Classes="row" Href="{Binding Next.Href}" IsVisible="{Binding Next, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     HorizontalAlignment="Right" MaxWidth="320">
+            <StackPanel>
+              <TextBlock Classes="muted small" Text="Next" HorizontalAlignment="Right" />
+              <TextBlock FontWeight="SemiBold" Text="{Binding Next.Title, StringFormat='{}{0} →'}" TextWrapping="Wrap" TextAlignment="Right" />
+            </StackPanel>
+          </c:AppLink>
+          <c:AppLink Classes="row" Href="{Binding Previous.Href}" IsVisible="{Binding Previous, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     HorizontalAlignment="Left" MaxWidth="320">
+            <StackPanel>
+              <TextBlock Classes="muted small" Text="Previous" />
+              <TextBlock FontWeight="SemiBold" Text="{Binding Previous.Title, StringFormat='← {0}'}" TextWrapping="Wrap" />
+            </StackPanel>
+          </c:AppLink>
+        </DockPanel>
+      </StackPanel>
+    </Grid>
+  </StackPanel>
+</UserControl>
