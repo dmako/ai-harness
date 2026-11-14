@@ -222,6 +222,16 @@
     <DataTemplate DataType="vm:RejectDialog">
       <views:RejectView />
     </DataTemplate>
+    <DataTemplate DataType="vm:ArchitectureViewModel">
+      <views:ArchitectureView Name="Architecture" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:FindingMarkDialog">
+      <StackPanel Classes="field">
+        <TextBlock Classes="label" Text="Why it is intended" />
+        <TextBox Name="ReasonField" Text="{Binding Reason}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" AutomationProperties.Name="Why it is intended" />
+        <TextBlock Classes="hint" Text="{x:Static vm:FindingMarkDialog.Note}" TextWrapping="Wrap" />
+      </StackPanel>
+    </DataTemplate>
     <DataTemplate DataType="vm:HealthViewModel">
       <views:HealthView Name="Health" />
     </DataTemplate>

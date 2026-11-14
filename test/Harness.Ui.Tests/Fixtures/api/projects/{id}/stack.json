@@ -1,0 +1,13 @@
+{
+  "stack": {
+    "language": "C#",
+    "runtime": {
+      "name": ".NET",
+      "version": "10.0",
+      "major": "10"
+    },
+    "frameworks": [],
+    "badge": "C# \u00B7 .NET 10"
+  },
+  "uses": []
+}

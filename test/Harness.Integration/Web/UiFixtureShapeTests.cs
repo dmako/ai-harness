@@ -32,6 +32,7 @@ public sealed class UiFixtureShapeTests
     {
         using var fixture = await SyncFixture.CreateAsync();
         Seed(fixture);
+        await CodeAsync(fixture);
         await using var server = await UiFixture.StartAsync(fixture);
         var projects = JsonNode.Parse(await server.Client.GetStringAsync("/api/projects", Token))!;
         var id = (string)projects["projects"]![0]!["id"]!;
@@ -76,6 +77,30 @@ public sealed class UiFixtureShapeTests
             }
         }
         problems.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// A small .NET solution in the repository, committed twice: two projects (App references Core), a test project, a
+    /// branchy function, so Architecture's structure, layers, complexity and change coupling have something to show.
+    /// </summary>
+    internal static async Task CodeAsync(SyncFixture fixture)
+    {
+        fixture.Write("Fixture.slnx", "<Solution>\n  <Project Path=\"src/Fixture.Core/Fixture.Core.csproj\" />\n  <Project Path=\"src/Fixture.App/Fixture.App.csproj\" />\n  <Project Path=\"test/Fixture.Tests/Fixture.Tests.csproj\" />\n</Solution>\n");
+        fixture.Write("src/Fixture.Core/Fixture.Core.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>\n  <ItemGroup><PackageReference Include=\"Newtonsoft.Json\" Version=\"13.0.1\" /></ItemGroup>\n</Project>\n");
+        fixture.Write("src/Fixture.App/Fixture.App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>\n  <ItemGroup><ProjectReference Include=\"../Fixture.Core/Fixture.Core.csproj\" /></ItemGroup>\n</Project>\n");
+        fixture.Write("test/Fixture.Tests/Fixture.Tests.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>\n  <ItemGroup><ProjectReference Include=\"../../src/Fixture.App/Fixture.App.csproj\" /></ItemGroup>\n</Project>\n");
+        fixture.Write("src/Fixture.Core/Rules.cs", Rules(4));
+        fixture.Write("src/Fixture.App/Program.cs", "namespace Fixture.App;\n\npublic static class Program\n{\n    public static int Main(string[] args) => Fixture.Core.Rules.Grade(args.Length);\n}\n");
+        await fixture.CommitAsync("a small solution");
+        fixture.Write("src/Fixture.Core/Rules.cs", Rules(14));
+        fixture.Write("src/Fixture.App/Program.cs", "namespace Fixture.App;\n\npublic static class Program\n{\n    public static int Main(string[] args) => Fixture.Core.Rules.Grade(args.Length + 1);\n}\n");
+        await fixture.CommitAsync("more rules");
+    }
+
+    private static string Rules(int branches)
+    {
+        var body = string.Concat(Enumerable.Range(1, branches).Select(i => $"        if (score == {i}) {{ return {i * 10}; }}\n"));
+        return $"namespace Fixture.Core;\n\npublic static class Rules\n{{\n    public static int Grade(int score)\n    {{\n{body}        return 0;\n    }}\n}}\n";
     }
 
     /// <summary>The query a fixture's route is read with when the endpoint needs one.</summary>

@@ -1,0 +1,54 @@
+<!-- Architecture (style.css .amap, .anode, .smell, .cxbar): the layer graph's nodes (selected, what it references,
+     what references it, the rest dimmed), the findings' cards and the hotspots' bars. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Button.anode">
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+  </Style>
+  <Style Selector="Button.anode.sel">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  </Style>
+  <Style Selector="Button.anode.rel-out">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.anode.rel-in">
+    <Setter Property="BorderBrush" Value="{DynamicResource CConvention}" />
+  </Style>
+  <Style Selector="Button.anode.dim">
+    <Setter Property="Background" Value="{DynamicResource Page}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+  </Style>
+  <Style Selector="Button.anode.dim TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+
+  <Style Selector="Border.smell">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="Border.smell.quiet">
+    <Setter Property="Background" Value="{DynamicResource Page}" />
+  </Style>
+
+  <Style Selector="Border.bar">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.side">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+</Styles>

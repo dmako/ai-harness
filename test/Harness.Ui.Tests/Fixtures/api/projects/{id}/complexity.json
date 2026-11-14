@@ -1,0 +1,51 @@
+{
+  "languages": [
+    {
+      "language": "csharp",
+      "thresholds": {
+        "note": 11,
+        "warn": 21,
+        "problem": 51
+      },
+      "functions": 2,
+      "max": 15,
+      "measured": 0,
+      "bins": [
+        {
+          "from": 1,
+          "to": 5,
+          "count": 1
+        },
+        {
+          "from": 6,
+          "to": 10,
+          "count": 0
+        },
+        {
+          "from": 11,
+          "to": 15,
+          "count": 1
+        }
+      ],
+      "top": [
+        {
+          "name": "Rules.Grade",
+          "path": "src/Fixture.Core/Rules.cs",
+          "line": 5,
+          "complexity": 15
+        },
+        {
+          "name": "Program.Main",
+          "path": "src/Fixture.App/Program.cs",
+          "line": 5,
+          "complexity": 1
+        }
+      ],
+      "files": {
+        "src/Fixture.App/Program.cs": 1,
+        "src/Fixture.Core/Rules.cs": 15
+      }
+    }
+  ],
+  "bin_width": 5
+}

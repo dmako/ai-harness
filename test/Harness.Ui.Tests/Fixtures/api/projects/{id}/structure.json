@@ -1,0 +1,123 @@
+{
+  "known": true,
+  "language": "dotnet",
+  "input": "solution at the repository root",
+  "workspaces": 1,
+  "architecture": {
+    "language": "dotnet",
+    "noun": "project",
+    "solutions": [
+      {
+        "path": "Fixture.slnx",
+        "projects": [
+          "src/Fixture.Core/Fixture.Core.csproj",
+          "src/Fixture.App/Fixture.App.csproj",
+          "test/Fixture.Tests/Fixture.Tests.csproj"
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "layer": 1,
+        "referenced_by": [
+          "test/Fixture.Tests/Fixture.Tests.csproj"
+        ],
+        "name": "Fixture.App",
+        "path": "src/Fixture.App/Fixture.App.csproj",
+        "package": "Fixture.App",
+        "kind": "library",
+        "references": [
+          "src/Fixture.Core/Fixture.Core.csproj"
+        ],
+        "ref_at": {
+          "src/Fixture.Core/Fixture.Core.csproj": "src/Fixture.App/Fixture.App.csproj:3"
+        },
+        "packages": [],
+        "solutions": [
+          "Fixture.slnx"
+        ]
+      },
+      {
+        "layer": 0,
+        "referenced_by": [
+          "src/Fixture.App/Fixture.App.csproj"
+        ],
+        "name": "Fixture.Core",
+        "path": "src/Fixture.Core/Fixture.Core.csproj",
+        "package": "Fixture.Core",
+        "kind": "library",
+        "references": [],
+        "packages": [
+          {
+            "name": "Newtonsoft.Json",
+            "version": "13.0.1"
+          }
+        ],
+        "solutions": [
+          "Fixture.slnx"
+        ]
+      },
+      {
+        "layer": 2,
+        "role": "test",
+        "referenced_by": [],
+        "name": "Fixture.Tests",
+        "path": "test/Fixture.Tests/Fixture.Tests.csproj",
+        "kind": "test",
+        "references": [
+          "src/Fixture.App/Fixture.App.csproj"
+        ],
+        "ref_at": {
+          "src/Fixture.App/Fixture.App.csproj": "test/Fixture.Tests/Fixture.Tests.csproj:3"
+        },
+        "packages": [],
+        "solutions": [
+          "Fixture.slnx"
+        ]
+      }
+    ],
+    "smells": [
+      {
+        "kind": "unused",
+        "level": "info",
+        "title": "Fixture.App is used by nothing here and no workspace member",
+        "why": "Nothing in the repository references it except its tests and no other member references its package Fixture.App; it may still be used outside the workspace.",
+        "fix": "Check whether anything outside the workspace uses its package; if nothing does, it can go.",
+        "project": "src/Fixture.App/Fixture.App.csproj",
+        "evidence": [
+          "src/Fixture.App/Fixture.App.csproj"
+        ],
+        "key": "unused:src/Fixture.App/Fixture.App.csproj",
+        "measure": 1,
+        "source": {
+          "provider": "harness",
+          "tool": "internal/dotnet"
+        },
+        "basis": "fact"
+      }
+    ],
+    "layers": 3
+  },
+  "package_users": {},
+  "findings": [
+    {
+      "kind": "unused",
+      "level": "info",
+      "title": "Fixture.App is used by nothing here and no workspace member",
+      "why": "Nothing in the repository references it except its tests and no other member references its package Fixture.App; it may still be used outside the workspace.",
+      "fix": "Check whether anything outside the workspace uses its package; if nothing does, it can go.",
+      "project": "src/Fixture.App/Fixture.App.csproj",
+      "evidence": [
+        "src/Fixture.App/Fixture.App.csproj"
+      ],
+      "key": "unused:src/Fixture.App/Fixture.App.csproj",
+      "measure": 1,
+      "source": {
+        "provider": "harness",
+        "tool": "internal/dotnet"
+      },
+      "basis": "fact"
+    }
+  ],
+  "snapshot": null
+}

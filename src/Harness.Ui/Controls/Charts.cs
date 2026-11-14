@@ -393,3 +393,204 @@ public sealed class Meter : Chart
         }
     }
 }
+
+/// <summary>A bin of the complexity chart: its range and how many functions fall in it.</summary>
+public sealed record ComplexityBar(int From, int To, int Count);
+
+/// <summary>A point of the hotspot chart: a file, how often it changed, its most complex function, and whether named.</summary>
+public sealed record HotspotPoint(string Name, int Commits, int Complexity, bool Named);
+
+/// <summary>What the complexity charts share: the level of a complexity against the thresholds, and drawn text.</summary>
+public abstract class ThresholdChart : Chart
+{
+    public static readonly StyledProperty<int> NoteProperty = AvaloniaProperty.Register<ThresholdChart, int>(nameof(Note), 11);
+    public static readonly StyledProperty<int> WarnProperty = AvaloniaProperty.Register<ThresholdChart, int>(nameof(Warn), 21);
+    public static readonly StyledProperty<int> ProblemProperty = AvaloniaProperty.Register<ThresholdChart, int>(nameof(Problem), 51);
+
+    static ThresholdChart() => AffectsRender<ThresholdChart>(NoteProperty, WarnProperty, ProblemProperty);
+
+    public int Note
+    {
+        get => GetValue(NoteProperty);
+        set => SetValue(NoteProperty, value);
+    }
+
+    public int Warn
+    {
+        get => GetValue(WarnProperty);
+        set => SetValue(WarnProperty, value);
+    }
+
+    public int Problem
+    {
+        get => GetValue(ProblemProperty);
+        set => SetValue(ProblemProperty, value);
+    }
+
+    /// <summary>The colour token of a complexity: problem, warning, note, or below them.</summary>
+    protected string Level(int complexity)
+    {
+        if (complexity >= Problem)
+        {
+            return "Critical";
+        }
+        if (complexity >= Warn)
+        {
+            return "Warning";
+        }
+        return complexity >= Note ? "Accent" : "Axis";
+    }
+
+    protected void Text(DrawingContext context, string text, Point at, string brush, bool right = false, bool center = false)
+    {
+        var formatted = new FormattedText(
+            text,
+            System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            Typeface.Default,
+            11,
+            Brush(brush)
+        );
+        var x = at.X;
+        if (right)
+        {
+            x -= formatted.Width;
+        }
+        else if (center)
+        {
+            x -= formatted.Width / 2;
+        }
+        context.DrawText(formatted, new Point(x, at.Y - formatted.Height));
+    }
+}
+
+/// <summary>
+/// How a language's functions spread over cyclomatic complexity (app.js complexityChart): a bar per bin on a
+/// square-root scale with its count above it, and the note, warning and problem thresholds as lines. The table
+/// beside it says the same in words.
+/// </summary>
+public sealed class ComplexityChart : ThresholdChart
+{
+    public static readonly StyledProperty<IReadOnlyList<ComplexityBar>?> BinsProperty = AvaloniaProperty.Register<ComplexityChart, IReadOnlyList<ComplexityBar>?>(nameof(Bins));
+
+    public static readonly StyledProperty<int> BinWidthProperty = AvaloniaProperty.Register<ComplexityChart, int>(nameof(BinWidth), 5);
+
+    private const double Band = 30;
+    private const double Plot = 120;
+    private const double AxisHeight = 18;
+
+    static ComplexityChart() => AffectsRender<ComplexityChart>(BinsProperty, BinWidthProperty);
+
+    public IReadOnlyList<ComplexityBar>? Bins
+    {
+        get => GetValue(BinsProperty);
+        set => SetValue(BinsProperty, value);
+    }
+
+    public int BinWidth
+    {
+        get => GetValue(BinWidthProperty);
+        set => SetValue(BinWidthProperty, value);
+    }
+
+    protected override Size MeasureOverride(Size availableSize) =>
+        new(double.IsInfinity(availableSize.Width) ? 720 : availableSize.Width, Band + Plot + AxisHeight);
+
+    public override void Render(DrawingContext context)
+    {
+        if (Bins is not { Count: > 0 } bins)
+        {
+            return;
+        }
+        var width = Bounds.Width;
+        var bw = width / bins.Count;
+        var top = Math.Max(1, bins.Max(b => b.Count));
+        double Y(int count) => Band + Plot - (count > 0 ? Math.Max(2, Math.Sqrt(count / (double)top) * (Plot - 14)) : 0);
+        var every = Math.Max(1, (int)Math.Ceiling(bins.Count / 12.0));
+        for (var i = 0; i < bins.Count; i++)
+        {
+            var bin = bins[i];
+            var y = Y(bin.Count);
+            context.FillRectangle(Brush(Level(bin.From)), new Rect((i * bw) + 1, y, Math.Max(bw - 2, 1), Band + Plot - y));
+            if (bin.Count > 0)
+            {
+                Text(context, bin.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), new Point((i * bw) + (bw / 2), y - 2), "Ink2", center: true);
+            }
+            if (i % every == 0)
+            {
+                Text(context, bin.From.ToString(System.Globalization.CultureInfo.InvariantCulture), new Point((i * bw) + 2, Band + Plot + AxisHeight), "Muted");
+            }
+        }
+        var row = 0;
+        var lastEnd = double.NegativeInfinity;
+        foreach (var (value, name, brush) in new[] { (Note, "note", "Accent"), (Warn, "warning", "Warning"), (Problem, "problem", "Critical") })
+        {
+            if ((value - 1) / (double)BinWidth >= bins.Count)
+            {
+                continue;
+            }
+            var x = (value - 1) / (double)BinWidth * bw;
+            context.DrawLine(new Pen(Brush(brush), 1.2, new DashStyle([4, 3], 0)), new Point(x, Band - 2), new Point(x, Band + Plot));
+            var label = $"{name} {value}";
+            row = x < lastEnd ? row + 1 : 0;
+            lastEnd = x + (label.Length * 6.2) + 6;
+            Text(context, label, new Point(x + 3, Band - 4 - (row * 12)), "Ink2");
+        }
+        context.DrawLine(new Pen(Brush("Axis"), 1), new Point(0, Band + Plot), new Point(width, Band + Plot));
+    }
+}
+
+/// <summary>
+/// Changing files by how often they changed (across) and their most complex function (up) (app.js hotspotChart): top
+/// right is complex code that keeps changing. The warning band is shaded and the worst few files are named.
+/// </summary>
+public sealed class HotspotChart : ThresholdChart
+{
+    public static readonly StyledProperty<IReadOnlyList<HotspotPoint>?> PointsProperty = AvaloniaProperty.Register<HotspotChart, IReadOnlyList<HotspotPoint>?>(nameof(Points));
+
+    private const double L = 34;
+    private const double B = 26;
+    private const double T = 10;
+    private const double R = 10;
+
+    static HotspotChart() => AffectsRender<HotspotChart>(PointsProperty);
+
+    public IReadOnlyList<HotspotPoint>? Points
+    {
+        get => GetValue(PointsProperty);
+        set => SetValue(PointsProperty, value);
+    }
+
+    protected override Size MeasureOverride(Size availableSize) => new(double.IsInfinity(availableSize.Width) ? 640 : availableSize.Width, 220);
+
+    public override void Render(DrawingContext context)
+    {
+        if (Points is not { Count: > 0 } points)
+        {
+            return;
+        }
+        var w = Bounds.Width;
+        var h = Bounds.Height;
+        var cmax = Math.Max(1, points.Max(p => p.Commits));
+        var kmax = Math.Max(Problem + 5, points.Max(p => p.Complexity));
+        double X(int c) => L + (c / (double)cmax * (w - L - R));
+        double Y(int k) => h - B - (k / (double)kmax * (h - B - T));
+        context.FillRectangle(Brush("AccentWash"), new Rect(L, T, w - L - R, Math.Max(0, Y(Warn) - T)));
+        context.DrawLine(new Pen(Brush("Warning"), 1, new DashStyle([4, 3], 0)), new Point(L, Y(Warn)), new Point(w - R, Y(Warn)));
+        Text(context, $"warning {Warn}", new Point(w - R - 4, Y(Warn) - 3), "Ink2", right: true);
+        var axis = new Pen(Brush("Axis"), 1);
+        context.DrawLine(axis, new Point(L, h - B), new Point(w - R, h - B));
+        context.DrawLine(axis, new Point(L, T), new Point(L, h - B));
+        Text(context, $"commits →  ({cmax} at most)", new Point(w - R, h - 4), "Muted", right: true);
+        Text(context, "cx", new Point(4, T + 10), "Muted");
+        foreach (var p in points)
+        {
+            var radius = p.Named ? 6 : 4.5;
+            context.DrawEllipse(Brush(Level(p.Complexity)), null, new Point(X(p.Commits), Y(p.Complexity)), radius, radius);
+        }
+        foreach (var p in points.Where(p => p.Named))
+        {
+            Text(context, p.Name, new Point(X(p.Commits) - 9, Y(p.Complexity) + 5), "Ink", right: true);
+        }
+    }
+}

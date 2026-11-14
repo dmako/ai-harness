@@ -238,6 +238,7 @@ public sealed partial class ProjectPage : PageViewModel
             (Body as WorkViewModel)?.Show(route);
             (Body as KnowledgeViewModel)?.Show(route);
             (Body as AgentsViewModel)?.Show(route);
+            (Body as ArchitectureViewModel)?.Show(route);
             return;
         }
         View = route.View;
@@ -312,8 +313,9 @@ public sealed partial class ProjectPage : PageViewModel
             work.Start();
             return work;
         }
-        // Architecture is the one view still to port
-        return new PlaceholderPage("Architecture", "TASK-0156", _services.Host.Current(route));
+        var architecture = new ArchitectureViewModel(_services, Id, route);
+        architecture.Start();
+        return architecture;
     }
 
     private async Task ShowBoardAsync(BoardViewModel board)

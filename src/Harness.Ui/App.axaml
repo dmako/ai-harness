@@ -27,5 +27,6 @@
     <StyleInclude Source="avares://Harness.Ui/Styles/Overview.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Work.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Knowledge.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Architecture.axaml" />
   </Application.Styles>
 </Application>

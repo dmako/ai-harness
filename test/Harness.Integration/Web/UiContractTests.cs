@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using AwesomeAssertions;
+using Harness.Core.Memory;
 using Harness.Core.Tasks;
+using Harness.Infrastructure.Memory;
 using Harness.Integration.Sync;
 using Harness.Ui.Api;
 using Xunit;
@@ -25,6 +27,12 @@ public sealed class UiContractTests
     {
         using var fixture = await SyncFixture.CreateAsync();
         UiFixtureShapeTests.Seed(fixture);
+        await UiFixtureShapeTests.CodeAsync(fixture);
+        using (var database = fixture.Database())
+        {
+            // a rule the code breaks: a boundary finding, which every read recomputes, to triage
+            new MemoryStore(database).Put(new() { Type = "constraint", Content = "forbid: Fixture.App -> Fixture.Core", Force = true }, Token);
+        }
         await using var server = await UiFixture.StartAsync(fixture);
         var id = (string)JsonNode.Parse(await server.Client.GetStringAsync("/api/projects", Token))!["projects"]![0]!["id"]!;
         await UiFixtureShapeTests.TitleAsync(server, id, "Fixture project");
@@ -240,6 +248,30 @@ public sealed class UiContractTests
         hooks.Git.Should().Contain(g => g.Name == "post-commit");
         hooks.Clients.Should().Contain(c => c.Client == "codex");
         hooks.Events.Should().NotBeNull();
+
+        // Architecture: the structure with its findings and their triage, the stack, complexity, change coupling, package marks
+        var structure = await api.StructureAsync(id, Token);
+        (structure.Known, structure.Architecture!.Language, structure.Architecture.Layers).Should().Be((true, "dotnet", 3));
+        structure.Architecture.Projects.Select(p => p.Name).Should().BeEquivalentTo("Fixture.App", "Fixture.Core", "Fixture.Tests");
+        structure.Architecture.Projects.Single(p => p.Name == "Fixture.Core").Packages.Should().ContainSingle(p => p.Name == "Newtonsoft.Json");
+        var boundary = structure.Findings!.Should().ContainSingle(f => f.Kind == "boundary").Subject;
+        boundary.Rule!.Memory.Should().StartWith("mem_");
+        await api.FindingAsync(id, "mark", new FindingAction { Key = boundary.Key!, Reason = "an entry point" }, Token);
+        var marked = (await api.StructureAsync(id, Token)).Findings!.Single(f => f.Key == boundary.Key);
+        (marked.Mark!.State, marked.Mark.Reason).Should().Be(("by_design", "an entry point"));
+        await api.FindingAsync(id, "unmark", new FindingAction { Key = boundary.Key! }, Token);
+        (await api.StructureAsync(id, Token)).Findings!.Single(f => f.Key == boundary.Key).Mark.Should().BeNull();
+        await api.FindingAsync(id, "task", new FindingAction { Key = boundary.Key!, Project = "" }, Token);
+        var tasked = (await api.StructureAsync(id, Token)).Findings!.Single(f => f.Key == boundary.Key);
+        tasked.Mark!.State.Should().Be("task");
+        tasked.Mark.TaskId.Should().StartWith("ARCH-");
+        (await api.StackAsync(id, Token)).Stack!.Runtime!.Name.Should().Be(".NET");
+        var complexity = (await api.ComplexityAsync(id, Token)).Languages.Should().ContainSingle().Subject;
+        (complexity.Language, complexity.Max).Should().Be(("csharp", 15));
+        complexity.Top.Should().Contain(f => f.Name == "Rules.Grade");
+        var coupling = await api.CouplingAsync(id, Token);
+        coupling.Hotspots.Should().Contain(h => h.Path == "src/Fixture.Core/Rules.cs");
+        (await api.PackageMarksAsync(id, [], Token)).Packages.Should().BeEmpty();
 
         // the docs
         var docs = await api.DocsAsync(Token);
