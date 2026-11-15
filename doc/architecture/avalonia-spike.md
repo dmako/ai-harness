@@ -28,21 +28,20 @@ The Board loads in **1.6–2.3 s cold** (4.9 MB transferred) and **about 1.4 s w
 | --- | --- | --- |
 | Shared UI | `src/Harness.Ui` | `App`, the views (`MainView`, `BoardView`, `TaskCard`) and view models (`MainViewModel`, `BoardViewModel`). It also holds a typed API client (`HarnessApi` with source-generated `UiJsonContext`, `ServerSentEvents`) and styles split into `Styles/Tokens.axaml` (semantic colours per theme, sizes), `Blueprints.axaml` (the 16 blueprint colours), `Base.axaml`, `Board.axaml` and `BlueprintFrames.axaml`. It references no harness project. |
 | Browser host | `src/Harness.Ui.Browser` | `Microsoft.NET.Sdk.WebAssembly`, `net11.0-browser`. `Program` reads the page address and the deep link and starts the shared `App` in `#out`. `wwwroot/` holds `index.html`, `main.js` (runtime start, timing marks) and `main.css`. |
-| Serving | `src/Harness.Web/UiNextAssets.cs` | `/next/` serves the publish output's `wwwroot` from the folder named by `HARNESS_UI_NEXT_DIR`; when the variable is unset, `/next/` does not exist. It serves the `.br` copy when the browser accepts Brotli, with ETag/Last-Modified and `no-cache`. Paths are guarded by the host's own path checks plus a containment check. |
+| Serving | `src/Harness.Web/UiBundleAssets.cs` | The release serves its `ui` sidecar at `/`, with Brotli negotiation and caching for fingerprinted framework files. |
 | Tests | `test/Harness.Ui.Tests` | 12 headless tests on Avalonia's headless platform with Skia. |
-| Tests | `test/Harness.Integration/Web/UiNextTests.cs` | `/next/` content types, policy, Brotli, redirect, path guard, and its absence when unset. |
+| Tests | `test/Harness.Integration/Web/UiBundleTests.cs` | Root bundle content types, policy, Brotli, cache and path guard. |
 
-The current UI at `/` is unchanged.
+The spike originally ran separately; TASK-0164 switched the release UI at `/` to this application.
 
 To try it:
 
 ```
-dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/next     # needs the wasm-tools workload
-HARNESS_UI_NEXT_DIR=<repo>/artifacts/next/wwwroot harness ui           # then open /next/#/p/<project id>/board
+dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/ui       # needs the wasm-tools workload
+harness ui  # release archive includes the ui directory beside the executable
 ```
 
-The bundle is served from a folder, not embedded. That keeps the release pipeline and the `harness` executable
-unchanged during the spike. Embedding it is a parity task (see [the plan](#follow-up-blueprint)).
+The release serves the bundle from the `ui` directory beside the executable.
 
 ## Versions and build
 
@@ -65,7 +64,7 @@ unchanged during the spike. Embedding it is a parity task (see [the plan](#follo
   For parity the contracts should move to a project that both the server and the UI reference, or be pinned by contract tests against the server.
 - **Live updates use a streamed `fetch`.** `HttpClient` in the browser streams a response body when the request sets the option `WebAssemblyEnableStreamingResponse`; the body then arrives as fetch's `ReadableStream`. `ServerSentEvents` parses the `text/event-stream` in C#. It is not the browser's `EventSource`, so it has no built-in reconnect: `MainViewModel` reconnects after 3 s and reloads. A change naming the shown project reloads its Board after 500 ms of quiet. Measured: one `task_update` caused **3 reloads**, because one call writes several change events. Parity should add the JavaScript UI's 3 s minimum gap between reloads.
 - **Writes**: the browser sends `Origin` itself, so `UiWrites`' origin check passes. Any other host (desktop, tests) must set `Origin: http://<host>` and `X-Harness-UI: 1`.
-- **Content Security Policy**: `/next/` sends `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; frame-ancestors 'none'`. `'wasm-unsafe-eval'` allows compiling WebAssembly only, not JavaScript `eval`. No inline-style allowance was needed, and the browser logged no policy violation.
+- **Content Security Policy**: `/` sends `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; frame-ancestors 'none'`. `'wasm-unsafe-eval'` allows compiling WebAssembly only, not JavaScript `eval`. No inline-style allowance was needed, and the browser logged no policy violation.
 
 ## Bundle size and load time
 
@@ -117,7 +116,7 @@ emulated colour scheme and device pixel ratio.
 | Ctrl+F (find in page) | **gap** | The page has no text in the page's DOM (`document.body.innerText` is the 16-character placeholder; `window.find()` finds nothing), so the browser's find cannot see the UI. *Workaround:* an in-app search or filter on each list view. |
 | Links: left click | **works** | A task id is a `HyperlinkButton`; clicking it opened a new tab at the current UI's task URL. |
 | Links: middle-click, context menu, hover URL | **gap** | Middle-click opened nothing; there is no "Open in new tab" or "Copy link" menu and no status-bar URL on hover. *Workaround:* an Avalonia context menu with "Open in new tab" and "Copy link" (`window.open`, the clipboard). |
-| Deep link into a project | **works** | `/next/#/p/<id>/board` opens that project's Board. Choosing another project rewrites the hash (`history.replaceState`), so the address stays shareable. Back and Forward are not wired (replace, not push): parity should push and listen to `hashchange`. |
+| Deep link into a project | **works** | `/#/p/<id>/board` opens that project's Board. Choosing another project rewrites the hash (`history.replaceState`), so the address stays shareable. Back and Forward are not wired (replace, not push): parity should push and listen to `hashchange`. |
 | Browser zoom | **works** | Emulated at 2× device pixel ratio: crisp text and controls, layout reflows. It first showed a real bug: columns squeezed until their headers were cut. The fix: the page scrolls vertically below `PageMinHeight` (520 px); above it, each column scrolls on its own. |
 | Keyboard | **works** | Tab moves through the project, sort, done-age and blueprint pickers, then the cards' links and titles, with a visible focus frame in the browser. The headless test `TabMovesThroughThePickersAndCards` asserts the pickers' order. Opening a picker from the keyboard was not checked. |
 | Screen reader exposure | **gap** | The accessibility tree holds only `Canvas`. Avalonia 12.1.6 in the browser does not expose its automation peers (the `AutomationProperties.Name`s set on pickers, columns and cards reach nothing). No setting for it was found. The spike also removes the "Loading harness…" placeholder once the Board is drawn, because a screen reader would otherwise still read it under the canvas. |

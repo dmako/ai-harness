@@ -12,11 +12,11 @@ namespace Harness.Integration.Web;
 /// The Avalonia UI in a real browser (TASK-0161): what headless tests cannot see. The WebAssembly bundle loads under
 /// harness ui's content security policy at a deep link, logs no error, draws the Board in time, follows a change to
 /// the project through the streamed /api/events without reloading, and moves between views with Back and Forward.
-/// It reuses the published bundle (HARNESS_UI_NEXT_DIR, else artifacts/next/wwwroot) and the browser of
+/// It reuses the published bundle (HARNESS_UI_TEST_BUNDLE, else artifacts/ui/wwwroot) and the browser of
 /// HARNESS_UI_BROWSER, and is skipped, saying why, when either is missing.
 /// </summary>
 [Collection("Provider processes")]
-public sealed class UiNextBrowserTests(SharedBrowser browser)
+public sealed class UiBrowserSmokeTests(SharedBrowser browser)
 {
     /// <summary>Collects what the page reports as wrong: console errors, uncaught errors, refused content.</summary>
     private const string Watch = """
@@ -38,10 +38,7 @@ public sealed class UiNextBrowserTests(SharedBrowser browser)
         var executable = Browser();
         using var fixture = await SyncFixture.CreateAsync();
         UiFixtureShapeTests.Seed(fixture);
-        await using var server = await UiFixture.StartAsync(
-            fixture,
-            environment: new Dictionary<string, string> { [UiNextAssets.FolderVariable] = bundle }
-        );
+        await using var server = await UiFixture.StartAsync(fixture, uiBundle: bundle);
         var id = UiWriteTests.ProjectId(fixture);
         await using var isolated = await browser.OpenAsync(executable, Token);
         var page = isolated.Page;
@@ -49,7 +46,7 @@ public sealed class UiNextBrowserTests(SharedBrowser browser)
         await page.CommandAsync("Page.addScriptToEvaluateOnNewDocument", new { source = Watch });
 
         // a deep link, drawn in time
-        await page.CommandAsync("Page.navigate", new { url = $"{server.Client.BaseAddress}next/#/p/{id}/board" });
+        await page.CommandAsync("Page.navigate", new { url = $"{server.Client.BaseAddress}#/p/{id}/board" });
         await page.WaitAsync("globalThis.harnessTimings?.board > 0");
         (await ValueAsync(page, "harnessTimings.board")).GetDouble().Should().BeLessThan(20_000, "the Board is drawn within 20 s");
 
@@ -91,6 +88,23 @@ public sealed class UiNextBrowserTests(SharedBrowser browser)
             "JSON.stringify(window.__problems.filter(p => !p.startsWith('console.error: Failed to create render target for mode')))"
         )).GetString();
         problems.Should().Be("[]", problems);
+
+        // A single browser context keeps its cache between navigations, as in a returning visit.
+        if (Environment.GetEnvironmentVariable("HARNESS_UI_TIMING_FILE") is { Length: > 0 } timingFile)
+        {
+            var samples = new List<double>();
+            await page.EvaluateAsync($"location.hash = '#/p/{id}/board'");
+            await page.WaitAsync($"globalThis.harnessTimings?.route === '#/p/{id}/board'");
+            for (var i = 0; i < 5; i++)
+            {
+                var previous = (await ValueAsync(page, "performance.timeOrigin")).GetDouble();
+                await page.CommandAsync("Page.reload", new { });
+                var origin = previous.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                await page.WaitAsync($"performance.timeOrigin !== {origin} && globalThis.harnessTimings?.board > 0");
+                samples.Add((await ValueAsync(page, "harnessTimings.board")).GetDouble());
+            }
+            await File.WriteAllTextAsync(timingFile, JsonSerializer.Serialize(samples), Token);
+        }
     }
 
     private static async Task<JsonElement> ValueAsync(BrowserPage page, string expression) =>
@@ -99,14 +113,14 @@ public sealed class UiNextBrowserTests(SharedBrowser browser)
     /// <summary>The published bundle's wwwroot, or a skip saying how to make one.</summary>
     private static string Bundle()
     {
-        var folder = Environment.GetEnvironmentVariable(UiNextAssets.FolderVariable) is { Length: > 0 } set
+        var folder = Environment.GetEnvironmentVariable("HARNESS_UI_TEST_BUNDLE") is { Length: > 0 } set
             ? set
-            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/next/wwwroot"));
+            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/ui/wwwroot"));
         return File.Exists(Path.Combine(folder, "index.html")) && Directory.Exists(Path.Combine(folder, "_framework"))
             ? folder
             : throw Xunit.Sdk.SkipException.ForSkip(
                 $"No Avalonia UI bundle at {folder}: publish it with 'dotnet publish src/Harness.Ui.Browser -c Release "
-                    + $"-o artifacts/next' (it needs the wasm-tools workload) or set {UiNextAssets.FolderVariable}."
+                    + "-o artifacts/ui' (it needs the wasm-tools workload) or set HARNESS_UI_TEST_BUNDLE."
             );
     }
 

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.WebAssembly">
   <!-- harness ui's Avalonia browser host (TASK-0144 spike): the shared Harness.Ui in WebAssembly. harness ui serves
-       its publish output (wwwroot) at /next/; it is built on its own, not referenced by any harness executable. -->
+       its publish output (wwwroot) at /; it is built on its own, not referenced by any harness executable. -->
   <PropertyGroup>
     <TargetFramework>net11.0-browser</TargetFramework>
     <OutputType>Exe</OutputType>

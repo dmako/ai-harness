@@ -233,8 +233,12 @@ def probe(main_archive, developer_archive, root, report):
 
     child, address = service(sandbox.binary, 'ui', '--no-open', '--addr', '127.0.0.1:0')
     try:
-        for path in ['/', '/app.js', '/style.css', '/api/projects', '/api/machine']:
+        for path in ['/', '/main.js', '/main.css', '/api/projects', '/api/machine']:
             check(http(address, path)[0] == 200, 'UI ' + path)
+        framework = next((main / 'ui' / '_framework').glob('*.wasm.br'))
+        check(http(address, '/_framework/' + framework.name[:-3])[0] == 200, 'UI WebAssembly bundle')
+        for path in ['/app.js', '/style.css', '/next/']:
+            check(http(address, path)[0] == 404, 'retired UI ' + path)
     finally:
         check(child.close(terminate=True) == 0 if os.name != 'nt' else child.close(terminate=True) is not None,
               'UI process cleanup')

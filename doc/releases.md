@@ -21,7 +21,7 @@ invocation isolates intermediate/output directories. Committed
 `--refresh-locks` only to regenerate a deliberately changed graph, review it,
 then return to locked restores. The main archive contains `harness`,
 `harness-graphify` and `harness-agents`; developer-tools contains `harness-collect` and `harness-share`.
-Keep their included SQLite native library beside the executables.
+Keep their included SQLite native library and the `ui` directory beside the executables.
 
 Archives carry README, build metadata, release notes and actual dependency
 licenses/notices. The repository's [MIT license](../LICENSE), with copyright to
@@ -67,19 +67,34 @@ So the release workflow's `ui-bundle` job builds it once:
 - reports its size against the budget (`scripts/ui_bundle.py`);
 - uploads it as an artifact.
 
-**Each runtime's packaging step only checks and records it.** Every `qualify` job
+**Each runtime's packaging step checks and ships it.** Every `qualify` job
 downloads the bundle and passes it to `publish_release.py --ui-bundle`, which
 checks that it is one and within the size budget. It records it in `RELEASE.json`
 as `ui_bundle`: files, raw and Brotli bytes, a hash of its tree, and
-`shipped: false`.
+`shipped: true`. The main archive contains `ui` beside the executable. It stores
+each Brotli variant when present and otherwise the raw file; the server streams
+decompression for browsers that do not accept Brotli.
 
-**It ships from the switch-over.** It goes into the archives with the switch-over
-(TASK-0164), which also chooses how it is delivered.
+The TASK-0164 Windows/Edge headless run measured 58 files, 21,239,127 raw bytes
+and 5,625,039 bytes with Brotli. Five warm Board reloads took 2.68, 2.27, 2.17,
+1.91 and 1.99 seconds (median 2.17 seconds), compared with the spike's roughly
+1.4-second warm median. These were separate runs of different application
+versions, not a controlled comparison. Set `HARNESS_UI_TIMING_FILE` during the
+browser smoke test to record five samples on another host.
+
+BP-010 exit check: the view and action coverage is recorded by TASK-0151 through
+TASK-0160; typed API contracts are exercised by `UiContractTests`; the release
+serves the bundle at `/` and removes the old assets; both workflows publish the
+browser host after installing `wasm-tools`; `Harness.Ui.Tests` checks view layout
+and contrast and the browser smoke checks load, errors and a live update; the
+screen-reader limitation and in-app find are documented in the guide and
+`doc/architecture/avalonia-spike.md`. Workflow configuration is checked locally;
+the hosted jobs are qualified when the branch runs in CI.
 
 Locally, the same as the CI:
 
 ```shell
 dotnet workload install wasm-tools
-dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/next
-python scripts/publish_release.py --version 0.13.0-preview --output dist/preview --ui-bundle artifacts/next/wwwroot
+dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/ui
+python scripts/publish_release.py --version 0.13.0-preview --output dist/preview --ui-bundle artifacts/ui/wwwroot
 ```

@@ -270,7 +270,7 @@ public sealed class UiHostContext
     public int Days =>
         int.TryParse(Preferences.Get("days"), System.Globalization.CultureInfo.InvariantCulture, out var days) && days > 0 ? days : 30;
 
-    /// <summary>The new UI's own page (its links open there in a new tab); harness ui serves it at /next/.</summary>
+    /// <summary>The UI's own page (its links open there in a new tab).</summary>
     public Uri? Page { get; init; }
 
     /// <summary>The address of <paramref name="href"/> (a hash) on the new UI's page.</summary>

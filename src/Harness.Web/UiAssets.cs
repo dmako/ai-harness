@@ -37,11 +37,6 @@ public static partial class UiAssets
         foreach (
             var (path, name, type, cache) in new[]
             {
-                ("/", "index.html", "text/html; charset=utf-8", false),
-                ("/index.html", "index.html", "text/html; charset=utf-8", false),
-                ("/app.js", "app.js", "text/javascript; charset=utf-8", false),
-                ("/style.css", "style.css", "text/css; charset=utf-8", false),
-                ("/brand.css", "brand.css", "text/css; charset=utf-8", false),
                 ("/logo.svg", "logo.svg", "image/svg+xml", true),
                 ("/favicon.png", "logo.png", "image/png", true),
                 ("/apple-touch-icon.png", "logo.png", "image/png", true),

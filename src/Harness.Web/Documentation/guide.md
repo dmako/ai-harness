@@ -210,6 +210,13 @@ proposed tasks.
 
 ## What harness ui shows
 
+The bundled Avalonia application opens in your browser. Use Ctrl+F (Command+F
+on macOS) or the Find field to search text currently rendered on the page;
+matched occurrences appear in a selectable preview. Keyboard navigation and
+copyable text are supported, though the browser accessibility tree currently
+exposes the drawing canvas rather than individual controls. The CLI remains
+available for screen-reader workflows.
+
 Each project opens on its Overview: rings for the tasks done and how well
 `get_context` answered, each with its trend over the window; what is in
 flight or next; and what needs a person, most urgent first. Then:

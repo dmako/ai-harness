@@ -20,27 +20,31 @@ public sealed class UiTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task DefaultPortHelpAndExplicitAddressStartTheEmbeddedUi()
+    public async Task DefaultPortHelpAndExplicitAddressStartTheInstalledUi()
     {
         UiHost.DefaultAddress.Should().Be("127.0.0.1:17477");
         using var fixture = await SyncFixture.CreateAsync();
         var help = await fixture.ProcessAsync("dotnet", [UiFixture.CliPath, "ui", "--help"]);
         help.Code.Should().Be(0, help.Error);
         help.Output.Should().Contain("127.0.0.1:17477").And.Contain("--no-open");
-        await using var server = await UiFixture.StartAsync(fixture, address: "127.0.0.1:0");
+        var bundle = Path.Combine(fixture.DirectoryRoot, "ui-bundle");
+        Directory.CreateDirectory(bundle);
+        await File.WriteAllTextAsync(Path.Combine(bundle, "index.html"), "<html><script src=\"main.js\"></script></html>", Token);
+        await File.WriteAllTextAsync(Path.Combine(bundle, "main.js"), new string('a', 120), Token);
+        await using var server = await UiFixture.StartAsync(fixture, address: "127.0.0.1:0", uiBundle: bundle);
         server.Client.BaseAddress!.Port.Should().BeGreaterThan(0);
         var response = await server.Client.GetAsync("/", Token);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync(Token)).Should().Contain("app.js").And.Contain("style.css");
+        (await response.Content.ReadAsStringAsync(Token)).Should().Contain("main.js");
         response
             .Headers.GetValues("Content-Security-Policy")
             .Should()
             .ContainSingle()
             .Which.Should()
-            .Be("default-src 'self'; frame-ancestors 'none'");
+            .Be(UiBundleAssets.ContentSecurityPolicy);
         response.Headers.GetValues("X-Content-Type-Options").Should().ContainSingle().Which.Should().Be("nosniff");
         foreach (
-            var asset in new[] { "app.js", "style.css", "brand.css", "logo.svg", "favicon.png", "apple-touch-icon.png" }
+            var asset in new[] { "main.js", "logo.svg", "favicon.png", "apple-touch-icon.png" }
         )
         {
             using var content = await server.Client.GetAsync(asset, Token);
@@ -78,7 +82,7 @@ public sealed class UiTests
             environment: new Dictionary<string, string> { [UiHost.AddressVariable] = "127.0.0.1:" + port }
         );
         server.Client.BaseAddress!.Port.Should().Be(port);
-        using var response = await server.Client.GetAsync("/", Token);
+        using var response = await server.Client.GetAsync("/api/docs", Token);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -102,7 +106,7 @@ public sealed class UiTests
     {
         using var fixture = await SyncFixture.CreateAsync();
         await using var server = await UiFixture.StartAsync(fixture);
-        foreach (var path in new[] { "/", "/app.js", "/api/machine", "/api/docs" })
+        foreach (var path in new[] { "/", "/main.js", "/api/machine", "/api/docs" })
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, path);
             request.Headers.Host = "evil.example";

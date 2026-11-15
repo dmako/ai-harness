@@ -70,20 +70,20 @@ beside the new ones:
 
 ```powershell
 dotnet workload install wasm-tools
-dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/next
-python scripts/ui_bundle.py artifacts/next/wwwroot
+dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/ui
+python scripts/ui_bundle.py artifacts/ui/wwwroot
 ```
 
-The tests that use the bundle read it from `HARNESS_UI_NEXT_DIR`, else from
-`artifacts/next/wwwroot`, and skip, saying how to build it, when it is missing:
+The tests that use the bundle read it from `HARNESS_UI_TEST_BUNDLE`, else from
+`artifacts/ui/wwwroot`, and skip, saying how to build it, when it is missing:
 
-- `UiNextBrowserTests`, the browser smoke test. It also needs `HARNESS_UI_BROWSER`.
+- `UiBrowserSmokeTests`, the browser smoke test. It also needs `HARNESS_UI_BROWSER`.
 - `UiBundleBudgetTests`. The Brotli total must stay within 6.0 MB, 25 % over the
   spike's 4.81 MB. Raise the budget here and in `scripts/ui_bundle.py` together,
   on purpose.
 
-Run them with `harness ui` serving the bundle at `/next/`
-(`HARNESS_UI_NEXT_DIR=<repo>/artifacts/next/wwwroot`).
+The smoke test stages the bundle beside a copy of the executable and serves it at `/`;
+`HARNESS_UI_TEST_BUNDLE` is a test-only override for the source bundle.
 
 The `ui` job of `tests.yml` does all of this on Linux with Chrome, in order:
 
@@ -92,7 +92,7 @@ The `ui` job of `tests.yml` does all of this on Linux with Chrome, in order:
 3. publishes the bundle;
 4. reports its size in the step summary;
 5. runs `Harness.Ui.Tests`, the bundle tests, the contract tests and the
-   `/next/` tests;
+   asset-serving tests;
 6. uploads the bundle.
 
 ## Performance

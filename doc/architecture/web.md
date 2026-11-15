@@ -1,15 +1,16 @@
-# Embedded web UI
+# Web UI
 
-Source: [`src/Harness.Web`](../../src/Harness.Web).
-Web depends only on Core. It hosts embedded HTML, JavaScript, CSS and Markdown
-without a Node build or runtime asset directory. `UiAssets` indexes documentation
-sections and serves assets with the appropriate cache behavior.
+Source: [`src/Harness.Web`](../../src/Harness.Web) and [`src/Harness.Ui`](../../src/Harness.Ui).
+The Avalonia WebAssembly application is served at `/` from the `ui` directory
+beside the harness executable. Release archives include that directory, storing
+Brotli files when available; the server decompresses them for clients that do
+not accept Brotli. Fingerprinted framework files have immutable caching; other
+assets are revalidated. Documentation and branding remain embedded.
 
 ASP.NET Core slim hosting and generated request delegates support Native AOT.
 HTTP handlers call Core read/write/change contracts supplied by the CLI.
 Reads, author operations, graph/session controls and live notifications remain
-separate boundaries. Each section loads independently so a slow optional backend
-does not delay all other sections.
+separate boundaries.
 
 ## Author operations
 

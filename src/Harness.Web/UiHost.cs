@@ -54,7 +54,8 @@ public static class UiHost
         string address,
         Func<IServiceProvider, IUiReadApi> api,
         Func<IServiceProvider, IUiWriteApi>? writes = null,
-        Func<IUiChangeSource>? changes = null
+        Func<IUiChangeSource>? changes = null,
+        string? assetsDirectory = null
     )
     {
         ArgumentNullException.ThrowIfNull(api);
@@ -158,7 +159,7 @@ public static class UiHost
             );
         }
         UiAssets.Map(app);
-        UiNextAssets.Map(app);
+        UiBundleAssets.Map(app, assetsDirectory ?? Path.Combine(AppContext.BaseDirectory, UiBundleAssets.DirectoryName));
         if (writes is not null)
         {
             UiWrites.Map(app);

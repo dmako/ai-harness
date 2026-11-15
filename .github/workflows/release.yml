@@ -35,10 +35,10 @@ jobs:
         run: |
           dotnet restore src/Harness.Ui.Browser/Harness.Ui.Browser.csproj --locked-mode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet publish src/Harness.Ui.Browser/Harness.Ui.Browser.csproj -c Release --no-restore -o artifacts/next
+          dotnet publish src/Harness.Ui.Browser/Harness.Ui.Browser.csproj -c Release --no-restore -o artifacts/ui
       - name: Bundle size
         run: |
-          $report = python scripts/ui_bundle.py artifacts/next/wwwroot --markdown
+          $report = python scripts/ui_bundle.py artifacts/ui/wwwroot --markdown
           $code = $LASTEXITCODE
           $report | Write-Output
           $report[-1] | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY
@@ -47,7 +47,7 @@ jobs:
         with:
           name: ui-bundle
           retention-days: 7
-          path: artifacts/next/wwwroot
+          path: artifacts/ui/wwwroot
   qualify:
     needs: ui-bundle
     strategy:

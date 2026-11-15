@@ -52,7 +52,8 @@ internal sealed class UiFixture : IAsyncDisposable
     public static async Task<UiFixture> StartAsync(
         SyncFixture fixture,
         string? address = "127.0.0.1:0",
-        IReadOnlyDictionary<string, string>? environment = null
+        IReadOnlyDictionary<string, string>? environment = null,
+        string? uiBundle = null
     )
     {
         var start = new ProcessStartInfo("dotnet")
@@ -63,7 +64,15 @@ internal sealed class UiFixture : IAsyncDisposable
             RedirectStandardError = true,
             WorkingDirectory = fixture.DirectoryRoot,
         };
-        start.ArgumentList.Add(CliPath);
+        var cli = CliPath;
+        if (uiBundle is not null)
+        {
+            var installed = Path.Combine(fixture.DirectoryRoot, "installed-ui-test");
+            CopyTree(Path.GetDirectoryName(cli)!, installed, skipUi: true);
+            CopyTree(uiBundle, Path.Combine(installed, "ui"), bundle: true);
+            cli = Path.Combine(installed, Path.GetFileName(cli));
+        }
+        start.ArgumentList.Add(cli);
         start.ArgumentList.Add("ui");
         if (address is not null)
         {
@@ -110,6 +119,26 @@ internal sealed class UiFixture : IAsyncDisposable
             }
             process.Dispose();
             throw;
+        }
+    }
+
+    private static void CopyTree(string source, string destination, bool skipUi = false, bool bundle = false)
+    {
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(source, file);
+            if (skipUi && relative.StartsWith("ui" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (bundle && (file.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+                || (!file.EndsWith(".br", StringComparison.OrdinalIgnoreCase) && File.Exists(file + ".br"))))
+            {
+                continue;
+            }
+            var target = Path.Combine(destination, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, overwrite: true);
         }
     }
 

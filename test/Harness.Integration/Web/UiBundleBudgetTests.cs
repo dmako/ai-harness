@@ -37,14 +37,14 @@ public sealed class UiBundleBudgetTests
 
     private static string Bundle()
     {
-        var folder = Environment.GetEnvironmentVariable(UiNextAssets.FolderVariable) is { Length: > 0 } set
+        var folder = Environment.GetEnvironmentVariable("HARNESS_UI_TEST_BUNDLE") is { Length: > 0 } set
             ? set
-            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/next/wwwroot"));
+            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/ui/wwwroot"));
         return File.Exists(Path.Combine(folder, "index.html"))
             ? folder
             : throw Xunit.Sdk.SkipException.ForSkip(
                 $"No Avalonia UI bundle at {folder}: publish it with 'dotnet publish src/Harness.Ui.Browser -c Release "
-                    + $"-o artifacts/next' into a new folder (it needs the wasm-tools workload) or set {UiNextAssets.FolderVariable}."
+                    + "-o artifacts/ui' into a new folder (it needs the wasm-tools workload) or set HARNESS_UI_TEST_BUNDLE."
             );
     }
 }
