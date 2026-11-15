@@ -38,12 +38,12 @@
           </Border>
           <Border Classes="dialog-foot">
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-              <Button Name="Cancel" Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}"
+              <Button Name="Cancel" Classes="ghost" Content="Cancel" AutomationProperties.Name="Cancel" Command="{Binding CancelCommand}"
                       IsVisible="{Binding HasCancel}" />
-              <Button Name="Back" Classes="ghost" Content="Back" Command="{Binding BackCommand}"
+              <Button Name="Back" Classes="ghost" Content="Back" AutomationProperties.Name="Back" Command="{Binding BackCommand}"
                       IsVisible="{Binding Reviewing}" />
               <Button Name="Accept" Classes.primary="{Binding !Danger}" Classes.danger="{Binding Danger}"
-                      Content="{Binding AcceptLabel}" Command="{Binding AcceptCommand}" IsEnabled="{Binding !Busy}" />
+                      Content="{Binding AcceptLabel}" AutomationProperties.Name="{Binding AcceptLabel}" Command="{Binding AcceptCommand}" IsEnabled="{Binding !Busy}" />
             </StackPanel>
           </Border>
         </StackPanel>

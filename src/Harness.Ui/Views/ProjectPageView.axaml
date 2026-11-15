@@ -15,7 +15,7 @@
                 AutomationProperties.Name="Rename this project" VerticalAlignment="Center">
           <c:Icon Kind="edit" />
         </Button>
-        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
+        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" AutomationProperties.Name="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
                 ToolTip.Tip="Agents and commands name this project so. Click to copy." />
       </WrapPanel>
       <WrapPanel ItemSpacing="12" LineSpacing="2">
@@ -27,7 +27,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="x:String">
-              <c:AppLink Classes="link" Href="{Binding Converter={x:Static c:Converters.WorkspaceHref}}" ToolTip.Tip="Open this workspace">
+              <c:AppLink Classes="link" Href="{Binding Converter={x:Static c:Converters.WorkspaceHref}}" AutomationProperties.Name="{Binding StringFormat='Open workspace {0}'}" ToolTip.Tip="Open this workspace">
                 <TextBlock Text="{Binding StringFormat='in {0}'}" />
               </c:AppLink>
             </DataTemplate>

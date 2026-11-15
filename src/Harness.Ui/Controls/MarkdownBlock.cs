@@ -233,15 +233,15 @@ public sealed partial class MarkdownBlock : StackPanel
     {
         if (url.StartsWith('#', StringComparison.Ordinal))
         {
-            return new InlineUIContainer(
-                new AppLink { Classes = { "link", "inline" }, Href = "#/docs/" + Uri.EscapeDataString(url[1..]), Content = text }
-            );
+            var link = new AppLink { Classes = { "link", "inline" }, Href = "#/docs/" + Uri.EscapeDataString(url[1..]), Content = text };
+            Avalonia.Automation.AutomationProperties.SetName(link, text);
+            return new InlineUIContainer(link);
         }
         if (url.StartsWith("http://", StringComparison.Ordinal) || url.StartsWith("https://", StringComparison.Ordinal))
         {
-            return new InlineUIContainer(
-                new HyperlinkButton { Classes = { "inline" }, NavigateUri = new Uri(url), Content = text, Padding = new Thickness(0) }
-            );
+            var link = new HyperlinkButton { Classes = { "inline" }, NavigateUri = new Uri(url), Content = text, Padding = new Thickness(0) };
+            Avalonia.Automation.AutomationProperties.SetName(link, text);
+            return new InlineUIContainer(link);
         }
         return new Run(text);
     }

@@ -16,7 +16,7 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:DocGroup">
             <StackPanel Spacing="2" Margin="0,0,0,12">
-              <c:AppLink Classes="nav" Classes.current="{Binding Intro.Current}" Href="{Binding Intro.Href}" IsVisible="{Binding HasIntro}">
+              <c:AppLink Classes="nav" Classes.current="{Binding Intro.Current}" Href="{Binding Intro.Href}" AutomationProperties.Name="{Binding Title}" IsVisible="{Binding HasIntro}">
                 <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
               </c:AppLink>
               <TextBlock FontWeight="SemiBold" Text="{Binding Title}" IsVisible="{Binding !HasIntro}" />
@@ -37,14 +37,14 @@
         <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <c:MarkdownBlock Name="DocText" Source="{Binding Doc.Body}" />
         <DockPanel>
-          <c:AppLink DockPanel.Dock="Right" Classes="row" Href="{Binding Next.Href}" IsVisible="{Binding Next, Converter={x:Static ObjectConverters.IsNotNull}}"
+          <c:AppLink DockPanel.Dock="Right" Classes="row" Href="{Binding Next.Href}" AutomationProperties.Name="{Binding Next.Title, StringFormat='Next: {0}'}" IsVisible="{Binding Next, Converter={x:Static ObjectConverters.IsNotNull}}"
                      HorizontalAlignment="Right" MaxWidth="320">
             <StackPanel>
               <TextBlock Classes="muted small" Text="Next" HorizontalAlignment="Right" />
               <TextBlock FontWeight="SemiBold" Text="{Binding Next.Title, StringFormat='{}{0} →'}" TextWrapping="Wrap" TextAlignment="Right" />
             </StackPanel>
           </c:AppLink>
-          <c:AppLink Classes="row" Href="{Binding Previous.Href}" IsVisible="{Binding Previous, Converter={x:Static ObjectConverters.IsNotNull}}"
+          <c:AppLink Classes="row" Href="{Binding Previous.Href}" AutomationProperties.Name="{Binding Previous.Title, StringFormat='Previous: {0}'}" IsVisible="{Binding Previous, Converter={x:Static ObjectConverters.IsNotNull}}"
                      HorizontalAlignment="Left" MaxWidth="320">
             <StackPanel>
               <TextBlock Classes="muted small" Text="Previous" />

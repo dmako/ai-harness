@@ -29,7 +29,7 @@
 
     <StackPanel Classes="section">
       <DockPanel>
-        <Button Name="NewWorkspace" DockPanel.Dock="Right" Classes="primary" Content="New workspace" Command="{Binding NewWorkspaceCommand}" />
+        <Button Name="NewWorkspace" DockPanel.Dock="Right" Classes="primary" Content="New workspace" AutomationProperties.Name="New workspace" Command="{Binding NewWorkspaceCommand}" />
         <StackPanel>
           <TextBlock Classes="h3" Text="Workspaces" />
           <TextBlock Classes="hint" Text="Repositories searched and reasoned about together." />
@@ -73,7 +73,7 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <c:AppLink Classes="link" Href="{Binding MoreHref}" IsVisible="{Binding HasMore}" Margin="8,4">
+              <c:AppLink Classes="link" Href="{Binding MoreHref}" AutomationProperties.Name="{Binding MoreText}" IsVisible="{Binding HasMore}" Margin="8,4">
                   <TextBlock Text="{Binding MoreText}" />
                 </c:AppLink>
               </StackPanel>

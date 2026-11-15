@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
 using Harness.Ui.Api;
@@ -150,7 +151,7 @@ public sealed class WorkViewTests
     [Fact]
     public Task TheTaskDialogShowsTheTaskItsSessionsAndItsAuditTrail() => Ui.RunAsync(async () =>
     {
-        var (_, api, model) = await OpenAsync("tasks");
+        var (window, api, model) = await OpenAsync("tasks");
 
         _ = Work(model).Plan.OpenTaskCommand.ExecuteAsync("TASK-0001");
         var dialog = await DialogAsync<TaskDialog>(model);
@@ -164,6 +165,14 @@ public sealed class WorkViewTests
         dialog.Editable.Should().BeTrue();
         dialog.SessionsNote.Should().StartWith("None recorded.");
         api.Gets.Should().Contain(Root + "/tasks/TASK-0001/sessions");
+
+        MainView.RequestFind();
+        var view = window.GetVisualDescendants().OfType<MainView>().Single();
+        view.FindControl<TextBox>("FindInput")!.Text = "It runs";
+        Ui.Settle();
+        view.GetVisualDescendants().OfType<SelectableTextBlock>()
+            .Should().Contain(t => t.Text == "It runs" && t.Classes.Contains("find-current"));
+        view.FindControl<Button>("FindClose")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
         await dialog.ShowTrailCommand.ExecuteAsync(null);
         dialog.Trail.Select(e => (e.Event, e.Move)).Should().Equal(("imported", ""), ("unlocked", "backlog → ready"));
@@ -277,7 +286,9 @@ public sealed class WorkViewTests
         var api = new FixtureApi();
         api.Answers[Root + "/agent-models"] = """{"clients":{}}""";
         api.Answers[Root + "/tasks/{task}/sessions"] = """
-            {"sessions":[],"totals":{},"hosts":[{"key":"host1234","client":"codex","status":"idle","alive":true}],
+            {"sessions":[{"client":"claude-code","session_id":"6f1e2d3c-0000-4000-8000-000000000001",
+             "origin":"hooks","status":"working","started_at":"2026-11-13T09:00:00Z","ended_at":"2026-11-13T09:30:00Z"}],
+             "totals":{},"hosts":[{"key":"host1234","client":"codex","status":"idle","alive":true}],
              "permission_modes":{"claude-code":[{"id":"auto","label":"Auto","description":"Automatic","default":true}]}}
             """;
         api.Answers[Root + "/agents/host1234/log"] = """

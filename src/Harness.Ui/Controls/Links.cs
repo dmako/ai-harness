@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace Harness.Ui.Controls;
 
@@ -77,7 +78,10 @@ public static class Links
     /// <summary>Open in new tab and Copy link for any control that stands for <paramref name="uri"/>.</summary>
     public static ContextMenu MenuFor(Control owner, Func<Uri?> uri)
     {
+        owner.RemoveHandler(InputElement.KeyDownEvent, OpenMenuFromKeyboard);
+        owner.AddHandler(InputElement.KeyDownEvent, OpenMenuFromKeyboard, RoutingStrategies.Tunnel);
         var open = new MenuItem { Header = "Open in new tab" };
+        Avalonia.Automation.AutomationProperties.SetName(open, "Open in new tab");
         open.Click += async (_, _) =>
         {
             if (uri() is { } target)
@@ -86,6 +90,7 @@ public static class Links
             }
         };
         var copy = new MenuItem { Header = "Copy link" };
+        Avalonia.Automation.AutomationProperties.SetName(copy, "Copy link");
         copy.Click += async (_, _) =>
         {
             if (uri() is { } target)
@@ -93,7 +98,30 @@ public static class Links
                 await CopyAsync(owner, target.ToString());
             }
         };
-        return new ContextMenu { Items = { open, copy } };
+        var copyText = new MenuItem { Header = "Copy text" };
+        Avalonia.Automation.AutomationProperties.SetName(copyText, "Copy text");
+        copyText.Click += async (_, _) =>
+        {
+            var text = owner is ContentControl { Content: string content }
+                ? content
+                : string.Join(" ", owner.GetVisualDescendants().OfType<TextBlock>()
+                    .Where(t => t.IsEffectivelyVisible && !string.IsNullOrWhiteSpace(t.Text)).Select(t => t.Text));
+            if (text.Length > 0)
+            {
+                await CopyAsync(owner, text);
+            }
+        };
+        return new ContextMenu { Items = { open, copy, copyText } };
+    }
+
+    private static void OpenMenuFromKeyboard(object? sender, KeyEventArgs e)
+    {
+        if (sender is Control { ContextMenu: { } menu } owner
+            && (e.Key is Key.Apps || (e.Key is Key.F10 && (e.KeyModifiers & KeyModifiers.Shift) != 0)))
+        {
+            menu.Open(owner);
+            e.Handled = true;
+        }
     }
 
     /// <summary>A middle click on <paramref name="owner"/> opens <paramref name="uri"/> in a new tab.</summary>

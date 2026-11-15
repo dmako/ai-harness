@@ -50,6 +50,20 @@ public sealed partial class DialogLayer : UserControl
         {
             return;
         }
+        var source = e.Source as Avalonia.Visual;
+        var picker = source as ComboBox ?? source?.GetVisualAncestors().OfType<ComboBox>().FirstOrDefault();
+        if (picker is not null && e.Key is Key.Enter)
+        {
+            // Let the picker open or accept its choice; Enter must not submit the surrounding form.
+            return;
+        }
+        var openPicker = Body.GetVisualDescendants().OfType<ComboBox>().FirstOrDefault(c => c.IsDropDownOpen);
+        if (openPicker is not null && e.Key is Key.Escape)
+        {
+            openPicker.IsDropDownOpen = false;
+            e.Handled = true;
+            return;
+        }
         if (e.Key is Key.Escape)
         {
             e.Handled = true;

@@ -31,6 +31,12 @@ globalThis.harnessTimings.runtimeReady = performance.now();
 
 // Back, Forward and an edited address come back to the shell as hash changes
 const exports = await runtime.getAssemblyExports("Harness.Ui.Browser.dll");
+globalThis.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    exports.Harness.Ui.Browser.Program.OpenFind();
+  }
+}, true);
 const changed = () => exports.Harness.Ui.Browser.BrowserNavigation.HashChanged(globalThis.location.hash);
 globalThis.addEventListener("hashchange", changed);
 globalThis.addEventListener("popstate", changed);

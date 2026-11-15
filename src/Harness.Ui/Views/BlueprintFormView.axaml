@@ -38,7 +38,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <Button Classes="ghost small" Command="{Binding AddExitCommand}" HorizontalAlignment="Left">
+      <Button Classes="ghost small" AutomationProperties.Name="Add criterion" Command="{Binding AddExitCommand}" HorizontalAlignment="Left">
         <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add another" /></StackPanel>
       </Button>
     </StackPanel>
@@ -64,8 +64,8 @@
     </StackPanel>
     <StackPanel Spacing="6" IsVisible="{Binding AsksSameName}">
       <TextBlock Classes="hint" Text="{Binding SameNameQuestion}" />
-      <RadioButton GroupName="same" Content="{Binding MergeLabel}" IsChecked="{Binding Merge}" />
-      <RadioButton GroupName="same" Content="Create a separate blueprint" IsChecked="{Binding Separate}" />
+      <RadioButton GroupName="same" Content="{Binding MergeLabel}" AutomationProperties.Name="{Binding MergeLabel}" IsChecked="{Binding Merge}" />
+      <RadioButton GroupName="same" Content="Create a separate blueprint" AutomationProperties.Name="Create a separate blueprint" IsChecked="{Binding Separate}" />
     </StackPanel>
   </StackPanel>
 </UserControl>

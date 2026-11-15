@@ -8,7 +8,7 @@
              x:DataType="vm:FindingsBoard">
   <!-- findings with their triage (app.js smellsSection): by kind, marked ones on request, the gone ones folded -->
   <StackPanel Spacing="6">
-      <CheckBox Name="ShowMarked" IsChecked="{Binding ShowMarked}" Content="{Binding MarkedLabel}" IsVisible="{Binding HasMarked}" />
+      <CheckBox Name="ShowMarked" IsChecked="{Binding ShowMarked}" Content="{Binding MarkedLabel}" AutomationProperties.Name="{Binding MarkedLabel}" IsVisible="{Binding HasMarked}" />
       <TextBlock Name="Snapshot" Classes="hint" Text="{Binding SnapshotLine}" TextWrapping="Wrap"
                  IsVisible="{Binding HasSnapshot}" />
       <TextBlock Classes="okay" Text="{Binding Okay}" TextWrapping="Wrap" IsVisible="{Binding !HasFindings}" />
@@ -40,12 +40,12 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:FilterChip">
-                          <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" />
+                          <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" AutomationProperties.Name="{Binding Label}" />
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <ItemsControl ItemsSource="{Binding Shown}" ItemTemplate="{StaticResource FindingRowTemplate}" />
-                    <Expander Header="{Binding MoreHead}" IsVisible="{Binding HasMore}" HorizontalAlignment="Stretch">
+                    <Expander Header="{Binding MoreHead}" AutomationProperties.Name="{Binding MoreHead}" IsVisible="{Binding HasMore}" HorizontalAlignment="Stretch">
                       <ItemsControl ItemsSource="{Binding More}" ItemTemplate="{StaticResource FindingRowTemplate}" />
                     </Expander>
                   </StackPanel>
@@ -55,7 +55,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <Expander Name="Gone" Header="{Binding GoneHead}" IsVisible="{Binding HasGone}" HorizontalAlignment="Stretch">
+      <Expander Name="Gone" Header="{Binding GoneHead}" AutomationProperties.Name="{Binding GoneHead}" IsVisible="{Binding HasGone}" HorizontalAlignment="Stretch">
         <ItemsControl ItemsSource="{Binding Gone}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="api:Finding">
@@ -84,7 +84,7 @@
           <SelectableTextBlock Classes="small" Text="{Binding Finding.Why}" IsVisible="{Binding HasWhy}" TextWrapping="Wrap" />
           <SelectableTextBlock Classes="small" Text="{Binding FixLine}" IsVisible="{Binding HasFix}" TextWrapping="Wrap" />
           <SelectableTextBlock Classes="small" Text="{Binding RuleLine}" IsVisible="{Binding HasRule}" TextWrapping="Wrap" />
-          <Expander Header="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
+          <Expander Header="{Binding EvidenceHead}" AutomationProperties.Name="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
             <ItemsControl ItemsSource="{Binding Finding.Evidence}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
@@ -94,15 +94,15 @@
           <TextBlock Classes="muted small" Text="{Binding FoundBy}" IsVisible="{Binding HasFoundBy}" TextWrapping="Wrap" />
           <TextBlock Classes="small" Text="{Binding MarkStory}" IsVisible="{Binding HasMarkStory}" TextWrapping="Wrap" />
           <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding Triaged}">
-            <Button Classes="ghost small" Content="{Binding MarkLabel}" IsVisible="{Binding CanMark}"
+            <Button Classes="ghost small" Content="{Binding MarkLabel}" AutomationProperties.Name="{Binding MarkLabel}" IsVisible="{Binding CanMark}"
                     Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).MarkCommand}" CommandParameter="{Binding}" />
-            <Button Classes="ghost small" Content="{Binding TaskLabel}" IsVisible="{Binding CanTask}"
+            <Button Classes="ghost small" Content="{Binding TaskLabel}" AutomationProperties.Name="{Binding TaskLabel}" IsVisible="{Binding CanTask}"
                     Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).TaskCommand}" CommandParameter="{Binding}" />
-            <Button Classes="ghost small" Content="{Binding ChangeLabel}" IsVisible="{Binding CanChangeKnowledge}"
+            <Button Classes="ghost small" Content="{Binding ChangeLabel}" AutomationProperties.Name="{Binding ChangeLabel}" IsVisible="{Binding CanChangeKnowledge}"
                     Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).ChangeKnowledgeCommand}" CommandParameter="{Binding}" />
-            <Button Classes="ghost small" Content="Retire it" IsVisible="{Binding CanRetireKnowledge}"
+            <Button Classes="ghost small" Content="Retire it" AutomationProperties.Name="Retire it" IsVisible="{Binding CanRetireKnowledge}"
                     Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).RetireKnowledgeCommand}" CommandParameter="{Binding}" />
-            <Button Classes="ghost small" Content="{Binding UnmarkLabel}" IsVisible="{Binding CanUnmark}"
+            <Button Classes="ghost small" Content="{Binding UnmarkLabel}" AutomationProperties.Name="{Binding UnmarkLabel}" IsVisible="{Binding CanUnmark}"
                     Command="{Binding $parent[views:FindingsView].((vm:FindingsBoard)DataContext).UnmarkCommand}" CommandParameter="{Binding}" />
           </WrapPanel>
         </StackPanel>

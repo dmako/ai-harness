@@ -279,6 +279,7 @@ public sealed class DependencyMap : Panel
         _lines = new Lines(this);
         Children.Add(_lines);
         Focusable = true;
+        Avalonia.Automation.AutomationProperties.SetName(this, "Workspace dependency map");
     }
 
     public DependencyModel? Model

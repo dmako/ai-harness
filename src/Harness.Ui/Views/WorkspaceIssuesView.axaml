@@ -44,7 +44,7 @@
         <views:SectionView.Body>
           <StackPanel x:DataType="vm:SharedCodeSection" Spacing="10">
             <views:FindingsView Name="SharedFindings" DataContext="{Binding Board}" />
-            <Expander Name="AllCode" HorizontalAlignment="Stretch">
+            <Expander Name="AllCode" AutomationProperties.Name="{Binding AllHead}" HorizontalAlignment="Stretch">
               <Expander.Header><TextBlock Text="{Binding AllHead}" TextWrapping="Wrap" /></Expander.Header>
               <StackPanel Spacing="8">
                 <TextBlock Classes="hint" TextWrapping="Wrap"
@@ -178,7 +178,7 @@
   <UserControl.Resources>
     <DataTemplate x:Key="RollupTemplate" x:DataType="vm:RollupLine">
       <StackPanel Spacing="3" Margin="0,4">
-        <c:AppLink Classes="link" Href="{Binding Href}" HorizontalAlignment="Left">
+        <c:AppLink Classes="link" Href="{Binding Href}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Left">
           <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
         </c:AppLink>
         <StackPanel Spacing="2">
@@ -211,7 +211,7 @@
     <DataTemplate x:Key="IssueDetailTemplate" x:DataType="vm:DesignIssuesSection">
       <StackPanel Spacing="6" IsVisible="{Binding HasSelection}">
         <TextBlock Classes="label" Text="{Binding KindLabel}" />
-        <TextBlock Classes="h3" Text="{Binding Selection.Issue.Title, FallbackValue=''}" TextWrapping="Wrap" />
+        <SelectableTextBlock Classes="h3" Text="{Binding Selection.Issue.Title, FallbackValue=''}" TextWrapping="Wrap" />
         <TextBlock Classes="label" Text="Why it matters" />
         <TextBlock Text="{Binding Selection.Issue.Why, FallbackValue=''}" TextWrapping="Wrap" />
         <TextBlock Classes="label" Text="What to do" IsVisible="{Binding HasTodo}" />

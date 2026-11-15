@@ -19,16 +19,16 @@
 
       <Border Classes="tabs">
         <StackPanel Orientation="Horizontal">
-          <ToggleButton Classes="tab" Content="Overview" IsChecked="True" />
-          <ToggleButton Classes="tab" Content="Work" />
-          <ToggleButton Classes="tab" Content="Board" />
+          <ToggleButton Classes="tab" Content="Overview" AutomationProperties.Name="Overview" IsChecked="True" />
+          <ToggleButton Classes="tab" Content="Work" AutomationProperties.Name="Work" />
+          <ToggleButton Classes="tab" Content="Board" AutomationProperties.Name="Board" />
         </StackPanel>
       </Border>
       <Border Classes="subnav">
         <StackPanel Orientation="Horizontal">
-          <ToggleButton Classes="seg" Content="Blueprints" IsChecked="True" />
-          <ToggleButton Classes="seg" Content="Tasks" />
-          <ToggleButton Classes="seg" Content="Inbox" BorderThickness="0" />
+          <ToggleButton Classes="seg" Content="Blueprints" AutomationProperties.Name="Blueprints" IsChecked="True" />
+          <ToggleButton Classes="seg" Content="Tasks" AutomationProperties.Name="Tasks" />
+          <ToggleButton Classes="seg" Content="Inbox" AutomationProperties.Name="Inbox" BorderThickness="0" />
         </StackPanel>
       </Border>
 
@@ -36,21 +36,21 @@
         <TextBlock Classes="h3" Text="Buttons" />
         <TextBlock Classes="hint" Text="Neutral by default; primary for a form's main action, highlight for the one thing a page asks for, danger for destructive actions, ghost for secondary ones." />
         <WrapPanel ItemSpacing="8" LineSpacing="8">
-          <Button Content="Neutral" />
-          <Button Classes="primary" Content="Primary" />
-          <Button Classes="highlight" Content="Highlight" />
-          <Button Classes="danger">
+          <Button Content="Neutral" AutomationProperties.Name="Neutral" />
+          <Button Classes="primary" Content="Primary" AutomationProperties.Name="Primary" />
+          <Button Classes="highlight" Content="Highlight" AutomationProperties.Name="Highlight" />
+          <Button Classes="danger" AutomationProperties.Name="Delete">
             <StackPanel Orientation="Horizontal">
               <c:Icon Kind="trash" />
               <TextBlock Text="Delete…" />
             </StackPanel>
           </Button>
-          <Button Classes="ghost" Content="Ghost" />
-          <Button Content="Disabled" IsEnabled="False" />
+          <Button Classes="ghost" Content="Ghost" AutomationProperties.Name="Ghost" />
+          <Button Content="Disabled" AutomationProperties.Name="Disabled" IsEnabled="False" />
           <Button Classes="icon" ToolTip.Tip="Refresh" AutomationProperties.Name="Refresh">
             <c:Icon Kind="refresh" />
           </Button>
-          <HyperlinkButton Content="A link" NavigateUri="https://example.invalid/" />
+          <HyperlinkButton Content="A link" AutomationProperties.Name="A link" NavigateUri="https://example.invalid/" />
         </WrapPanel>
       </StackPanel>
 
@@ -71,8 +71,8 @@
           <Border Classes="badge"><TextBlock Text="12" /></Border>
         </WrapPanel>
         <WrapPanel ItemSpacing="8" LineSpacing="8" Margin="0,8,0,0">
-          <ToggleButton Classes="chip" Content="Open" IsChecked="True" />
-          <ToggleButton Classes="chip" Content="Done" />
+          <ToggleButton Classes="chip" Content="Open" AutomationProperties.Name="Open" IsChecked="True" />
+          <ToggleButton Classes="chip" Content="Done" AutomationProperties.Name="Done" />
           <StackPanel Orientation="Horizontal" Spacing="4">
             <c:Icon Classes="prio p-low" Kind="p-low" /><TextBlock Text="low" />
             <c:Icon Classes="prio p-medium" Kind="p-medium" /><TextBlock Text="medium" />
@@ -143,7 +143,7 @@
             <ComboBoxItem Content="medium" />
             <ComboBoxItem Content="high" />
           </ComboBox>
-          <CheckBox Content="Approved outside harness" />
+          <CheckBox Content="Approved outside harness" AutomationProperties.Name="Approved outside harness" />
         </StackPanel>
       </StackPanel>
 
@@ -184,8 +184,8 @@
               </Border>
               <Border Classes="dialog-foot">
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                  <Button Classes="ghost" Content="Cancel" />
-                  <Button Classes="danger" Content="Delete" />
+                  <Button Classes="ghost" Content="Cancel" AutomationProperties.Name="Cancel" />
+                  <Button Classes="danger" Content="Delete" AutomationProperties.Name="Delete" />
                 </StackPanel>
               </Border>
             </StackPanel>

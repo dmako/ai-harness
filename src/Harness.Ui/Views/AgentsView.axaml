@@ -56,7 +56,7 @@
               </StackPanel>
             </Border>
             <ItemsControl Name="Findings" ItemsSource="{Binding Findings}" ItemTemplate="{StaticResource FindingTemplate}" />
-            <Expander Header="{Binding ResolvedHead}" IsVisible="{Binding HasResolved}" HorizontalAlignment="Stretch">
+            <Expander Header="{Binding ResolvedHead}" AutomationProperties.Name="{Binding ResolvedHead}" IsVisible="{Binding HasResolved}" HorizontalAlignment="Stretch">
               <ItemsControl ItemsSource="{Binding Resolved}" ItemTemplate="{StaticResource FindingTemplate}" />
             </Expander>
           </StackPanel>
@@ -71,7 +71,7 @@
           <StackPanel x:DataType="vm:ToolsSection" Spacing="12">
             <WrapPanel>
               <TextBlock Classes="hint" Text="{Binding Hint2}" TextWrapping="Wrap" Margin="0,0,6,0" />
-              <c:AppLink Classes="link small" Href="{Binding HealthHref}" Content="Whether they start: Health → Check providers" />
+              <c:AppLink Classes="link small" Href="{Binding HealthHref}" Content="Whether they start: Health → Check providers" AutomationProperties.Name="Whether they start: Health → Check providers" />
             </WrapPanel>
             <TextBlock Classes="h3" Text="Used here" />
             <!-- the project's SCM: a section of its own, first among what serves it -->
@@ -86,7 +86,7 @@
                     </WrapPanel>
                     <WrapPanel IsVisible="{Binding NotConfigured}">
                       <TextBlock Text="No SCM is configured on this machine: add one under " TextWrapping="Wrap" />
-                      <c:AppLink Classes="link" Href="#/machine" Content="Machine › SCM connections" />
+                      <c:AppLink Classes="link" Href="#/machine" Content="Machine › SCM connections" AutomationProperties.Name="Machine › SCM connections" />
                       <TextBlock Text=" to let agents review this project's merge requests." TextWrapping="Wrap" />
                     </WrapPanel>
                     <StackPanel Spacing="6" IsVisible="{Binding Configured}">
@@ -105,7 +105,7 @@
                         </ComboBox>
                         <TextBlock Classes="muted small" Text="{Binding PickNote}" TextWrapping="Wrap" />
                       </StackPanel>
-                      <Button Name="ScmTest" Classes="ghost" Content="Test connection" Command="{Binding TestCommand}" IsVisible="{Binding Matched}"
+                      <Button Name="ScmTest" Classes="ghost" Content="Test connection" AutomationProperties.Name="Test connection" Command="{Binding TestCommand}" IsVisible="{Binding Matched}"
                               HorizontalAlignment="Left" />
                       <TextBlock Classes="small" Text="{Binding TestLine}" TextWrapping="Wrap" />
                       <TextBlock Classes="small" Text="{Binding ProjectCheck}" TextWrapping="Wrap" IsVisible="{Binding HasProjectCheck}" />
@@ -152,15 +152,15 @@
                             <Run FontWeight="SemiBold" Text="{Binding Info.Check.Name, Mode=OneWay, StringFormat='{}{0}: '}" /><Run Text="{Binding Info.Check.Detail, Mode=OneWay}" />
                           </SelectableTextBlock>
                           <SelectableTextBlock Classes="small" Text="{Binding Info.Check.Fix, StringFormat='Fix: {0}'}" TextWrapping="Wrap" />
-                          <Button Classes="primary small" Content="Fix" Command="{Binding FixCommand}" IsVisible="{Binding Info.Check.Fixable}"
+                          <Button Classes="primary small" Content="Fix" AutomationProperties.Name="Fix" Command="{Binding FixCommand}" IsVisible="{Binding Info.Check.Fixable}"
                                   HorizontalAlignment="Left" />
                         </StackPanel>
                       </Border>
-                      <Expander Header="What it has indexed" IsVisible="{Binding CanIndex}" HorizontalAlignment="Stretch">
+                      <Expander Header="What it has indexed" AutomationProperties.Name="What it has indexed" IsVisible="{Binding CanIndex}" HorizontalAlignment="Stretch">
                         <StackPanel Spacing="6">
                           <TextBlock Classes="hint" TextWrapping="Wrap"
                                      Text="Counts of what the provider found in the code: a check that it indexed the project, not the architecture. Loading starts it." />
-                          <Button Content="Load" Command="{Binding LoadIndexCommand}" HorizontalAlignment="Left" />
+                          <Button Content="Load" AutomationProperties.Name="Load" Command="{Binding LoadIndexCommand}" HorizontalAlignment="Left" />
                           <SelectableTextBlock Classes="small mono" Text="{Binding Indexed}" TextWrapping="Wrap" />
                         </StackPanel>
                       </Expander>
@@ -171,9 +171,9 @@
                             <DataTemplate x:DataType="vm:GraphifyRow">
                               <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-                                  <Button Classes="ghost small" Content="Restart"
+                                  <Button Classes="ghost small" Content="Restart" AutomationProperties.Name="Restart"
                                           Command="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.RestartCommand}" CommandParameter="{Binding}" />
-                                  <Button Classes="ghost small" Content="Stop"
+                                  <Button Classes="ghost small" Content="Stop" AutomationProperties.Name="Stop"
                                           Command="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.StopCommand}" CommandParameter="{Binding}" />
                                 </StackPanel>
                                 <TextBlock Classes="small" Text="{Binding Session.Summary}" TextWrapping="Wrap" VerticalAlignment="Center" />
@@ -181,7 +181,7 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Classes="ghost small" Content="Start a session" HorizontalAlignment="Left"
+                        <Button Classes="ghost small" Content="Start a session" AutomationProperties.Name="Start a session" HorizontalAlignment="Left"
                                 Command="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.StartCommand}"
                                 IsVisible="{Binding $parent[views:AgentsView].((vm:AgentsViewModel)DataContext).Graphify.IsEmpty}" />
                       </StackPanel>
@@ -254,7 +254,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock Classes="small" Text="{Binding EventsLine}" TextWrapping="Wrap" />
-                <Expander Header="Files" HorizontalAlignment="Stretch">
+                <Expander Header="Files" AutomationProperties.Name="Files" HorizontalAlignment="Stretch">
                   <ItemsControl ItemsSource="{Binding Files}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>

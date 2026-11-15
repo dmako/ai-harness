@@ -12,7 +12,7 @@
       <TextBlock Classes="path" Text="Projects, workspaces, knowledge, tasks and blueprints across the machine. Agents search the code." />
     </StackPanel>
     <DockPanel>
-      <Button DockPanel.Dock="Right" Classes="primary" Content="Search" Command="{Binding SubmitCommand}" Margin="8,0,0,0" />
+      <Button DockPanel.Dock="Right" Classes="primary" Content="Search" AutomationProperties.Name="Search" Command="{Binding SubmitCommand}" Margin="8,0,0,0" />
       <TextBox Name="SearchField" Text="{Binding Query}" PlaceholderText="Search everything…" AutomationProperties.Name="Search everything">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Enter" Command="{Binding SubmitCommand}" />

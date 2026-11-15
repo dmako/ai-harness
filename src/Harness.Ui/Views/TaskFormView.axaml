@@ -79,7 +79,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <Button Name="AddCriterion" Classes="ghost small" Command="{Binding AddCriterionCommand}" HorizontalAlignment="Left">
+      <Button Name="AddCriterion" Classes="ghost small" AutomationProperties.Name="Add criterion" Command="{Binding AddCriterionCommand}" HorizontalAlignment="Left">
         <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add another" /></StackPanel>
       </Button>
     </StackPanel>
@@ -102,7 +102,7 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddTypedDependencyCommand}" Margin="6,0,0,0" />
+        <Button DockPanel.Dock="Right" Content="Add" AutomationProperties.Name="Add" Command="{Binding AddTypedDependencyCommand}" Margin="6,0,0,0" />
         <TextBox Name="DependsField" Text="{Binding DependsQuery}" PlaceholderText="Search tasks by id or title; another project's as project:TASK-1"
                  AutomationProperties.Name="Depends on" />
       </DockPanel>
@@ -144,7 +144,7 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddScopeCommand}" Margin="6,0,0,0" />
+        <Button DockPanel.Dock="Right" Content="Add" AutomationProperties.Name="Add" Command="{Binding AddScopeCommand}" Margin="6,0,0,0" />
         <TextBox Name="ScopeField" Text="{Binding ScopeText}" PlaceholderText="a path, e.g. src/tasks" AutomationProperties.Name="Scope" />
       </DockPanel>
       <TextBlock Classes="muted small" Text="Paths it may touch." />

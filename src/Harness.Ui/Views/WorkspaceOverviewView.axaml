@@ -35,7 +35,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <c:AppLink Classes="link small" Href="{Binding AllHref}" Content="{Binding AllLabel}" IsVisible="{Binding HasAll}" />
+      <c:AppLink Classes="link small" Href="{Binding AllHref}" Content="{Binding AllLabel}" AutomationProperties.Name="{Binding AllLabel}" IsVisible="{Binding HasAll}" />
     </StackPanel>
 
     <views:SectionView Name="GlanceSection" DataContext="{Binding Glance}">
@@ -50,7 +50,7 @@
                 <DataTemplate x:DataType="vm:GlanceLine">
                   <DockPanel Margin="0,3">
                     <TextBlock DockPanel.Dock="Left" Text="{Binding Icon}" Width="22" />
-                    <c:AppLink DockPanel.Dock="Right" Classes="link small" Href="{Binding Href}" Content="details →" IsVisible="{Binding HasHref}" Margin="8,0,0,0" />
+                    <c:AppLink DockPanel.Dock="Right" Classes="link small" Href="{Binding Href}" Content="details →" AutomationProperties.Name="details →" IsVisible="{Binding HasHref}" Margin="8,0,0,0" />
                     <TextBlock TextWrapping="Wrap">
                       <Run Text="{Binding Text, Mode=OneWay}" /><Run Text=" " /><Run Classes="muted" Text="{Binding More, Mode=OneWay}" />
                     </TextBlock>

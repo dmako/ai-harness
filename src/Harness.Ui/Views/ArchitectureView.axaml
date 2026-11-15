@@ -56,7 +56,7 @@
                             <TextBlock Classes="mono small" Text="{Binding Use.Package}" VerticalAlignment="Center" />
                             <TextBlock Classes="small" Text="{Binding Used, StringFormat='uses {0}'}" VerticalAlignment="Center" />
                             <TextBlock Classes="muted small" Text="{Binding Declared, StringFormat='declares {0}'}" VerticalAlignment="Center" />
-                            <c:AppLink Classes="link small" Href="{Binding Href}" Content="{Binding Use.Member}" />
+                            <c:AppLink Classes="link small" Href="{Binding Href}" Content="{Binding Use.Member}" AutomationProperties.Name="{Binding Use.Member}" />
                             <Border Classes="pill" IsVisible="{Binding HasFlag}"><TextBlock Text="{Binding Flag}" /></Border>
                           </WrapPanel>
                         </DataTemplate>
@@ -180,7 +180,7 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:FilterChip">
-                          <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" />
+                          <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" AutomationProperties.Name="{Binding Label}" />
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -289,7 +289,7 @@
 
   <UserControl.Resources>
     <DataTemplate x:Key="RelatedTemplate" x:DataType="vm:RelatedRow">
-      <Button Classes="ghost small" HorizontalAlignment="Left" Content="{Binding Name}" ToolTip.Tip="{Binding Path}"
+      <Button Classes="ghost small" HorizontalAlignment="Left" Content="{Binding Name}" AutomationProperties.Name="{Binding Name}" ToolTip.Tip="{Binding Path}"
               Command="{Binding $parent[views:ArchitectureView].((vm:ArchitectureViewModel)DataContext).Structure.PickCommand}" CommandParameter="{Binding}" />
     </DataTemplate>
   </UserControl.Resources>

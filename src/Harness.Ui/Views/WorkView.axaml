@@ -89,7 +89,7 @@
           <!-- Blueprints: the cards with their state filter -->
           <StackPanel Name="Blueprints" Spacing="12" IsVisible="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).ShowsBlueprints}">
             <DockPanel>
-              <Button Name="NewBlueprint" DockPanel.Dock="Right" Classes="primary" Content="New blueprint…"
+              <Button Name="NewBlueprint" DockPanel.Dock="Right" Classes="primary" Content="New blueprint…" AutomationProperties.Name="New blueprint…"
                       Command="{Binding NewBlueprintCommand}" VerticalAlignment="Top" />
               <ItemsControl ItemsSource="{Binding CardChips}">
                 <ItemsControl.ItemsPanel>
@@ -138,7 +138,7 @@
                         </StackPanel>
                         <WrapPanel ItemSpacing="8" LineSpacing="4">
                           <Border Classes="bpframe" c:StyleClass.Name="{Binding FrameClass}" IsVisible="{Binding HasBlueprint}">
-                            <TextBlock Classes="mono" Text="{Binding Id}" />
+                            <SelectableTextBlock Classes="mono" Text="{Binding Id}" />
                           </Border>
                           <Border Classes="pill" c:StyleClass.Name="{Binding StateClass}">
                             <StackPanel Orientation="Horizontal">
@@ -148,7 +148,7 @@
                           </Border>
                         </WrapPanel>
                       </DockPanel>
-                      <TextBlock Classes="h3" Classes.muted="{Binding !Described}" Text="{Binding Heading}" />
+                      <SelectableTextBlock Classes="h3" Classes.muted="{Binding !Described}" Text="{Binding Heading}" />
                       <TextBlock Text="{Binding Info.Goal}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"
                                  IsVisible="{Binding HasGoal}" />
                       <StackPanel Spacing="4" IsVisible="{Binding HasTasks}">
@@ -181,7 +181,7 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Classes="link small" Content="{Binding ExitToggle}" Command="{Binding ToggleExitCommand}"
+                        <Button Classes="link small" Content="{Binding ExitToggle}" AutomationProperties.Name="{Binding ExitToggle}" Command="{Binding ToggleExitCommand}"
                                 IsVisible="{Binding ExitMore}" />
                       </StackPanel>
                       <StackPanel Spacing="2" IsVisible="{Binding NotesAsList}">
@@ -195,7 +195,7 @@
                         </ItemsControl>
                       </StackPanel>
                       <TextBlock Classes="muted small" Text="{Binding Info.Notes}" TextWrapping="Wrap" IsVisible="{Binding NotesAsText}" />
-                      <Button Classes="link" Content="{Binding ShowTasks}" IsVisible="{Binding HasTasks}"
+                      <Button Classes="link" Content="{Binding ShowTasks}" AutomationProperties.Name="{Binding ShowTasks}" IsVisible="{Binding HasTasks}"
                               Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.ShowTasksOfCommand}" CommandParameter="{Binding}" />
                     </StackPanel>
                   </Border>
@@ -229,13 +229,13 @@
               </ItemsControl>
               <ComboBox Name="BlueprintPicker" ItemsSource="{Binding BlueprintChoices}" SelectedItem="{Binding SelectedBlueprint}"
                         AutomationProperties.Name="Blueprint" MinWidth="160" MaxWidth="320" />
-              <Button Name="NewTask" Classes="primary" Content="New task…" Command="{Binding NewTaskCommand}" />
+              <Button Name="NewTask" Classes="primary" Content="New task…" AutomationProperties.Name="New task…" Command="{Binding NewTaskCommand}" />
             </WrapPanel>
             <TextBlock Classes="muted small" TextWrapping="Wrap"
                        Text="Drag a task onto another blueprint, or use Move to in its dialog, to move it; 'harness tasks export' writes the moves into the backlog file. Drag a blueprint by its header, or use its arrows, to reorder the blueprints." />
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding TasksEmpty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
               <TextBlock Classes="empty" Text="{Binding TasksEmpty}" VerticalAlignment="Center" />
-              <Button Content="Show done tasks" Command="{Binding ShowDoneCommand}" IsVisible="{Binding OffersDone}" />
+              <Button Content="Show done tasks" AutomationProperties.Name="Show done tasks" Command="{Binding ShowDoneCommand}" IsVisible="{Binding OffersDone}" />
             </StackPanel>
             <ItemsControl Name="Groups" ItemsSource="{Binding Groups}">
               <ItemsControl.ItemsPanel>
@@ -329,13 +329,13 @@
                               </Border>
                               <TextBlock Classes="small" Text="{Binding CountText}" VerticalAlignment="Center" />
                               <TextBlock Classes="muted small" Text="{Binding Reason}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                              <Button Classes="link small" Content="show"
+                              <Button Classes="link small" Content="show" AutomationProperties.Name="show"
                                       Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.ShowDeferredCommand}" />
                             </WrapPanel>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                      <Button Classes="ghost small" IsVisible="{Binding Open}" HorizontalAlignment="Left"
+                      <Button Classes="ghost small" AutomationProperties.Name="Add task" IsVisible="{Binding Open}" HorizontalAlignment="Left"
                               Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.NewTaskCommand}" CommandParameter="{Binding Id}">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                           <c:Icon Kind="plus" />
@@ -377,7 +377,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:FilterChip">
-                <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" />
+                <ToggleButton Classes="chip" IsChecked="{Binding On}" Content="{Binding Label}" AutomationProperties.Name="{Binding Label}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -431,7 +431,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Expander Header="{Binding ListHead}" IsVisible="{Binding HasList}" IsExpanded="True" HorizontalAlignment="Stretch">
+          <Expander Header="{Binding ListHead}" AutomationProperties.Name="{Binding ListHead}" IsVisible="{Binding HasList}" IsExpanded="True" HorizontalAlignment="Stretch">
             <ItemsControl ItemsSource="{Binding List}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
@@ -442,9 +442,9 @@
           </Expander>
           <TextBlock Classes="muted small" Text="{Binding Provenance}" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Pending}">
-            <Button Classes="primary" Content="{Binding ApproveLabel}"
+            <Button Classes="primary" Content="{Binding ApproveLabel}" AutomationProperties.Name="{Binding ApproveLabel}"
                     Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Inbox.ApproveCommand}" CommandParameter="{Binding}" />
-            <Button Classes="ghost" Content="Reject…"
+            <Button Classes="ghost" Content="Reject…" AutomationProperties.Name="Reject…"
                     Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Inbox.RejectCommand}" CommandParameter="{Binding}" />
           </StackPanel>
         </StackPanel>

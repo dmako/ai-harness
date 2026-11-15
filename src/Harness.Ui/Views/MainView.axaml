@@ -9,6 +9,24 @@
              Classes="page">
   <!-- the page frame: the sidebar (beside the page when wide, over it when narrow), the top bar, and the page the
        address names; toasts and the open dialog above everything -->
+  <UserControl.Styles>
+    <Style Selector="TextBlock.find-hit">
+      <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+    <Style Selector="TextBlock.find-current">
+      <Setter Property="Background" Value="{DynamicResource Gold}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnGold}" />
+    </Style>
+    <Style Selector="TextBox.find-hit">
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="TextBox.find-current">
+      <Setter Property="BorderBrush" Value="{DynamicResource Gold}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+  </UserControl.Styles>
   <Panel>
     <Grid Name="Frame" ColumnDefinitions="Auto,*">
       <Border Name="Sidebar" Classes="sidebar" Grid.Column="0" ZIndex="1">
@@ -20,6 +38,7 @@
             <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
                     AutomationProperties.Name="Show projects" IsVisible="False" />
             <TextBlock DockPanel.Dock="Right" Classes="live" Text="{Binding Services.Live.State, StringFormat='● {0}'}" />
+            <TextBox Name="OpenFind" DockPanel.Dock="Right" Width="110" PlaceholderText="Find…" AutomationProperties.Name="Find in this view" />
             <TextBlock Classes="brand" Text="harness" />
           </DockPanel>
         </Border>
@@ -33,7 +52,20 @@
       </DockPanel>
     </Grid>
     <views:ToastLayer DataContext="{Binding Services.Toasts}" />
-    <views:DialogLayer DataContext="{Binding Services.Dialogs}" />
+    <views:DialogLayer Name="Dialogs" DataContext="{Binding Services.Dialogs}" />
+    <Border Name="FindBar" Classes="inset" Margin="16,8" IsVisible="False" ZIndex="10"
+            HorizontalAlignment="Right" VerticalAlignment="Top" MaxWidth="540">
+      <StackPanel Spacing="4">
+        <WrapPanel ItemSpacing="6" LineSpacing="6">
+          <TextBox Name="FindInput" Width="180" PlaceholderText="Find in this view" AutomationProperties.Name="Find in this view" />
+          <TextBlock Name="FindCount" VerticalAlignment="Center" />
+          <Button Name="FindPrevious" Content="Previous" AutomationProperties.Name="Previous match" />
+          <Button Name="FindNext" Content="Next" AutomationProperties.Name="Next match" />
+          <Button Name="FindClose" Content="Close" AutomationProperties.Name="Close find" />
+        </WrapPanel>
+        <TextBlock Name="FindPreview" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
   </Panel>
   <UserControl.DataTemplates>
     <DataTemplate DataType="vm:HomePage">
@@ -101,14 +133,14 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Button Classes="ghost small" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left">
+          <Button Classes="ghost small" AutomationProperties.Name="Add alias" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add alias" /></StackPanel>
           </Button>
           <TextBlock Classes="muted small" TextWrapping="Wrap"
                      Text="Other host names or base URLs this server's repositories are cloned from. They only match remotes; API calls use the URL above." />
         </StackPanel>
         <WrapPanel ItemSpacing="8">
-          <Button Name="ScmTest" Classes="ghost" Content="Test connection" Command="{Binding TestCommand}" />
+          <Button Name="ScmTest" Classes="ghost" Content="Test connection" AutomationProperties.Name="Test connection" Command="{Binding TestCommand}" />
           <TextBlock Classes="small" Text="{Binding TestLine}" TextWrapping="Wrap" VerticalAlignment="Center"
                      IsVisible="{Binding TestLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </WrapPanel>
@@ -184,11 +216,11 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="api:SimilarMemory">
             <DockPanel Margin="0,0,0,6">
-              <Button DockPanel.Dock="Right" Content="Replace this one" Margin="8,0,0,0" VerticalAlignment="Top"
+              <Button DockPanel.Dock="Right" Content="Replace this one" AutomationProperties.Name="Replace this one" Margin="8,0,0,0" VerticalAlignment="Top"
                       Command="{Binding $parent[ItemsControl].((vm:SimilarDecisionDialog)DataContext).ReplaceCommand}" CommandParameter="{Binding}" />
               <StackPanel>
                 <SelectableTextBlock Text="{Binding Memory.Content}" TextWrapping="Wrap" />
-                <TextBlock Classes="muted small" Text="{Binding Memory.Id}" />
+                <SelectableTextBlock Classes="muted small" Text="{Binding Memory.Id}" />
               </StackPanel>
             </DockPanel>
           </DataTemplate>
@@ -261,8 +293,8 @@
       <StackPanel Spacing="8">
         <WrapPanel ItemSpacing="6" LineSpacing="6">
           <TextBox Name="PickFilter" Text="{Binding Query}" PlaceholderText="Filter by name or folder" Width="220" AutomationProperties.Name="Filter projects" />
-          <Button Classes="ghost small" Content="Choose all shown" Command="{Binding ChooseShownCommand}" />
-          <Button Classes="ghost small" Content="None" Command="{Binding ChooseNoneCommand}" />
+          <Button Classes="ghost small" Content="Choose all shown" AutomationProperties.Name="Choose all shown" Command="{Binding ChooseShownCommand}" />
+          <Button Classes="ghost small" Content="None" AutomationProperties.Name="None" Command="{Binding ChooseNoneCommand}" />
           <TextBlock Classes="muted small" Text="{Binding ChosenLine}" VerticalAlignment="Center" />
         </WrapPanel>
         <Border Classes="inset">
@@ -287,7 +319,7 @@
         <TextBlock Classes="label" Text="Or choose those under a folder" />
         <WrapPanel ItemSpacing="6" LineSpacing="6">
           <TextBox Name="PickFolder" Classes="mono" Text="{Binding Folder}" PlaceholderText="/path/to/folder" Width="300" AutomationProperties.Name="Folder" />
-          <Button Classes="small" Content="Find" Command="{Binding FindCommand}" />
+          <Button Classes="small" Content="Find" AutomationProperties.Name="Find" Command="{Binding FindCommand}" />
         </WrapPanel>
         <TextBlock Classes="muted small" Text="{Binding FolderMessage}" TextWrapping="Wrap"
                    IsVisible="{Binding FolderMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -328,20 +360,20 @@
     <DataTemplate DataType="vm:MessagePage">
       <StackPanel Spacing="8">
         <Border Classes="error"><TextBlock Text="{Binding Message}" /></Border>
-        <c:AppLink Classes="link" Href="#/" Content="Home" />
+        <c:AppLink Classes="link" Href="#/" Content="Home" AutomationProperties.Name="Home" />
       </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:PlaceholderPage">
       <StackPanel Classes="section" Margin="0">
         <TextBlock Classes="h3" Text="{Binding Title}" />
         <TextBlock Classes="hint" Text="{Binding Note}" />
-        <HyperlinkButton Content="Open it in the current harness ui" NavigateUri="{Binding Current}" />
+        <HyperlinkButton Content="Open it in the current harness ui" AutomationProperties.Name="Open it in the current harness ui" NavigateUri="{Binding Current}" />
       </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:UnreadableBody">
       <StackPanel Spacing="8">
         <TextBlock Classes="empty" Text="{Binding Message}" />
-        <c:AppLink Classes="link" Href="{Binding HealthHref}" Content="See Health" />
+        <c:AppLink Classes="link" Href="{Binding HealthHref}" Content="See Health" AutomationProperties.Name="See Health" />
       </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:RenameDialog">

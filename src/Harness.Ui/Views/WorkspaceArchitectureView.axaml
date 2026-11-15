@@ -69,7 +69,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ServiceLine">
                           <StackPanel Spacing="1" Margin="0,2">
-                            <Button Classes="ghost small" Content="{Binding Name}" HorizontalAlignment="Left"
+                            <Button Classes="ghost small" Content="{Binding Name}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Left"
                                     Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).System.PickCommand}"
                                     CommandParameter="{Binding Id}" />
                             <TextBlock Classes="muted small" Text="{Binding Line}" TextWrapping="Wrap" />
@@ -82,7 +82,7 @@
                   <StackPanel Spacing="6" IsVisible="{Binding HasSelection}">
                     <TextBlock Name="SystemSelected" Classes="h3" Text="{Binding SelectedName}" TextWrapping="Wrap" />
                     <TextBlock Classes="muted small" Text="{Binding SelectedKind}" TextWrapping="Wrap" />
-                    <c:AppLink Classes="link small" Href="{Binding SelectedHref}" Content="Its project architecture →" IsVisible="{Binding HasSelectedHref}" />
+                    <c:AppLink Classes="link small" Href="{Binding SelectedHref}" Content="Its project architecture →" AutomationProperties.Name="Its project architecture →" IsVisible="{Binding HasSelectedHref}" />
                     <TextBlock Classes="label" Text="{Binding CallsHead}" IsVisible="{Binding HasCalls}" />
                     <ItemsControl ItemsSource="{Binding Calls}" ItemTemplate="{StaticResource CallTemplate}" />
                     <TextBlock Classes="label" Text="{Binding CalledByHead}" IsVisible="{Binding HasCalledBy}" />
@@ -130,7 +130,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Expander IsVisible="{Binding HasIdle}" HorizontalAlignment="Stretch">
+            <Expander IsVisible="{Binding HasIdle}" AutomationProperties.Name="{Binding IdleHead}" HorizontalAlignment="Stretch">
               <Expander.Header><TextBlock Text="{Binding IdleHead}" TextWrapping="Wrap" /></Expander.Header>
               <ItemsControl ItemsSource="{Binding Idle}">
                 <ItemsControl.ItemTemplate>
@@ -161,7 +161,7 @@
           <StackPanel Spacing="10" IsVisible="{Binding HasMap}">
             <WrapPanel ItemSpacing="10" LineSpacing="8">
               <TextBox Name="BuildFilter" Text="{Binding Filter}" PlaceholderText="Filter projects" Width="220" AutomationProperties.Name="Filter projects" />
-              <CheckBox Name="Indirect" IsChecked="{Binding Indirect}" Content="include indirect" />
+              <CheckBox Name="Indirect" IsChecked="{Binding Indirect}" Content="include indirect" AutomationProperties.Name="include indirect" />
             </WrapPanel>
             <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding HasFoundations}">
               <TextBlock Classes="label" Text="Foundations" VerticalAlignment="Center" />
@@ -201,7 +201,7 @@
                       </Button>
                       <TextBlock Name="BuildFocus" Classes="h3" Text="{Binding FocusName}" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </DockPanel>
-                    <c:AppLink Classes="link small" Href="{Binding FocusHref}" Content="Open project →" />
+                    <c:AppLink Classes="link small" Href="{Binding FocusHref}" Content="Open project →" AutomationProperties.Name="Open project →" />
                     <TextBlock Classes="small" Text="{Binding CycleNote}" IsVisible="{Binding HasCycleNote}" TextWrapping="Wrap" />
                     <TextBlock TextWrapping="Wrap">
                       <Run FontWeight="SemiBold" Text="{Binding UsesHead, Mode=OneWay}" /><Run Classes="muted" Text="{Binding UsesNote, Mode=OneWay}" />
@@ -303,14 +303,14 @@
       <TextBlock Classes="small" Text="{Binding}" Width="110" />
     </DataTemplate>
     <DataTemplate x:Key="ChipTemplate" x:DataType="vm:DepChip">
-      <Button Classes="ghost small" Content="{Binding Text}"
+      <Button Classes="ghost small" Content="{Binding Text}" AutomationProperties.Name="{Binding Text}"
               Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).Build.PickCommand}"
               CommandParameter="{Binding Id}" />
     </DataTemplate>
     <DataTemplate x:Key="DepTemplate" x:DataType="vm:DepLink">
       <StackPanel Spacing="1" Margin="0,2">
         <WrapPanel ItemSpacing="4">
-          <Button Classes="ghost small" Content="{Binding Name}"
+          <Button Classes="ghost small" Content="{Binding Name}" AutomationProperties.Name="{Binding Name}"
                   Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).Build.PickCommand}"
                   CommandParameter="{Binding Id}" />
           <TextBlock Classes="muted small" Text="(indirect)" IsVisible="{Binding Indirect}" VerticalAlignment="Center" />
@@ -322,7 +322,7 @@
     <DataTemplate x:Key="CallTemplate" x:DataType="vm:CallRow">
       <StackPanel Spacing="2" Margin="0,2">
         <WrapPanel ItemSpacing="6">
-          <Button Classes="ghost small" Content="{Binding Name}"
+          <Button Classes="ghost small" Content="{Binding Name}" AutomationProperties.Name="{Binding Name}"
                   Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).System.PickCommand}"
                   CommandParameter="{Binding Other}" />
           <c:Swatch BrushKey="{Binding Tone}" VerticalAlignment="Center" />
@@ -330,7 +330,7 @@
         </WrapPanel>
         <TextBlock Classes="muted small" Text="{Binding ContractsLine}" IsVisible="{Binding HasContracts}" TextWrapping="Wrap" />
         <TextBlock Classes="muted small" Text="{Binding DeclaredLine}" IsVisible="{Binding HasDeclared}" TextWrapping="Wrap" />
-        <Expander Header="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
+        <Expander Header="{Binding EvidenceHead}" AutomationProperties.Name="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
           <ItemsControl ItemsSource="{Binding Link.Evidence}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>

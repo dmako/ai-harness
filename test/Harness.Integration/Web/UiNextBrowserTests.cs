@@ -53,6 +53,15 @@ public sealed class UiNextBrowserTests(SharedBrowser browser)
         await page.WaitAsync("globalThis.harnessTimings?.board > 0");
         (await ValueAsync(page, "harnessTimings.board")).GetDouble().Should().BeLessThan(20_000, "the Board is drawn within 20 s");
 
+        // The browser shortcut is intercepted for the Avalonia find bar, and the canvas remains in the AX tree.
+        (await ValueAsync(page, "!window.dispatchEvent(new KeyboardEvent('keydown', {key:'f', ctrlKey:true, bubbles:true, cancelable:true}))"))
+            .GetBoolean().Should().BeTrue();
+        var accessibility = await page.CommandAsync("Accessibility.getFullAXTree", new { });
+        var roles = accessibility.GetProperty("nodes").EnumerateArray()
+            .Select(node => node.GetProperty("role").GetProperty("value").GetString()).ToArray();
+        roles.Should().Contain("Canvas");
+        roles.Should().NotContain("button", "Avalonia 12.1.6 does not expose the Board's buttons to the browser tree");
+
         // a change to the project redraws the Board without reloading the page
         await page.EvaluateAsync("window.__stayed = true");
         using (var database = fixture.Database())

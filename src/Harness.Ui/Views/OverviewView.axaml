@@ -11,7 +11,7 @@
   <StackPanel>
     <Border Name="Since" Classes="since" IsVisible="{Binding HasSince}">
       <DockPanel>
-        <Button Name="SeeActivity" DockPanel.Dock="Right" Classes="link small" Content="see the activity"
+        <Button Name="SeeActivity" DockPanel.Dock="Right" Classes="link small" Content="see the activity" AutomationProperties.Name="see the activity"
                 VerticalAlignment="Center" Margin="12,0,0,0" />
         <TextBlock Text="{Binding Since}" TextWrapping="Wrap" VerticalAlignment="Center" />
       </DockPanel>
@@ -80,7 +80,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <c:AppLink Classes="link small" Href="{Binding TasksHref}" Content="All tasks →" IsVisible="{Binding HasMoreTasks}" />
+          <c:AppLink Classes="link small" Href="{Binding TasksHref}" Content="All tasks →" AutomationProperties.Name="All tasks →" IsVisible="{Binding HasMoreTasks}" />
         </StackPanel>
       </Border>
 
@@ -121,7 +121,7 @@
                   </StackPanel>
                 </DockPanel>
               </Border>
-              <c:AppLink Name="Serving" Classes="link" Href="{Binding AgentsHref}" IsVisible="{Binding HasFindings}">
+              <c:AppLink Name="Serving" Classes="link" Href="{Binding AgentsHref}" AutomationProperties.Name="How harness serves your agents" IsVisible="{Binding HasFindings}">
                 <TextBlock Text="How harness serves your agents, and what to change →" TextWrapping="Wrap" />
               </c:AppLink>
             </StackPanel>
@@ -179,7 +179,7 @@
               <ItemsControl Name="ActivityRows" ItemsSource="{Binding Rows}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="vm:ActivityRow">
-                    <c:AppLink Classes="row" Href="{Binding Href}">
+                    <c:AppLink Classes="row" Href="{Binding Href}" AutomationProperties.Name="{Binding Head}">
                       <DockPanel>
                         <Border DockPanel.Dock="Left" Classes="glyph">
                           <TextBlock Text="{Binding Glyph}" />
@@ -203,7 +203,7 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Button Name="ShowAll" Classes="ghost small" Content="{Binding MoreLabel}" Command="{Binding ShowAllCommand}"
+              <Button Name="ShowAll" Classes="ghost small" Content="{Binding MoreLabel}" AutomationProperties.Name="{Binding MoreLabel}" Command="{Binding ShowAllCommand}"
                       IsVisible="{Binding HasMore}" />
             </StackPanel>
           </views:SectionView.Body>

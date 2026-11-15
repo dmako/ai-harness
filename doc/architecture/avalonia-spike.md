@@ -121,6 +121,26 @@ emulated colour scheme and device pixel ratio.
 | Browser zoom | **works** | Emulated at 2× device pixel ratio: crisp text and controls, layout reflows. It first showed a real bug: columns squeezed until their headers were cut. The fix: the page scrolls vertically below `PageMinHeight` (520 px); above it, each column scrolls on its own. |
 | Keyboard | **works** | Tab moves through the project, sort, done-age and blueprint pickers, then the cards' links and titles, with a visible focus frame in the browser. The headless test `TabMovesThroughThePickersAndCards` asserts the pickers' order. Opening a picker from the keyboard was not checked. |
 | Screen reader exposure | **gap** | The accessibility tree holds only `Canvas`. Avalonia 12.1.6 in the browser does not expose its automation peers (the `AutomationProperties.Name`s set on pickers, columns and cards reach nothing). No setting for it was found. The spike also removes the "Loading harness…" placeholder once the Board is drawn, because a screen reader would otherwise still read it under the canvas. |
+
+### Accessibility follow-up (TASK-0162)
+
+Rechecked 2026-11-15 with the pinned Avalonia **12.1.6** browser bundle in headless Edge using
+`Accessibility.getFullAXTree`: the tree contains the Canvas but not the Board's button roles. This is an accessibility
+tree probe, not a test with a screen reader. The current [Avalonia accessibility documentation](https://github.com/AvaloniaUI/avalonia-docs/blob/main/docs/app-development/accessibility.md)
+describes browser ARIA support as partial; that general statement does not establish support in this pinned build.
+Avalonia's desktop platforms can expose automation peers and the views name their interactive controls; the desktop
+host is separate work (TASK-0145) and is not yet available here.
+
+The UI provides a visible Find field and Ctrl+F (Command+F on macOS) to search the rendered text of the current view
+or open dialog. Matching text blocks are highlighted, and Previous/Next step through occurrences with the exact match
+highlighted in the preview; collapsed or unrealized
+content is not searched. Text used for ids, paths and details can be selected, and link menus offer Copy text as well
+as Copy link. These features do not make the browser canvas usable with a screen reader. A synchronized DOM mirror
+could provide semantics, but would need keyboard actions, focus, live updates and accessible state kept in sync; a
+hidden text-only copy would not provide an operable UI. Recommend a separately tested semantic DOM interface or a
+verified Avalonia browser accessibility implementation before claiming screen-reader support. The CLI remains
+available, and the planned desktop host needs its own assistive-technology verification. Recheck this on each
+Avalonia upgrade.
 | Light and dark theme | **works** | Avalonia follows `prefers-color-scheme`; the semantic tokens switch through `ThemeDictionaries`. |
 | 390 px width | **works** | The header and pickers wrap, and the Board scrolls sideways inside itself, never the page. Columns keep 232 px (the JavaScript UI uses 85vw on narrow screens). |
 | Live updates | **works** | A change to the project in the database redrew the Board without a page reload. The status shows "● live" once the stream is open. |

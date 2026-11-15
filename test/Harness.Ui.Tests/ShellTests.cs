@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
@@ -15,6 +17,52 @@ namespace Harness.Ui.Tests;
 /// </summary>
 public sealed class ShellTests
 {
+    [Fact]
+    public Task FindHighlightsAndStepsThroughTheCurrentView() => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800, address: "#/");
+        var view = window.GetVisualDescendants().OfType<MainView>().Single();
+        view.GetVisualDescendants().OfType<AppLink>().First(link => link.IsEffectivelyVisible).Focus();
+        window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
+        var bar = view.FindControl<Border>("FindBar")!;
+        bar.IsVisible.Should().BeTrue();
+        var input = view.FindControl<TextBox>("FindInput")!;
+        input.Text = "fixture";
+        Ui.Settle();
+        var hits = view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("find-hit")).ToArray();
+        hits.Should().NotBeEmpty();
+        var first = hits.Single(t => t.Classes.Contains("find-current"));
+        var next = view.FindControl<Button>("FindNext")!;
+        next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        if (hits.Length > 1)
+        {
+            first.Classes.Should().NotContain("find-current");
+        }
+        input.Text = "e";
+        Ui.Settle();
+        var count = view.FindControl<TextBlock>("FindCount")!.Text!;
+        var blocks = view.GetVisualDescendants().OfType<TextBlock>().Count(t => t.Classes.Contains("find-hit"));
+        int.Parse(count.Split(" of ", StringSplitOptions.None)[1], System.Globalization.CultureInfo.InvariantCulture)
+            .Should().BeGreaterThan(blocks, "each occurrence in a text block is a separate match");
+        view.FindControl<TextBlock>("FindPreview")!.Inlines.Should().HaveCount(3);
+        model.Navigate("#/p/prj_fixture/overview");
+        await Ui.UntilAsync(() => model.Page is ProjectPage { View: "overview" });
+        input.Text.Should().BeEmpty("a new view must not keep matches from the previous one");
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        bar.IsVisible.Should().BeFalse();
+        view.GetVisualDescendants().OfType<TextBlock>().Should().OnlyContain(t => !t.Classes.Contains("find-hit"));
+    });
+
+    [Fact]
+    public Task FindPassesTheUiChecks() => Ui.RunAsync(() => UiChecks.AssertAsync(async (width, height) =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(width, height, address: "#/");
+        var view = window.GetVisualDescendants().OfType<MainView>().Single();
+        MainView.RequestFind();
+        view.FindControl<TextBox>("FindInput")!.Text = "project";
+        Ui.Settle();
+        return window;
+    }));
     [Fact]
     public Task TheSidebarListsWorkspacesAndProjectsWithWhatWaits() => Ui.RunAsync(async () =>
     {

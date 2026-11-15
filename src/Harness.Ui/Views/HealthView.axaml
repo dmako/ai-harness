@@ -11,7 +11,7 @@
     <views:SectionView.Body>
       <StackPanel Spacing="16">
         <WrapPanel>
-          <Button Name="Probe" Content="Check providers" Command="{Binding ProbeCommand}" Margin="0,0,12,0" />
+          <Button Name="Probe" Content="Check providers" AutomationProperties.Name="Check providers" Command="{Binding ProbeCommand}" Margin="0,0,12,0" />
           <TextBlock Classes="muted" VerticalAlignment="Center" IsVisible="{Binding Probing}" TextWrapping="Wrap"
                      Text="Starting each provider to check it (can take a while)…" />
         </WrapPanel>
@@ -21,7 +21,7 @@
                 Classes.lv-warn="{Binding Tone, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
                 Classes.lv-fail="{Binding Tone, Converter={x:Static c:Converters.Is}, ConverterParameter=fail}">
           <DockPanel>
-            <Button Name="Sync" DockPanel.Dock="Right" Classes="primary" Content="Sync now" VerticalAlignment="Center"
+            <Button Name="Sync" DockPanel.Dock="Right" Classes="primary" Content="Sync now" AutomationProperties.Name="Sync now" VerticalAlignment="Center"
                     Command="{Binding SyncCommand}" IsVisible="{Binding CanSync}" Margin="12,0,0,0" />
             <c:Icon DockPanel.Dock="Left" Kind="{Binding ToneIcon}" Size="20" VerticalAlignment="Top" Margin="0,2,10,0" />
             <StackPanel Spacing="2">

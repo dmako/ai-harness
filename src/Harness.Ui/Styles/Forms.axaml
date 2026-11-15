@@ -48,6 +48,10 @@
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
   </Style>
+  <Style Selector="ComboBox:focus-visible /template/ Border#Background">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
   <Style Selector="CheckBox">
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />

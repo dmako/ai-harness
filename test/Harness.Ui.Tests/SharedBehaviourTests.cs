@@ -85,6 +85,34 @@ public sealed class SharedBehaviourTests
     });
 
     [Fact]
+    public Task PickerKeysDoNotSubmitOrCancelTheContainingDialog() => Ui.RunAsync(async () =>
+    {
+        using var http = new HttpClient(new FixtureApi()) { BaseAddress = Ui.Server };
+        using var services = Ui.Services(http);
+        var layer = new DialogLayer { DataContext = services.Dialogs };
+        layer.DataTemplates.Add(new FuncDataTemplate<RenameForm>((_, _) =>
+            new ComboBox { Name = "Picker", ItemsSource = new[] { "one", "two" }, SelectedIndex = 0 }));
+        var window = Ui.Show(layer, 800, 600);
+        var result = services.Dialogs.ShowAsync(new RenameForm(services) { Title = "Choose" });
+        await Ui.UntilAsync(() => window.FocusManager.GetFocusedElement() is ComboBox { Name: "Picker" });
+        var picker = layer.GetVisualDescendants().OfType<ComboBox>().Single();
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        services.Dialogs.IsOpen.Should().BeTrue();
+        if (!picker.IsDropDownOpen)
+        {
+            window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, null);
+        }
+        picker.IsDropDownOpen.Should().BeTrue();
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        Ui.Settle();
+        picker.IsDropDownOpen.Should().BeFalse();
+        services.Dialogs.IsOpen.Should().BeTrue();
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        (await result).Should().BeNull();
+        window.Close();
+    });
+
+    [Fact]
     public Task AFormFocusesItsFirstFieldChecksItShowsTheReviewAndKeepsARefusal() => Ui.RunAsync(async () =>
     {
         var api = new FixtureApi();
@@ -256,13 +284,21 @@ public sealed class SharedBehaviourTests
             var chip = new Button { Classes = { "copychip" }, Content = "workspace:main" };
             Links.SetCopy(chip, "workspace:main");
             var window = Ui.Show(new StackPanel { Children = { link, chip } }, 400, 200);
+            var clipboard = window.Clipboard ?? throw new InvalidOperationException("No clipboard");
 
             var items = link.ContextMenu!.Items.OfType<MenuItem>().ToArray();
-            items.Select(i => (string?)i.Header).Should().Equal("Open in new tab", "Copy link");
+            items.Select(i => (string?)i.Header).Should().Equal("Open in new tab", "Copy link", "Copy text");
+            link.Focus();
+            window.KeyPress(Key.F10, RawInputModifiers.Shift, PhysicalKey.F10, null);
+            await Ui.UntilAsync(() => link.ContextMenu.IsOpen);
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            await Ui.UntilAsync(() => !link.ContextMenu.IsOpen);
             items[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             items[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             await Ui.UntilAsync(() => opened.Count is 1);
-            (await window.Clipboard!.TryGetTextAsync()).Should().Be(link.NavigateUri.ToString());
+            (await clipboard.TryGetTextAsync()).Should().Be(link.NavigateUri.ToString());
+            items[2].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            (await clipboard.TryGetTextAsync()).Should().Be("TASK-0001");
 
             var center = link.TranslatePoint(new Point(link.Bounds.Width / 2, link.Bounds.Height / 2), window)!.Value;
             window.MouseDown(center, MouseButton.Middle);
@@ -271,7 +307,7 @@ public sealed class SharedBehaviourTests
 
             chip.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await Ui.UntilAsync(() => chip.Classes.Contains("copied"));
-            (await window.Clipboard!.TryGetTextAsync()).Should().Be("workspace:main");
+            (await clipboard.TryGetTextAsync()).Should().Be("workspace:main");
             window.Close();
         }
         finally

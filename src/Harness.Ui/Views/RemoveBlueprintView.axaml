@@ -7,11 +7,11 @@
   <StackPanel Spacing="10">
     <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" IsVisible="{Binding HasName}" />
     <DockPanel>
-      <RadioButton Name="MoveChoice" GroupName="tasks" Content="Move them to" IsChecked="{Binding Move}" Margin="0,0,8,0" />
+      <RadioButton Name="MoveChoice" GroupName="tasks" Content="Move them to" AutomationProperties.Name="Move them to" IsChecked="{Binding Move}" Margin="0,0,8,0" />
       <ComboBox Name="MoveTo" ItemsSource="{Binding Targets}" SelectedItem="{Binding MoveTo}" MinWidth="180" MaxWidth="320"
                 AutomationProperties.Name="Move to" />
     </DockPanel>
-    <RadioButton Name="DeleteChoice" GroupName="tasks" Content="Delete them, with their audit trail" IsChecked="{Binding Delete}" />
+    <RadioButton Name="DeleteChoice" GroupName="tasks" Content="Delete them, with their audit trail" AutomationProperties.Name="Delete them, with their audit trail" IsChecked="{Binding Delete}" />
     <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{x:Static vm:RemoveBlueprintDialog.Note}" />
     <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{x:Static vm:RemoveBlueprintDialog.Backlog}" />
   </StackPanel>

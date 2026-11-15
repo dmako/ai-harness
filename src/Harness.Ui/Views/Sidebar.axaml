@@ -54,7 +54,7 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <c:AppLink Classes="nav member" Href="{Binding MoreHref}" IsVisible="{Binding HasMore}">
+              <c:AppLink Classes="nav member" Href="{Binding MoreHref}" AutomationProperties.Name="{Binding MoreText}" IsVisible="{Binding HasMore}">
                 <TextBlock Classes="muted" Text="{Binding MoreText}" />
               </c:AppLink>
             </StackPanel>

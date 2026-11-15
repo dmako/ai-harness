@@ -71,6 +71,7 @@ public sealed partial class SessionRow(
 {
     public string Client => Agents.Client(session.Client);
     public string ShortId => session.SessionId[..Math.Min(8, session.SessionId.Length)];
+    public string FullId => session.SessionId;
     public string Status => session.Status;
     public string Seen => seen;
     public string Usage => usage;

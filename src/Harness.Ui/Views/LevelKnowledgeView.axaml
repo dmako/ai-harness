@@ -9,7 +9,7 @@
   <views:SectionView>
     <views:SectionView.Body>
       <StackPanel x:DataType="vm:LevelKnowledgeViewModel" Spacing="12">
-        <Button Name="AddLevel" Classes="primary" Content="Add" Command="{Binding AddCommand}" HorizontalAlignment="Left" />
+        <Button Name="AddLevel" Classes="primary" Content="Add" AutomationProperties.Name="Add" Command="{Binding AddCommand}" HorizontalAlignment="Left" />
         <ItemsControl Name="LevelGroups" ItemsSource="{Binding Groups}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MemoryGroup"><views:MemoryGroupView /></DataTemplate>

@@ -14,10 +14,10 @@
                 AutomationProperties.Name="Rename this workspace" VerticalAlignment="Center">
           <c:Icon Kind="edit" />
         </Button>
-        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
+        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" AutomationProperties.Name="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
                 ToolTip.Tip="Agents and commands name this workspace so. Click to copy." />
       </WrapPanel>
-      <TextBlock Classes="path" Text="{Binding Path}" />
+      <SelectableTextBlock Classes="path" Text="{Binding Path}" />
     </StackPanel>
     <Border DockPanel.Dock="Top" Classes="tabs">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">

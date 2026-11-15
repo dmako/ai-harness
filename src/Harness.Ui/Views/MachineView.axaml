@@ -85,7 +85,7 @@
                 <Border Classes="card" Padding="14,10">
                   <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
-                      <Button Classes="ghost small" Content="Test connection"
+                      <Button Classes="ghost small" Content="Test connection" AutomationProperties.Name="Test connection"
                               Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.TestCommand}" CommandParameter="{Binding}" />
                       <Button Classes="icon" AutomationProperties.Name="{Binding Entry.Name, StringFormat='Edit SCM {0}'}"
                               Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.EditCommand}" CommandParameter="{Binding}">
@@ -117,7 +117,7 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <WrapPanel ItemSpacing="10">
-            <Button Name="AddScm" Command="{Binding AddCommand}">
+            <Button Name="AddScm" AutomationProperties.Name="Add SCM" Command="{Binding AddCommand}">
               <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add SCM" /></StackPanel>
             </Button>
             <SelectableTextBlock Classes="muted small" Text="{Binding File, StringFormat='Stored in {0}'}" TextWrapping="Wrap" VerticalAlignment="Center"
@@ -135,7 +135,7 @@
         <StackPanel Spacing="10">
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <Button Classes="ghost small" Content="Change…" Command="{Binding EditCommand}" IsVisible="{Binding CanChange}" />
+              <Button Classes="ghost small" Content="Change…" AutomationProperties.Name="Change…" Command="{Binding EditCommand}" IsVisible="{Binding CanChange}" />
               <ToggleSwitch Name="TelemetrySwitch" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding ToggleCommand}"
                             OnContent="" OffContent="" AutomationProperties.Name="Share telemetry" />
             </StackPanel>
@@ -157,8 +157,8 @@
             </StackPanel>
             <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="primary" Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" />
-              <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+              <Button Classes="primary" Content="{Binding SaveLabel}" AutomationProperties.Name="{Binding SaveLabel}" Command="{Binding SaveCommand}" />
+              <Button Classes="ghost" Content="Cancel" AutomationProperties.Name="Cancel" Command="{Binding CancelCommand}" />
             </StackPanel>
             <TextBlock Classes="muted small" Text="'harness telemetry preview' prints exactly what is sent." TextWrapping="Wrap" />
           </StackPanel>
@@ -180,18 +180,18 @@
                     <Border Classes="trow" Padding="12,8">
                       <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                          <Button Classes="ghost small" Content="Restart" IsVisible="{Binding HasProject}"
+                          <Button Classes="ghost small" Content="Restart" AutomationProperties.Name="Restart" IsVisible="{Binding HasProject}"
                                   Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Graphify.RestartCommand}" CommandParameter="{Binding}" />
-                          <Button Classes="ghost small" Content="Stop"
+                          <Button Classes="ghost small" Content="Stop" AutomationProperties.Name="Stop"
                                   Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Graphify.StopCommand}" CommandParameter="{Binding}" />
                         </StackPanel>
                         <c:Icon DockPanel.Dock="Left" Classes="lv" Classes.warn="{Binding Loading}" Classes.problem="{Binding Bad}" Kind="{Binding Icon}" />
                         <StackPanel Spacing="2">
                           <WrapPanel ItemSpacing="8">
-                            <c:AppLink Classes="link" Href="{Binding Href}" Content="{Binding Solution}" IsVisible="{Binding HasProject}" />
+                            <c:AppLink Classes="link" Href="{Binding Href}" Content="{Binding Solution}" AutomationProperties.Name="{Binding Solution}" IsVisible="{Binding HasProject}" />
                             <TextBlock FontWeight="SemiBold" Text="{Binding Solution}" IsVisible="{Binding !HasProject}" ToolTip.Tip="{Binding Session.Root}" />
                             <TextBlock Classes="small" Text="{Binding StateWord}" VerticalAlignment="Center" />
-                            <TextBlock Classes="mono small muted" Text="{Binding ShortId}" VerticalAlignment="Center" ToolTip.Tip="{Binding Session.Id}" />
+                            <SelectableTextBlock Classes="mono small muted" Text="{Binding Session.Id}" VerticalAlignment="Center" TextWrapping="Wrap" />
                           </WrapPanel>
                           <TextBlock Classes="muted small" Text="{Binding Detail}" TextWrapping="Wrap" />
                         </StackPanel>

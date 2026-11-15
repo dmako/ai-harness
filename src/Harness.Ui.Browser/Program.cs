@@ -7,6 +7,7 @@ using Harness.Ui;
 using Harness.Ui.Api;
 using Harness.Ui.Navigation;
 using Harness.Ui.ViewModels;
+using Harness.Ui.Views;
 
 [assembly: SupportedOSPlatform("browser")]
 
@@ -18,6 +19,8 @@ namespace Harness.Ui.Browser;
 /// </summary>
 internal static partial class Program
 {
+    [JSExport]
+    internal static void OpenFind() => Dispatcher.UIThread.Post(MainView.RequestFind);
     /// <summary>The browser HttpClient handler's switch for a streamed response body.</summary>
     private static readonly HttpRequestOptionsKey<bool> StreamingResponse = new("WebAssemblyEnableStreamingResponse");
 

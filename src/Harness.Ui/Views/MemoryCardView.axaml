@@ -30,13 +30,13 @@
       <TextBlock Classes="small" Text="{Binding SupersededText}" TextWrapping="Wrap"
                  IsVisible="{Binding SupersededText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       <WrapPanel ItemSpacing="6" LineSpacing="6">
-        <Button Classes="ghost small" Content="Correct" Command="{Binding CorrectCommand}" IsVisible="{Binding CanChange}" />
-        <Button Classes="ghost small" Content="Retire" Command="{Binding RetireCommand}" IsVisible="{Binding CanChange}" />
-        <Button Classes="ghost small" Content="Promote" Command="{Binding PromoteCommand}" IsVisible="{Binding CanPromote}"
+        <Button Classes="ghost small" Content="Correct" AutomationProperties.Name="Correct" Command="{Binding CorrectCommand}" IsVisible="{Binding CanChange}" />
+        <Button Classes="ghost small" Content="Retire" AutomationProperties.Name="Retire" Command="{Binding RetireCommand}" IsVisible="{Binding CanChange}" />
+        <Button Classes="ghost small" Content="Promote" AutomationProperties.Name="Promote" Command="{Binding PromoteCommand}" IsVisible="{Binding CanPromote}"
                 ToolTip.Tip="Record it for a workspace or for all your projects" />
-        <Button Classes="ghost small" Content="{Binding ShareLabel}" Command="{Binding ShareCommand}" IsVisible="{Binding CanShare}"
+        <Button Classes="ghost small" Content="{Binding ShareLabel}" AutomationProperties.Name="{Binding ShareLabel}" Command="{Binding ShareCommand}" IsVisible="{Binding CanShare}"
                 ToolTip.Tip="{Binding ShareTip}" />
-        <Button Classes="ghost small" Content="History" Command="{Binding HistoryCommand}" />
+        <Button Classes="ghost small" Content="History" AutomationProperties.Name="History" Command="{Binding HistoryCommand}" />
       </WrapPanel>
       <TextBlock Classes="error" Text="{Binding HistoryError}" IsVisible="{Binding HistoryError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       <Border Classes="inset" IsVisible="{Binding HistoryShown}">
