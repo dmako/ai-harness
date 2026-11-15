@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+
 namespace Harness.Ui.Api;
 
 /// <summary>The work area: blueprints, tasks and their trail and sessions, and the proposals waiting.</summary>
@@ -17,6 +19,25 @@ public sealed partial class HarnessApi
 
     public Task<TaskSessions> TaskSessionsAsync(string projectId, string taskId, CancellationToken token) =>
         GetAsync(Project(projectId, $"tasks/{Uri.EscapeDataString(taskId)}/sessions"), UiJsonContext.Default.TaskSessions, token);
+
+    public async Task<AgentModels> AgentModelsAsync(string projectId, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, Project(projectId, "agent-models"));
+        request.Headers.Add("X-Harness-UI", "1");
+        using var response = await http.SendAsync(request, token);
+        await EnsureAsync(response, token);
+        return await response.Content.ReadFromJsonAsync(UiJsonContext.Default.AgentModels, token)
+            ?? throw new HarnessApiException("empty model catalog");
+    }
+
+    public Task<AgentLog> AgentLogAsync(string projectId, string key, long after, CancellationToken token) =>
+        GetAsync(Project(projectId, $"agents/{Uri.EscapeDataString(key)}/log?after={after}"), UiJsonContext.Default.AgentLog, token);
+
+    public Task StartAgentAsync(string projectId, string taskId, AgentStart body, CancellationToken token) =>
+        PostAsync(Project(projectId, $"tasks/{Uri.EscapeDataString(taskId)}/agents"), body, UiJsonContext.Default.AgentStart, token);
+
+    public Task AgentCommandAsync(string projectId, string key, string action, AgentCommand body, CancellationToken token) =>
+        PostAsync(Project(projectId, $"agents/{Uri.EscapeDataString(key)}/{action}"), body, UiJsonContext.Default.AgentCommand, token);
 
     public Task<TranscriptTail> TranscriptTailAsync(
         string projectId, string taskId, string client, string sessionId, CancellationToken token

@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
+using Harness.Ui.Api;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
@@ -196,6 +197,121 @@ public sealed class WorkViewTests
         await session.ShowTranscriptCommand.ExecuteAsync(null);
         session.Transcript.Should().Be("You: Hello\n\nRead: file.cs\n\nResume in a terminal: claude --resume 0123456789abcdef");
         dialog.Editable.Should().BeFalse("a claimed task's definition is fixed");
+    });
+
+    [Fact]
+    public Task StartingAnAgentOffersModelsAndModes() => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Answers[Root + "/tasks/{task}/sessions"] = """
+            {"sessions":[],"totals":{},"hosts":[],"permission_modes":{"claude-code":[
+              {"id":"auto","label":"Auto","description":"Automatic","default":true,"unsafe":false},
+              {"id":"bypass","label":"Bypass","description":"Unrestricted","default":false,"unsafe":true}]}}
+            """;
+        api.Answers[Root + "/agent-models"] = """
+            {"clients":{"claude-code":{"default":{"id":"sonnet","label":"Sonnet"},
+             "models":[{"id":"opus","label":"Opus","source":"seen"}],"refreshing":false}}}
+            """;
+        var (_, _, model) = await OpenAsync("tasks", api);
+        _ = Work(model).Plan.OpenTaskCommand.ExecuteAsync("TASK-0001");
+        var dialog = await DialogAsync<TaskDialog>(model);
+        await dialog.Loaded;
+        var form = dialog.AgentSessions;
+        form.FormOpen = true;
+        await Ui.UntilAsync(() => form.Models.Any(m => m.Value == "opus"));
+        form.Models.Select(m => m.Label).Should().Equal("Default (Sonnet)", "Opus (seen)", "Other…");
+        form.Modes[1].Display.Should().Contain("unsafe");
+        form.Mode = form.Modes[1];
+        form.Model = form.Models[^1];
+        form.OtherModel = "custom-model";
+        form.Prompt = "Do it";
+        await form.StartCommand.ExecuteAsync(null);
+        api.UiGets.Should().Contain(Root + "/agent-models");
+        api.Posts.Should().ContainSingle(p => p.Path == Root + "/tasks/TASK-0001/agents" &&
+            p.Body.Contains("\"model\":\"custom-model\"", StringComparison.Ordinal) &&
+            p.Body.Contains("\"mode\":\"bypass\"", StringComparison.Ordinal));
+        dialog.Cancel();
+    });
+
+    [Fact]
+    public Task AgentLogReplaysThenFollowsAndAcceptsCommands() => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Answers[Root + "/tasks/{task}/sessions"] = """
+            {"sessions":[],"totals":{},"hosts":[{"key":"host1234","client":"codex","status":"idle","alive":true,
+              "requested_model":"unknown","model_unlisted":true}],"permission_modes":{}}
+            """;
+        api.Answers[Root + "/agents/host1234/log"] = """
+            {"status":"idle","alive":true,"events":[{"seq":1,"event":"text","text":"first"}]}
+            """;
+        api.Delays[Root + "/agents/host1234/log"] = TimeSpan.FromMilliseconds(250);
+        var (_, _, model) = await OpenAsync("tasks", api);
+        _ = Work(model).Plan.OpenTaskCommand.ExecuteAsync("TASK-0001");
+        var dialog = await DialogAsync<TaskDialog>(model);
+        await dialog.Loaded;
+        var panel = dialog.AgentSessions.Hosts.Should().ContainSingle().Subject;
+        panel.Heading.Should().Contain("unknown").And.Contain("not in the model list");
+        api.Agent("""{"project":"prj_fixture","key":"host1234","events":[{"seq":2,"event":"approval","id":"a1","tool":"Read","text":"file"},{"seq":3,"event":"text","text":"second"}]}""");
+        await Ui.UntilAsync(() => panel.Entries.Count is 3);
+        panel.Entries.Select(e => e.Text).Should().Equal("first", "Wants to use Read: file", "second");
+        await panel.Entries[1].AllowCommand.ExecuteAsync(null);
+        api.Agent("""{"project":"prj_fixture","key":"host1234","events":[{"seq":4,"event":"answered","id":"a1","allow":true}]}""");
+        await Ui.UntilAsync(() => panel.Entries[1].Answer == "allowed");
+        panel.Message = "Continue";
+        await panel.SendCommand.ExecuteAsync(null);
+        await panel.StopCommand.ExecuteAsync(null);
+        api.Posts.Select(p => p.Path).Should().ContainInOrder(
+            Root + "/agents/host1234/approve", Root + "/agents/host1234/send", Root + "/agents/host1234/stop");
+        api.Answers[Root + "/agents/host1234/log"] = """
+            {"status":"idle","alive":true,"events":[{"seq":5,"event":"text","text":"after reconnect"}]}
+            """;
+        api.Drop();
+        await Ui.UntilAsync(() => panel.Entries.Any(e => e.Text == "after reconnect"));
+        api.GetsWithQuery.Should().Contain(Root + "/agents/host1234/log?after=4");
+        dialog.Cancel();
+    });
+
+    [Fact]
+    public Task AgentSessionFormPassesTheUiChecks() => Ui.RunAsync(() => UiChecks.AssertAsync(async (width, height) =>
+    {
+        var api = new FixtureApi();
+        api.Answers[Root + "/agent-models"] = """{"clients":{}}""";
+        api.Answers[Root + "/tasks/{task}/sessions"] = """
+            {"sessions":[],"totals":{},"hosts":[{"key":"host1234","client":"codex","status":"idle","alive":true}],
+             "permission_modes":{"claude-code":[{"id":"auto","label":"Auto","description":"Automatic","default":true}]}}
+            """;
+        api.Answers[Root + "/agents/host1234/log"] = """
+            {"status":"idle","alive":true,"events":[{"seq":1,"event":"approval","id":"a","tool":"Read","text":"file"}]}
+            """;
+        var (window, _, model) = await OpenAsync("tasks", api, width, height);
+        _ = Work(model).Plan.OpenTaskCommand.ExecuteAsync("TASK-0001");
+        var dialog = await DialogAsync<TaskDialog>(model);
+        await dialog.Loaded;
+        dialog.AgentSessions.FormOpen = true;
+        await Ui.UntilAsync(() => dialog.AgentSessions.Hosts[0].Entries.Count is 1);
+        Ui.Settle();
+        return window;
+    }));
+
+    [Fact]
+    public Task AgentLogPollsWhenTheStreamIsOffline() => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        var path = Root + "/agents/host1234/log";
+        api.Answers[path] = """{"status":"idle","alive":true,"events":[]}""";
+        using var http = new HttpClient(api) { BaseAddress = Ui.Server };
+        using var services = Ui.Services(http, fastLive: true);
+        using var panel = new AgentPanel(services, "prj_fixture", "TASK-0001", new AgentHost
+        {
+            Key = "host1234", Client = "codex", Status = "idle", Alive = true,
+        }, () => Task.CompletedTask);
+        await Ui.UntilAsync(() => api.Gets.Contains(path));
+        api.Answers[path] = """
+            {"status":"idle","alive":true,"events":[{"seq":1,"event":"text","text":"polled"}]}
+            """;
+        await Ui.UntilAsync(() => panel.Entries.Count is 1);
+        panel.Entries[0].Text.Should().Be("polled");
+        api.Gets.Count(p => p == path).Should().BeGreaterThanOrEqualTo(2);
     });
 
     [Fact]

@@ -65,7 +65,8 @@ public sealed record EventRow(string Event, string? From, string? To, string Who
 
 /// <summary>An agent session in the task dialog: the client, its id, what it did, when and what it used.</summary>
 public sealed partial class SessionRow(
-    HarnessApi api, string projectId, string taskId, AgentSession session, string seen, string usage
+    HarnessApi api, string projectId, string taskId, AgentSession session, string seen, string usage,
+    bool hasHost, Func<Task> refresh
 ) : ObservableObject
 {
     public string Client => Agents.Client(session.Client);
@@ -74,9 +75,30 @@ public sealed partial class SessionRow(
     public string Seen => seen;
     public string Usage => usage;
     public bool CanShowTranscript => session.Origin is not "harness";
+    public bool CanResume => session.Origin is "harness" && !hasHost;
+
+    [ObservableProperty]
+    public partial string ResumePrompt { get; set; } = "Go on.";
 
     [ObservableProperty]
     public partial string? Transcript { get; private set; }
+
+    [RelayCommand]
+    private async Task ResumeAsync()
+    {
+        try
+        {
+            await api.StartAgentAsync(projectId, taskId, new AgentStart
+            {
+                Client = session.Client, Prompt = ResumePrompt, Resume = session.SessionId,
+            }, CancellationToken.None);
+            await refresh();
+        }
+        catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
+        {
+            Transcript = exception.Message;
+        }
+    }
 
     [RelayCommand]
     private async Task ShowTranscriptAsync()
@@ -121,6 +143,8 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
         _services = services;
         _projectId = projectId;
         _taskId = taskId;
+        AgentSessions = new AgentSessionsViewModel(services, projectId, taskId);
+        _ = DisposeAgentSessionsAsync();
         if (plan is { HasContent: true })
         {
             _blueprints = plan.AllBlueprints;
@@ -131,6 +155,13 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
 
     /// <summary>Done once the task and its sessions are read.</summary>
     public Task Loaded { get; }
+    public AgentSessionsViewModel AgentSessions { get; }
+
+    private async Task DisposeAgentSessionsAsync()
+    {
+        await Result;
+        AgentSessions.Dispose();
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasTask))]
@@ -371,6 +402,7 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
 
     private void ShowSessions(TaskSessions answer)
     {
+        AgentSessions.SetSessions(answer);
         Lists.Sync(
             Sessions,
             answer.Sessions.Select(s => new SessionRow(
@@ -378,7 +410,8 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
                 $"{(s.Origin is "harness" ? "started by harness" : "seen by hooks")} · first {Shell.Ago(s.StartedAt)} · last {Shell.Ago(s.EndedAt)}",
                 (s.Model is { Length: > 0 } model ? model + " · " : "")
                     + Agents.Usage(s)
-                    + (s.ActiveMs > 0 ? " · active " + Agents.Duration(s.ActiveMs) : "")
+                    + (s.ActiveMs > 0 ? " · active " + Agents.Duration(s.ActiveMs) : ""),
+                answer.Hosts.Any(h => h.Client == s.Client && h.SessionId == s.SessionId), RefreshSessionsAsync
             ))
         );
         SessionsNote = Sessions.Count > 0
@@ -398,6 +431,9 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
         OnPropertyChanged(nameof(HasSessions));
         OnPropertyChanged(nameof(HasSessionsUsage));
     }
+
+    private async Task RefreshSessionsAsync() =>
+        ShowSessions(await _services.Api.TaskSessionsAsync(_projectId, _taskId, CancellationToken.None));
 }
 
 /// <summary>How the page names agents and what their sessions used (app.js usageLine, tokenCount, durationText).</summary>

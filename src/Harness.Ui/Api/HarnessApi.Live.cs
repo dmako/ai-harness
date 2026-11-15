@@ -8,12 +8,13 @@ public sealed partial class HarnessApi
 {
     /// <summary>
     /// /api/events as it comes: each "change" event, until <paramref name="token"/> ends it or the stream drops
-    /// (the caller reconnects). Comments, heartbeats and "agent" events are skipped; <paramref name="connected"/>
+    /// (the caller reconnects). Agent events are delivered separately, in order; <paramref name="connected"/>
     /// is called once the stream is open.
     /// </summary>
     public async IAsyncEnumerable<LiveChange> ChangesAsync(
         Action? connected,
-        [EnumeratorCancellation] CancellationToken token
+        [EnumeratorCancellation] CancellationToken token,
+        Action<AgentBatchEventArgs>? agent = null
     )
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "api/events");
@@ -27,6 +28,10 @@ public sealed partial class HarnessApi
             if (name is "change" && JsonSerializer.Deserialize(data, UiJsonContext.Default.LiveChange) is { } change)
             {
                 yield return change;
+            }
+            else if (name is "agent" && JsonSerializer.Deserialize(data, UiJsonContext.Default.AgentBatchEventArgs) is { } batch)
+            {
+                agent?.Invoke(batch);
             }
         }
     }

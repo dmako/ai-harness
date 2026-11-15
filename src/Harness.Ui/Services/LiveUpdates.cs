@@ -59,6 +59,9 @@ public sealed partial class LiveUpdates : ObservableObject, IDisposable
     /// <summary>Raised with each applied change, after the sections were asked to reload (the shell's lists use it).</summary>
     public event EventHandler<LiveAppliedEventArgs>? Applied;
 
+    /// <summary>Agent events bypass change coalescing and are delivered in stream order, including while dialogs are open.</summary>
+    public event EventHandler<AgentBatchEventArgs>? AgentReceived;
+
     /// <summary>Follows <paramref name="section"/> until the returned handle is disposed.</summary>
     public IDisposable Register(ILiveSection section)
     {
@@ -108,7 +111,8 @@ public sealed partial class LiveUpdates : ObservableObject, IDisposable
                             }
                             opened = true;
                         },
-                        token
+                        token,
+                        batch => AgentReceived?.Invoke(this, batch)
                     )
                 )
                 {

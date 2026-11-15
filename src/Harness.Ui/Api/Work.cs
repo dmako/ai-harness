@@ -43,6 +43,9 @@ public sealed class TaskSessions
 {
     public required IReadOnlyList<AgentSession> Sessions { get; init; }
     public required SessionUsage Totals { get; init; }
+    public IReadOnlyList<AgentHost> Hosts { get; init; } = [];
+    public IReadOnlyDictionary<string, IReadOnlyList<AgentMode>> PermissionModes { get; init; } =
+        new Dictionary<string, IReadOnlyList<AgentMode>>(StringComparer.Ordinal);
     public string? ClaimedAt { get; init; }
     public string? CompletedAt { get; init; }
     public string? RefreshError { get; init; }

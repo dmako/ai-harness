@@ -8,6 +8,7 @@ using Harness.Core.Tasks;
 using Harness.Infrastructure.Agents;
 using Harness.Infrastructure.Storage;
 using Harness.Infrastructure.Tasks;
+using Harness.Ui.Api;
 using Harness.Integration.Providers;
 using Harness.Integration.Sync;
 using Xunit;
@@ -69,6 +70,12 @@ public sealed class UiAgentTests
             (await events.WaitAsync(key, e => Is(e, "answered"))).Should().NotBeNull();
 
             var sessions = await Read(server.Client, project + "/tasks/TASK-0001/sessions");
+            var typed = new HarnessApi(server.Client);
+            var typedSessions = await typed.TaskSessionsAsync(id, "TASK-0001", Token);
+            typedSessions.Hosts.Should().ContainSingle(h => h.Key == key && h.Alive);
+            typedSessions.PermissionModes["codex"].Should().HaveCount(4);
+            (await typed.AgentModelsAsync(id, Token)).Clients.Should().ContainKey("codex");
+            (await typed.AgentLogAsync(id, key, 0, Token)).Events.Should().Contain(e => e.Event == "text");
             var host = sessions["hosts"]!.AsArray().Single()!;
             (host["key"]!.GetValue<string>(), host["alive"]!.GetValue<bool>(), host["client"]!.GetValue<string>())
                 .Should()
@@ -183,6 +190,9 @@ public sealed class UiAgentTests
             .Be(transcript);
 
         var tail = await Read(server.Client, project + "/tasks/TASK-0001/sessions/claude-code/" + Session + "/tail");
+        var typedTail = await new HarnessApi(server.Client).TranscriptTailAsync(id, "TASK-0001", "claude-code", Session, Token);
+        typedTail.Resume.Should().Be("claude --resume " + Session);
+        typedTail.Entries.Select(e => e.Kind).Should().Equal("user", "tool", "text");
         tail["resume"]!.GetValue<string>().Should().Be("claude --resume " + Session);
         tail["entries"]!
             .AsArray()
