@@ -18,6 +18,7 @@
                       LogicalName="PreviewFixtures/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
+    <AvaloniaResource Include="../Harness.Web/Assets/logo.png" Link="Assets/logo.png" />
     <InternalsVisibleTo Include="Harness.Ui.Tests" />
   </ItemGroup>
 </Project>

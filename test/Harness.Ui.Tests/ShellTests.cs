@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -38,6 +39,11 @@ public sealed class ShellTests
         model.Breadcrumbs.Select(c => c.Label).Should().Equal("Home", "Main workspace", "Members");
         var breadcrumbs = main.FindControl<ItemsControl>("Breadcrumbs")!;
         var home = breadcrumbs.GetVisualDescendants().OfType<AppLink>().First(link => link.Href == "#/");
+        main.FindControl<Image>("BrandIcon")!.Source.Should().NotBeNull();
+        AutomationProperties.GetName(home).Should().Be("Home");
+        home.GetVisualDescendants().OfType<Icon>().Should().Contain(icon => icon.Kind == "home" && icon.IsVisible);
+        breadcrumbs.GetVisualDescendants().OfType<TextBlock>()
+            .Count(text => text.Text == "›" && text.IsVisible).Should().Be(2);
         home.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         model.Route.Page.Should().Be("home");
         window.Close();

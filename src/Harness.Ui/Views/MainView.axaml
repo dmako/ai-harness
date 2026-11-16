@@ -55,6 +55,8 @@
                    AutomationProperties.Name="Find in this view" />
           <Grid ColumnDefinitions="Auto,*">
             <StackPanel Orientation="Horizontal">
+              <Image Name="BrandIcon" Source="avares://Harness.Ui/Assets/logo.png" Width="24" Height="24"
+                     Margin="0,0,6,0" VerticalAlignment="Center" />
               <TextBlock Classes="brand" Text="harness" Margin="0,0,12,0" VerticalAlignment="Center" />
               <TextBlock Classes="brandSeparator" Text="|" Margin="0,0,12,0" VerticalAlignment="Center" />
             </StackPanel>
@@ -68,9 +70,13 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:Breadcrumb">
                     <StackPanel Orientation="Horizontal" Spacing="2">
-                      <TextBlock Classes="muted" Text="›" VerticalAlignment="Center" />
+                      <TextBlock Classes="muted" Text="›" VerticalAlignment="Center" IsVisible="{Binding !IsHome}" />
                       <c:AppLink Classes="link" Href="{Binding Href}" AutomationProperties.Name="{Binding Label}">
-                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                        <Panel>
+                          <c:Icon Kind="home" IsVisible="{Binding IsHome}" />
+                          <TextBlock Text="{Binding Label}" IsVisible="{Binding !IsHome}"
+                                     TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                        </Panel>
                       </c:AppLink>
                     </StackPanel>
                   </DataTemplate>

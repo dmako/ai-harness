@@ -13,7 +13,10 @@ namespace Harness.Ui.ViewModels;
 /// host's history (<see cref="UiHostContext.Navigation"/>); live changes reload the lists (and so the badges and the
 /// headers) and the sections that show what changed.
 /// </summary>
-public sealed record Breadcrumb(string Label, string Href);
+public sealed record Breadcrumb(string Label, string Href)
+{
+    public bool IsHome => Href is "#/";
+}
 
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
