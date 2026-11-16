@@ -273,6 +273,27 @@ public sealed class WorkspaceViewTests
     });
 
     [Fact]
+    public Task WorkspaceEvidenceUsesTheMemberSnippetEndpoint() => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        api.Answers[Root + "/snippet"] = """{"snippet":{"path":"Api.csproj","start":3,"lines":["reference"]}}""";
+        var (window, _, model) = await OpenAsync("issues", api, 390);
+        var issues = (WorkspaceIssuesViewModel)Page(model).Body!;
+        await Ui.UntilAsync(() => issues.Issues.HasContent);
+        var location = issues.Issues.Places.Single().Location;
+        var button = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Content is string text && text == "Api.csproj:3");
+        button.Command.Should().NotBeNull();
+        button.CommandParameter.Should().Be(location);
+        button.Command.Execute(button.CommandParameter);
+        var dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == 1 && dialog.Panes[0].Text.Contains("reference", StringComparison.Ordinal));
+        api.GetsWithQuery.Should().Contain(x => x.StartsWith(Root + "/snippet?at=", StringComparison.Ordinal));
+        dialog.Cancel();
+        window.Close();
+    });
+
+    [Fact]
     public Task VersionDriftListsTheDriftAndComparesTheVersions() => Ui.RunAsync(async () =>
     {
         var api = Api();

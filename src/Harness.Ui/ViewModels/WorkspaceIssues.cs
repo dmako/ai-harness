@@ -138,6 +138,7 @@ public sealed record IssuePlace(IssueEvidence Evidence)
     public string? Where => Evidence.Path is { Length: > 0 } p ? p + Line : null;
     private string Line => Evidence.Line > 0 ? ":" + Evidence.Line.ToString(CultureInfo.InvariantCulture) : "";
     public bool HasWhere => Where is not null;
+    public string Location => $"{Evidence.Project}: {Where}";
 }
 
 /// <summary>
@@ -256,11 +257,20 @@ public sealed record DuplicateRow(DuplicateGroup Group, Func<string, string> Fol
 
     public IReadOnlyList<string> Where =>
         [.. Group.Copies.Select(c => $"{Folder(c.Project)}  {c.Path}{(c.Line > 0 ? ":" + c.Line.ToString(CultureInfo.InvariantCulture) : "")}{(c.Extends ? " · extends it" : "")}")];
+    public IReadOnlyList<DuplicatePlace> Places =>
+        [.. Group.Copies.Select(c => new DuplicatePlace(Folder(c.Project), c))];
 
     public string Home => Group.Home is { } h ? h.Member ?? "a new shared library" : "–";
     public string? HomeReason => Group.Home?.Reason;
     public bool HasHomeReason => HomeReason is not null;
     public IReadOnlyList<string> Knowledge => [.. (Group.Home?.Knowledge ?? []).Select(k => "↳ " + k)];
+}
+
+public sealed record DuplicatePlace(string Name, DuplicateCopy Copy)
+{
+    private string Path => Copy.Path + (Copy.Line > 0 ? ":" + Copy.Line.ToString(CultureInfo.InvariantCulture) : "");
+    public string Label => Name + "  " + Path + (Copy.Extends ? " · extends it" : "");
+    public string Location => Copy.Project + ": " + Path;
 }
 
 /// <summary>

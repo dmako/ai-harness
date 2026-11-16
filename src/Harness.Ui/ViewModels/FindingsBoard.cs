@@ -149,6 +149,11 @@ public sealed record FindingRow(Finding Finding, bool InGroup)
     public bool HasRule => RuleLine is not null;
     public bool HasEvidence => Finding.Evidence.Count > 0;
     public string EvidenceHead => $"Evidence ({Finding.Evidence.Count})";
+    public IReadOnlyList<string> EvidencePlaces =>
+        [.. Finding.Evidence.SelectMany(e => e.Split(" → ", StringSplitOptions.RemoveEmptyEntries))];
+    public bool CanCompare => Finding.Kind is "duplicate" or "template" or "repeated-sequence" or "shared-code"
+        && Finding.Evidence.Count >= 2;
+    public bool CanCompareThree => CanCompare && Finding.Evidence.Count >= 3;
 
     public string? FoundBy
     {

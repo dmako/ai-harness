@@ -78,6 +78,8 @@ public sealed record CallRow(string Other, string Name, SystemLink Link)
     public bool HasDeclared => DeclaredLine is not null;
     public bool HasEvidence => Link.Evidence.Count > 0;
     public string EvidenceHead => $"evidence ({Link.Evidence.Count})";
+    public IReadOnlyList<string> EvidencePlaces =>
+        [.. Link.Evidence.SelectMany(e => e.Split(" → ", StringSplitOptions.RemoveEmptyEntries))];
 
     /// <summary>The first <paramref name="n"/> of a list and how many more (app.js listCut).</summary>
     public static string Cut(IReadOnlyList<string> xs, int n) =>

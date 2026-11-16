@@ -72,6 +72,89 @@ public sealed class ArchitectureViewTests
         """;
 
     [Fact]
+    public Task EvidenceOpensSnippetsAndComparisonsWithPartialFailures() => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        api.Answers[Root + "/snippet"] = """{"snippet":{"path":"src/A.cs","start":4,"lines":["one","two"]}}""";
+        api.Answers[Root + "/snippet?B.cs"] = """{"snippet":null}""";
+        var (window, _, model) = await OpenAsync("architecture", api);
+        var finding = new FindingRow(new Harness.Ui.Api.Finding
+        {
+            Kind = "duplicate", Level = "warn", Title = "Copies", Evidence = ["src/A.cs:5", "src/B.cs:8", "src/C.cs:9"],
+        }, false);
+        finding.CanCompare.Should().BeTrue();
+        finding.CanCompareThree.Should().BeTrue();
+        _ = model.CompareThreeEvidenceCommand.ExecuteAsync(finding);
+        var dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == 3 && dialog.Panes.All(p => p.Text != "Loading…"));
+        dialog.Panes.Select(p => p.Location).Should().Equal(finding.Finding.Evidence);
+        dialog.Panes[0].Text.Should().Contain("    4  one");
+        dialog.Panes[1].Text.Should().StartWith("Source unavailable:");
+        dialog.Panes[2].Text.Should().Contain("one");
+        api.GetsWithQuery.Count(x => x.StartsWith(Root + "/snippet?", StringComparison.Ordinal)).Should().Be(3);
+        dialog.Cancel();
+        await Ui.UntilAsync(() => !model.Services.Dialogs.IsOpen);
+        _ = model.CompareEvidenceCommand.ExecuteAsync(finding);
+        dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == 2 && dialog.Panes.All(p => p.Text != "Loading…"));
+        dialog.Cancel();
+        await Ui.UntilAsync(() => !model.Services.Dialogs.IsOpen);
+        api.Answers[Root + "/snippet"] = """{"snippet":{}}""";
+        _ = model.ShowEvidenceCommand.ExecuteAsync("missing.cs:3");
+        dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == 1 && dialog.Panes[0].Text != "Loading…");
+        dialog.Panes[0].Text.Should().Contain("No source lines available");
+        dialog.Cancel();
+        window.Close();
+    });
+
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task ComplexityLocationOpensSourceFromTheView(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        api.Answers[Root + "/snippet"] = """{"snippet":{"path":"src/Fixture.Core/Rules.cs","start":5,"lines":["return 1;"]}}""";
+        var (window, _, model) = await OpenAsync("architecture/complexity", api, width);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var button = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Content is string text && text == "src/Fixture.Core/Rules.cs:5");
+        button.Command.Should().NotBeNull();
+        button.Command.Execute(button.CommandParameter);
+        var dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == 1 && dialog.Panes[0].Text.Contains("return 1", StringComparison.Ordinal));
+        window.GetVisualDescendants().OfType<SelectableTextBlock>()
+            .Should().Contain(x => x.Text != null && x.Text.Contains("return 1", StringComparison.Ordinal));
+        dialog.Cancel();
+        window.Close();
+    });
+
+    [Fact]
+    public Task FindingEvidenceOpensFromTheView() => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        api.Answers[Root + "/snippet"] = """{"snippet":{"path":"src/Fixture.Core/Rules.cs","start":5,"lines":["rule"]}}""";
+        var (window, _, model) = await OpenAsync("architecture", api);
+        window.GetVisualDescendants().OfType<Expander>()
+            .First(e => AutomationProperties.GetName(e) == "3 × functions with many paths through them").IsExpanded = true;
+        Ui.Settle();
+        var evidence = window.GetVisualDescendants().OfType<Expander>()
+            .First(e => e.Header is string label && label == "Evidence (1)");
+        evidence.IsExpanded = true;
+        Ui.Settle();
+        var button = evidence.GetVisualDescendants().OfType<Button>()
+            .Single(b => AutomationProperties.GetName(b) == "src/Fixture.Core/Rules.cs:5");
+        button.Command.Should().NotBeNull();
+        button.Command.Execute(button.CommandParameter);
+        var dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == 1 && dialog.Panes[0].Text.Contains("rule", StringComparison.Ordinal));
+        dialog.Cancel();
+        window.Close();
+    });
+
+    [Fact]
     public Task StructureShowsWhatItIsBuiltOnAndItsFindingsByKind() => Ui.RunAsync(async () =>
     {
         var api = Api();

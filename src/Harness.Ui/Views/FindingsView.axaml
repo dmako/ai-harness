@@ -88,11 +88,21 @@
           <SelectableTextBlock Classes="small" Text="{Binding FixLine}" IsVisible="{Binding HasFix}" TextWrapping="Wrap" />
           <SelectableTextBlock Classes="small" Text="{Binding RuleLine}" IsVisible="{Binding HasRule}" TextWrapping="Wrap" />
           <Expander Header="{Binding EvidenceHead}" AutomationProperties.Name="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
-            <ItemsControl ItemsSource="{Binding Finding.Evidence}">
+            <StackPanel>
+            <WrapPanel ItemSpacing="6">
+              <Button Classes="ghost small" Content="Compare 2 places" IsVisible="{Binding CanCompare}"
+                      Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).CompareEvidenceCommand}" CommandParameter="{Binding}" />
+              <Button Classes="ghost small" Content="Compare 3 places" IsVisible="{Binding CanCompareThree}"
+                      Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).CompareThreeEvidenceCommand}" CommandParameter="{Binding}" />
+            </WrapPanel>
+            <ItemsControl ItemsSource="{Binding EvidencePlaces}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                <DataTemplate x:DataType="x:String"><Button Classes="ghost small" HorizontalContentAlignment="Left"
+                    AutomationProperties.Name="{Binding}" Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).ShowEvidenceCommand}" CommandParameter="{Binding}">
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" /></Button></DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </StackPanel>
           </Expander>
           <TextBlock Classes="muted small" Text="{Binding FoundBy}" IsVisible="{Binding HasFoundBy}" TextWrapping="Wrap" />
           <TextBlock Classes="small" Text="{Binding MarkStory}" IsVisible="{Binding HasMarkStory}" TextWrapping="Wrap" />

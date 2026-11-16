@@ -93,6 +93,40 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Navigate(string href) => Navigation.Go(href);
 
+    [RelayCommand]
+    private Task ShowEvidenceAsync(string location) => OpenEvidenceAsync([location], 0);
+
+    [RelayCommand]
+    private Task CompareEvidenceAsync(FindingRow row) => OpenComparisonAsync(row, 2);
+
+    [RelayCommand]
+    private Task CompareThreeEvidenceAsync(FindingRow row) => OpenComparisonAsync(row, 3);
+
+    private Task OpenComparisonAsync(FindingRow row, int count)
+    {
+        var span = row.Finding.Kind is "repeated-sequence"
+            ? (row.Finding.Why ?? "").Split('\n').Skip(1).Count(line => line.Length > 0 && !line.StartsWith("They differ", StringComparison.Ordinal))
+            : 0;
+        return OpenEvidenceAsync(row.Finding.Evidence.Take(count).ToArray(), span);
+    }
+
+    private async Task OpenEvidenceAsync(string[] locations, int span)
+    {
+        var endpoint = Route.Page is "workspace"
+            ? $"/api/workspaces/{Uri.EscapeDataString(Route.Workspace ?? "")}/snippet"
+            : $"/api/projects/{Uri.EscapeDataString(Route.Id ?? "")}/snippet";
+        var dialog = new EvidenceDialog
+        {
+            Title = locations.Length > 1 ? "Compare source" : "Source evidence",
+            Wide = true,
+            HasCancel = false,
+            AcceptLabel = "Close",
+        };
+        var shown = Services.Dialogs.ShowAsync(dialog);
+        await dialog.LoadAsync(Services, endpoint, locations, span);
+        await shown;
+    }
+
     /// <summary>Changes this browser's theme, keeping Machine's picker in sync when it is open.</summary>
     [RelayCommand]
     private void SelectTheme(string theme)

@@ -81,9 +81,10 @@
                             <TextBlock Classes="muted small" Text="{Binding Copies, StringFormat='{}{0} projects'}" VerticalAlignment="Center" />
                           </WrapPanel>
                           <TextBlock Classes="muted small" Text="{Binding Names}" IsVisible="{Binding HasNames}" TextWrapping="Wrap" />
-                          <ItemsControl ItemsSource="{Binding Where}">
+                          <ItemsControl ItemsSource="{Binding Places}">
                             <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="x:String"><SelectableTextBlock Classes="mono small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                              <DataTemplate x:DataType="vm:DuplicatePlace"><Button Classes="ghost small" Content="{Binding Label}" HorizontalAlignment="Left"
+                                  Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).ShowEvidenceCommand}" CommandParameter="{Binding Location}" /></DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <TextBlock Classes="small" TextWrapping="Wrap">
@@ -225,7 +226,8 @@
             <DataTemplate x:DataType="vm:IssuePlace">
               <StackPanel Spacing="1" Margin="0,2">
                 <TextBlock TextWrapping="Wrap"><Run FontWeight="SemiBold" Text="{Binding Project, Mode=OneWay}" /><Run Classes="muted" Text="{Binding Note, Mode=OneWay}" /></TextBlock>
-                <SelectableTextBlock Classes="mono small muted" Text="{Binding Where}" IsVisible="{Binding HasWhere}" TextWrapping="Wrap" />
+                <Button Classes="ghost small" Content="{Binding Where}" IsVisible="{Binding HasWhere}" HorizontalAlignment="Left"
+                        Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).ShowEvidenceCommand}" CommandParameter="{Binding Location}" />
               </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
