@@ -1,9 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.Sidebar"
-             x:DataType="vm:MainViewModel">
+             x:DataType="vm:MainViewModel"
+             d:DataContext="{x:Static preview:PreviewData.Main}">
   <!-- the sidebar (app.js renderProjects): Home and Search, the workspaces with their first projects, the projects
        outside workspaces, then your knowledge, the machine and the docs; each row with its state and what waits -->
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">

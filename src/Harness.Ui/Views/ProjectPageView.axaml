@@ -1,9 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.ProjectPageView"
-             x:DataType="vm:ProjectPage">
+             x:DataType="vm:ProjectPage"
+             d:DataContext="{x:Static preview:PreviewData.ProjectPage}">
   <!-- a project's page (app.js projectHead): its name, rename, the short name to copy, where it lives, what it is in,
        what changed; the view tabs with what waits; then the view -->
   <DockPanel>

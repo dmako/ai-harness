@@ -1,10 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.OverviewView"
-             x:DataType="vm:OverviewViewModel">
+             x:DataType="vm:OverviewViewModel"
+             d:DataContext="{x:Static preview:PreviewData.Overview}">
   <!-- a project's Overview (app.js viewOverview): since the last visit; the rings, what is in flight and the
        proposals waiting; Needs attention, with the recent activity beside it when there is room. The columns are
        arranged by width in code (OverviewView.axaml.cs). -->

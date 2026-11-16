@@ -1,0 +1,58 @@
+{
+  "issues": [
+    {
+      "kind": "cycle",
+      "level": "problem",
+      "subject": "Api \u21c4 Worker",
+      "summary": "each uses the other's packages",
+      "title": "Api and Worker use each other's packages",
+      "why": "Neither can ship alone.",
+      "projects": [
+        "api",
+        "worker"
+      ],
+      "evidence": [
+        {
+          "project": "api",
+          "path": "Api.csproj",
+          "line": 3,
+          "note": "references Worker.Client"
+        }
+      ]
+    },
+    {
+      "kind": "hub",
+      "level": "info",
+      "subject": "Core",
+      "summary": "3 members depend on it",
+      "title": "Core is a hub",
+      "why": "Its changes ripple.",
+      "projects": [
+        "core"
+      ],
+      "evidence": []
+    },
+    {
+      "kind": "version-drift",
+      "level": "warn",
+      "subject": "Core.Contracts",
+      "summary": "1.1.0, 1.2.0",
+      "title": "Core.Contracts at 1.1.0 and 1.2.0",
+      "why": "Two versions in one system.",
+      "projects": [
+        "api",
+        "worker"
+      ],
+      "evidence": []
+    },
+    {
+      "kind": "duplicate",
+      "level": "warn",
+      "subject": "Money",
+      "title": "Money twice",
+      "why": "copies",
+      "projects": [],
+      "evidence": []
+    }
+  ]
+}

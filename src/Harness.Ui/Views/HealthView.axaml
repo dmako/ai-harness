@@ -1,10 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.HealthView"
-             x:DataType="vm:HealthViewModel">
+             x:DataType="vm:HealthViewModel"
+             d:DataContext="{x:Static preview:PreviewData.Health}">
   <!-- a project's Health (app.js viewHealth/healthReport): the summary, what is wrong first with its fix, what passes
        by area, paths and identifiers, index freshness and the recent syncs -->
   <views:SectionView>

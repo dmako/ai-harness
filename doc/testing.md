@@ -98,6 +98,28 @@ The `ui` job of `tests.yml` does all of this on Linux with Chrome, in order:
    asset-serving tests;
 6. uploads the bundle.
 
+## Avalonia designer previews
+
+Open a view under `src/Harness.Ui/Views` in an Avalonia-compatible IDE and open
+its XAML preview, using the **Debug** configuration. The designer uses the
+`d:DataContext` declared by the view and the application styles in
+`Harness.Ui/App.axaml`. `StyleGallery` is self-contained and needs no data context.
+See Avalonia's [previewer and design-time settings guide](https://docs.avaloniaui.net/docs/app-development/xaml-preview-and-design-settings)
+for IDE setup and troubleshooting.
+
+Preview data lives in `Harness.Ui/Preview`. Project, workspace, task and
+knowledge examples are fictitious. The preview HTTP handler serves embedded test
+fixtures and refuses writes; it never contacts a harness server. Each preview
+gets its own in-memory preferences and services. The fixtures are embedded only
+in Debug builds, so use Debug when opening previews. Production data contexts
+are supplied by the host as usual.
+
+Some reusable controls, such as `SectionView`, `DialogLayer`, and `TaskCard`,
+normally receive body templates or commands from a parent view. Their standalone
+previews show the available sample state; preview the parent page to inspect the
+complete composition. Use `PreviewTests` for a headless check of sample data,
+rendering and runtime data-context isolation.
+
 ## Performance
 
 ```shell

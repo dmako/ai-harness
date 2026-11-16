@@ -11,6 +11,12 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="DynamicData" />
   </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <EmbeddedResource Include="../../test/Harness.Ui.Tests/Fixtures/**/*.json"
+                      LogicalName="PreviewFixtures/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Preview/Fixtures/**/*.json"
+                      LogicalName="PreviewFixtures/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Harness.Ui.Tests" />
   </ItemGroup>

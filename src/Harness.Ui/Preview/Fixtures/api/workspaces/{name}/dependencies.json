@@ -1,0 +1,86 @@
+{
+  "nodes": [
+    {
+      "project": "fixture",
+      "project_id": "prj_fixture",
+      "packages": []
+    },
+    {
+      "project": "api",
+      "project_id": "prj_api",
+      "packages": [
+        "Api.Client"
+      ]
+    },
+    {
+      "project": "worker",
+      "project_id": "prj_worker",
+      "packages": [
+        "Worker.Client"
+      ]
+    },
+    {
+      "project": "core",
+      "project_id": "prj_core",
+      "packages": [
+        "Core.Contracts",
+        "Core.Client",
+        "Core.Unused"
+      ],
+      "library": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "prj_fixture",
+      "to": "prj_core",
+      "packages": [
+        "Core.Contracts"
+      ],
+      "refs": 1,
+      "via": [
+        {
+          "path": "src/Fixture.App/Fixture.App.csproj",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "from": "prj_api",
+      "to": "prj_core",
+      "packages": [
+        "Core.Contracts",
+        "Core.Client"
+      ],
+      "refs": 2,
+      "via": [
+        {
+          "path": "src/Acme.Api.Web/Acme.Api.Web.csproj",
+          "line": 3
+        },
+        {
+          "path": "src/Acme.Api.Jobs/Acme.Api.Jobs.csproj",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "from": "prj_worker",
+      "to": "prj_core",
+      "packages": [
+        "Core.Contracts"
+      ],
+      "refs": 1,
+      "via": []
+    },
+    {
+      "from": "prj_api",
+      "to": "prj_worker",
+      "packages": [
+        "Worker.Client"
+      ],
+      "refs": 1,
+      "via": []
+    }
+  ]
+}

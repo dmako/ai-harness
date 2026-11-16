@@ -1,8 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:vm="using:Harness.Ui.ViewModels"
              x:Class="Harness.Ui.Views.RejectView"
-             x:DataType="vm:RejectDialog">
+             x:DataType="vm:RejectDialog"
+             d:DataContext="{x:Static preview:PreviewData.Reject}">
   <!-- rejecting a proposal: why not, optional -->
   <StackPanel Classes="field">
     <TextBlock Classes="label" Text="Why not (optional)" />

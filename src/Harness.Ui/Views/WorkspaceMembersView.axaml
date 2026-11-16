@@ -1,9 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.WorkspaceMembersView"
-             x:DataType="vm:WorkspaceMembersViewModel">
+             x:DataType="vm:WorkspaceMembersViewModel"
+             d:DataContext="{x:Static preview:PreviewData.WorkspaceMembers}">
   <!-- a workspace's Members (app.js membersManage): filter, choose and remove, add projects, delete the workspace -->
   <StackPanel Classes="section" Spacing="10">
     <WrapPanel ItemSpacing="8" LineSpacing="8">

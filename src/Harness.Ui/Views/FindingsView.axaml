@@ -1,11 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:vm="using:Harness.Ui.ViewModels"
              xmlns:api="using:Harness.Ui.Api"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.FindingsView"
-             x:DataType="vm:FindingsBoard">
+             x:DataType="vm:FindingsBoard"
+             d:DataContext="{x:Static preview:PreviewData.Findings}">
   <!-- findings with their triage (app.js smellsSection): by kind, marked ones on request, the gone ones folded -->
   <StackPanel Spacing="6">
       <CheckBox Name="ShowMarked" IsChecked="{Binding ShowMarked}" Content="{Binding MarkedLabel}" AutomationProperties.Name="{Binding MarkedLabel}" IsVisible="{Binding HasMarked}" />

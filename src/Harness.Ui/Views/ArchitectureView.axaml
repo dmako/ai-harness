@@ -1,11 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:api="using:Harness.Ui.Api"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.ArchitectureView"
-             x:DataType="vm:ArchitectureViewModel">
+             x:DataType="vm:ArchitectureViewModel"
+             d:DataContext="{x:Static preview:PreviewData.Architecture}">
   <!-- a project's Architecture (app.js "architecture"): Structure, Layers, Complexity or Change coupling by the address -->
   <StackPanel>
     <Border Classes="subnav">

@@ -1,10 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:s="using:Harness.Ui.Services"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.DialogLayer"
              x:DataType="s:DialogService"
-             IsVisible="{Binding IsOpen}">
+             IsVisible="{Binding IsOpen}"
+             d:DataContext="{x:Static preview:PreviewData.Dialog}">
   <!-- the open dialog over the page (app.js dialog()): Esc cancels, Enter accepts (not in a multi-line field), the
        first field takes the focus when it opens. A form's fields are its view model's DataTemplate. -->
   <Border Classes="backdrop">

@@ -1,9 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.SearchView"
-             x:DataType="vm:SearchPage">
+             x:DataType="vm:SearchPage"
+             d:DataContext="{x:Static preview:PreviewData.Search}">
   <!-- Search (app.js renderSearch): the big box, then the kinds and the results by kind; with fewer than two
        characters, what each kind is searched by -->
   <StackPanel Spacing="12">

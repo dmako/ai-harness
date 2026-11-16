@@ -1,8 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:vm="using:Harness.Ui.ViewModels"
              x:Class="Harness.Ui.Views.RemoveBlueprintView"
-             x:DataType="vm:RemoveBlueprintDialog">
+             x:DataType="vm:RemoveBlueprintDialog"
+             d:DataContext="{x:Static preview:PreviewData.RemoveBlueprint}">
   <!-- removing a blueprint with tasks (app.js removeBlueprintDialog): move them, or delete them with it -->
   <StackPanel Spacing="10">
     <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" IsVisible="{Binding HasName}" />

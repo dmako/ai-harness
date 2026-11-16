@@ -1,0 +1,75 @@
+{
+  "rows": [
+    {
+      "kind": "member",
+      "name": "Fixture project",
+      "member_id": "prj_fixture",
+      "levels": {},
+      "by_design": 0,
+      "review": 0,
+      "note": "not synced since findings are recorded (harness sync)"
+    },
+    {
+      "kind": "member",
+      "name": "Api",
+      "member_id": "prj_api",
+      "levels": {
+        "warn": 1
+      },
+      "by_design": 0,
+      "review": 0,
+      "snapshot": {
+        "taken_at": "2026-11-13T09:00:00Z"
+      }
+    },
+    {
+      "kind": "member",
+      "name": "Worker",
+      "member_id": "prj_worker",
+      "levels": {
+        "problem": 1,
+        "info": 2
+      },
+      "by_design": 1,
+      "review": 0,
+      "snapshot": {
+        "taken_at": "2026-11-13T09:00:00Z"
+      }
+    },
+    {
+      "kind": "member",
+      "name": "Core",
+      "member_id": "prj_core",
+      "levels": {},
+      "by_design": 0,
+      "review": 0,
+      "snapshot": {
+        "taken_at": "2026-11-13T09:00:00Z"
+      }
+    },
+    {
+      "kind": "system",
+      "name": "between the services",
+      "levels": {
+        "warn": 1
+      },
+      "by_design": 0,
+      "review": 0,
+      "snapshot": {
+        "taken_at": "2026-11-13T09:00:00Z"
+      }
+    },
+    {
+      "kind": "shared",
+      "name": "code repeated across members",
+      "levels": {
+        "warn": 1
+      },
+      "by_design": 0,
+      "review": 0,
+      "snapshot": {
+        "taken_at": "2026-11-13T09:00:00Z"
+      }
+    }
+  ]
+}

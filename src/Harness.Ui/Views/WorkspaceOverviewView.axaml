@@ -1,10 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.WorkspaceOverviewView"
-             x:DataType="vm:WorkspaceOverviewViewModel">
+             x:DataType="vm:WorkspaceOverviewViewModel"
+             d:DataContext="{x:Static preview:PreviewData.WorkspaceOverview}">
   <!-- a workspace's Overview (app.js workspaceView "overview"): a card per member, then the workspace at a glance -->
   <StackPanel>
     <StackPanel Classes="section" Spacing="8">

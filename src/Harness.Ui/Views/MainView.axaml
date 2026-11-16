@@ -1,12 +1,15 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:vm="using:Harness.Ui.ViewModels"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:views="using:Harness.Ui.Views"
              xmlns:c="using:Harness.Ui.Controls"
              xmlns:api="using:Harness.Ui.Api"
              x:Class="Harness.Ui.Views.MainView"
              x:DataType="vm:MainViewModel"
-             Classes="page">
+             Classes="page"
+             d:DataContext="{x:Static preview:PreviewData.Main}">
   <!-- the page frame: the sidebar (beside the page when wide, over it when narrow), the top bar, and the page the
        address names; toasts and the open dialog above everything -->
   <UserControl.Styles>

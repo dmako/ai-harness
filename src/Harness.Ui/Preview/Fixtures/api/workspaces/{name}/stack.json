@@ -1,0 +1,61 @@
+{
+  "stacks": {
+    "prj_api": {
+      "language": "C#",
+      "badge": "C# \u00b7 .NET 10"
+    },
+    "prj_worker": {
+      "language": "C#",
+      "badge": "C# \u00b7 .NET 10"
+    },
+    "prj_core": {
+      "language": "C#",
+      "badge": "C# \u00b7 .NET 10"
+    }
+  },
+  "rows": [
+    {
+      "kind": "runtime",
+      "name": ".NET",
+      "versions": {
+        "prj_api": [
+          "10.0"
+        ],
+        "prj_worker": [
+          "9.0"
+        ]
+      },
+      "differ": true
+    },
+    {
+      "kind": "core",
+      "name": "Core.Contracts",
+      "versions": {
+        "prj_api": [
+          "1.1.0"
+        ],
+        "prj_worker": [
+          "1.2.0"
+        ]
+      },
+      "owner": "prj_core",
+      "published": "1.2.0",
+      "differ": true
+    },
+    {
+      "kind": "core",
+      "name": "Core.Client",
+      "versions": {
+        "prj_api": [
+          "1.1.0"
+        ],
+        "prj_worker": [
+          "1.2.0"
+        ]
+      },
+      "owner": "prj_core",
+      "published": "1.2.0",
+      "differ": true
+    }
+  ]
+}

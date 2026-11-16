@@ -1,9 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:vm="using:Harness.Ui.ViewModels"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.BlueprintFormView"
-             x:DataType="vm:BlueprintFormDialog">
+             x:DataType="vm:BlueprintFormDialog"
+             d:DataContext="{x:Static preview:PreviewData.BlueprintForm}">
   <!-- a blueprint's description (app.js blueprintFields): id (new), title, goal, Done when, notes and colour; for a
        proposal titled as an existing blueprint, merge or new -->
   <StackPanel Spacing="12">

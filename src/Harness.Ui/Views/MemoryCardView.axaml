@@ -1,9 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:preview="using:Harness.Ui.Preview"
              xmlns:vm="using:Harness.Ui.ViewModels"
              xmlns:c="using:Harness.Ui.Controls"
              x:Class="Harness.Ui.Views.MemoryCardView"
-             x:DataType="vm:MemoryCard">
+             x:DataType="vm:MemoryCard"
+             d:DataContext="{x:Static preview:PreviewData.MemoryCard}">
   <!-- a memory (app.js memoryCard): its point first and the rest after it, its provenance, what it overrides or is
        overridden by, what superseded it, its actions as the memory allows them, and its history on request -->
   <Border Classes="mem" c:StyleClass.Name="{Binding Memory.Type, StringFormat='ty-{0}'}" Classes.inactive="{Binding Inactive}"

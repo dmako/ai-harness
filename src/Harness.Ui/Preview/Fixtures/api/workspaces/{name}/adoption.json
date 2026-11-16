@@ -1,0 +1,55 @@
+{
+  "library": "core",
+  "packages": [
+    "Core.Contracts",
+    "Core.Client",
+    "Core.Unused"
+  ],
+  "public_types": 12,
+  "consumers": [
+    {
+      "project": "api",
+      "packages": [
+        {
+          "path": "Api.csproj",
+          "matched": "Core.Contracts"
+        },
+        {
+          "path": "Api.csproj",
+          "matched": "Core.Client"
+        }
+      ],
+      "import_files": 7
+    },
+    {
+      "project": "worker",
+      "packages": [
+        {
+          "path": "Worker.csproj",
+          "matched": "Core.Contracts"
+        }
+      ],
+      "import_files": 2
+    }
+  ],
+  "non_consumers": [
+    "fixture"
+  ],
+  "possible_local_implementations": [
+    {
+      "project": "worker",
+      "declared": {
+        "name": "Money",
+        "kind": "class",
+        "path": "Money.cs",
+        "line": 1
+      },
+      "library": {
+        "name": "Money",
+        "kind": "class",
+        "path": "Money.cs",
+        "line": 1
+      }
+    }
+  ]
+}
