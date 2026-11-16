@@ -17,7 +17,32 @@
   <Style Selector="Border.project-mark.pc5"><Setter Property="BorderBrush" Value="{DynamicResource CFact}" /></Style>
   <Style Selector="Border.project-mark.pc6"><Setter Property="BorderBrush" Value="{DynamicResource COpenQuestion}" /></Style>
   <Style Selector="Border.project-mark.pc7"><Setter Property="BorderBrush" Value="{DynamicResource Accent}" /></Style>
-  <Style Selector="Border.project-mark.compact"><Setter Property="Padding" Value="3,1" /></Style>
+  <Style Selector="Border.project-mark.compact">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="Border.project-mark.compact TextBlock">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="FontSize" Value="8" />
+  </Style>
+  <Style Selector="Border.project-mark.compact.pc0"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill0}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder0}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc0 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk0}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc1"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill1}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder1}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc1 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk1}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc2"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill2}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder2}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc2 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk2}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc3"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill3}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder3}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc3 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk3}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc4"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill4}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder4}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc4 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk4}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc5"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill5}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder5}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc5 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk5}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc6"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill6}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder6}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc6 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk6}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc7"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill7}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder7}" /></Style>
+  <Style Selector="Border.project-mark.compact.pc7 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk7}" /></Style>
   <Style Selector="Border.project-mark TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
     <Setter Property="FontWeight" Value="Bold" />

@@ -364,6 +364,38 @@ public sealed class ShellTests
         window.Close();
     });
 
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task SidebarFooterAndProjectMarksKeepTheirLayout(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(width, 844, address: "#/");
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var main = window.GetVisualDescendants().OfType<MainView>().Single();
+        main.FindControl<ToggleButton>("Menu")!.IsChecked = true;
+        Ui.Settle();
+        var sidebar = main.FindControl<Border>("Sidebar")!;
+        var footer = sidebar.GetVisualDescendants().OfType<StackPanel>().Single(x => x.Name == "SidebarFooter");
+        var bottom = footer.TranslatePoint(new Point(0, footer.Bounds.Height), sidebar)!.Value.Y;
+        (bottom + footer.Margin.Bottom).Should().BeApproximately(sidebar.Bounds.Height, 1);
+        footer.GetVisualDescendants().OfType<AppLink>().Select(x => x.Href)
+            .Should().Equal("#/knowledge", "#/machine", "#/docs");
+        var marks = sidebar.GetVisualDescendants().OfType<Border>().Where(x => x.Classes.Contains("project-mark"));
+        marks.Should().NotBeEmpty();
+        foreach (var mark in marks)
+        {
+            mark.Bounds.Width.Should().BeApproximately(mark.Bounds.Height, 0.1);
+            mark.DataContext.Should().BeOfType<NavProject>();
+            var project = (NavProject)mark.DataContext;
+            mark.Classes.Should().Contain("pc" + project.MarkColor);
+            mark.Background.Should().NotBeNull();
+            mark.Child.Should().BeOfType<TextBlock>().Which.Foreground.Should().NotBeNull();
+        }
+        window.Close();
+    });
+
     /// <summary>Clicks the link to <paramref name="href"/> on the page (in the sidebar first).</summary>
     private static void Follow(Window window, string href) =>
         window
