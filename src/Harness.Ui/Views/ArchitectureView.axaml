@@ -115,11 +115,19 @@
                       <ItemsControl Name="Packages" ItemsSource="{Binding Packages}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:PackageRow">
-                            <StackPanel Spacing="1" Margin="0,1">
-                              <SelectableTextBlock Classes="mono small" Text="{Binding Line}" TextWrapping="Wrap" />
-                              <TextBlock Classes="small" Text="{Binding Newer}" IsVisible="{Binding HasNewer}" TextWrapping="Wrap" />
-                              <TextBlock Classes="small" Classes.critical="{Binding Severe}" Text="{Binding Vulnerable}" IsVisible="{Binding HasVulnerable}" TextWrapping="Wrap" />
-                            </StackPanel>
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,1">
+                              <SelectableTextBlock Classes="mono small" Text="{Binding Line}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                              <Button Grid.Column="1" Classes="icon package-up" IsVisible="{Binding HasNewer}"
+                                      ToolTip.Tip="{Binding NewerLabel}" AutomationProperties.Name="{Binding NewerLabel}">
+                                <Button.Flyout><Flyout><TextBlock Text="{Binding NewerLabel}" MaxWidth="300" TextWrapping="Wrap" /></Flyout></Button.Flyout>
+                                <c:Icon Kind="level-info" />
+                              </Button>
+                              <Button Grid.Column="2" Classes="icon package-vuln" Classes.severe="{Binding Severe}" IsVisible="{Binding HasVulnerable}"
+                                      ToolTip.Tip="{Binding VulnerableLabel}" AutomationProperties.Name="{Binding VulnerableLabel}">
+                                <Button.Flyout><Flyout><TextBlock Text="{Binding VulnerableLabel}" MaxWidth="300" TextWrapping="Wrap" /></Flyout></Button.Flyout>
+                                <c:Icon Kind="st-warn" />
+                              </Button>
+                            </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>

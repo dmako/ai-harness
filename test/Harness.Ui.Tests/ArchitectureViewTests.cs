@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
@@ -224,6 +225,59 @@ public sealed class ArchitectureViewTests
     });
 
     [Fact]
+    public Task PackageIndicatorsExposeDetailsWithoutInlineStatusText() => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await OpenAsync("architecture/layers", Api());
+        var structure = Architecture(model).Structure;
+        structure.Selected = Core;
+        await Ui.UntilAsync(() => structure.Packages.Any(package => package.HasVulnerable));
+        structure.Packages.Clear();
+        structure.Packages.Add(new PackageRow("Current", "1", null, null, false));
+        structure.Packages.Add(new PackageRow("Older", "1", "Newer version 2", null, false));
+        structure.Packages.Add(new PackageRow("Unsafe", "1", null, "Known high vulnerability", true));
+        structure.Packages.Add(new PackageRow("Both", "1", "Newer version 2", "Known low vulnerability", false));
+        Ui.Settle();
+        var list = window.GetVisualDescendants().OfType<ItemsControl>().Single(control => control.Name is "Packages");
+        foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        {
+            Application.Current!.RequestedThemeVariant = theme;
+            Ui.Settle();
+            var buttons = list.GetVisualDescendants().OfType<Button>()
+                .Where(button => button.Classes.Contains("package-up") || button.Classes.Contains("package-vuln")).ToArray();
+            foreach (var row in structure.Packages)
+            {
+                var rowButtons = buttons.Where(button => ReferenceEquals(button.DataContext, row)).ToArray();
+                rowButtons.Single(button => button.Classes.Contains("package-up")).IsVisible.Should().Be(row.HasNewer);
+                rowButtons.Single(button => button.Classes.Contains("package-vuln")).IsVisible.Should().Be(row.HasVulnerable);
+                foreach (var button in rowButtons.Where(button => button.IsVisible))
+                {
+                    var detail = button.Classes.Contains("package-up") ? row.NewerLabel : row.VulnerableLabel;
+                    ToolTip.GetTip(button).Should().Be(detail);
+                    AutomationProperties.GetName(button).Should().Be(detail);
+                    button.Focusable.Should().BeTrue();
+                    var token = (button.Classes.Contains("package-up"), row.Severe) switch
+                    {
+                        (true, _) => "Accent",
+                        (false, true) => "Critical",
+                        _ => "Warning",
+                    };
+                    button.TryFindResource(token, theme, out var color).Should().BeTrue();
+                    button.Foreground.Should().Be(color);
+                    var flyout = button.Flyout.Should().BeOfType<Flyout>().Subject;
+                    flyout.ShowAt(button);
+                    Ui.Settle();
+                    ((TextBlock)flyout.Content!).Text.Should().Be(detail);
+                    flyout.Hide();
+                }
+            }
+            list.GetVisualDescendants().OfType<TextBlock>().Where(text => text.IsEffectivelyVisible)
+                .Should().NotContain(text => text.Text == "Newer version 2" || text.Text == "Known high vulnerability" || text.Text == "Known low vulnerability");
+        }
+        window.Close();
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
+    });
+
+    [Fact]
     public Task ComplexityShowsEachLanguageAndItsMostComplexFunctions() => Ui.RunAsync(async () =>
     {
         var (_, _, model) = await OpenAsync("architecture/complexity", Api(complexity: false));
@@ -273,7 +327,7 @@ public sealed class ArchitectureViewTests
                 if (view.EndsWith("layers", StringComparison.Ordinal))
                 {
                     Architecture(model).Structure.Selected = Core;
-                    Ui.Settle();
+                    await Ui.UntilAsync(() => Architecture(model).Structure.Packages.Any(package => package.HasVulnerable));
                 }
                 if (view.EndsWith("structure", StringComparison.Ordinal) || view == "architecture")
                 {

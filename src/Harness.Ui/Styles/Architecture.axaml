@@ -5,6 +5,15 @@
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
   </Style>
+  <Style Selector="Button.package-up">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.package-vuln">
+    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="Button.package-vuln.severe">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
   <Style Selector="Button.anode">
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />

@@ -63,6 +63,8 @@ public sealed record PackageRow(string Name, string? Version, string? Newer, str
     public bool HasNewer => Newer is not null;
     public bool HasVulnerable => Vulnerable is not null;
     public string Line => Version is { Length: > 0 } v ? $"{Name} {v}" : Name;
+    public string NewerLabel => $"{Name}: {Newer}";
+    public string VulnerableLabel => $"{Name}: {Vulnerable}";
 }
 
 /// <summary>A related unit in the side panel: its short name, and its path to select it by.</summary>
