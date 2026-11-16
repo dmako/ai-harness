@@ -24,6 +24,33 @@ public sealed class WorkViewTests
     private const string Root = "/api/projects/prj_fixture";
 
     [Theory]
+    [InlineData("tasks", false)]
+    [InlineData("tasks", true)]
+    [InlineData("blueprints", false)]
+    [InlineData("blueprints", true)]
+    public Task RemoveControlsRevealOnHoverAndFocus(string section, bool dark) => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await OpenAsync(section);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var button = window.GetVisualDescendants().OfType<Button>()
+            .First(b => b.Classes.Contains("hover-remove") && b.IsEffectivelyVisible);
+        button.Opacity.Should().Be(1, "touch and other non-hover input starts with visible actions");
+        window.MouseMove(new Point(1, 1));
+        Ui.Settle();
+        button.Opacity.Should().Be(0);
+        button.Focus();
+        Ui.Settle();
+        button.Opacity.Should().Be(1);
+        window.MouseMove(Center(button, window));
+        Ui.Settle();
+        button.Opacity.Should().Be(1);
+        button.TryFindResource("Critical", button.ActualThemeVariant, out var critical).Should().BeTrue();
+        button.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().Single().Foreground
+            .Should().BeEquivalentTo(critical);
+        window.Close();
+    });
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public Task TaskTypeMarksUseBoardColorsInRowsAndEditor(bool dark) => Ui.RunAsync(async () =>

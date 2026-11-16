@@ -26,6 +26,8 @@ public sealed partial class MainView : UserControl
         InitializeComponent();
         AddHandler(AppLink.NavigateEvent, Followed);
         Menu.IsCheckedChanged += (_, _) => Sidebar.IsVisible = Menu.IsChecked is true;
+        AddHandler(PointerMovedEvent, PointerMode, RoutingStrategies.Tunnel);
+        AddHandler(PointerPressedEvent, PointerMode, RoutingStrategies.Tunnel);
         SizeChanged += (_, e) => Layout(e.NewSize.Width);
         PageScroller.SizeChanged += (_, _) => Fit();
         OpenFind.TextChanged += (_, _) => QuickFind();
@@ -40,6 +42,9 @@ public sealed partial class MainView : UserControl
 
     /// <summary>Opens find from a browser host that intercepts the browser's own Ctrl+F.</summary>
     public static void RequestFind() => FindRequested?.Invoke();
+
+    private void PointerMode(object? sender, PointerEventArgs e) =>
+        Classes.Set("pointer-hover", e.Pointer.Type is PointerType.Mouse);
 
     protected override void OnDataContextChanged(EventArgs e)
     {
