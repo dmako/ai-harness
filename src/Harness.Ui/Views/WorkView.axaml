@@ -110,11 +110,11 @@
             <TextBlock Classes="empty" Text="{Binding CardsEmpty}" IsVisible="{Binding CardsEmpty, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <ItemsControl Name="Cards" ItemsSource="{Binding Cards}">
               <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
+                <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:BlueprintCard">
-                  <Border Classes="card bpcard drag-blueprint drop-blueprint" Width="340" Padding="14,12"
+                  <Border Classes="card bpcard drag-blueprint drop-blueprint" HorizontalAlignment="Stretch" Padding="14,12"
                           AutomationProperties.Name="{Binding Heading}">
                     <StackPanel Spacing="8">
                       <DockPanel>

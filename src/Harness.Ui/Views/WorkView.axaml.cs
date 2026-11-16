@@ -130,8 +130,8 @@ public sealed partial class WorkView : UserControl
                 };
                 var box = target.Bounds;
                 var local = this.TranslatePoint(point, target) ?? default;
-                // cards side by side take it on their left or right half, stacked groups above or below
-                var after = target.DataContext is BlueprintCard ? local.X > box.Width / 2 : local.Y > box.Height / 2;
+                // Both blueprint cards and task groups are stacked vertically.
+                var after = local.Y > box.Height / 2;
                 await plan.PlaceAsync(from, id, after);
                 break;
         }

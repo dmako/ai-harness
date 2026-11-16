@@ -488,15 +488,15 @@ public sealed class WorkViewTests
     [Fact]
     public Task DraggingABlueprintOntoAnotherReordersThem() => Ui.RunAsync(async () =>
     {
-        var (window, api, model) = await OpenAsync("blueprints");
+        var (window, api, model) = await OpenAsync("blueprints", height: 1800);
         Work(model).Plan.CardChips.Single(c => c.Key == "all").On = true;
         Ui.Settle();
         var cards = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("bpcard")).ToArray();
         var bp8 = cards.Single(c => ((BlueprintCard)c.DataContext!).Id == "BP-008");
         var bp9 = cards.Single(c => ((BlueprintCard)c.DataContext!).Id == "BP-009");
         var from = Center(bp8, window) + new Point(0, -bp8.Bounds.Height / 4);
-        // the left half of BP-009: before it
-        var to = bp9.TranslatePoint(new Point(bp9.Bounds.Width / 4, bp9.Bounds.Height / 2), window)!.Value;
+        // the upper half of BP-009: before it
+        var to = bp9.TranslatePoint(new Point(bp9.Bounds.Width / 2, bp9.Bounds.Height / 4), window)!.Value;
 
         window.MouseDown(from, MouseButton.Left);
         window.MouseMove(from + new Point(-20, 0));
@@ -505,6 +505,27 @@ public sealed class WorkViewTests
 
         await Ui.UntilAsync(() => api.Posts.Count > 0);
         api.Posts.Should().ContainSingle().Which.Body.Should().Be("""{"order":["BP-008","BP-009"]}""");
+    });
+
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task BlueprintCardsFillOneColumn(int width) => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await OpenAsync("blueprints", width: width, height: 1800);
+        Work(model).Plan.CardChips.Single(c => c.Key == "all").On = true;
+        Ui.Settle();
+        var view = window.GetVisualDescendants().OfType<WorkView>().Single();
+        var list = view.FindControl<ItemsControl>("Cards")!;
+        var cards = list.GetVisualDescendants().OfType<Border>().Where(card => card.Classes.Contains("bpcard")).ToArray();
+        cards.Should().HaveCountGreaterThan(1);
+        foreach (var card in cards)
+        {
+            card.Bounds.Width.Should().BeApproximately(list.Bounds.Width, 1);
+        }
+        var positions = cards.Select(card => card.TranslatePoint(new Point(), list)!.Value).ToArray();
+        positions[1].X.Should().BeApproximately(positions[0].X, 1);
+        positions[1].Y.Should().BeGreaterThanOrEqualTo(positions[0].Y + cards[0].Bounds.Height);
     });
 
     [Theory]
