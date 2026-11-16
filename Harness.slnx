@@ -15,6 +15,7 @@
     <Project Path="src/Harness.Scm.Forgejo/Harness.Scm.Forgejo.csproj" />
     <Project Path="src/Harness.Scm.Github/Harness.Scm.Github.csproj" />
     <Project Path="src/Harness.Ui/Harness.Ui.csproj" />
+    <Project Path="src/Harness.Ui.Desktop/Harness.Ui.Desktop.csproj" />
     <!-- needs the wasm-tools workload (SkiaSharp links natively): built on its own (dotnet publish), not by the
          solution build that CI runs without the workload -->
     <Project Path="src/Harness.Ui.Browser/Harness.Ui.Browser.csproj">

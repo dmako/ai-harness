@@ -6,6 +6,7 @@
   <ItemGroup Label="Avalonia UI (TASK-0144 spike)">
     <PackageVersion Include="Avalonia" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Browser" Version="$(AvaloniaVersion)" />
+    <PackageVersion Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
