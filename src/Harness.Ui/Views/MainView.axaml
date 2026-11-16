@@ -34,8 +34,8 @@
     <Grid RowDefinitions="Auto,*">
       <Border Name="Header" Classes="topbar" Grid.Row="0">
         <DockPanel>
-          <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
-                  AutomationProperties.Name="Show projects" IsVisible="False" />
+          <ToggleButton Name="Menu" DockPanel.Dock="Left" Content="☰" Margin="0,0,12,0"
+                        AutomationProperties.Name="Navigation" ToolTip.Tip="Toggle navigation" />
           <TextBlock Name="LiveState" DockPanel.Dock="Right" Classes="live"
                      Classes.connected="{Binding Services.Live.IsConnected}"
                      Classes.offline="{Binding Services.Live.IsOffline}"

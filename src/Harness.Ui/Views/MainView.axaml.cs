@@ -10,7 +10,7 @@ namespace Harness.Ui.Views;
 
 /// <summary>
 /// The page frame. In-page links (AppLink) navigate through the shell; below 760 px the sidebar leaves the page's
-/// side and opens over it from the Projects button, closing again when a link in it is followed.
+/// side and opens over it from the navigation toggle, closing again when a link in it is followed.
 /// </summary>
 public sealed partial class MainView : UserControl
 {
@@ -25,7 +25,7 @@ public sealed partial class MainView : UserControl
     {
         InitializeComponent();
         AddHandler(AppLink.NavigateEvent, Followed);
-        Menu.Click += (_, _) => Sidebar.IsVisible = !Sidebar.IsVisible;
+        Menu.IsCheckedChanged += (_, _) => Sidebar.IsVisible = Menu.IsChecked is true;
         SizeChanged += (_, e) => Layout(e.NewSize.Width);
         PageScroller.SizeChanged += (_, _) => Fit();
         OpenFind.TextChanged += (_, _) => QuickFind();
@@ -278,7 +278,7 @@ public sealed partial class MainView : UserControl
         }
         if (_narrow)
         {
-            Sidebar.IsVisible = false;
+            Menu.IsChecked = false;
         }
     }
 
@@ -291,11 +291,11 @@ public sealed partial class MainView : UserControl
         }
         _narrow = narrow;
         Sidebar.Classes.Add("placed");
-        Menu.IsVisible = narrow;
         Sidebar.Classes.Set("overlay", narrow);
         Grid.SetColumnSpan(Sidebar, narrow ? 2 : 1);
         Sidebar.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Left : Avalonia.Layout.HorizontalAlignment.Stretch;
-        Sidebar.IsVisible = !narrow;
+        Menu.IsChecked = !narrow;
+        Sidebar.IsVisible = Menu.IsChecked is true;
         Grid.SetColumn(Sidebar, 0);
         Frame.ColumnDefinitions[0].Width = narrow ? new GridLength(0) : GridLength.Auto;
     }

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Input;
@@ -318,16 +319,49 @@ public sealed class ShellTests
     {
         var (window, _, model) = await Ui.OpenMainAsync(390, 844, address: "#/");
         var sidebar = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "Sidebar");
-        var menu = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "Menu");
+        var menu = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "Menu");
         sidebar.IsVisible.Should().BeFalse();
         menu.IsVisible.Should().BeTrue();
 
-        menu.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        menu.IsChecked = true;
         sidebar.IsVisible.Should().BeTrue();
         await Ui.UntilAsync(() => sidebar.Bounds.Width > 0);
         Follow(window, "#/p/prj_fixture/overview");
         await Ui.UntilAsync(() => model.Page is ProjectPage);
         sidebar.IsVisible.Should().BeFalse();
+    });
+
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task NavigationToggleReclaimsSpaceAndWorksWithKeyboard(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(width, 844, address: "#/");
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var main = window.GetVisualDescendants().OfType<MainView>().Single();
+        var sidebar = main.FindControl<Border>("Sidebar")!;
+        var menu = main.FindControl<ToggleButton>("Menu")!;
+        var page = main.FindControl<ScrollViewer>("PageScroller")!;
+        AutomationProperties.GetName(menu).Should().Be("Navigation");
+        menu.Focus();
+        window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, null);
+        window.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, null);
+        Ui.Settle();
+        sidebar.IsVisible.Should().Be(width < 760);
+        menu.IsChecked.Should().Be(sidebar.IsVisible);
+        var firstWidth = page.Bounds.Width;
+        window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, null);
+        window.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, null);
+        Ui.Settle();
+        sidebar.IsVisible.Should().Be(width >= 760);
+        menu.IsChecked.Should().Be(sidebar.IsVisible);
+        if (width >= 760)
+        {
+            firstWidth.Should().BeGreaterThan(page.Bounds.Width);
+        }
+        window.Close();
     });
 
     /// <summary>Clicks the link to <paramref name="href"/> on the page (in the sidebar first).</summary>
