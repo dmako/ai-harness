@@ -553,6 +553,13 @@ public sealed partial class ComplexitySection(UiServices services, string projec
     }
 }
 
+/// <summary>A file that often changes with a hotspot, shown as a badge with its full details.</summary>
+public sealed record PartnerBadge(Partner Partner)
+{
+    public string Label => $"{Partner.Path.Split('/')[^1]} {Overview.Pct(Partner.Share)}";
+    public string Detail => $"{Partner.Path}: {Partner.Together} commits together, {Overview.Pct(Partner.Share)} of its commits";
+}
+
 /// <summary>A file in Change coupling: how often it changed, its most complex function, what changes with it.</summary>
 public sealed record HotspotRow(Hotspot Hotspot, double Ratio, int? Complexity, string Level)
 {
@@ -561,7 +568,7 @@ public sealed record HotspotRow(Hotspot Hotspot, double Ratio, int? Complexity, 
     public string ComplexityText => Complexity?.ToString(CultureInfo.InvariantCulture) ?? "–";
     public bool IsProblem => Level is "problem";
     public bool IsWarn => Level is "warn";
-    public IReadOnlyList<string> Partners => [.. Hotspot.Partners.Select(p => $"{p.Path.Split('/')[^1]} {Overview.Pct(p.Share)}")];
+    public IReadOnlyList<PartnerBadge> Partners => [.. Hotspot.Partners.Select(p => new PartnerBadge(p))];
     public bool HasPartners => Hotspot.Partners.Count > 0;
 }
 

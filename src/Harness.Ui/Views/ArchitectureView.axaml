@@ -251,20 +251,22 @@
                             Problem="{Binding Thresholds.Problem}" AutomationProperties.Name="{Binding ChartName}" />
           </Border>
           <TextBlock Classes="empty" Text="No code file changed in the last 180 days." IsVisible="{Binding IsEmpty}" />
-          <Border Classes="card" IsVisible="{Binding !IsEmpty}">
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding !IsEmpty}">
+          <Border Classes="card" MinWidth="680">
             <StackPanel>
               <Border Classes="thead">
-                <Grid ColumnDefinitions="*,110,44">
-                  <TextBlock Classes="th" Text="file, and what changes with it" TextWrapping="Wrap" />
+                <Grid Name="CouplingHeader" ColumnDefinitions="2*,110,90,3*">
+                  <TextBlock Classes="th" Text="file" TextWrapping="Wrap" />
                   <TextBlock Grid.Column="1" Classes="th" Text="commits" />
-                  <TextBlock Grid.Column="2" Classes="th num" Text="cx" />
+                  <TextBlock Grid.Column="2" Classes="th num" Text="complexity" />
+                  <TextBlock Grid.Column="3" Classes="th" Text="changes together with" Margin="12,0,0,0" />
                 </Grid>
               </Border>
               <ItemsControl Name="CouplingRows" ItemsSource="{Binding Rows}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:HotspotRow">
                     <Border Classes="trow">
-                      <Grid ColumnDefinitions="*,110,44" RowDefinitions="Auto,Auto">
+                      <Grid ColumnDefinitions="2*,110,90,3*">
                         <StackPanel Margin="0,0,8,0" ToolTip.Tip="{Binding Hotspot.Path}">
                           <TextBlock Classes="mono small" FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                           <TextBlock Classes="muted small" Text="{Binding Folder}" TextTrimming="CharacterEllipsis" />
@@ -275,12 +277,17 @@
                         </StackPanel>
                         <TextBlock Grid.Column="2" Classes="num small" Classes.critical="{Binding IsProblem}" Classes.gold="{Binding IsWarn}"
                                    Text="{Binding ComplexityText}" />
-                        <ItemsControl Grid.Row="1" Grid.ColumnSpan="3" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}" Margin="0,4,0,0">
+                        <TextBlock Grid.Column="3" Classes="muted small" Text="nothing often" IsVisible="{Binding !HasPartners}" Margin="12,0,0,0" />
+                        <ItemsControl Grid.Column="3" Classes="coupling-partners" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}" Margin="12,0,0,0">
                           <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate><WrapPanel ItemSpacing="10" LineSpacing="2" /></ItemsPanelTemplate>
+                            <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
                           </ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="x:String"><TextBlock Classes="muted small" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                            <DataTemplate x:DataType="vm:PartnerBadge">
+                              <Border Classes="pill coupling-badge" ToolTip.Tip="{Binding Detail}" AutomationProperties.Name="{Binding Detail}">
+                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                              </Border>
+                            </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                       </Grid>
@@ -290,6 +297,7 @@
               </ItemsControl>
             </StackPanel>
           </Border>
+          </ScrollViewer>
         </StackPanel>
       </views:SectionView.Body>
     </views:SectionView>

@@ -7,6 +7,7 @@ using AwesomeAssertions;
 using Harness.Ui.Controls;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
+using Harness.Ui.Views;
 using Xunit;
 
 namespace Harness.Ui.Tests;
@@ -309,9 +310,37 @@ public sealed class ArchitectureViewTests
         c.MissingHead.Should().Be("Your uncommitted change leaves out 1 file that usually change with it (a reminder, not a rule)");
         c.Missing.Should().Equal("src/Fixture.App/Program.cs usually changes with src/Fixture.Core/Rules.cs (6 commits together, 75% of its commits)");
         c.Rows.Select(r => (r.Name, r.ComplexityText, r.Level)).Should().Equal(("Rules.cs", "60", "problem"), ("Program.cs", "3", "low"), ("Text.cs", "12", "info"));
-        c.Rows[0].Partners.Should().Equal("Program.cs 75%");
+        c.Rows[0].Partners.Select(partner => partner.Label).Should().Equal("Program.cs 75%");
+        c.Rows[0].Partners[0].Detail.Should().Contain("src/Fixture.App/Program.cs: 6 commits together");
         c.HasChart.Should().BeTrue();
         c.Points.Where(p => p.Named).Select(p => p.Name).Should().Contain("Rules.cs");
+    });
+
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task ChangeCouplingUsesSeparateAlignedColumns(int width) => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await OpenAsync("architecture/coupling", Api(), width, 800);
+        await Ui.UntilAsync(() => Architecture(model).Coupling.HasContent);
+        Ui.Settle();
+        var view = window.GetVisualDescendants().OfType<ArchitectureView>().Single();
+        var header = view.FindControl<Grid>("CouplingHeader")!;
+        header.Children.OfType<TextBlock>().Select(text => text.Text)
+            .Should().Equal("file", "commits", "complexity", "changes together with");
+        var rows = view.FindControl<ItemsControl>("CouplingRows")!;
+        var partnerColumn = rows.GetVisualDescendants().OfType<ItemsControl>()
+            .First(control => control.Classes.Contains("coupling-partners") && control.IsVisible);
+        Grid.GetColumn(partnerColumn).Should().Be(3);
+        var badge = partnerColumn.GetVisualDescendants().OfType<Border>()
+            .Single(border => border.Classes.Contains("coupling-badge"));
+        ToolTip.GetTip(badge).Should().Be("src/Fixture.App/Program.cs: 6 commits together, 75% of its commits");
+        if (width == 390)
+        {
+            var scroll = rows.GetVisualAncestors().OfType<ScrollViewer>()
+                .First(viewer => viewer.Extent.Width > viewer.Viewport.Width);
+            scroll.HorizontalScrollBarVisibility.Should().Be(Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
+        }
     });
 
     [Theory]
