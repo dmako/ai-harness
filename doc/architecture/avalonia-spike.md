@@ -28,7 +28,7 @@ The Board loads in **1.6–2.3 s cold** (4.9 MB transferred) and **about 1.4 s w
 | --- | --- | --- |
 | Shared UI | `src/Harness.Ui` | `App`, the views (`MainView`, `BoardView`, `TaskCard`) and view models (`MainViewModel`, `BoardViewModel`). It also holds a typed API client (`HarnessApi` with source-generated `UiJsonContext`, `ServerSentEvents`) and styles split into `Styles/Tokens.axaml` (semantic colours per theme, sizes), `Blueprints.axaml` (the 16 blueprint colours), `Base.axaml`, `Board.axaml` and `BlueprintFrames.axaml`. It references no harness project. |
 | Browser host | `src/Harness.Ui.Browser` | `Microsoft.NET.Sdk.WebAssembly`, `net11.0-browser`. `Program` reads the page address and the deep link and starts the shared `App` in `#out`. `wwwroot/` holds `index.html`, `main.js` (runtime start, timing marks) and `main.css`. |
-| Serving | `src/Harness.Web/UiBundleAssets.cs` | The release serves its `ui` sidecar at `/`, with Brotli negotiation and caching for fingerprinted framework files. |
+| Serving | `src/Harness.Web/UiBundleAssets.cs` | The release serves embedded UI resources at `/`, with Brotli negotiation and caching for fingerprinted framework files. |
 | Tests | `test/Harness.Ui.Tests` | 12 headless tests on Avalonia's headless platform with Skia. |
 | Tests | `test/Harness.Integration/Web/UiBundleTests.cs` | Root bundle content types, policy, Brotli, cache and path guard. |
 
@@ -38,10 +38,10 @@ To try it:
 
 ```
 dotnet publish src/Harness.Ui.Browser -c Release -o artifacts/ui       # needs the wasm-tools workload
-harness ui  # release archive includes the ui directory beside the executable
+harness ui  # the release executable embeds the UI
 ```
 
-The release serves the bundle from the `ui` directory beside the executable.
+The release serves the bundle from embedded resources in the executable.
 
 ## Versions and build
 

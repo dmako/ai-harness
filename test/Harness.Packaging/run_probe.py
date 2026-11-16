@@ -235,9 +235,19 @@ def probe(main_archive, developer_archive, root, report):
     try:
         for path in ['/', '/main.js', '/main.css', '/api/projects', '/api/machine']:
             check(http(address, path)[0] == 200, 'UI ' + path)
-        framework = next((main / 'ui' / '_framework').glob('*.wasm.br'))
-        check(http(address, '/_framework/' + framework.name[:-3])[0] == 200, 'UI WebAssembly bundle')
-        for path in ['/app.js', '/style.css', '/next/']:
+        check(not (main / 'ui').exists(), 'UI has no sidecar directory')
+        loader = http(address, '/_framework/dotnet.js')[1].decode('utf-8')
+        framework = re.search(r'dotnet\.native\.[a-z0-9]+\.wasm', loader).group()
+        check(http(address, '/_framework/' + framework)[0] == 200, 'UI WebAssembly bundle')
+        check(http(address, '/_framework/' + framework, 'HEAD')[0] == 200, 'UI WebAssembly HEAD')
+        request = urllib.request.Request(address + '/_framework/' + framework, headers={'Accept-Encoding': 'br'})
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=10) as response:
+            check(response.headers.get('Content-Encoding') == 'br', 'UI Brotli encoding')
+            check('immutable' in response.headers.get('Cache-Control', ''), 'UI fingerprinted cache policy')
+            tag = response.headers['ETag']
+        check(http(address, '/_framework/' + framework, headers={'Accept-Encoding': 'br', 'If-None-Match': tag})[0] == 304,
+              'UI conditional request')
+        for path in ['/app.js', '/style.css', '/next/', '/web.config', '/_framework/missing.wasm']:
             check(http(address, path)[0] == 404, 'retired UI ' + path)
     finally:
         check(child.close(terminate=True) == 0 if os.name != 'nt' else child.close(terminate=True) is not None,

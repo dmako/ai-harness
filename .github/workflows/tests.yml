@@ -77,7 +77,12 @@ jobs:
         run: |
           dotnet test --project test/Harness.Ui.Tests/Harness.Ui.Tests.csproj --no-restore --report-trx --results-directory "$PWD/artifacts/tests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --report-trx --results-directory "$PWD/artifacts/tests" -- --filter-class Harness.Integration.Web.UiBrowserSmokeTests --filter-class Harness.Integration.Web.UiBundleBudgetTests --filter-class Harness.Integration.Web.UiContractTests --filter-class Harness.Integration.Web.UiBundleTests
+          dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore --report-trx --results-directory "$PWD/artifacts/tests" -- --filter-class Harness.Integration.Web.UiBundleBudgetTests --filter-class Harness.Integration.Web.UiContractTests --filter-class Harness.Integration.Web.UiBundleTests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "import sys; from pathlib import Path; sys.path.insert(0, 'scripts'); from publish_release import stage_ui_bundle; stage_ui_bundle(Path('artifacts/ui/wwwroot'), Path('artifacts/ui-embedded'))"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:HARNESS_UI_TEST_EMBEDDED = '1'
+          dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore "-p:HarnessUiBundle=$PWD/artifacts/ui-embedded" -- --filter-class Harness.Integration.Web.UiBrowserSmokeTests
       - uses: actions/upload-artifact@v7
         if: always()
         with:

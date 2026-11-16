@@ -11,4 +11,7 @@
     <EmbeddedResource Include="Assets/*" LogicalName="Harness.Web.Assets/%(Filename)%(Extension)" />
     <EmbeddedResource Include="Documentation/*.md" LogicalName="Harness.Web.Documentation/%(Filename)%(Extension)" />
   </ItemGroup>
+  <ItemGroup Condition="'$(HarnessUiBundle)' != ''">
+    <EmbeddedResource Include="$(HarnessUiBundle)/**/*" LogicalName="Harness.Web.Ui/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

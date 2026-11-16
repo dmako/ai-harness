@@ -1,11 +1,10 @@
 # Web UI
 
 Source: [`src/Harness.Web`](../../src/Harness.Web) and [`src/Harness.Ui`](../../src/Harness.Ui).
-The Avalonia WebAssembly application is served at `/` from the `ui` directory
-beside the harness executable. Release archives include that directory, storing
-Brotli files when available; the server decompresses them for clients that do
-not accept Brotli. Fingerprinted framework files have immutable caching; other
-assets are revalidated. Documentation and branding remain embedded.
+The Avalonia WebAssembly application is embedded in the release executable and
+served at `/`. Brotli resources are streamed directly, or decompressed for
+clients that do not accept Brotli. Fingerprinted framework files have immutable
+caching; other assets are revalidated. Documentation and branding remain embedded.
 
 ASP.NET Core slim hosting and generated request delegates support Native AOT.
 HTTP handlers call Core read/write/change contracts supplied by the CLI.

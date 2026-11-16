@@ -38,7 +38,12 @@ public sealed class UiBrowserSmokeTests(SharedBrowser browser)
         var executable = Browser();
         using var fixture = await SyncFixture.CreateAsync();
         UiFixtureShapeTests.Seed(fixture);
-        await using var server = await UiFixture.StartAsync(fixture, uiBundle: bundle);
+        var native = Environment.GetEnvironmentVariable("HARNESS_UI_NATIVE_EXECUTABLE") is { Length: > 0 } path
+            ? path : null;
+        var embedded = native is not null || Environment.GetEnvironmentVariable("HARNESS_UI_TEST_EMBEDDED") is "1";
+        await using var server = await UiFixture.StartAsync(
+            fixture, uiBundle: embedded ? null : bundle, nativeExecutable: native
+        );
         var id = UiWriteTests.ProjectId(fixture);
         await using var isolated = await browser.OpenAsync(executable, Token);
         var page = isolated.Page;

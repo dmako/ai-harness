@@ -785,13 +785,8 @@ started detached beside `harness`:
 
 ## harness ui
 
-Release archives include the Avalonia browser application in the `ui` directory
-beside the executable. Keep that directory with the executable when installing
-or moving it. Open the displayed local URL to use the application.
-
-Release archives include the Avalonia browser application in the `ui` directory
-beside the executable. Keep that directory with the executable when installing
-or moving it. Open the displayed local URL to use the application.
+The release executable embeds the browser application. Open the displayed local URL
+to use it; no separate UI directory is required.
 
 The default listener is `127.0.0.1:17477`, or `HARNESS_UI_ADDR` when that is set (a loopback address, as for `--addr`). Use `--addr` to override it and `--no-open` to leave the browser closed.
 

@@ -84,6 +84,9 @@ The tests that use the bundle read it from `HARNESS_UI_TEST_BUNDLE`, else from
 
 The smoke test stages the bundle beside a copy of the executable and serves it at `/`;
 `HARNESS_UI_TEST_BUNDLE` is a test-only override for the source bundle.
+Set `HARNESS_UI_NATIVE_EXECUTABLE` to run the browser smoke against an extracted
+release executable with its embedded bundle instead. The release workflow does
+this on Linux x64 after building the package.
 
 The `ui` job of `tests.yml` does all of this on Linux with Chrome, in order:
 

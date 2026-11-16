@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Harness.Core.Web;
 using Microsoft.AspNetCore.Builder;
@@ -7,12 +9,18 @@ using Microsoft.Net.Http.Headers;
 
 namespace Harness.Web;
 
-/// <summary>The published Avalonia browser bundle, installed in the ui directory beside harness.</summary>
+/// <summary>The published Avalonia browser bundle, embedded in release binaries.</summary>
 public static partial class UiBundleAssets
 {
     public const string DirectoryName = "ui";
     public const string ContentSecurityPolicy =
         "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; frame-ancestors 'none'";
+    private const string ResourcePrefix = "Harness.Web.Ui/";
+    private static readonly System.Reflection.Assembly Assembly = typeof(UiBundleAssets).Assembly;
+    private static readonly Dictionary<string, string> Resources = Assembly.GetManifestResourceNames()
+        .Where(name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal))
+        .ToDictionary(name => name[ResourcePrefix.Length..].Replace('\\', '/'), StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, string> Tags = new(StringComparer.Ordinal);
 
     private static readonly Dictionary<string, string> ContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -36,9 +44,55 @@ public static partial class UiBundleAssets
     internal static void Map(WebApplication app, string root)
     {
         var directory = Path.GetFullPath(root);
-        app.MapMethods("/", ["GET", "HEAD"], (HttpContext context) => Serve(context, directory, "index.html"));
+        app.MapMethods("/", ["GET", "HEAD"], (HttpContext context) => ServeAsset(context, directory, "index.html"));
         app.MapMethods("/{**path}", ["GET", "HEAD"], (HttpContext context, string? path) =>
-            Serve(context, directory, path is { Length: > 0 } value ? value : "index.html"));
+            ServeAsset(context, directory, path is { Length: > 0 } value ? value : "index.html"));
+    }
+
+    private static IResult ServeAsset(HttpContext context, string root, string path) =>
+        Resources.Count is 0 ? Serve(context, root, path) : ServeEmbedded(context, path);
+
+    private static IResult ServeEmbedded(HttpContext context, string path)
+    {
+        context.Response.Headers.ContentSecurityPolicy = ContentSecurityPolicy;
+        if (path.StartsWith("/", StringComparison.Ordinal) || path.Split('/').Any(part => part is "." or ".." or "")
+            || ContentTypes.GetValueOrDefault(Path.GetExtension(path)) is not { } type)
+        {
+            throw new UiRequestException(404, "404 page not found");
+        }
+        var compressed = Resources.TryGetValue(path + ".br", out var compressedName);
+        if (!compressed && !Resources.ContainsKey(path))
+        {
+            throw new UiRequestException(404, "404 page not found");
+        }
+        var useBrotli = compressed && AcceptsBrotli(context.Request.Headers.AcceptEncoding);
+        var name = compressed ? compressedName! : Resources[path];
+        var tag = Tags.GetOrAdd(name, static resource =>
+        {
+            using var input = Assembly.GetManifestResourceStream(resource)!;
+            return Convert.ToHexString(SHA256.HashData(input));
+        });
+        context.Response.Headers.CacheControl = path.StartsWith("_framework/", StringComparison.Ordinal)
+            && Fingerprinted.IsMatch(Path.GetFileName(path))
+                ? "public, max-age=31536000, immutable" : "no-cache";
+        context.Response.Headers.Vary = "Accept-Encoding";
+        if (useBrotli)
+        {
+            context.Response.Headers.ContentEncoding = "br";
+        }
+        return Results.Stream(async output =>
+        {
+            await using var input = Assembly.GetManifestResourceStream(name)!;
+            if (compressed && !useBrotli)
+            {
+                await using var decoder = new BrotliStream(input, CompressionMode.Decompress, leaveOpen: true);
+                await decoder.CopyToAsync(output, context.RequestAborted);
+            }
+            else
+            {
+                await input.CopyToAsync(output, context.RequestAborted);
+            }
+        }, type, entityTag: new EntityTagHeaderValue($"\"{tag}-{(useBrotli ? "br" : "raw")}\""));
     }
 
     private static IResult Serve(HttpContext context, string root, string path)

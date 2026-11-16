@@ -21,7 +21,7 @@ invocation isolates intermediate/output directories. Committed
 `--refresh-locks` only to regenerate a deliberately changed graph, review it,
 then return to locked restores. The main archive contains `harness`,
 `harness-graphify` and `harness-agents`; developer-tools contains `harness-collect` and `harness-share`.
-Keep their included SQLite native library and the `ui` directory beside the executables.
+Keep their included SQLite native library beside the executables. The browser UI is embedded in `harness`.
 
 Archives carry README, build metadata, release notes and actual dependency
 licenses/notices. The repository's [MIT license](../LICENSE), with copyright to
@@ -71,9 +71,15 @@ So the release workflow's `ui-bundle` job builds it once:
 downloads the bundle and passes it to `publish_release.py --ui-bundle`, which
 checks that it is one and within the size budget. It records it in `RELEASE.json`
 as `ui_bundle`: files, raw and Brotli bytes, a hash of its tree, and
-`shipped: true`. The main archive contains `ui` beside the executable. It stores
-each Brotli variant when present and otherwise the raw file; the server streams
-decompression for browsers that do not accept Brotli.
+`shipped: true`. The main executable embeds each Brotli variant when present
+and otherwise the raw file; the server streams decompression for browsers that
+do not accept Brotli. The main archive needs no UI directory.
+
+A Windows x64 test build embedding the 5,625,039-byte Brotli bundle increased
+`harness.exe` from 52,538,880 to 58,182,656 bytes (+5,643,776); the main ZIP
+changed from 34,307,788 to 34,305,876 bytes. These are local builds with different
+working-tree changes and are a size comparison, not a reproducibility claim. Release manifests
+record each executable and archive size alongside the bundle size.
 
 The TASK-0164 Windows/Edge headless run measured 58 files, 21,239,127 raw bytes
 and 5,625,039 bytes with Brotli. Five warm Board reloads took 2.68, 2.27, 2.17,

@@ -100,6 +100,16 @@ jobs:
         run: |
           $archive = Get-ChildItem artifacts/package/harness-* | Where-Object { $_.Name -match '\.(zip|tar.gz)$' } | Select-Object -First 1
           python test/Harness.Packaging/run_probe.py --archive $archive.FullName --developer-archive (Join-Path $PWD "artifacts/package/developer-tools/$($archive.Name)") --output artifacts/native-smoke.json
+      - name: Browser smoke against the native executable
+        if: matrix.rid == 'linux-x64'
+        run: |
+          $archive = Get-ChildItem artifacts/package/harness-*.tar.gz | Select-Object -First 1
+          python -c "import sys; from pathlib import Path; sys.path.insert(0, 'test/Harness.Packaging'); from run_probe import extract; extract(Path(sys.argv[1]), Path('artifacts/browser-package').resolve())" $archive.FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:HARNESS_UI_NATIVE_EXECUTABLE = "$PWD/artifacts/browser-package/harness"
+          $env:HARNESS_UI_TEST_BUNDLE = "$PWD/artifacts/ui-bundle"
+          $env:HARNESS_UI_BROWSER = '/usr/bin/google-chrome'
+          dotnet test --project test/Harness.Integration/Harness.Integration.csproj --no-restore -- --filter-class Harness.Integration.Web.UiBrowserSmokeTests
       - name: Verify Native AOT inventory and runtime receipts
         run: python test/Harness.Packaging/verify_aot.py --release artifacts/package --smoke artifacts/native-smoke.json --output artifacts/native-aot-verification.json
       - name: Clean Linux runtime-dependencies-only container

@@ -53,10 +53,11 @@ internal sealed class UiFixture : IAsyncDisposable
         SyncFixture fixture,
         string? address = "127.0.0.1:0",
         IReadOnlyDictionary<string, string>? environment = null,
-        string? uiBundle = null
+        string? uiBundle = null,
+        string? nativeExecutable = null
     )
     {
-        var start = new ProcessStartInfo("dotnet")
+        var start = new ProcessStartInfo(nativeExecutable ?? "dotnet")
         {
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -72,7 +73,10 @@ internal sealed class UiFixture : IAsyncDisposable
             CopyTree(uiBundle, Path.Combine(installed, "ui"), bundle: true);
             cli = Path.Combine(installed, Path.GetFileName(cli));
         }
-        start.ArgumentList.Add(cli);
+        if (nativeExecutable is null)
+        {
+            start.ArgumentList.Add(cli);
+        }
         start.ArgumentList.Add("ui");
         if (address is not null)
         {
