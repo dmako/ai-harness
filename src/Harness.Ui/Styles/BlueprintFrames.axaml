@@ -4,7 +4,7 @@
   <Style Selector="Border.bpframe">
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusXs}" />
     <Setter Property="Padding" Value="6,1" />
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>

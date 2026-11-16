@@ -32,58 +32,67 @@
   </UserControl.Styles>
   <Panel>
     <Grid RowDefinitions="Auto,*">
-        <Border Name="Header" Classes="topbar" Grid.Row="0">
-          <DockPanel>
-            <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
-                    AutomationProperties.Name="Show projects" IsVisible="False" />
-            <TextBlock Name="LiveState" DockPanel.Dock="Right" Classes="live"
-                       Classes.connected="{Binding Services.Live.IsConnected}" Classes.offline="{Binding Services.Live.IsOffline}"
-                       Text="{Binding Services.Live.State, StringFormat='● {0}'}"
-                       AutomationProperties.Name="{Binding Services.Live.State, StringFormat='Connection: {0}'}" />
-            <Button Name="ThemeButton" DockPanel.Dock="Right" Classes="ghost" Content="◐" Margin="8,0"
-                    AutomationProperties.Name="Theme" ToolTip.Tip="Theme">
-              <Button.Flyout>
-                <MenuFlyout>
-                  <MenuItem Header="System" Command="{Binding SelectThemeCommand}" CommandParameter="system" />
-                  <MenuItem Header="Light" Command="{Binding SelectThemeCommand}" CommandParameter="light" />
-                  <MenuItem Header="Dark" Command="{Binding SelectThemeCommand}" CommandParameter="dark" />
-                </MenuFlyout>
-              </Button.Flyout>
-            </Button>
-            <TextBox Name="OpenFind" DockPanel.Dock="Right" Width="110" PlaceholderText="Find…" AutomationProperties.Name="Find in this view" />
-            <Grid ColumnDefinitions="Auto,*">
+      <Border Name="Header" Classes="topbar" Grid.Row="0">
+        <DockPanel>
+          <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
+                  AutomationProperties.Name="Show projects" IsVisible="False" />
+          <TextBlock Name="LiveState" DockPanel.Dock="Right" Classes="live"
+                     Classes.connected="{Binding Services.Live.IsConnected}"
+                     Classes.offline="{Binding Services.Live.IsOffline}"
+                     Text="{Binding Services.Live.State, StringFormat='● {0}'}"
+                     AutomationProperties.Name="{Binding Services.Live.State, StringFormat='Connection: {0}'}" />
+          <Button Name="ThemeButton" DockPanel.Dock="Right" Classes="ghost" Content="◐" Margin="8,0"
+                  AutomationProperties.Name="Theme" ToolTip.Tip="Theme">
+            <Button.Flyout>
+              <MenuFlyout>
+                <MenuItem Header="System" Command="{Binding SelectThemeCommand}" CommandParameter="system" />
+                <MenuItem Header="Light" Command="{Binding SelectThemeCommand}" CommandParameter="light" />
+                <MenuItem Header="Dark" Command="{Binding SelectThemeCommand}" CommandParameter="dark" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+          <TextBox Name="OpenFind" DockPanel.Dock="Right" Width="110" PlaceholderText="Find…"
+                   AutomationProperties.Name="Find in this view" />
+          <Grid ColumnDefinitions="Auto,*">
+            <StackPanel Orientation="Horizontal">
               <TextBlock Classes="brand" Text="harness" Margin="0,0,12,0" VerticalAlignment="Center" />
-              <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                <ItemsControl Name="Breadcrumbs" ItemsSource="{Binding Breadcrumbs}">
-                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:Breadcrumb">
-                      <StackPanel Orientation="Horizontal" Spacing="2">
-                        <TextBlock Classes="muted" Text="›" VerticalAlignment="Center" />
-                        <c:AppLink Classes="link" Href="{Binding Href}" AutomationProperties.Name="{Binding Label}">
-                          <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
-                        </c:AppLink>
-                      </StackPanel>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </ScrollViewer>
-            </Grid>
-          </DockPanel>
-        </Border>
-      <Grid Name="Frame" Grid.Row="1" ColumnDefinitions="Auto,*">
-      <Border Name="Sidebar" Classes="sidebar" Grid.Column="0" ZIndex="1">
-        <views:Sidebar />
+              <TextBlock Classes="brandSeparator" Text="|" Margin="0,0,12,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+              <ItemsControl Name="Breadcrumbs" ItemsSource="{Binding Breadcrumbs}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:Breadcrumb">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                      <TextBlock Classes="muted" Text="›" VerticalAlignment="Center" />
+                      <c:AppLink Classes="link" Href="{Binding Href}" AutomationProperties.Name="{Binding Label}">
+                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                      </c:AppLink>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Grid>
+        </DockPanel>
       </Border>
-      <DockPanel Grid.Column="1">
-        <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0" Text="{Binding Error}"
-                   IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <!-- the page scrolls up and down only when the window is shorter than PageMinHeight; otherwise the page is
-             exactly the window's height and a view that scrolls (the Board's columns) scrolls inside itself -->
-        <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <ContentControl Name="Page" Content="{Binding Page}" Margin="16,12,16,16" />
-        </ScrollViewer>
-      </DockPanel>
+      <Grid Name="Frame" Grid.Row="1" ColumnDefinitions="Auto,*">
+        <Border Name="Sidebar" Classes="sidebar" Grid.Column="0" ZIndex="1">
+          <views:Sidebar />
+        </Border>
+        <DockPanel Grid.Column="1">
+          <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0" Text="{Binding Error}"
+                     IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <!-- the page scrolls up and down only when the window is shorter than PageMinHeight; otherwise the page is
+               exactly the window's height and a view that scrolls (the Board's columns) scrolls inside itself -->
+          <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ContentControl Name="Page" Content="{Binding Page}" Margin="16,12,16,16" />
+          </ScrollViewer>
+        </DockPanel>
       </Grid>
     </Grid>
     <views:ToastLayer DataContext="{Binding Services.Toasts}" />
@@ -92,7 +101,8 @@
             HorizontalAlignment="Right" VerticalAlignment="Top" MaxWidth="540">
       <StackPanel Spacing="4">
         <WrapPanel ItemSpacing="6" LineSpacing="6">
-          <TextBox Name="FindInput" Width="180" PlaceholderText="Find in this view" AutomationProperties.Name="Find in this view" />
+          <TextBox Name="FindInput" Width="180" PlaceholderText="Find in this view"
+                   AutomationProperties.Name="Find in this view" />
           <TextBlock Name="FindCount" VerticalAlignment="Center" />
           <Button Name="FindPrevious" Content="Previous" AutomationProperties.Name="Previous match" />
           <Button Name="FindNext" Content="Next" AutomationProperties.Name="Next match" />
@@ -135,22 +145,27 @@
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Name" />
           <TextBox Name="ScmName" Text="{Binding Name}" AutomationProperties.Name="Name" />
-          <TextBlock Classes="muted small" Text="How projects and the CLI refer to it: letters, digits, '-', '_' or '.'." TextWrapping="Wrap" />
+          <TextBlock Classes="muted small"
+                     Text="How projects and the CLI refer to it: letters, digits, '-', '_' or '.'."
+                     TextWrapping="Wrap" />
         </StackPanel>
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Type" />
-          <ComboBox Name="ScmType" ItemsSource="{x:Static vm:ScmFormDialog.Types}" SelectedItem="{Binding Type}" PlaceholderText="Choose a type"
+          <ComboBox Name="ScmType" ItemsSource="{x:Static vm:ScmFormDialog.Types}" SelectedItem="{Binding Type}"
+                    PlaceholderText="Choose a type"
                     MinWidth="180" AutomationProperties.Name="Type" />
         </StackPanel>
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="URL" />
-          <TextBox Name="ScmUrl" Text="{Binding Address}" PlaceholderText="https://gitlab.example.com" AutomationProperties.Name="URL" />
+          <TextBox Name="ScmUrl" Text="{Binding Address}" PlaceholderText="https://gitlab.example.com"
+                   AutomationProperties.Name="URL" />
           <TextBlock Classes="muted small" TextWrapping="Wrap"
                      Text="The server's base address; an instance under a path keeps it (https://host/gitlab). GitHub: https://github.com or the Enterprise Server's address." />
         </StackPanel>
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Token" />
-          <TextBox Name="ScmToken" Text="{Binding Token}" PasswordChar="•" PlaceholderText="{Binding TokenPlaceholder}" AutomationProperties.Name="Token" />
+          <TextBox Name="ScmToken" Text="{Binding Token}" PasswordChar="•" PlaceholderText="{Binding TokenPlaceholder}"
+                   AutomationProperties.Name="Token" />
           <TextBlock Classes="muted small" Text="{Binding TokenHint}" TextWrapping="Wrap" />
         </StackPanel>
         <StackPanel Classes="field">
@@ -160,22 +175,28 @@
               <DataTemplate x:DataType="vm:LineItem">
                 <DockPanel Margin="0,0,0,4">
                   <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Remove alias"
-                          Command="{Binding $parent[ItemsControl].((vm:ScmFormDialog)DataContext).RemoveAliasCommand}" CommandParameter="{Binding}">
+                          Command="{Binding $parent[ItemsControl].((vm:ScmFormDialog)DataContext).RemoveAliasCommand}"
+                          CommandParameter="{Binding}">
                     <c:Icon Kind="trash" />
                   </Button>
-                  <TextBox Text="{Binding Text}" PlaceholderText="https://git-alias.example.com or ssh-alias" AutomationProperties.Name="Alias" />
+                  <TextBox Text="{Binding Text}" PlaceholderText="https://git-alias.example.com or ssh-alias"
+                           AutomationProperties.Name="Alias" />
                 </DockPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Button Classes="ghost small" AutomationProperties.Name="Add alias" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left">
-            <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add alias" /></StackPanel>
+          <Button Classes="ghost small" AutomationProperties.Name="Add alias" Command="{Binding AddAliasCommand}"
+                  HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <c:Icon Kind="plus" /><TextBlock Text="Add alias" />
+            </StackPanel>
           </Button>
           <TextBlock Classes="muted small" TextWrapping="Wrap"
                      Text="Other host names or base URLs this server's repositories are cloned from. They only match remotes; API calls use the URL above." />
         </StackPanel>
         <WrapPanel ItemSpacing="8">
-          <Button Name="ScmTest" Classes="ghost" Content="Test connection" AutomationProperties.Name="Test connection" Command="{Binding TestCommand}" />
+          <Button Name="ScmTest" Classes="ghost" Content="Test connection" AutomationProperties.Name="Test connection"
+                  Command="{Binding TestCommand}" />
           <TextBlock Classes="small" Text="{Binding TestLine}" TextWrapping="Wrap" VerticalAlignment="Center"
                      IsVisible="{Binding TestLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </WrapPanel>
@@ -212,25 +233,29 @@
     <DataTemplate DataType="vm:PromoteDialog">
       <StackPanel Classes="field">
         <TextBlock Classes="label" Text="Apply to" />
-        <ComboBox Name="PromoteTo" ItemsSource="{Binding Targets}" SelectedItem="{Binding To}" MinWidth="220" AutomationProperties.Name="Apply to" />
+        <ComboBox Name="PromoteTo" ItemsSource="{Binding Targets}" SelectedItem="{Binding To}" MinWidth="220"
+                  AutomationProperties.Name="Apply to" />
       </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:MemoryAddDialog">
       <StackPanel Spacing="10">
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Type" />
-          <ComboBox Name="TypeField" ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" HorizontalAlignment="Stretch"
+          <ComboBox Name="TypeField" ItemsSource="{Binding Types}" SelectedItem="{Binding Type}"
+                    HorizontalAlignment="Stretch"
                     AutomationProperties.Name="Type" />
           <TextBlock Classes="muted small" Text="{Binding Type.Example}" TextWrapping="Wrap" />
           <TextBlock Classes="muted small" Text="{Binding Type.Reach}" TextWrapping="Wrap" />
         </StackPanel>
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Statement" />
-          <TextBox Name="StatementField" Text="{Binding Content}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
+          <TextBox Name="StatementField" Text="{Binding Content}" AcceptsReturn="True" TextWrapping="Wrap"
+                   MinHeight="72"
                    AutomationProperties.Name="Statement" />
         </StackPanel>
         <StackPanel Classes="field" IsVisible="{Binding AsksScope}">
-          <TextBlock Classes="label" Text="Applies to (project, or path:src/ui, subsystem:sync, branch:main)" TextWrapping="Wrap" />
+          <TextBlock Classes="label" Text="Applies to (project, or path:src/ui, subsystem:sync, branch:main)"
+                     TextWrapping="Wrap" />
           <TextBox Name="ScopeField" Text="{Binding Scope}" AutomationProperties.Name="Applies to" />
         </StackPanel>
         <StackPanel Classes="field">
@@ -251,8 +276,10 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="api:SimilarMemory">
             <DockPanel Margin="0,0,0,6">
-              <Button DockPanel.Dock="Right" Content="Replace this one" AutomationProperties.Name="Replace this one" Margin="8,0,0,0" VerticalAlignment="Top"
-                      Command="{Binding $parent[ItemsControl].((vm:SimilarDecisionDialog)DataContext).ReplaceCommand}" CommandParameter="{Binding}" />
+              <Button DockPanel.Dock="Right" Content="Replace this one" AutomationProperties.Name="Replace this one"
+                      Margin="8,0,0,0" VerticalAlignment="Top"
+                      Command="{Binding $parent[ItemsControl].((vm:SimilarDecisionDialog)DataContext).ReplaceCommand}"
+                      CommandParameter="{Binding}" />
               <StackPanel>
                 <SelectableTextBlock Text="{Binding Memory.Content}" TextWrapping="Wrap" />
                 <SelectableTextBlock Classes="muted small" Text="{Binding Memory.Id}" />
@@ -308,13 +335,18 @@
       <StackPanel Spacing="10">
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Display name" />
-          <TextBox Name="WorkspaceTitle" Text="{Binding DisplayTitle}" PlaceholderText="e.g. Company services" MaxLength="80" AutomationProperties.Name="Display name" />
-          <TextBlock Classes="hint" Text="Any text, shown in the sidebar and on its page (optional)." TextWrapping="Wrap" />
+          <TextBox Name="WorkspaceTitle" Text="{Binding DisplayTitle}" PlaceholderText="e.g. Company services"
+                   MaxLength="80" AutomationProperties.Name="Display name" />
+          <TextBlock Classes="hint" Text="Any text, shown in the sidebar and on its page (optional)."
+                     TextWrapping="Wrap" />
         </StackPanel>
         <StackPanel Classes="field">
           <TextBlock Classes="label" Text="Short name" />
-          <TextBox Name="WorkspaceName" Classes="mono" Text="{Binding ShortName}" PlaceholderText="e.g. company" AutomationProperties.Name="Short name" />
-          <TextBlock Classes="hint" Text="What agents and commands use: workspace:&lt;short name&gt;. Follows the display name until you edit it." TextWrapping="Wrap" />
+          <TextBox Name="WorkspaceName" Classes="mono" Text="{Binding ShortName}" PlaceholderText="e.g. company"
+                   AutomationProperties.Name="Short name" />
+          <TextBlock Classes="hint"
+                     Text="What agents and commands use: workspace:&lt;short name&gt;. Follows the display name until you edit it."
+                     TextWrapping="Wrap" />
           <TextBlock Classes="muted small mono" Text="{Binding Preview}" />
         </StackPanel>
         <TextBlock Classes="label" Text="Projects (now, or none and add them later)" />
@@ -327,9 +359,12 @@
     <DataTemplate DataType="vm:ProjectPicker">
       <StackPanel Spacing="8">
         <WrapPanel ItemSpacing="6" LineSpacing="6">
-          <TextBox Name="PickFilter" Text="{Binding Query}" PlaceholderText="Filter by name or folder" Width="220" AutomationProperties.Name="Filter projects" />
-          <Button Classes="ghost small" Content="Choose all shown" AutomationProperties.Name="Choose all shown" Command="{Binding ChooseShownCommand}" />
-          <Button Classes="ghost small" Content="None" AutomationProperties.Name="None" Command="{Binding ChooseNoneCommand}" />
+          <TextBox Name="PickFilter" Text="{Binding Query}" PlaceholderText="Filter by name or folder" Width="220"
+                   AutomationProperties.Name="Filter projects" />
+          <Button Classes="ghost small" Content="Choose all shown" AutomationProperties.Name="Choose all shown"
+                  Command="{Binding ChooseShownCommand}" />
+          <Button Classes="ghost small" Content="None" AutomationProperties.Name="None"
+                  Command="{Binding ChooseNoneCommand}" />
           <TextBlock Classes="muted small" Text="{Binding ChosenLine}" VerticalAlignment="Center" />
         </WrapPanel>
         <Border Classes="inset">
@@ -341,7 +376,20 @@
                   <DataTemplate x:DataType="vm:PickRow">
                     <CheckBox IsChecked="{Binding Chosen}" AutomationProperties.Name="{Binding Name}">
                       <StackPanel Spacing="1">
-                        <StackPanel Orientation="Horizontal" Spacing="6"><Border Classes="project-mark compact" Classes.pc0="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Project.Mark}" /></Border><TextBlock FontWeight="SemiBold" Text="{Binding Name}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <Border Classes="project-mark compact"
+                                  Classes.pc0="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}"
+                                  Classes.pc1="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}"
+                                  Classes.pc2="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}"
+                                  Classes.pc3="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}"
+                                  Classes.pc4="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}"
+                                  Classes.pc5="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}"
+                                  Classes.pc6="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}"
+                                  Classes.pc7="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}">
+                            <TextBlock Text="{Binding Project.Mark}" />
+                          </Border>
+                          <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                        </StackPanel>
                         <TextBlock Classes="muted small mono" Text="{Binding Root}" TextWrapping="Wrap" />
                       </StackPanel>
                     </CheckBox>
@@ -353,7 +401,8 @@
         </Border>
         <TextBlock Classes="label" Text="Or choose those under a folder" />
         <WrapPanel ItemSpacing="6" LineSpacing="6">
-          <TextBox Name="PickFolder" Classes="mono" Text="{Binding Folder}" PlaceholderText="/path/to/folder" Width="300" AutomationProperties.Name="Folder" />
+          <TextBox Name="PickFolder" Classes="mono" Text="{Binding Folder}" PlaceholderText="/path/to/folder"
+                   Width="300" AutomationProperties.Name="Folder" />
           <Button Classes="small" Content="Find" AutomationProperties.Name="Find" Command="{Binding FindCommand}" />
         </WrapPanel>
         <TextBlock Classes="muted small" Text="{Binding FolderMessage}" TextWrapping="Wrap"
@@ -363,9 +412,12 @@
     <DataTemplate DataType="vm:FindingTaskDialog">
       <StackPanel Classes="field">
         <TextBlock Classes="label" Text="The member it belongs to" />
-        <ComboBox Name="TaskMember" ItemsSource="{Binding Members}" SelectedItem="{Binding Member}" MinWidth="240" AutomationProperties.Name="The member it belongs to">
+        <ComboBox Name="TaskMember" ItemsSource="{Binding Members}" SelectedItem="{Binding Member}" MinWidth="240"
+                  AutomationProperties.Name="The member it belongs to">
           <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:MemberChoice"><TextBlock Text="{Binding Name}" /></DataTemplate>
+            <DataTemplate x:DataType="vm:MemberChoice">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
         <TextBlock Classes="hint" Text="{x:Static vm:FindingTaskDialog.Note}" TextWrapping="Wrap" />
@@ -374,7 +426,8 @@
     <DataTemplate DataType="vm:FindingMarkDialog">
       <StackPanel Classes="field">
         <TextBlock Classes="label" Text="Why it is intended" />
-        <TextBox Name="ReasonField" Text="{Binding Reason}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" AutomationProperties.Name="Why it is intended" />
+        <TextBox Name="ReasonField" Text="{Binding Reason}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56"
+                 AutomationProperties.Name="Why it is intended" />
         <TextBlock Classes="hint" Text="{x:Static vm:FindingMarkDialog.Note}" TextWrapping="Wrap" />
       </StackPanel>
     </DataTemplate>
@@ -394,7 +447,9 @@
     </DataTemplate>
     <DataTemplate DataType="vm:MessagePage">
       <StackPanel Spacing="8">
-        <Border Classes="error"><TextBlock Text="{Binding Message}" /></Border>
+        <Border Classes="error">
+          <TextBlock Text="{Binding Message}" />
+        </Border>
         <c:AppLink Classes="link" Href="#/" Content="Home" AutomationProperties.Name="Home" />
       </StackPanel>
     </DataTemplate>
@@ -402,13 +457,16 @@
       <StackPanel Classes="section" Margin="0">
         <TextBlock Classes="h3" Text="{Binding Title}" />
         <TextBlock Classes="hint" Text="{Binding Note}" />
-        <HyperlinkButton Content="Open it in the current harness ui" AutomationProperties.Name="Open it in the current harness ui" NavigateUri="{Binding Current}" />
+        <HyperlinkButton Content="Open it in the current harness ui"
+                         AutomationProperties.Name="Open it in the current harness ui"
+                         NavigateUri="{Binding Current}" />
       </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:UnreadableBody">
       <StackPanel Spacing="8">
         <TextBlock Classes="empty" Text="{Binding Message}" />
-        <c:AppLink Classes="link" Href="{Binding HealthHref}" Content="See Health" AutomationProperties.Name="See Health" />
+        <c:AppLink Classes="link" Href="{Binding HealthHref}" Content="See Health"
+                   AutomationProperties.Name="See Health" />
       </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="vm:RenameDialog">

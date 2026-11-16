@@ -39,15 +39,15 @@
                 <Border Classes="bcol" Width="{Binding $parent[views:BoardView].ColumnSize}"
                         AutomationProperties.Name="{Binding AccessibleName}">
                   <DockPanel>
-                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,10">
-                      <Border Classes="pill" c:StyleClass.Name="{Binding StatusClass}">
+                    <Grid DockPanel.Dock="Top" Margin="12,10" ColumnDefinitions="Auto,*,Auto">
+                      <Border Classes="pill" c:StyleClass.Name="{Binding StatusClass}" Grid.Column="0">
                         <StackPanel Orientation="Horizontal">
                           <c:Icon Kind="{Binding StatusIcon}" />
                           <TextBlock Text="{Binding Label}" />
                         </StackPanel>
                       </Border>
-                      <TextBlock Classes="bcount" Text="{Binding Count}" VerticalAlignment="Center" />
-                    </StackPanel>
+                      <TextBlock Classes="bcount" Text="{Binding Count}" VerticalAlignment="Center" Grid.Column="2" />
+                    </Grid>
                     <TextBlock DockPanel.Dock="Top" Classes="bnone" Text="None" IsVisible="{Binding IsEmpty}" />
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                       <ItemsControl ItemsSource="{Binding Tasks}" Margin="8,0,8,0">
