@@ -102,8 +102,8 @@ public sealed class Rings : Chart
 }
 
 /// <summary>
-/// The window's days in a small picture (app.js sparkline()): bars for counts, or a line for rates where a day
-/// without data is a gap, with a dot on the last value.
+/// The window's days in a small picture: bars for counts, or a line joining the available rates with a dot on the
+/// last value. Days without a rate are omitted from the line.
 /// </summary>
 public sealed class Sparkline : Chart
 {
@@ -170,28 +170,33 @@ public sealed class Sparkline : Chart
         {
             return;
         }
-        var step = W / Math.Max(1, line.Count - 1);
+        var values = line.Where(value => value.HasValue).Select(value => value.GetValueOrDefault()).ToArray();
+        if (values.Length is 0 || Bounds.Width <= 0 || Bounds.Height <= 0)
+        {
+            return;
+        }
+        var radius = Math.Min(2, Math.Min(Bounds.Width, Bounds.Height) / 2);
+        var plotWidth = Math.Max(0, Bounds.Width - (2 * radius));
+        var plotHeight = Math.Max(0, Bounds.Height - (2 * radius));
+        var step = plotWidth / Math.Max(1, values.Length - 1);
         var pen = new Pen(brush, 1.5, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
         Point? last = null;
-        Point? previous = null;
-        for (var i = 0; i < line.Count; i++)
+        using (context.PushClip(new Rect(Bounds.Size)))
         {
-            if (line[i] is not { } v)
+            for (var i = 0; i < values.Length; i++)
             {
-                previous = null;
-                continue;
+                var x = values.Length is 1 ? Bounds.Width / 2 : radius + (i * step);
+                var point = new Point(x, radius + ((1 - Math.Clamp(values[i], 0, 1)) * plotHeight));
+                if (last is { } from)
+                {
+                    context.DrawLine(pen, from, point);
+                }
+                last = point;
             }
-            var point = new Point(i * step, H - 1 - v * (H - 2));
-            if (previous is { } from)
+            if (last is { } dot)
             {
-                context.DrawLine(pen, from, point);
+                context.DrawEllipse(brush, null, dot, radius, radius);
             }
-            previous = point;
-            last = point;
-        }
-        if (last is { } dot)
-        {
-            context.DrawEllipse(brush, null, dot, 2, 2);
         }
     }
 }
