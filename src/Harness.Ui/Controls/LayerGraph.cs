@@ -8,10 +8,10 @@ using Avalonia.Media;
 namespace Harness.Ui.Controls;
 
 /// <summary>A node of a layered graph: its id, words, a second line, a badge (users), and its tooltip.</summary>
-public sealed record GraphNode(string Id, string Label, string? Meta = null, string? Badge = null, string? Tip = null);
+public sealed record GraphNode(string Id, string Label, string? Meta = null, string? Badge = null, string? Tip = null, string? Role = null);
 
 /// <summary>A row of the graph, labelled (tests, layer 2, …), its nodes left to right.</summary>
-public sealed record GraphRow(string Label, IReadOnlyList<GraphNode> Nodes);
+public sealed record GraphRow(string Label, IReadOnlyList<GraphNode> Nodes, bool Highlight = false);
 
 /// <summary>
 /// A line from a node to one it references; dashed when it only builds first; quiet when shown only in focus; in its
@@ -47,7 +47,7 @@ public sealed class LayerGraph : Panel
 
     private readonly Dictionary<string, Button> _nodes = new(StringComparer.Ordinal);
     private readonly EdgeLayer _lines;
-    private readonly List<(TextBlock Label, IReadOnlyList<Button> Nodes)> _rows = [];
+    private readonly List<(TextBlock Label, IReadOnlyList<Button> Nodes, Border? Band)> _rows = [];
     private string? _hover;
 
     static LayerGraph() => AffectsMeasure<LayerGraph>(RowsProperty);
@@ -107,6 +107,12 @@ public sealed class LayerGraph : Panel
         _rows.Clear();
         foreach (var row in Rows ?? [])
         {
+            Border? band = null;
+            if (row.Highlight)
+            {
+                band = new Border { Classes = { "layer-band" }, IsHitTestVisible = false };
+                Children.Insert(0, band);
+            }
             var label = new TextBlock { Text = row.Label, Classes = { "muted", "small" }, VerticalAlignment = VerticalAlignment.Center };
             Children.Add(label);
             var buttons = new List<Button>();
@@ -128,6 +134,10 @@ public sealed class LayerGraph : Panel
                     text.Children.Add(meta);
                 }
                 var button = new Button { Content = text, Classes = { "anode" }, MaxWidth = 220, Tag = node.Id };
+                if (node.Role is "model" or "base" or "data" or "logic" or "feature" or "api" or "page" or "test" or "hooks" or "ui")
+                {
+                    button.Classes.Add("role-" + node.Role);
+                }
                 ToolTip.SetTip(button, node.Tip ?? node.Label);
                 Avalonia.Automation.AutomationProperties.SetName(button, node.Label);
                 var id = node.Id;
@@ -149,7 +159,7 @@ public sealed class LayerGraph : Panel
                 buttons.Add(button);
                 _nodes[id] = button;
             }
-            _rows.Add((label, buttons));
+            _rows.Add((label, buttons, band));
         }
         Mark();
     }
@@ -176,8 +186,9 @@ public sealed class LayerGraph : Panel
         _lines.Measure(Size.Infinity);
         var width = double.IsInfinity(availableSize.Width) ? 960 : availableSize.Width;
         var y = 0.0;
-        foreach (var (label, nodes) in _rows)
+        foreach (var (label, nodes, band) in _rows)
         {
+            band?.Measure(new Size(width, double.PositiveInfinity));
             label.Measure(new Size(LabelWidth, double.PositiveInfinity));
             var x = LabelWidth;
             var line = 0.0;
@@ -201,7 +212,7 @@ public sealed class LayerGraph : Panel
     protected override Size ArrangeOverride(Size finalSize)
     {
         var y = 0.0;
-        foreach (var (label, nodes) in _rows)
+        foreach (var (label, nodes, band) in _rows)
         {
             var x = LabelWidth;
             var top = y;
@@ -220,6 +231,7 @@ public sealed class LayerGraph : Panel
             }
             var height = Math.Max(line, label.DesiredSize.Height);
             label.Arrange(new Rect(0, top, LabelWidth, Math.Max(height, (y + height) - top)));
+            band?.Arrange(new Rect(0, top, finalSize.Width, (y + height) - top));
             y += height + RowGap;
         }
         _lines.Arrange(new Rect(finalSize));

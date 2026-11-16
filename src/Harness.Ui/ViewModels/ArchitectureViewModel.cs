@@ -335,7 +335,8 @@ public sealed partial class StructureSection : SectionViewModel
         {
             var n = MemberCount(x);
             var meta = x.Role ?? (x.Kind is "entry" ? "entry" : null);
-            return new GraphNode(x.Path, Short(x), meta, n > 0 ? $"↗ {n}" : null, x.Name);
+            return new GraphNode(x.Path, Short(x), meta, n > 0 ? $"↗ {n}" : null, x.Name,
+                x.Role ?? (x.Kind is "test" ? "test" : null));
         }
         var rows = new List<GraphRow>();
         var tests = all.Where(x => x.Kind is "test").ToArray();
@@ -354,7 +355,7 @@ public sealed partial class StructureSection : SectionViewModel
                 rows.Add(new GraphRow($"layer {l}", [.. layer.Select(Node)]));
             }
         }
-        Rows = rows;
+        Rows = [.. rows.Select((row, index) => row with { Highlight = index % 2 is 0 })];
         Edges = [.. all.SelectMany(x =>
             x.References.Select(r => new GraphEdge(x.Path, r, false, x.Kind is "test"))
                 .Concat(x.BuildOrder.Select(r => new GraphEdge(x.Path, r, true, x.Kind is "test"))))];

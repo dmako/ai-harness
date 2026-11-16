@@ -1,10 +1,35 @@
 <!-- Architecture (style.css .amap, .anode, .smell, .cxbar): the layer graph's nodes (selected, what it references,
      what references it, the rest dimmed), the findings' cards and the hotspots' bars. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Border.layer-band">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+  </Style>
   <Style Selector="Button.anode">
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+  </Style>
+  <Style Selector="Button.anode.role-model, Button.anode.role-base">
+    <Setter Property="BorderBrush" Value="{DynamicResource CFact}" />
+  </Style>
+  <Style Selector="Button.anode.role-data">
+    <Setter Property="BorderBrush" Value="{DynamicResource CConstraint}" />
+  </Style>
+  <Style Selector="Button.anode.role-logic, Button.anode.role-feature">
+    <Setter Property="BorderBrush" Value="{DynamicResource CDecision}" />
+  </Style>
+  <Style Selector="Button.anode.role-api, Button.anode.role-page">
+    <Setter Property="BorderBrush" Value="{DynamicResource CConvention}" />
+  </Style>
+  <Style Selector="Button.anode.role-test">
+    <Setter Property="BorderBrush" Value="{DynamicResource CWarning}" />
+  </Style>
+  <Style Selector="Button.anode.role-hooks">
+    <Setter Property="BorderBrush" Value="{DynamicResource COpenQuestion}" />
+  </Style>
+  <Style Selector="Button.anode.role-ui">
+    <Setter Property="BorderBrush" Value="{DynamicResource CGoal}" />
   </Style>
   <Style Selector="Button.anode.sel">
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />

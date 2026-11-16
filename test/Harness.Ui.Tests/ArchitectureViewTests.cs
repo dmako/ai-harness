@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
 using Harness.Ui.Controls;
@@ -151,6 +153,7 @@ public sealed class ArchitectureViewTests
 
         Architecture(model).ShowsLayers.Should().BeTrue();
         s.Rows.Select(r => (r.Label, string.Join(",", r.Nodes.Select(n => n.Label)))).Should().Equal(("tests", "Tests"), ("layer 1", "App"), ("layer 0", "Core"));
+        s.Rows.Select(row => row.Highlight).Should().Equal(true, false, true);
         s.Rows[2].Nodes[0].Badge.Should().Be("↗ 1");
         s.Edges.Should().Contain(new GraphEdge(App, Core));
         s.Big.Should().BeFalse();
@@ -178,6 +181,46 @@ public sealed class ArchitectureViewTests
         s.PickCommand.Execute(s.ReferencedBy[0]);
         s.Unit.Name.Should().Be("Fixture.App");
         graph.Selected.Should().Be(App);
+    });
+
+    [Fact]
+    public Task LayersUseAlternatingBandsAndRoleOutlinesInBothThemes() => Ui.RunAsync(() =>
+    {
+        var roles = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["model"] = "CFact", ["base"] = "CFact", ["data"] = "CConstraint", ["logic"] = "CDecision",
+            ["feature"] = "CDecision", ["api"] = "CConvention", ["page"] = "CConvention", ["test"] = "CWarning",
+            ["hooks"] = "COpenQuestion", ["ui"] = "CGoal",
+        };
+        var graph = new LayerGraph
+        {
+            Rows = [new GraphRow("first", [.. roles.Keys.Select(role => new GraphNode(role, role, Role: role))], true),
+                    new GraphRow("second", [new GraphNode("other", "other")]),
+                    new GraphRow("third", [new GraphNode("last", "last")], true)],
+        };
+        var window = Ui.Show(graph, 1280, 800);
+        foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        {
+            Application.Current!.RequestedThemeVariant = theme;
+            graph.Selected = null;
+            Ui.Settle();
+            var bands = graph.Children.OfType<Border>().Where(band => band.Classes.Contains("layer-band")).ToArray();
+            bands.Should().HaveCount(2);
+            graph.TryFindResource("Surface2", theme, out var background).Should().BeTrue();
+            bands.Should().OnlyContain(band => band.Background == background);
+            foreach (var (role, token) in roles)
+            {
+                graph.TryFindResource(token, theme, out var brush).Should().BeTrue();
+                graph.NodeFor(role)!.BorderBrush.Should().Be(brush);
+            }
+            graph.Selected = "model";
+            Ui.Settle();
+            graph.TryFindResource("Accent", theme, out var selected).Should().BeTrue();
+            graph.NodeFor("model")!.BorderBrush.Should().Be(selected, "selection overrides the role outline");
+        }
+        window.Close();
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
+        return Task.CompletedTask;
     });
 
     [Fact]
