@@ -3,6 +3,7 @@ using Avalonia.Headless;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using AwesomeAssertions;
 using Harness.Ui.Controls;
 using Harness.Ui.Views;
@@ -77,6 +78,32 @@ public sealed class DesignSystemTests
             .Should()
             .BeLessThan(4.5, "if the token changes to pass, Critical may be drawn on Surface2 again");
         return Task.CompletedTask;
+    });
+
+    [Fact]
+    public Task MainPageUsesThePreviousDarkPaletteInsteadOfTransparency() => Ui.RunAsync(async () =>
+    {
+        var page = Token("Page", ThemeVariant.Dark);
+        var surface = Token("Surface", ThemeVariant.Dark);
+        var inset = Token("Surface2", ThemeVariant.Dark);
+        var ink = Token("Ink", ThemeVariant.Dark);
+        page.Should().Be(Color.Parse("#141413"));
+        surface.Should().Be(Color.Parse("#1c1c1b"));
+        inset.Should().Be(Color.Parse("#252523"));
+        ink.Should().Be(Color.Parse("#f3ecdf"));
+        UiChecks.Contrast(ink, page).Should().BeGreaterThan(4.5);
+        Token("Page", ThemeVariant.Light).Should().Be(Color.Parse("#ffffff"));
+        var (window, _, _) = await Ui.OpenMainAsync(1280, 800, address: "#/");
+        var view = window.GetVisualDescendants().OfType<MainView>().Single();
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
+        Ui.Settle();
+        ((ISolidColorBrush)view.Background!).Color.Should().Be(Token("Page", ThemeVariant.Light));
+        Application.Current.RequestedThemeVariant = ThemeVariant.Dark;
+        Ui.Settle();
+        ((ISolidColorBrush)view.Background).Color.Should().Be(page);
+        ((ISolidColorBrush)view.Foreground!).Color.Should().Be(ink);
+        window.Close();
+        Application.Current.RequestedThemeVariant = ThemeVariant.Default;
     });
 
     [Fact]

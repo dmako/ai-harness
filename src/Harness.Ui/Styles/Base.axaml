@@ -1,6 +1,6 @@
 <!-- Page-wide styles: the page itself, the header and the live state. Components are in their own files. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Style Selector="UserControl.page">
+  <Style Selector=":is(UserControl).page">
     <Setter Property="Background" Value="{DynamicResource Page}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />
