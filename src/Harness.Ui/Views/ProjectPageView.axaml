@@ -26,8 +26,6 @@
             <TextBlock Text="{Binding Project.Live.HealthWords}" />
           </StackPanel>
         </c:AppLink>
-        <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" AutomationProperties.Name="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
-                ToolTip.Tip="Agents and commands name this project so. Click to copy." />
       </WrapPanel>
       <WrapPanel ItemSpacing="12" LineSpacing="2">
         <SelectableTextBlock Classes="mono path" Text="{Binding Project.Root}" />

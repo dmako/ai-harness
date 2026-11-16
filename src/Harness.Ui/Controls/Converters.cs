@@ -24,10 +24,28 @@ public static class Converters
     /// <summary>Whether the value's text is the parameter's (a style class for one state, one page).</summary>
     public static IValueConverter Is { get; } = new EqualsConverter();
 
+    /// <summary>Converts string to its upper case invariant form</summary>
+    public static IValueConverter Uppercase { get; } = new UppercaseConverter();
+
     private sealed class EqualsConverter : IValueConverter
     {
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
             string.Equals(value?.ToString(), parameter?.ToString(), StringComparison.Ordinal);
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+    
+    private sealed class UppercaseConverter : IValueConverter
+    {
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is string str)
+            {
+                return str.ToUpperInvariant();
+            }
+            return string.Empty;
+        }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
             throw new NotSupportedException();

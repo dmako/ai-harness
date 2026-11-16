@@ -5,7 +5,8 @@
     <Setter Property="Spacing" Value="4" />
   </Style>
   <Style Selector="TextBlock.label">
-    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontSize" Value="{StaticResource TextMd}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>

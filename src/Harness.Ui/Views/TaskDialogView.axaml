@@ -16,157 +16,198 @@
     </Border>
     <StackPanel Spacing="12" IsVisible="{Binding HasTask}">
       <WrapPanel ItemSpacing="8" LineSpacing="8">
-        <Button Name="Edit" AutomationProperties.Name="Edit task" IsEnabled="{Binding Editable}" ToolTip.Tip="{Binding EditTip}" Command="{Binding EditCommand}">
-          <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="edit" /><TextBlock Text="Edit" /></StackPanel>
+        <Button Name="Edit" AutomationProperties.Name="Edit task" IsEnabled="{Binding Editable}"
+                ToolTip.Tip="{Binding EditTip}" Command="{Binding EditCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <c:Icon Kind="edit" /><TextBlock Text="Edit" />
+          </StackPanel>
         </Button>
         <WrapPanel ItemSpacing="6" LineSpacing="6">
           <TextBlock Classes="label" Text="Move to" />
-          <ComboBox Name="MoveTo" ItemsSource="{Binding MoveChoices}" SelectedItem="{Binding MoveTo}" MinWidth="160" MaxWidth="280"
+          <ComboBox Name="MoveTo" ItemsSource="{Binding MoveChoices}" SelectedItem="{Binding MoveTo}" MinWidth="160"
+                    MaxWidth="280"
                     AutomationProperties.Name="Move to blueprint" />
           <Button Name="Move" Content="Move" AutomationProperties.Name="Move" Command="{Binding MoveCommand}" />
         </WrapPanel>
         <Button Name="Delete" Classes="ghost" AutomationProperties.Name="Delete task" Command="{Binding DeleteCommand}">
-          <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="trash" /><TextBlock Text="Delete" /></StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <c:Icon Kind="trash" /><TextBlock Text="Delete" />
+          </StackPanel>
         </Button>
       </WrapPanel>
-      <Border Classes="callout" Classes.bad="{Binding CalloutBad}" IsVisible="{Binding HasCallout}">
-        <SelectableTextBlock Text="{Binding Callout}" TextWrapping="Wrap" />
-      </Border>
-      <StackPanel Spacing="2" IsVisible="{Binding HasGoal}">
-        <TextBlock Classes="label" Text="Goal" />
-        <SelectableTextBlock Text="{Binding Task.Goal}" TextWrapping="Wrap" />
-      </StackPanel>
-      <StackPanel Spacing="2" IsVisible="{Binding HasCriteria}">
-        <TextBlock Classes="label" Text="{Binding CriteriaHead}" />
-        <ItemsControl Name="Criteria" ItemsSource="{Binding Criteria}" ItemTemplate="{StaticResource CheckRowTemplate}" />
-      </StackPanel>
-      <StackPanel Spacing="2" IsVisible="{Binding HasCompletion}">
-        <TextBlock Classes="label" Text="Completed" />
-        <SelectableTextBlock Text="{Binding Task.Completion.Summary}" TextWrapping="Wrap" />
-        <ItemsControl ItemsSource="{Binding Checks}" ItemTemplate="{StaticResource CheckRowTemplate}" IsVisible="{Binding HasChecks}" />
-      </StackPanel>
-      <StackPanel Spacing="2" IsVisible="{Binding HasNotes}">
-        <TextBlock Classes="label" Text="Notes" />
-        <SelectableTextBlock Classes="muted" Text="{Binding Task.Notes}" TextWrapping="Wrap" />
-      </StackPanel>
-      <Border Classes="inset">
-        <Grid Name="Facts">
-          <ItemsControl ItemsSource="{Binding Facts}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:Fact">
-                <Grid ColumnDefinitions="110,*" Margin="0,2">
-                  <TextBlock Classes="muted small" Text="{Binding Label}" Margin="0,0,8,0" />
-                  <SelectableTextBlock Grid.Column="1" Classes="small" Text="{Binding Value}" TextWrapping="Wrap" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </Grid>
-      </Border>
-      <StackPanel Name="Sessions" Spacing="4">
-        <TextBlock Classes="label" Text="Agent sessions" />
-        <TextBlock Classes="small" Text="{Binding SessionsUsage}" TextWrapping="Wrap" IsVisible="{Binding HasSessionsUsage}" />
-        <TextBlock Classes="muted small" Text="{Binding SessionsNote}" TextWrapping="Wrap"
-                   IsVisible="{Binding SessionsNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        <TextBlock Classes="error" Text="{Binding AgentSessions.Error}" TextWrapping="Wrap" />
-        <ItemsControl ItemsSource="{Binding Sessions}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:SessionRow">
-              <StackPanel Margin="0,2">
-                <WrapPanel ItemSpacing="8">
-                  <TextBlock FontWeight="SemiBold" Text="{Binding Client}" />
-                  <SelectableTextBlock Classes="mono small" Text="{Binding FullId}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                  <TextBlock Classes="small" Text="{Binding Status}" VerticalAlignment="Center" />
-                  <TextBlock Classes="muted small" Text="{Binding Seen}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                </WrapPanel>
-                <TextBlock Classes="muted small" Text="{Binding Usage}" TextWrapping="Wrap" />
-                <Button Classes="ghost" Content="Show transcript" AutomationProperties.Name="Show transcript" Command="{Binding ShowTranscriptCommand}"
-                        IsVisible="{Binding CanShowTranscript}" HorizontalAlignment="Left" />
-                <SelectableTextBlock Text="{Binding Transcript}" TextWrapping="Wrap"
-                                     IsVisible="{Binding Transcript, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <StackPanel IsVisible="{Binding CanResume}" Spacing="4">
-                  <TextBox Text="{Binding ResumePrompt}" AutomationProperties.Name="Prompt to resume with" AcceptsReturn="True" TextWrapping="Wrap" />
-                  <Button Content="Resume" AutomationProperties.Name="Resume" Command="{Binding ResumeCommand}" HorizontalAlignment="Left" />
-                </StackPanel>
-              </StackPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <Expander Header="Start an agent on this task" AutomationProperties.Name="Start an agent on this task" IsExpanded="{Binding AgentSessions.FormOpen}">
-          <StackPanel DataContext="{Binding AgentSessions}" x:DataType="vm:AgentSessionsViewModel" Spacing="6">
-            <TextBlock Classes="label" Text="Agent" />
-            <ComboBox ItemsSource="{Binding Clients}" SelectedItem="{Binding Client}" AutomationProperties.Name="Agent" HorizontalAlignment="Stretch" />
-            <TextBlock Classes="label" Text="Model" />
-            <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding Model}" AutomationProperties.Name="Model" HorizontalAlignment="Stretch" />
-            <TextBox Text="{Binding OtherModel}" PlaceholderText="Model id" AutomationProperties.Name="Model id" IsVisible="{Binding OtherModelVisible}" />
-            <TextBlock Classes="muted small" Text="{Binding ModelNote}" TextWrapping="Wrap" />
-            <TextBlock Classes="label" Text="Permission mode" />
-            <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" AutomationProperties.Name="Permission mode" HorizontalAlignment="Stretch" />
-            <TextBlock Classes="muted small" Text="{Binding ModeDescription}" TextWrapping="Wrap" />
-            <TextBlock Classes="label" Text="Prompt" />
-            <TextBox Text="{Binding Prompt}" AutomationProperties.Name="First prompt" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" />
-            <TextBlock Classes="muted small" Text="The agent runs in its own process and continues when this page closes. Tool calls may wait here for approval." TextWrapping="Wrap" />
-            <Button Content="Start" AutomationProperties.Name="Start" Command="{Binding StartCommand}" HorizontalAlignment="Left" />
+      <Border Padding="16,8" Background="{StaticResource Layer}" CornerRadius="16" BorderBrush="{StaticResource Border}">
+        <StackPanel Spacing="16">
+          <Border Classes="callout" Classes.bad="{Binding CalloutBad}" IsVisible="{Binding HasCallout}">
+            <SelectableTextBlock Text="{Binding Callout}" TextWrapping="Wrap" />
+          </Border>
+          <StackPanel Spacing="4" IsVisible="{Binding HasGoal}">
+            <TextBlock Classes="label" Text="GOAL" />
+            <SelectableTextBlock Text="{Binding Task.Goal}" TextWrapping="Wrap" />
           </StackPanel>
-        </Expander>
-        <ItemsControl ItemsSource="{Binding AgentSessions.Hosts}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:AgentPanel">
-              <Border Classes="inset" Margin="0,4">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="{Binding Heading}" TextWrapping="Wrap" />
-                  <TextBlock Classes="muted small" Text="{Binding Status}" />
-                  <ItemsControl ItemsSource="{Binding Entries}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:AgentLogRow">
-                        <StackPanel Margin="0,3" Spacing="4">
-                          <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" />
-                          <TextBlock Classes="muted small" Text="{Binding Answer}" />
-                          <WrapPanel IsVisible="{Binding IsApproval}" ItemSpacing="6">
-                            <Button Content="Allow" AutomationProperties.Name="Allow" Command="{Binding AllowCommand}" />
-                            <Button Content="Deny" AutomationProperties.Name="Deny" Command="{Binding DenyCommand}" />
-                          </WrapPanel>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" />
-                  <TextBox Text="{Binding Message}" AutomationProperties.Name="Message to the agent" AcceptsReturn="True" TextWrapping="Wrap" IsVisible="{Binding Alive}" PlaceholderText="Message to the agent" />
-                  <WrapPanel ItemSpacing="6" LineSpacing="6">
-                    <Button Content="Send" AutomationProperties.Name="Send" Command="{Binding SendCommand}" IsVisible="{Binding CanSend}" />
-                    <Button Content="Stop" AutomationProperties.Name="Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" />
-                    <Button Content="Close session" AutomationProperties.Name="Close session" Command="{Binding CloseCommand}" IsVisible="{Binding Alive}" />
-                  </WrapPanel>
-                  <StackPanel IsVisible="{Binding CanResume}" Spacing="4">
-                    <TextBox Text="{Binding ResumePrompt}" AutomationProperties.Name="Prompt to resume with" AcceptsReturn="True" TextWrapping="Wrap" />
-                    <Button Content="Resume" AutomationProperties.Name="Resume" Command="{Binding ResumeCommand}" HorizontalAlignment="Left" />
+          <StackPanel Spacing="4" IsVisible="{Binding HasCriteria}">
+            <TextBlock Classes="label" Text="{Binding CriteriaHead, Converter={x:Static c:Converters.Uppercase}, ConverterParameter=0}" />
+            <ItemsControl Name="Criteria" ItemsSource="{Binding Criteria}"
+                          ItemTemplate="{StaticResource CheckRowTemplate}" />
+          </StackPanel>
+          <StackPanel Spacing="4" IsVisible="{Binding HasCompletion}">
+            <TextBlock Classes="label" Text="COMPLETED" />
+            <SelectableTextBlock Text="{Binding Task.Completion.Summary}" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Checks}" ItemTemplate="{StaticResource CheckRowTemplate}"
+                          IsVisible="{Binding HasChecks}" />
+          </StackPanel>
+          <StackPanel Spacing="4" IsVisible="{Binding HasNotes}">
+            <TextBlock Classes="label" Text="NOTES" />
+            <SelectableTextBlock Classes="muted" Text="{Binding Task.Notes}" TextWrapping="Wrap" />
+          </StackPanel>
+          <Border Classes="inset">
+            <Grid Name="Facts">
+              <ItemsControl ItemsSource="{Binding Facts}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:Fact">
+                    <Grid ColumnDefinitions="110,*" Margin="0,2">
+                      <TextBlock Classes="muted small" Text="{Binding Label}" Margin="0,0,8,0" />
+                      <SelectableTextBlock Grid.Column="1" Classes="small" Text="{Binding Value}" TextWrapping="Wrap" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Grid>
+          </Border>
+          <StackPanel Name="Sessions" Spacing="4">
+            <TextBlock Classes="label" Text="Agent sessions" />
+            <TextBlock Classes="small" Text="{Binding SessionsUsage}" TextWrapping="Wrap"
+                       IsVisible="{Binding HasSessionsUsage}" />
+            <TextBlock Classes="muted small" Text="{Binding SessionsNote}" TextWrapping="Wrap"
+                       IsVisible="{Binding SessionsNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Classes="error" Text="{Binding AgentSessions.Error}" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Sessions}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SessionRow">
+                  <StackPanel Margin="0,2">
+                    <WrapPanel ItemSpacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="{Binding Client}" />
+                      <SelectableTextBlock Classes="mono small" Text="{Binding FullId}" VerticalAlignment="Center"
+                                           TextWrapping="Wrap" />
+                      <TextBlock Classes="small" Text="{Binding Status}" VerticalAlignment="Center" />
+                      <TextBlock Classes="muted small" Text="{Binding Seen}" TextWrapping="Wrap"
+                                 VerticalAlignment="Center" />
+                    </WrapPanel>
+                    <TextBlock Classes="muted small" Text="{Binding Usage}" TextWrapping="Wrap" />
+                    <Button Classes="ghost" Content="Show transcript" AutomationProperties.Name="Show transcript"
+                            Command="{Binding ShowTranscriptCommand}"
+                            IsVisible="{Binding CanShowTranscript}" HorizontalAlignment="Left" />
+                    <SelectableTextBlock Text="{Binding Transcript}" TextWrapping="Wrap"
+                                         IsVisible="{Binding Transcript, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <StackPanel IsVisible="{Binding CanResume}" Spacing="4">
+                      <TextBox Text="{Binding ResumePrompt}" AutomationProperties.Name="Prompt to resume with"
+                               AcceptsReturn="True" TextWrapping="Wrap" />
+                      <Button Content="Resume" AutomationProperties.Name="Resume" Command="{Binding ResumeCommand}"
+                              HorizontalAlignment="Left" />
+                    </StackPanel>
                   </StackPanel>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </StackPanel>
-      <StackPanel Name="Trail" Spacing="4">
-        <Button Name="ShowTrail" Classes="ghost" Content="Show audit trail" AutomationProperties.Name="Show audit trail" Command="{Binding ShowTrailCommand}"
-                IsVisible="{Binding !TrailShown}" HorizontalAlignment="Left" />
-        <TextBlock Classes="label" Text="Audit trail" IsVisible="{Binding TrailShown}" />
-        <TextBlock Classes="error" Text="{Binding TrailError}" IsVisible="{Binding TrailError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        <ItemsControl ItemsSource="{Binding Trail}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:EventRow">
-              <StackPanel Margin="0,2">
-                <WrapPanel ItemSpacing="8">
-                  <TextBlock FontWeight="SemiBold" Text="{Binding Event}" />
-                  <TextBlock Classes="small" Text="{Binding Move}" IsVisible="{Binding Moved}" VerticalAlignment="Center" />
-                  <TextBlock Classes="muted small" Text="{Binding Who}" VerticalAlignment="Center" />
-                </WrapPanel>
-                <SelectableTextBlock Classes="muted small" Text="{Binding Detail}" TextWrapping="Wrap" IsVisible="{Binding HasDetail}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Expander Header="Start an agent on this task" AutomationProperties.Name="Start an agent on this task"
+                      IsExpanded="{Binding AgentSessions.FormOpen}">
+              <StackPanel DataContext="{Binding AgentSessions}" x:DataType="vm:AgentSessionsViewModel" Spacing="6">
+                <TextBlock Classes="label" Text="Agent" />
+                <ComboBox ItemsSource="{Binding Clients}" SelectedItem="{Binding Client}"
+                          AutomationProperties.Name="Agent" HorizontalAlignment="Stretch" />
+                <TextBlock Classes="label" Text="Model" />
+                <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding Model}"
+                          AutomationProperties.Name="Model"
+                          HorizontalAlignment="Stretch" />
+                <TextBox Text="{Binding OtherModel}" PlaceholderText="Model id" AutomationProperties.Name="Model id"
+                         IsVisible="{Binding OtherModelVisible}" />
+                <TextBlock Classes="muted small" Text="{Binding ModelNote}" TextWrapping="Wrap" />
+                <TextBlock Classes="label" Text="Permission mode" />
+                <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}"
+                          AutomationProperties.Name="Permission mode" HorizontalAlignment="Stretch" />
+                <TextBlock Classes="muted small" Text="{Binding ModeDescription}" TextWrapping="Wrap" />
+                <TextBlock Classes="label" Text="Prompt" />
+                <TextBox Text="{Binding Prompt}" AutomationProperties.Name="First prompt" AcceptsReturn="True"
+                         TextWrapping="Wrap" MinHeight="70" />
+                <TextBlock Classes="muted small"
+                           Text="The agent runs in its own process and continues when this page closes. Tool calls may wait here for approval."
+                           TextWrapping="Wrap" />
+                <Button Content="Start" AutomationProperties.Name="Start" Command="{Binding StartCommand}"
+                        HorizontalAlignment="Left" />
               </StackPanel>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </StackPanel>
+            </Expander>
+            <ItemsControl ItemsSource="{Binding AgentSessions.Hosts}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AgentPanel">
+                  <Border Classes="inset" Margin="0,4">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="{Binding Heading}" TextWrapping="Wrap" />
+                      <TextBlock Classes="muted small" Text="{Binding Status}" />
+                      <ItemsControl ItemsSource="{Binding Entries}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:AgentLogRow">
+                            <StackPanel Margin="0,3" Spacing="4">
+                              <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                              <TextBlock Classes="muted small" Text="{Binding Answer}" />
+                              <WrapPanel IsVisible="{Binding IsApproval}" ItemSpacing="6">
+                                <Button Content="Allow" AutomationProperties.Name="Allow"
+                                        Command="{Binding AllowCommand}" />
+                                <Button Content="Deny" AutomationProperties.Name="Deny"
+                                        Command="{Binding DenyCommand}" />
+                              </WrapPanel>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" />
+                      <TextBox Text="{Binding Message}" AutomationProperties.Name="Message to the agent"
+                               AcceptsReturn="True" TextWrapping="Wrap" IsVisible="{Binding Alive}"
+                               PlaceholderText="Message to the agent" />
+                      <WrapPanel ItemSpacing="6" LineSpacing="6">
+                        <Button Content="Send" AutomationProperties.Name="Send" Command="{Binding SendCommand}"
+                                IsVisible="{Binding CanSend}" />
+                        <Button Content="Stop" AutomationProperties.Name="Stop" Command="{Binding StopCommand}"
+                                IsVisible="{Binding CanStop}" />
+                        <Button Content="Close session" AutomationProperties.Name="Close session"
+                                Command="{Binding CloseCommand}" IsVisible="{Binding Alive}" />
+                      </WrapPanel>
+                      <StackPanel IsVisible="{Binding CanResume}" Spacing="4">
+                        <TextBox Text="{Binding ResumePrompt}" AutomationProperties.Name="Prompt to resume with"
+                                 AcceptsReturn="True" TextWrapping="Wrap" />
+                        <Button Content="Resume" AutomationProperties.Name="Resume" Command="{Binding ResumeCommand}"
+                                HorizontalAlignment="Left" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <StackPanel Name="Trail" Spacing="4">
+            <Button Name="ShowTrail" Classes="ghost" Content="Show audit trail"
+                    AutomationProperties.Name="Show audit trail" Command="{Binding ShowTrailCommand}"
+                    IsVisible="{Binding !TrailShown}" HorizontalAlignment="Left" />
+            <TextBlock Classes="label" Text="Audit trail" IsVisible="{Binding TrailShown}" />
+            <TextBlock Classes="error" Text="{Binding TrailError}"
+                       IsVisible="{Binding TrailError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <ItemsControl ItemsSource="{Binding Trail}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:EventRow">
+                  <StackPanel Margin="0,2">
+                    <WrapPanel ItemSpacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="{Binding Event}" />
+                      <TextBlock Classes="small" Text="{Binding Move}" IsVisible="{Binding Moved}"
+                                 VerticalAlignment="Center" />
+                      <TextBlock Classes="muted small" Text="{Binding Who}" VerticalAlignment="Center" />
+                    </WrapPanel>
+                    <SelectableTextBlock Classes="muted small" Text="{Binding Detail}" TextWrapping="Wrap"
+                                         IsVisible="{Binding HasDetail}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </Border>
     </StackPanel>
   </StackPanel>
   <UserControl.Resources>
@@ -176,7 +217,8 @@
                    Text="{Binding Mark}" ToolTip.Tip="{Binding Result}" />
         <StackPanel>
           <SelectableTextBlock Classes.mono="{Binding Mono}" Text="{Binding Text}" TextWrapping="Wrap" />
-          <SelectableTextBlock Classes="muted small" Text="{Binding Evidence}" TextWrapping="Wrap" IsVisible="{Binding HasEvidence}" />
+          <SelectableTextBlock Classes="muted small" Text="{Binding Evidence}" TextWrapping="Wrap"
+                               IsVisible="{Binding HasEvidence}" />
         </StackPanel>
       </DockPanel>
     </DataTemplate>

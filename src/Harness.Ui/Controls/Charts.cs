@@ -123,7 +123,7 @@ public sealed class Sparkline : Chart
     );
 
     private const double W = 72;
-    private const double H = 18;
+    private const double H = 32;
 
     static Sparkline() => AffectsRender<Sparkline>(BarsProperty, LineProperty, BrushKeyProperty);
 
