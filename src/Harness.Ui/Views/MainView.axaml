@@ -28,12 +28,8 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <Grid Name="Frame" ColumnDefinitions="Auto,*">
-      <Border Name="Sidebar" Classes="sidebar" Grid.Column="0" ZIndex="1">
-        <views:Sidebar />
-      </Border>
-      <DockPanel Grid.Column="1">
-        <Border Classes="topbar" DockPanel.Dock="Top">
+    <Grid RowDefinitions="Auto,*">
+        <Border Name="Header" Classes="topbar" Grid.Row="0">
           <DockPanel>
             <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
                     AutomationProperties.Name="Show projects" IsVisible="False" />
@@ -52,9 +48,31 @@
               </Button.Flyout>
             </Button>
             <TextBox Name="OpenFind" DockPanel.Dock="Right" Width="110" PlaceholderText="Find…" AutomationProperties.Name="Find in this view" />
-            <TextBlock Classes="brand" Text="harness" />
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Classes="brand" Text="harness" Margin="0,0,12,0" VerticalAlignment="Center" />
+              <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl Name="Breadcrumbs" ItemsSource="{Binding Breadcrumbs}">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:Breadcrumb">
+                      <StackPanel Orientation="Horizontal" Spacing="2">
+                        <TextBlock Classes="muted" Text="›" VerticalAlignment="Center" />
+                        <c:AppLink Classes="link" Href="{Binding Href}" AutomationProperties.Name="{Binding Label}">
+                          <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                        </c:AppLink>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
           </DockPanel>
         </Border>
+      <Grid Name="Frame" Grid.Row="1" ColumnDefinitions="Auto,*">
+      <Border Name="Sidebar" Classes="sidebar" Grid.Column="0" ZIndex="1">
+        <views:Sidebar />
+      </Border>
+      <DockPanel Grid.Column="1">
         <TextBlock Classes="error" DockPanel.Dock="Top" Margin="16,8,16,0" Text="{Binding Error}"
                    IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
         <!-- the page scrolls up and down only when the window is shorter than PageMinHeight; otherwise the page is
@@ -63,6 +81,7 @@
           <ContentControl Name="Page" Content="{Binding Page}" Margin="16,12,16,16" />
         </ScrollViewer>
       </DockPanel>
+      </Grid>
     </Grid>
     <views:ToastLayer DataContext="{Binding Services.Toasts}" />
     <views:DialogLayer Name="Dialogs" DataContext="{Binding Services.Dialogs}" />

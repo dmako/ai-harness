@@ -13,6 +13,8 @@ namespace Harness.Ui.ViewModels;
 /// host's history (<see cref="UiHostContext.Navigation"/>); live changes reload the lists (and so the badges and the
 /// headers) and the sections that show what changed.
 /// </summary>
+public sealed record Breadcrumb(string Label, string Href);
+
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private IReadOnlyList<ProjectInfo> _projects = [];
@@ -39,6 +41,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>The sidebar's projects outside any workspace.</summary>
     public ObservableCollection<NavProject> Outside { get; } = [];
+
+    public ObservableCollection<Breadcrumb> Breadcrumbs { get; } = [];
 
     [ObservableProperty]
     public partial PageViewModel? Page { get; private set; }
@@ -152,6 +156,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void UpdateBreadcrumbs(Route route)
+    {
+        var crumbs = new List<Breadcrumb> { new("Home", "#/") };
+        if (route.Page is "project")
+        {
+            var project = _projects.FirstOrDefault(p => p.Id == route.Id);
+            crumbs.Add(new Breadcrumb(project?.DisplayName ?? route.Id, Route.ProjectHref(route.Id)));
+            var label = Route.ProjectViews.FirstOrDefault(view => view.View == route.View).Label ?? route.View;
+            crumbs.Add(new Breadcrumb(label, Route.ProjectHref(route.Id, route.View)));
+        }
+        else if (route.Page is "workspace")
+        {
+            var workspace = _workspaces.FirstOrDefault(w => w.Name == route.Workspace);
+            crumbs.Add(new Breadcrumb(workspace?.DisplayName ?? route.Workspace, Route.WorkspaceHref(route.Workspace)));
+            var label = Route.WorkspaceViews.FirstOrDefault(view => view.View == route.View).Label ?? route.View;
+            crumbs.Add(new Breadcrumb(label, Route.WorkspaceHref(route.Workspace, route.View)));
+        }
+        else if (route.Page is not "home")
+        {
+            var label = route.Page switch { "knowledge" => "Your knowledge", "machine" => "Machine", "search" => "Search", "docs" => "Docs", _ => route.Page };
+            crumbs.Add(new Breadcrumb(label, route.Href));
+        }
+        Lists.Sync(Breadcrumbs, crumbs);
+    }
+
     /// <summary>Shows <paramref name="route"/>: the same page is kept and told the new view, so its header stays.</summary>
     private void Show(Route route)
     {
@@ -161,6 +190,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
         Route = route;
+        UpdateBreadcrumbs(route);
         Sidebar(route);
         if (!_loaded)
         {

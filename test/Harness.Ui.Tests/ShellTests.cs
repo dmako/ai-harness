@@ -21,6 +21,28 @@ namespace Harness.Ui.Tests;
 /// </summary>
 public sealed class ShellTests
 {
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task HeaderSpansTheWindowAndBreadcrumbsFollowNavigation(int width) => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await Ui.OpenMainAsync(width, 800, address: "#/p/prj_fixture/architecture");
+        var main = window.GetVisualDescendants().OfType<MainView>().Single();
+        var header = main.FindControl<Border>("Header")!;
+        var frame = main.FindControl<Grid>("Frame")!;
+        header.Bounds.Width.Should().BeApproximately(frame.Bounds.Width, 1);
+        model.Breadcrumbs.Select(c => c.Label).Should().Equal("Home", "Fixture project", "Architecture");
+        model.Breadcrumbs[1].Href.Should().Be("#/p/prj_fixture/overview");
+        model.Navigate("#/w/main/members");
+        await Ui.UntilAsync(() => model.Route.Page is "workspace");
+        model.Breadcrumbs.Select(c => c.Label).Should().Equal("Home", "Main workspace", "Members");
+        var breadcrumbs = main.FindControl<ItemsControl>("Breadcrumbs")!;
+        var home = breadcrumbs.GetVisualDescendants().OfType<AppLink>().First(link => link.Href == "#/");
+        home.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        model.Route.Page.Should().Be("home");
+        window.Close();
+    });
+
     [Fact]
     public Task ProjectHeaderShowsIdentityHealthAndStack() => Ui.RunAsync(async () =>
     {
