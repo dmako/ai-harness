@@ -9,9 +9,13 @@
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
-  <div id="out">
-    <p class="loading">Loading harness…</p>
+  <div id="startup" class="startup" role="status" aria-live="polite">
+    <img src="/logo.svg" alt="" width="192" height="192">
+    <strong>harness</strong>
+    <span id="startup-message">Loading harness…</span>
+    <span class="spinner" aria-hidden="true"></span>
   </div>
+  <div id="out"></div>
   <script type="module" src="main.js"></script>
 </body>
 </html>

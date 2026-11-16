@@ -27,6 +27,14 @@ public sealed class UiBrowserSmokeTests(SharedBrowser browser)
         window.addEventListener("error", (e) => report("error: " + (e.message || e.type)));
         window.addEventListener("unhandledrejection", (e) => report("unhandled rejection: " + (e.reason?.message || e.reason)));
         document.addEventListener("securitypolicyviolation", (e) => report("csp: " + e.violatedDirective + " " + e.blockedURI));
+        const watchStartup = new MutationObserver(() => {
+          const startup = document.getElementById("startup");
+          if (startup && startup.querySelector('img[src="/logo.svg"]') && startup.textContent.includes("Loading harness")) {
+            window.__startupSeen = getComputedStyle(startup).display !== "none";
+            watchStartup.disconnect();
+          }
+        });
+        watchStartup.observe(document, {childList: true, subtree: true});
         """;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -53,6 +61,8 @@ public sealed class UiBrowserSmokeTests(SharedBrowser browser)
         // a deep link, drawn in time
         await page.CommandAsync("Page.navigate", new { url = $"{server.Client.BaseAddress}#/p/{id}/board" });
         await page.WaitAsync("globalThis.harnessTimings?.board > 0");
+        await page.WaitAsync("!document.getElementById('startup')");
+        (await ValueAsync(page, "window.__startupSeen === true")).GetBoolean().Should().BeTrue("the splash appeared before the UI");
         (await ValueAsync(page, "harnessTimings.board")).GetDouble().Should().BeLessThan(20_000, "the Board is drawn within 20 s");
 
         // The browser shortcut is intercepted for the Avalonia find bar, and the canvas remains in the AX tree.
@@ -110,6 +120,23 @@ public sealed class UiBrowserSmokeTests(SharedBrowser browser)
             }
             await File.WriteAllTextAsync(timingFile, JsonSerializer.Serialize(samples), Token);
         }
+
+        // Starting on another route must also dismiss the splash; it must not depend on the Board.
+        await page.CommandAsync("Page.navigate", new { url = $"{server.Client.BaseAddress}?other=1#/p/{id}/overview" });
+        await page.WaitAsync("globalThis.harnessTimings?.runtimeReady > 0 && !document.getElementById('startup')");
+        (await ValueAsync(page, "window.__startupSeen === true")).GetBoolean().Should().BeTrue();
+
+        // A failed runtime download leaves an understandable message instead of an endless spinner.
+        await page.CommandAsync("Network.enable", new { });
+        await page.CommandAsync("Network.setCacheDisabled", new { cacheDisabled = true });
+        await page.CommandAsync("Network.setBlockedURLs", new { urls = new[] { "*dotnet.js" } });
+        await page.CommandAsync("Emulation.setDeviceMetricsOverride", new { width = 390, height = 844, deviceScaleFactor = 1, mobile = false });
+        await page.CommandAsync("Emulation.setEmulatedMedia", new { features = new[] { new { name = "prefers-color-scheme", value = "dark" } } });
+        await page.CommandAsync("Page.navigate", new { url = $"{server.Client.BaseAddress}?startup-failure=1" });
+        await page.WaitAsync("document.getElementById('startup-message')?.textContent.includes('could not start')");
+        (await ValueAsync(page, "document.querySelector('.spinner') === null")).GetBoolean().Should().BeTrue();
+        (await ValueAsync(page, "document.querySelector('#startup img').getBoundingClientRect().width <= innerWidth"))
+            .GetBoolean().Should().BeTrue("the splash fits a narrow screen");
     }
 
     private static async Task<JsonElement> ValueAsync(BrowserPage page, string expression) =>
