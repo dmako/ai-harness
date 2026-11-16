@@ -37,7 +37,20 @@
           <DockPanel>
             <Button Name="Menu" DockPanel.Dock="Left" Classes="ghost" Content="Projects" Margin="0,0,12,0"
                     AutomationProperties.Name="Show projects" IsVisible="False" />
-            <TextBlock DockPanel.Dock="Right" Classes="live" Text="{Binding Services.Live.State, StringFormat='● {0}'}" />
+            <TextBlock Name="LiveState" DockPanel.Dock="Right" Classes="live"
+                       Classes.connected="{Binding Services.Live.IsConnected}" Classes.offline="{Binding Services.Live.IsOffline}"
+                       Text="{Binding Services.Live.State, StringFormat='● {0}'}"
+                       AutomationProperties.Name="{Binding Services.Live.State, StringFormat='Connection: {0}'}" />
+            <Button Name="ThemeButton" DockPanel.Dock="Right" Classes="ghost" Content="◐" Margin="8,0"
+                    AutomationProperties.Name="Theme" ToolTip.Tip="Theme">
+              <Button.Flyout>
+                <MenuFlyout>
+                  <MenuItem Header="System" Command="{Binding SelectThemeCommand}" CommandParameter="system" />
+                  <MenuItem Header="Light" Command="{Binding SelectThemeCommand}" CommandParameter="light" />
+                  <MenuItem Header="Dark" Command="{Binding SelectThemeCommand}" CommandParameter="dark" />
+                </MenuFlyout>
+              </Button.Flyout>
+            </Button>
             <TextBox Name="OpenFind" DockPanel.Dock="Right" Width="110" PlaceholderText="Find…" AutomationProperties.Name="Find in this view" />
             <TextBlock Classes="brand" Text="harness" />
           </DockPanel>

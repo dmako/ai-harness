@@ -210,7 +210,8 @@ proposed tasks.
 
 ## What harness ui shows
 
-The Avalonia application is embedded in the release executable and opens in your browser. Use Ctrl+F (Command+F
+The Avalonia application is embedded in the release executable and opens in your browser. The header's theme
+menu lets you choose light, dark or the system setting. Use Ctrl+F (Command+F
 on macOS) or the Find field to search text currently rendered on the page;
 matched occurrences appear in a selectable preview. Keyboard navigation and
 copyable text are supported, though the browser accessibility tree currently

@@ -51,7 +51,12 @@ public sealed partial class LiveUpdates : ObservableObject, IDisposable
 
     /// <summary>connecting, live or offline: what the header's live badge shows.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConnected))]
+    [NotifyPropertyChangedFor(nameof(IsOffline))]
     public partial string State { get; private set; } = "connecting";
+
+    public bool IsConnected => State is "live";
+    public bool IsOffline => State is "offline";
 
     /// <summary>How many times changes were applied (tests and the spike's measurements count them).</summary>
     public int Applies { get; private set; }

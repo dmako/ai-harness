@@ -96,6 +96,18 @@ public sealed class UiBrowserSmokeTests(SharedBrowser browser)
         await page.EvaluateAsync("history.forward()");
         await page.WaitAsync($"globalThis.harnessTimings?.route === '#/p/{id}/overview'");
 
+        // The default system theme follows a change in the browser's OS color preference without a reload.
+        var pixels = new List<string>();
+        foreach (var scheme in new[] { "light", "dark" })
+        {
+            await page.CommandAsync("Emulation.setEmulatedMedia", new { features = new[] { new { name = "prefers-color-scheme", value = scheme } } });
+            await page.WaitAsync($"matchMedia('(prefers-color-scheme: {scheme})').matches");
+            await Task.Delay(500, Token);
+            var screenshot = await page.CommandAsync("Page.captureScreenshot", new { format = "png", clip = new { x = 5, y = 5, width = 1, height = 1, scale = 1 } });
+            pixels.Add(screenshot.GetProperty("data").GetString()!);
+        }
+        pixels[0].Should().NotBe(pixels[1], "the rendered UI follows a system theme change");
+
         // Avalonia tries WebGL first and reports each mode the browser cannot give it before falling back to software
         // drawing (a headless browser without a GPU); the page then draws, so those reports are not problems
         var problems = (await ValueAsync(

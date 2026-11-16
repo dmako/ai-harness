@@ -86,6 +86,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Navigate(string href) => Navigation.Go(href);
 
+    /// <summary>Changes this browser's theme, keeping Machine's picker in sync when it is open.</summary>
+    [RelayCommand]
+    private void SelectTheme(string theme)
+    {
+        var selected = PageSettings.Themes.FirstOrDefault(choice => choice.Value == theme);
+        if (selected is null)
+        {
+            return;
+        }
+        if (Page is MachinePage machine)
+        {
+            machine.Theme = selected;
+        }
+        else
+        {
+            Services.Host.Preferences.Set("theme", selected.Value);
+            PageSettings.ApplyTheme(Services.Host.Preferences);
+        }
+    }
+
     /// <summary>Takes a live change directly (a host or test), as if it came from the stream.</summary>
     public void Changed(LiveChange change) => Services.Live.Changed(change);
 

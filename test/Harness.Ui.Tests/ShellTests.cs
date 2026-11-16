@@ -1,10 +1,13 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
 using Harness.Ui.Controls;
+using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
 using Xunit;
@@ -17,6 +20,58 @@ namespace Harness.Ui.Tests;
 /// </summary>
 public sealed class ShellTests
 {
+    [Fact]
+    public Task HeaderThemeChoicesPersistAndApply() => Ui.RunAsync(async () =>
+    {
+        var preferences = new InMemoryPreferences();
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800, address: "#/", preferences: preferences);
+        var view = window.GetVisualDescendants().OfType<MainView>().Single();
+        var button = view.FindControl<Button>("ThemeButton")!;
+        var flyout = button.Flyout.Should().BeOfType<MenuFlyout>().Subject;
+        flyout.ShowAt(button);
+        Ui.Settle();
+        flyout.Items.OfType<MenuItem>().Select(item => item.Header).Should().Equal("System", "Light", "Dark");
+        foreach (var (name, variant) in new[] { ("dark", ThemeVariant.Dark), ("light", ThemeVariant.Light), ("system", ThemeVariant.Default) })
+        {
+            var item = flyout.Items.OfType<MenuItem>().Single(choice => (string)choice.CommandParameter! == name);
+            item.Command.Should().NotBeNull();
+            item.Command.Execute(item.CommandParameter);
+            preferences.Get("theme").Should().Be(name);
+            Avalonia.Application.Current!.RequestedThemeVariant.Should().Be(variant);
+        }
+        model.Navigate("#/machine");
+        await Ui.UntilAsync(() => model.Page is MachinePage);
+        model.SelectThemeCommand.Execute("dark");
+        ((MachinePage)model.Page!).Theme.Value.Should().Be("dark", "the Machine picker stays in sync");
+        window.Close();
+        var (reopened, _, _) = await Ui.OpenMainAsync(1280, 800, address: "#/", preferences: preferences);
+        Avalonia.Application.Current!.RequestedThemeVariant.Should().Be(ThemeVariant.Dark);
+        reopened.Close();
+        Avalonia.Application.Current.RequestedThemeVariant = ThemeVariant.Default;
+    });
+
+    [Fact]
+    public Task LiveIndicatorShowsOfflineAndConnectedStates() => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Failures["/api/events"] = System.Net.HttpStatusCode.ServiceUnavailable;
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800, api: api, fastLive: true, address: "#/");
+        var view = window.GetVisualDescendants().OfType<MainView>().Single();
+        var indicator = view.FindControl<TextBlock>("LiveState")!;
+        await Ui.UntilAsync(() => model.Services.Live.State is "offline");
+        indicator.Classes.Should().Contain("offline");
+        indicator.Classes.Should().NotContain("connected");
+        indicator.TryFindResource("Critical", indicator.ActualThemeVariant, out var offline).Should().BeTrue();
+        indicator.Foreground.Should().Be(offline);
+        api.Failures.Remove("/api/events");
+        await Ui.UntilAsync(() => model.Services.Live.State is "live");
+        indicator.Classes.Should().Contain("connected");
+        indicator.Classes.Should().NotContain("offline");
+        indicator.TryFindResource("GoodInk", indicator.ActualThemeVariant, out var connected).Should().BeTrue();
+        indicator.Foreground.Should().Be(connected);
+        window.Close();
+    });
+
     [Fact]
     public Task FindHighlightsAndStepsThroughTheCurrentView() => Ui.RunAsync(async () =>
     {

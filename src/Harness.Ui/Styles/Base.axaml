@@ -22,6 +22,12 @@
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <Style Selector="TextBlock.live.connected">
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
+  </Style>
+  <Style Selector="TextBlock.live.offline">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
   <Style Selector="TextBlock.error">
     <Setter Property="Foreground" Value="{DynamicResource Critical}" />
     <Setter Property="TextWrapping" Value="Wrap" />
