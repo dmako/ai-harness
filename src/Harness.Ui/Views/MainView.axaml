@@ -319,7 +319,7 @@
                   <DataTemplate x:DataType="vm:PickRow">
                     <CheckBox IsChecked="{Binding Chosen}" AutomationProperties.Name="{Binding Name}">
                       <StackPanel Spacing="1">
-                        <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6"><Border Classes="project-mark compact" Classes.pc0="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Project.Mark}" /></Border><TextBlock FontWeight="SemiBold" Text="{Binding Name}" /></StackPanel>
                         <TextBlock Classes="muted small mono" Text="{Binding Root}" TextWrapping="Wrap" />
                       </StackPanel>
                     </CheckBox>

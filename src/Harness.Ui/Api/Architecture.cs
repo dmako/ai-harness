@@ -187,6 +187,21 @@ public sealed class ProjectStack
     public StackPart? Runtime { get; init; }
     public IReadOnlyList<StackPart> Frameworks { get; init; } = [];
     public string? Badge { get; init; }
+
+    [JsonIgnore]
+    public string Mark => LanguageMark(Language);
+
+    public static string LanguageMark(string? language) => language switch
+    {
+        "C#" => "C#",
+        "TypeScript" => "TS",
+        "JavaScript" => "JS",
+        "Dart" => "D",
+        "Go" => "Go",
+        { Length: > 2 } name => name[..2],
+        null => "",
+        _ => language,
+    };
 }
 
 public sealed class StackPart

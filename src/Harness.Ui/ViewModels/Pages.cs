@@ -11,6 +11,8 @@ namespace Harness.Ui.ViewModels;
 /// <summary>A project's row in the sidebar or a workspace card (app.js navProject): its name, state shape and badge.</summary>
 public sealed record NavProject(string Id, string Name, string Href, string StateKind, string StateWords, int Waiting, bool Current)
 {
+    public string Mark => ProjectInfo.MarkFor(Name);
+    public string MarkColor => ProjectInfo.MarkColorFor(Id);
     public bool HasWaiting => Waiting > 0;
     public string WaitingTip => $"{Waiting} waiting for you: proposals, failing checks or unreadable state";
     public string StateIcon => Shell.StateIcon(StateKind);
@@ -167,9 +169,27 @@ public sealed partial class ProjectPage : PageViewModel
         Id = project.Id;
         Project = project;
         Show(route);
+        _ = LoadStackAsync();
     }
 
     public string Id { get; }
+
+    public string HealthHref => Route.ProjectHref(Id, "health");
+
+    [ObservableProperty]
+    public partial ProjectStack? Stack { get; private set; }
+
+    private async Task LoadStackAsync()
+    {
+        try
+        {
+            Stack = (await _services.Api.StackAsync(Id, CancellationToken.None)).Stack;
+        }
+        catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
+        {
+            Stack = null;
+        }
+    }
 
     public ObservableCollection<TabItem> Tabs { get; } = [];
 

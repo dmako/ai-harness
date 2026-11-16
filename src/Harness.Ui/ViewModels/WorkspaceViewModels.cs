@@ -369,6 +369,8 @@ public sealed partial class MemberRow(WorkspaceMember member, ProjectInfo? proje
     public ProjectInfo? Project { get; } = project;
     public string Id => Member.ProjectId;
     public string Name => Project?.DisplayName ?? Member.ProjectId;
+    public string Mark => ProjectInfo.MarkFor(Name);
+    public string MarkColor => ProjectInfo.MarkColorFor(Id);
     public string? Href => Project is null ? null : Route.ProjectHref(Project.Id);
     public bool Registered => Project is not null;
     public string State => Project?.Live.Words ?? "not registered";

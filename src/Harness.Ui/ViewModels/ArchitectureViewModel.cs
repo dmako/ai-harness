@@ -185,9 +185,11 @@ public sealed partial class StructureSection : SectionViewModel
     public ObservableCollection<PackageRow> Packages { get; } = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowBuiltOn))]
     public partial bool Known { get; private set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LanguageMark))]
     public partial string? Language { get; private set; }
 
     [ObservableProperty]
@@ -226,6 +228,8 @@ public sealed partial class StructureSection : SectionViewModel
 
     public bool HasUnit => Unit is not null;
     public bool HasStack => Parts.Count > 0 || Language is not null;
+    public bool ShowBuiltOn => Known || HasStack;
+    public string LanguageMark => ProjectStack.LanguageMark(Language);
     public bool HasUses => Uses.Count > 0;
     public bool HasBuildsBefore => BuildsBefore.Count > 0;
     public string UnitLine { get; private set; } = "";
@@ -282,6 +286,7 @@ public sealed partial class StructureSection : SectionViewModel
         Lists.Sync(Uses, (stack?.Uses ?? []).Select(u => new UseRow(u)));
         Known = s.Known && s.Architecture is not null;
         OnPropertyChanged(nameof(HasStack));
+        OnPropertyChanged(nameof(ShowBuiltOn));
         OnPropertyChanged(nameof(HasUses));
         if (!Known)
         {

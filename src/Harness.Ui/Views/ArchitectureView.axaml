@@ -28,11 +28,11 @@
         <StackPanel x:DataType="vm:StructureSection" Spacing="12">
           <!-- Structure -->
           <StackPanel Spacing="12" IsVisible="{Binding $parent[views:ArchitectureView].((vm:ArchitectureViewModel)DataContext).ShowsStructure}">
-            <StackPanel Classes="section" Spacing="6" IsVisible="{Binding HasStack}">
+            <StackPanel Classes="section" Spacing="6" IsVisible="{Binding ShowBuiltOn}">
               <TextBlock Classes="h3" Text="Built on" />
               <Border Name="BuiltOn" Classes="card" Padding="14,10">
                 <StackPanel Spacing="6">
-                  <TextBlock Classes="label" Text="{Binding Language}" />
+                  <Border Classes="language-mark" HorizontalAlignment="Left" IsVisible="{Binding Language, Converter={x:Static ObjectConverters.IsNotNull}}"><TextBlock Text="{Binding LanguageMark}" /></Border>
                   <ItemsControl ItemsSource="{Binding Parts}">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="6" /></ItemsPanelTemplate>
@@ -63,6 +63,11 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
+                  <Border Classes="separator" IsVisible="{Binding Known}" />
+                  <StackPanel Spacing="4" IsVisible="{Binding Known}">
+                    <TextBlock Name="Summary" FontWeight="SemiBold" Text="{Binding Summary}" TextWrapping="Wrap" />
+                    <TextBlock Classes="hint" Text="{Binding Detail}" TextWrapping="Wrap" />
+                  </StackPanel>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -71,13 +76,7 @@
                        Text="No .NET solution or project, Go module or TypeScript project was found here, so there is no structure to show." />
 
             <StackPanel Classes="section" Spacing="6" IsVisible="{Binding Known}">
-              <TextBlock Classes="h3" Text="Structure" />
-              <TextBlock Name="Summary" FontWeight="SemiBold" Text="{Binding Summary}" TextWrapping="Wrap" />
-              <TextBlock Classes="hint" Text="{Binding Detail}" TextWrapping="Wrap" />
-            </StackPanel>
-
-            <StackPanel Classes="section" Spacing="6" IsVisible="{Binding Known}">
-              <TextBlock Classes="h3" Text="Findings" />
+              <TextBlock Classes="h3" Text="Smells" />
               <views:FindingsView Name="Findings" DataContext="{Binding Board}" />
             </StackPanel>
           </StackPanel>

@@ -9,12 +9,20 @@
   <DockPanel>
     <StackPanel DockPanel.Dock="Top" Classes="phead">
       <WrapPanel ItemSpacing="10" LineSpacing="4">
-        <TextBlock Classes="kind" Text="PROJECT" />
+        <Border Classes="project-mark" Classes.pc0="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding Project.MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Project.Mark}" /></Border>
         <TextBlock Classes="h2" Text="{Binding Project.DisplayName}" />
         <Button Name="Rename" Classes="icon" Command="{Binding RenameCommand}" ToolTip.Tip="Rename: change the display name or the short name"
                 AutomationProperties.Name="Rename this project" VerticalAlignment="Center">
           <c:Icon Kind="edit" />
         </Button>
+        <c:AppLink Classes="health-badge" Href="{Binding HealthHref}" AutomationProperties.Name="{Binding Project.Live.HealthWords}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="●" Classes="health-dot" Classes.g-ok="{Binding Project.Live.HealthKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                       Classes.g-warn="{Binding Project.Live.HealthKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                       Classes.g-bad="{Binding Project.Live.HealthKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}" />
+            <TextBlock Text="{Binding Project.Live.HealthWords}" />
+          </StackPanel>
+        </c:AppLink>
         <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" AutomationProperties.Name="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
                 ToolTip.Tip="Agents and commands name this project so. Click to copy." />
       </WrapPanel>
@@ -34,7 +42,11 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </WrapPanel>
-      <TextBlock Classes="facts" Text="{Binding Facts}" IsVisible="{Binding HasFacts}" />
+      <WrapPanel ItemSpacing="10">
+        <Border Classes="language-mark" IsVisible="{Binding Stack, Converter={x:Static ObjectConverters.IsNotNull}}"><TextBlock Text="{Binding Stack.Mark}" /></Border>
+        <TextBlock Classes="facts" Text="{Binding Stack.Badge}" />
+        <TextBlock Classes="facts" Text="{Binding Facts}" IsVisible="{Binding HasFacts}" />
+      </WrapPanel>
       <TextBlock Classes="facts" Text="{Binding Detail}" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </StackPanel>
     <Border DockPanel.Dock="Top" Classes="tabs">

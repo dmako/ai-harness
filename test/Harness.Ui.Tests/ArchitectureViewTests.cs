@@ -75,8 +75,14 @@ public sealed class ArchitectureViewTests
     public Task StructureShowsWhatItIsBuiltOnAndItsFindingsByKind() => Ui.RunAsync(async () =>
     {
         var api = Api();
-        var (_, _, model) = await OpenAsync("architecture", api);
+        var (window, _, model) = await OpenAsync("architecture", api);
         var s = Architecture(model).Structure;
+        var view = window.GetVisualDescendants().OfType<ArchitectureView>().Single();
+        var card = view.FindControl<Border>("BuiltOn")!;
+        card.GetVisualDescendants().OfType<TextBlock>().Should().Contain(text => text.Name == "Summary");
+        card.GetVisualDescendants().OfType<Border>().Should().Contain(mark => mark.Classes.Contains("language-mark"));
+        view.GetVisualDescendants().OfType<TextBlock>().Should().Contain(text => text.Text == "Smells");
+        view.GetVisualDescendants().OfType<Border>().Should().Contain(border => border.Classes.Contains("smell"));
 
         Architecture(model).ShowsStructure.Should().BeTrue();
         s.Language.Should().Be("C#");

@@ -30,7 +30,7 @@
                   <CheckBox IsChecked="{Binding Chosen}" AutomationProperties.Name="{Binding Name, StringFormat='Select {0}'}" VerticalAlignment="Top" />
                   <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,8,0">
                     <c:AppLink Classes="link" Href="{Binding Href}" AutomationProperties.Name="{Binding Name}" IsVisible="{Binding Registered}" HorizontalAlignment="Left">
-                      <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Spacing="6"><Border Classes="project-mark compact" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /></StackPanel>
                     </c:AppLink>
                     <SelectableTextBlock Classes="muted" Text="{Binding Id}" IsVisible="{Binding !Registered}" TextWrapping="Wrap" />
                     <TextBlock Classes="small" TextWrapping="Wrap">

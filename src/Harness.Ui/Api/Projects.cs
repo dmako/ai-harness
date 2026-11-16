@@ -61,6 +61,37 @@ public sealed class ProjectInfo
         }
     }
 
+    /// <summary>The compact mark shown beside the project name.</summary>
+    [JsonIgnore]
+    public string Mark => MarkFor(DisplayName);
+
+    [JsonIgnore]
+    public string MarkColor => MarkColorFor(Id);
+
+    public static string MarkColorFor(string id)
+    {
+        uint hash = 0;
+        foreach (var c in id)
+        {
+            hash = unchecked((hash * 31) + c);
+        }
+        return (hash % 8).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public static string MarkFor(string name)
+    {
+        var words = name.Split([' ', '.', '_', '-'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => !new[] { "webapi", "api", "web", "service", "services", "app" }
+                .Contains(w, StringComparer.OrdinalIgnoreCase)).ToArray();
+        if (words.Length >= 2)
+        {
+            return string.Concat(words[0][0], words[1][0]).ToUpperInvariant();
+        }
+        var word = words.FirstOrDefault() ?? name;
+        var capitals = word.Where(char.IsUpper).Take(2).ToArray();
+        return (capitals.Length == 2 ? new string(capitals) : word[..Math.Min(2, word.Length)]).ToUpperInvariant();
+    }
+
     /// <summary>How many things wait for a person here (app.js waitingIn): proposals, failing checks, unreadable state.</summary>
     [JsonIgnore]
     public int Waiting => Live.KnowledgeWaiting + Live.WorkProposals + Live.ChecksFailed + (Live.State is "ok" ? 0 : 1);
@@ -110,6 +141,27 @@ public sealed class ProjectLive
             "missing" or "error" => "bad",
             _ => "warn",
         };
+
+    [JsonIgnore]
+    public string HealthKind => (State, ChecksFailed, Stale, ChecksWarned) switch
+    {
+        (not "ok", _, _, _) => Kind,
+        (_, > 0, _, _) => "bad",
+        (_, _, { Length: > 0 }, _) or (_, _, _, > 0) => "warn",
+        _ => "ok",
+    };
+
+    [JsonIgnore]
+    public string HealthWords => (State, ChecksFailed, Stale, ChecksWarned) switch
+    {
+        (not "ok", _, _, _) => Words,
+        (_, > 0, _, _) => $"{HealthCount(ChecksFailed, "check")} failing",
+        (_, _, { Length: > 0 }, _) => "index stale",
+        (_, _, _, > 0) => HealthCount(ChecksWarned, "warning"),
+        _ => "healthy",
+    };
+
+    private static string HealthCount(int count, string word) => $"{count} {word}{(count == 1 ? "" : "s")}";
 
     /// <summary>The words for the state (app.js STATE_WORD, or the state itself when not ok).</summary>
     [JsonIgnore]

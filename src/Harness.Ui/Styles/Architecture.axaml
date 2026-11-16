@@ -2,6 +2,50 @@
      what references it, the rest dimmed), the findings' cards and the hotspots' bars. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="using:Harness.Ui.Controls">
+  <Style Selector="Border.project-mark">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource GoldInk}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="8" />
+  </Style>
+  <Style Selector="Border.project-mark.pc0"><Setter Property="BorderBrush" Value="{DynamicResource CDecision}" /></Style>
+  <Style Selector="Border.project-mark.pc1"><Setter Property="BorderBrush" Value="{DynamicResource CConvention}" /></Style>
+  <Style Selector="Border.project-mark.pc2"><Setter Property="BorderBrush" Value="{DynamicResource CConstraint}" /></Style>
+  <Style Selector="Border.project-mark.pc3"><Setter Property="BorderBrush" Value="{DynamicResource CGoal}" /></Style>
+  <Style Selector="Border.project-mark.pc4"><Setter Property="BorderBrush" Value="{DynamicResource CWarning}" /></Style>
+  <Style Selector="Border.project-mark.pc5"><Setter Property="BorderBrush" Value="{DynamicResource CFact}" /></Style>
+  <Style Selector="Border.project-mark.pc6"><Setter Property="BorderBrush" Value="{DynamicResource COpenQuestion}" /></Style>
+  <Style Selector="Border.project-mark.pc7"><Setter Property="BorderBrush" Value="{DynamicResource Accent}" /></Style>
+  <Style Selector="Border.project-mark.compact"><Setter Property="Padding" Value="3,1" /></Style>
+  <Style Selector="Border.project-mark TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="Button.health-badge">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="8,3" />
+  </Style>
+  <Style Selector="TextBlock.health-dot.g-ok"><Setter Property="Foreground" Value="{DynamicResource GoodInk}" /></Style>
+  <Style Selector="TextBlock.health-dot.g-warn"><Setter Property="Foreground" Value="{DynamicResource GoldInk}" /></Style>
+  <Style Selector="TextBlock.health-dot.g-bad"><Setter Property="Foreground" Value="{DynamicResource Critical}" /></Style>
+  <Style Selector="Border.language-mark">
+    <Setter Property="Background" Value="#5140a4" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+  <Style Selector="Border.language-mark TextBlock">
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="Border.separator">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Border}" />
+    <Setter Property="Margin" Value="0,12" />
+  </Style>
   <Style Selector="Border.layer-band">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
@@ -96,6 +140,11 @@
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
     <Setter Property="Padding" Value="12,8" />
     <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="Border.smell Expander /template/ ToggleButton">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="Border.smell.quiet">
     <Setter Property="Background" Value="{DynamicResource Page}" />

@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
+using Harness.Ui.Api;
 using Harness.Ui.Controls;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
@@ -20,6 +21,39 @@ namespace Harness.Ui.Tests;
 /// </summary>
 public sealed class ShellTests
 {
+    [Fact]
+    public Task ProjectHeaderShowsIdentityHealthAndStack() => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800, address: "#/p/prj_fixture/architecture");
+        await Ui.UntilAsync(() => model.Page is ProjectPage { Stack: not null });
+        var page = (ProjectPage)model.Page!;
+        var view = window.GetVisualDescendants().OfType<ProjectPageView>().Single();
+        view.GetVisualDescendants().OfType<Border>().Should().Contain(mark => mark.Classes.Contains("project-mark"));
+        view.GetVisualDescendants().OfType<AppLink>().Should().Contain(link => link.Href == page.HealthHref);
+        page.Project.Mark.Should().Be("FP");
+        page.Project.Live.HealthWords.Should().Be("1 warning");
+        page.Stack!.Language.Should().Be("C#");
+        window.Close();
+    });
+
+    [Theory]
+    [InlineData("ok", 0, 0, null, "healthy", "ok")]
+    [InlineData("ok", 1, 0, null, "1 check failing", "bad")]
+    [InlineData("ok", 0, 2, null, "2 warnings", "warn")]
+    [InlineData("ok", 0, 0, "stale", "index stale", "warn")]
+    [InlineData("missing", 0, 0, null, "missing", "bad")]
+    public void ProjectHealthUsesCurrentState(string state, int failed, int warned, string? stale, string words, string kind)
+    {
+        var live = new ProjectLive
+        {
+            State = state, ChecksFailed = failed, ChecksWarned = warned, Stale = stale,
+            PendingProposals = 0, PendingArchProposals = 0, PendingTaskProposals = 0,
+            PendingBlueprintProposals = 0, RemovedFromProject = 0,
+        };
+        live.HealthWords.Should().Be(words);
+        live.HealthKind.Should().Be(kind);
+    }
+
     [Fact]
     public Task HeaderThemeChoicesPersistAndApply() => Ui.RunAsync(async () =>
     {
