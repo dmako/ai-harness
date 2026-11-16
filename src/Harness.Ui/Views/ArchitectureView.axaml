@@ -277,14 +277,14 @@
               <ItemsControl Name="CouplingRows" ItemsSource="{Binding Rows}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:HotspotRow">
-                    <Border Classes="trow">
+                    <Border Classes="trow" Padding="14,6">
                       <Grid ColumnDefinitions="2*,110,90,3*">
                         <StackPanel Margin="0,0,8,0" ToolTip.Tip="{Binding Hotspot.Path}">
-                          <TextBlock Classes="mono small" FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="muted small" Text="{Binding Folder}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="mono small coupling-file-name" FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" />
+                          <TextBlock Classes="muted small coupling-file-folder" Text="{Binding Folder}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
-                          <c:Meter Value="{Binding Ratio}" Width="60" VerticalAlignment="Center" />
+                          <c:Meter Value="{Binding Ratio}" BrushKey="Accent" Width="60" VerticalAlignment="Center" />
                           <TextBlock Classes="num small" Text="{Binding Hotspot.Commits}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Grid.Column="2" Classes="num small" Classes.critical="{Binding IsProblem}" Classes.gold="{Binding IsWarn}"
@@ -297,7 +297,7 @@
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PartnerBadge">
                               <Border Classes="pill coupling-badge" ToolTip.Tip="{Binding Detail}" AutomationProperties.Name="{Binding Detail}">
-                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" MaxWidth="220" />
                               </Border>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>

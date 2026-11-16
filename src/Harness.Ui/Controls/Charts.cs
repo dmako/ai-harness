@@ -372,7 +372,11 @@ public sealed class Meter : Chart
 {
     public static readonly StyledProperty<double> ValueProperty = AvaloniaProperty.Register<Meter, double>(nameof(Value));
 
-    static Meter() => AffectsRender<Meter>(ValueProperty);
+    public static readonly StyledProperty<string> BrushKeyProperty = AvaloniaProperty.Register<Meter, string>(nameof(BrushKey), "Good");
+
+    static Meter() => AffectsRender<Meter>(ValueProperty, BrushKeyProperty);
+
+    public string BrushKey { get => GetValue(BrushKeyProperty); set => SetValue(BrushKeyProperty, value); }
 
     public double Value
     {
@@ -389,7 +393,7 @@ public sealed class Meter : Chart
         var value = Math.Clamp(Value, 0, 1);
         if (value > 0)
         {
-            context.FillRectangle(Brush("Good"), new Rect(0, 0, Bounds.Width * value, Bounds.Height), 3);
+            context.FillRectangle(Brush(BrushKey), new Rect(0, 0, Bounds.Width * value, Bounds.Height), 3);
         }
     }
 }
@@ -546,6 +550,9 @@ public sealed class ComplexityChart : ThresholdChart
 /// </summary>
 public sealed class HotspotChart : ThresholdChart
 {
+    internal const string WarningBandBrush = "Warning";
+    internal const double WarningBandOpacity = 0.08;
+
     public static readonly StyledProperty<IReadOnlyList<HotspotPoint>?> PointsProperty = AvaloniaProperty.Register<HotspotChart, IReadOnlyList<HotspotPoint>?>(nameof(Points));
 
     private const double L = 34;
@@ -575,9 +582,12 @@ public sealed class HotspotChart : ThresholdChart
         var kmax = Math.Max(Problem + 5, points.Max(p => p.Complexity));
         double X(int c) => L + (c / (double)cmax * (w - L - R));
         double Y(int k) => h - B - (k / (double)kmax * (h - B - T));
-        context.FillRectangle(Brush("AccentWash"), new Rect(L, T, w - L - R, Math.Max(0, Y(Warn) - T)));
+        using (context.PushOpacity(WarningBandOpacity))
+        {
+            context.FillRectangle(Brush(WarningBandBrush), new Rect(L, T, w - L - R, Math.Max(0, Y(Warn) - T)));
+        }
         context.DrawLine(new Pen(Brush("Warning"), 1, new DashStyle([4, 3], 0)), new Point(L, Y(Warn)), new Point(w - R, Y(Warn)));
-        Text(context, $"warning {Warn}", new Point(w - R - 4, Y(Warn) - 3), "Ink2", right: true);
+        Text(context, $"warning {Warn}", new Point(w - R - 4, Y(Warn) - 3), "Muted", right: true);
         var axis = new Pen(Brush("Axis"), 1);
         context.DrawLine(axis, new Point(L, h - B), new Point(w - R, h - B));
         context.DrawLine(axis, new Point(L, T), new Point(L, h - B));
@@ -586,7 +596,11 @@ public sealed class HotspotChart : ThresholdChart
         foreach (var p in points)
         {
             var radius = p.Named ? 6 : 4.5;
-            context.DrawEllipse(Brush(Level(p.Complexity)), null, new Point(X(p.Commits), Y(p.Complexity)), radius, radius);
+            using (context.PushOpacity(0.75))
+            {
+                context.DrawEllipse(Brush(Level(p.Complexity)), new Pen(Brush("Surface"), 1.5),
+                    new Point(X(p.Commits), Y(p.Complexity)), radius, radius);
+            }
         }
         foreach (var p in points.Where(p => p.Named))
         {

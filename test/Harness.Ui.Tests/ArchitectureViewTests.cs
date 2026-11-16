@@ -445,6 +445,48 @@ public sealed class ArchitectureViewTests
     });
 
     [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task ChangeCouplingWrapsLongFilesAndPartnersWithoutLosingAlignment(int width) => Ui.RunAsync(async () =>
+    {
+        var data = JsonNode.Parse(Coupling)!;
+        var first = data["hotspots"]![0]!;
+        first["path"] = "src/very-long-directory-name-that-should-wrap/another-long-directory/ExtremelyLongSourceFileNameThatMustWrapWithoutBeingCutOff.cs";
+        first["partners"] = new JsonArray(
+            new JsonObject { ["path"] = "src/FirstPartnerWithAnEspeciallyLongNameThatMustWrap.cs", ["together"] = 5, ["share"] = 0.7 },
+            new JsonObject { ["path"] = "src/SecondPartnerWithAnEspeciallyLongNameThatMustWrap.cs", ["together"] = 4, ["share"] = 0.6 },
+            new JsonObject { ["path"] = "src/ThirdPartner.cs", ["together"] = 3, ["share"] = 0.4 });
+        var api = Api();
+        api.Answers[Root + "/coupling"] = data.ToJsonString();
+        var (window, _, model) = await OpenAsync("architecture/coupling", api, width, 800);
+        await Ui.UntilAsync(() => Architecture(model).Coupling.HasContent);
+        var view = window.GetVisualDescendants().OfType<ArchitectureView>().Single();
+        var header = view.FindControl<Grid>("CouplingHeader")!;
+        var rows = view.FindControl<ItemsControl>("CouplingRows")!;
+        var grids = rows.GetVisualDescendants().OfType<Grid>().Where(grid => grid.ColumnDefinitions.Count == 4).ToArray();
+        grids.Should().HaveCount(3);
+        grids[0].Bounds.Height.Should().BeGreaterThan(grids[1].Bounds.Height);
+        for (var column = 0; column < 4; column++)
+        {
+            grids[0].ColumnDefinitions[column].ActualWidth.Should().BeApproximately(header.ColumnDefinitions[column].ActualWidth, 1);
+        }
+        HotspotChart.WarningBandBrush.Should().Be("Warning");
+        HotspotChart.WarningBandOpacity.Should().BeApproximately(0.08, 0.001);
+        var file = grids[0].GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("coupling-file-name"));
+        file.TextWrapping.Should().Be(Avalonia.Media.TextWrapping.Wrap);
+        file.Text.Should().EndWith("WithoutBeingCutOff.cs");
+        grids[0].GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("coupling-badge")).Should().HaveCount(3);
+        grids[0].GetVisualDescendants().OfType<Meter>().Single().BrushKey.Should().Be("Accent");
+        foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        {
+            Application.Current!.RequestedThemeVariant = theme;
+            UiChecks.Check(window).Should().BeEmpty();
+        }
+        window.Close();
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
+    });
+
+    [Theory]
     [InlineData("architecture")]
     [InlineData("architecture/layers")]
     [InlineData("architecture/complexity")]
