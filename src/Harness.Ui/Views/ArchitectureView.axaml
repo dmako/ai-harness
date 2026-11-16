@@ -89,9 +89,18 @@
               <TextBlock Classes="h3" Text="Layers" />
               <TextBlock Classes="hint" Text="{Binding LayersHint}" TextWrapping="Wrap" />
               <Grid Name="LayersGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                  <c:LayerGraph Name="Graph" Rows="{Binding Rows}" Edges="{Binding Edges}" Selected="{Binding Selected}" LinesOnFocus="{Binding Big}" Margin="0,0,12,0" />
-                </ScrollViewer>
+                <StackPanel Spacing="8" Margin="0,0,12,0">
+                  <ToggleButton Name="MatrixSwitch" Classes="chip" Content="Matrix view" AutomationProperties.Name="Matrix view"
+                                IsVisible="{Binding Big}" IsChecked="{Binding Matrix}" HorizontalAlignment="Left" />
+                  <TextBlock Classes="hint" IsVisible="{Binding Matrix}" TextWrapping="Wrap"
+                             Text="Rows reference numbered columns. Select a name or column for details; hollow marks build first, red marks reach up a layer or form a cycle." />
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !Matrix}">
+                    <c:LayerGraph Name="Graph" Rows="{Binding Rows}" Edges="{Binding Edges}" Selected="{Binding Selected}" LinesOnFocus="{Binding Big}" />
+                  </ScrollViewer>
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding Matrix}">
+                    <c:LayerMatrix Name="Matrix" Rows="{Binding Rows}" Edges="{Binding Edges}" Selected="{Binding Selected}" />
+                  </ScrollViewer>
+                </StackPanel>
                 <Border Name="Side" Grid.Column="1" Classes="side" Width="300" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                   <StackPanel Spacing="6">
                     <TextBlock Classes="hint" Text="{Binding SideHint}" TextWrapping="Wrap" IsVisible="{Binding !HasUnit}" />

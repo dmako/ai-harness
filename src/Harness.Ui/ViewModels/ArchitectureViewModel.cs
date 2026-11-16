@@ -206,6 +206,9 @@ public sealed partial class StructureSection : SectionViewModel
     public partial bool Big { get; private set; }
 
     [ObservableProperty]
+    public partial bool Matrix { get; set; }
+
+    [ObservableProperty]
     public partial string LayersHint { get; private set; } = "";
 
     /// <summary>The selected unit's path in the layer graph.</summary>
@@ -247,6 +250,8 @@ public sealed partial class StructureSection : SectionViewModel
         };
 
     partial void OnSelectedChanged(string? value) => DrawSide();
+
+    partial void OnMatrixChanged(bool value) => DrawSide();
 
     protected override async Task LoadCoreAsync(CancellationToken token)
     {
@@ -361,7 +366,11 @@ public sealed partial class StructureSection : SectionViewModel
         Edges = [.. all.SelectMany(x =>
             x.References.Select(r => new GraphEdge(x.Path, r, false, x.Kind is "test"))
                 .Concat(x.BuildOrder.Select(r => new GraphEdge(x.Path, r, true, x.Kind is "test"))))];
-        Big = all.Count(x => x.Kind is not "test") > 24;
+        Big = all.Count > 24;
+        if (!Big)
+        {
+            Matrix = false;
+        }
         var noun = a.Noun;
         var verb = Imports ? "import" : "reference";
         LayersHint =
@@ -377,9 +386,12 @@ public sealed partial class StructureSection : SectionViewModel
         Unit = Selected is { } path ? byPath.GetValueOrDefault(path) : null;
         var noun = a?.Noun ?? "project";
         var verb = Imports ? "imports" : "references";
-        SideHint =
-            $"{(Big ? $"Point at a {noun} to see its lines; select" : "Select")} a {noun} to see what it {verb}, what {verb} it, its packages and who uses it. Lines point from a {noun} to the {noun}s it {verb}"
-            + (all.Any(x => x.BuildOrder.Count > 0) ? "; a dashed one to a project it only builds first." : ".");
+        var opening = Big ? $"Point at a {noun} to see its lines; select" : "Select";
+        var buildHint = all.Any(x => x.BuildOrder.Count > 0) ? "; a dashed one to a project it only builds first." : ".";
+        SideHint = Matrix
+            ? $"Select a row or column to see what the {noun} {verb}, what {verb} it, its packages and who uses it."
+            : $"{opening} a {noun} to see what it {verb}, what {verb} it, its packages and who uses it. Lines point from a {noun} to the {noun}s it {verb}"
+                + buildHint;
         RelatedRow Related(string p) => new(p, byPath.TryGetValue(p, out var x) ? Short(x) : p);
         Lists.Sync(References, (Unit?.References ?? []).Select(Related));
         Lists.Sync(ReferencedBy, (Unit?.ReferencedBy ?? []).Select(Related));

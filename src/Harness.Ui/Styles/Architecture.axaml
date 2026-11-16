@@ -1,9 +1,35 @@
 <!-- Architecture (style.css .amap, .anode, .smell, .cxbar): the layer graph's nodes (selected, what it references,
      what references it, the rest dimmed), the findings' cards and the hotspots' bars. -->
-<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
   <Style Selector="Border.layer-band">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+  </Style>
+  <Style Selector="Button.matrix-row, Button.matrix-column, Button.matrix-edge">
+    <Setter Property="Padding" Value="2" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+  <Style Selector="Button.matrix-row">
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.matrix-column, Button.matrix-edge">
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.matrix-edge">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.matrix-edge c|Icon">
+    <Setter Property="Margin" Value="0" />
+  </Style>
+  <Style Selector="Button.matrix-edge.back">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+  <Style Selector="Button.matrix-row.sel, Button.matrix-column.sel, Button.matrix-edge.sel">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
   </Style>
   <Style Selector="Button.package-up">
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />

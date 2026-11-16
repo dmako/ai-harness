@@ -226,7 +226,8 @@ flight or next; and what needs a person, most urgent first. Then:
   Layers (a dashed line is a project only built first, through
   `ReferenceOutputAssembly=false`; a NuGet package with a newer stable
   version or a known vulnerability is marked, see Package upgrades and
-  vulnerabilities), Complexity (every function by cyclomatic complexity, the most
+  vulnerabilities; graphs with more than 24 projects can switch to a dependency
+  matrix, where rows reference numbered columns), Complexity (every function by cyclomatic complexity, the most
   complex named) and Change coupling.
 - **Knowledge:** the memories by type (the team's marked PROJECT, with
   Share with project or Withdraw from project on each card), what applies

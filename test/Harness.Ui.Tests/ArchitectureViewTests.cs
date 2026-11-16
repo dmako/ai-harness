@@ -1,6 +1,9 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
@@ -9,6 +12,7 @@ using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
 using Xunit;
+using System.Text.Json.Nodes;
 
 namespace Harness.Ui.Tests;
 
@@ -223,6 +227,76 @@ public sealed class ArchitectureViewTests
         window.Close();
         Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
         return Task.CompletedTask;
+    });
+
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task LargeLayerGraphsSwitchToAnAccessibleDependencyMatrix(int width) => Ui.RunAsync(async () =>
+    {
+        var data = JsonNode.Parse(Structure)!;
+        var projects = data["architecture"]!["projects"]!.AsArray();
+        projects.Clear();
+        for (var i = 0; i < 25; i++)
+        {
+            var project = new JsonObject
+            {
+                ["name"] = $"Project{i:00}", ["path"] = $"src/Project{i:00}.csproj", ["layer"] = i is 0 ? 1 : 0,
+                ["kind"] = "library",
+            };
+            if (i is 0)
+            {
+                project["references"] = new JsonArray("src/Project01.csproj");
+                project["build_order"] = new JsonArray("src/Project02.csproj");
+            }
+            if (i is 1)
+            {
+                project["references"] = new JsonArray("src/Project00.csproj");
+            }
+            projects.Add(project);
+        }
+        var api = Api();
+        api.Answers[Root + "/structure"] = data.ToJsonString();
+        var (window, _, model) = await OpenAsync("architecture/layers", api, width, 1000);
+        var structure = Architecture(model).Structure;
+        structure.Big.Should().BeTrue();
+        var view = window.GetVisualDescendants().OfType<ArchitectureView>().Single();
+        var toggle = view.FindControl<ToggleButton>("MatrixSwitch")!;
+        toggle.IsVisible.Should().BeTrue();
+        var graph = view.FindControl<LayerGraph>("Graph")!;
+        var matrix = view.FindControl<LayerMatrix>("Matrix")!;
+        toggle.IsChecked = true;
+        Ui.Settle();
+        matrix.IsEffectivelyVisible.Should().BeTrue();
+        graph.IsEffectivelyVisible.Should().BeFalse();
+        var marks = matrix.Children.OfType<Button>().Where(button => button.Tag is GraphEdge).ToArray();
+        marks.Should().HaveCount(3);
+        marks.Select(AutomationProperties.GetName).Should().Contain(name => name.Contains("references", StringComparison.Ordinal));
+        marks.Select(AutomationProperties.GetName).Should().Contain(name => name.Contains("builds first", StringComparison.Ordinal));
+        marks.Should().ContainSingle(button => button.Classes.Contains("back"));
+        ((Icon)marks.Single(button => ((GraphEdge)button.Tag!).Dashed).Content!).Kind.Should().Be("status-backlog");
+        var row = matrix.Children.OfType<Button>().First(button => button.Classes.Contains("matrix-row") && (string?)button.Tag == "src/Project00.csproj");
+        row.Focus().Should().BeTrue();
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        structure.Selected.Should().Be("src/Project00.csproj");
+        structure.Unit!.Name.Should().Be("Project00");
+        foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        {
+            Application.Current!.RequestedThemeVariant = theme;
+            UiChecks.Check(window).Should().BeEmpty($"the matrix should fit and remain readable in {theme}");
+        }
+        toggle.IsChecked = false;
+        Ui.Settle();
+        graph.Selected.Should().Be("src/Project00.csproj");
+        graph.IsEffectivelyVisible.Should().BeTrue();
+        if (width == 390)
+        {
+            toggle.IsChecked = true;
+            Ui.Settle();
+            matrix.GetVisualAncestors().OfType<ScrollViewer>().Should().Contain(viewer => viewer.Extent.Width > viewer.Viewport.Width);
+        }
+        window.Close();
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
     });
 
     [Fact]
