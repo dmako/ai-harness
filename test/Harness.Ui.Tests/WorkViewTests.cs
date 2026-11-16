@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
 using Harness.Ui.Api;
@@ -21,6 +22,32 @@ namespace Harness.Ui.Tests;
 public sealed class WorkViewTests
 {
     private const string Root = "/api/projects/prj_fixture";
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task TaskTypeMarksUseBoardColorsInRowsAndEditor(bool dark) => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await OpenAsync("tasks");
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        Ui.Settle();
+        var row = window.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("drag-task") && b.DataContext is TaskRow { Id: "TASK-0001" });
+        var mark = row.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().First(i => i.Kind == "spike");
+        mark.Classes.Should().Contain("ty-spike");
+        _ = Work(model).Plan.NewTaskCommand.ExecuteAsync("BP-009");
+        await DialogAsync<TaskFormDialog>(model);
+        var picker = window.GetVisualDescendants().OfType<ListBox>().Single(x => x.Name == "TypePicker");
+        var icons = picker.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().ToArray();
+        foreach (var type in TaskStates.Types)
+        {
+            var icon = icons.Single(i => i.Kind == type);
+            icon.Classes.Should().Contain("ty-" + type);
+            icon.Foreground.Should().NotBeNull();
+        }
+        icons.Single(i => i.Kind == "spike").Foreground.Should().BeEquivalentTo(mark.Foreground);
+        window.Close();
+    });
 
     [Fact]
     public Task BlueprintsShowEachBlueprintsStateProgressAndDoneWhen() => Ui.RunAsync(async () =>

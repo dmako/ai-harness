@@ -306,7 +306,7 @@
                                     <TextBlock DockPanel.Dock="Right" Classes="muted small" Text="{Binding Acceptance}" Margin="8,0,0,0"
                                                VerticalAlignment="Center" ToolTip.Tip="acceptance criteria met" />
                                     <TextBlock DockPanel.Dock="Left" Classes="mono small muted" Text="{Binding Id}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                    <c:Icon DockPanel.Dock="Left" Kind="{Binding TypeIcon}" ToolTip.Tip="{Binding Type}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <c:Icon DockPanel.Dock="Left" Classes="type" c:StyleClass.Name="{Binding TypeIcon, StringFormat='ty-{0}'}" Kind="{Binding TypeIcon}" ToolTip.Tip="{Binding Type}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <WrapPanel VerticalAlignment="Center" ItemSpacing="8">
                                       <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
                                       <Border Classes="claimtag" Classes.warn="{Binding ClaimWarn}" Classes.bad="{Binding ClaimBad}" IsVisible="{Binding HasClaim}">

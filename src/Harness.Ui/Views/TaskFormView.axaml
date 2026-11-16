@@ -31,7 +31,7 @@
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="x:String">
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <c:Icon Kind="{Binding}" />
+              <c:Icon Classes="type" c:StyleClass.Name="{Binding StringFormat='ty-{0}'}" Kind="{Binding}" />
               <TextBlock Text="{Binding}" />
             </StackPanel>
           </DataTemplate>
