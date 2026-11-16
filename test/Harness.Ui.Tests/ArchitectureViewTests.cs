@@ -189,8 +189,10 @@ public sealed class ArchitectureViewTests
         graph.Selected.Should().Be(App);
     });
 
-    [Fact]
-    public Task LayersUseAlternatingBandsAndRoleOutlinesInBothThemes() => Ui.RunAsync(() =>
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task LayersUseAlternatingBandsAndRoleOutlinesInBothThemes(int width) => Ui.RunAsync(() =>
     {
         var roles = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -200,11 +202,11 @@ public sealed class ArchitectureViewTests
         };
         var graph = new LayerGraph
         {
-            Rows = [new GraphRow("first", [.. roles.Keys.Select(role => new GraphNode(role, role, Role: role))], true),
+            Rows = [new GraphRow("first", [.. roles.Keys.Select(role => new GraphNode(role, role, Meta: role == "model" ? "type" : null, Role: role))], true),
                     new GraphRow("second", [new GraphNode("other", "other")]),
                     new GraphRow("third", [new GraphNode("last", "last")], true)],
         };
-        var window = Ui.Show(graph, 1280, 800);
+        var window = Ui.Show(graph, width, 800);
         foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
         {
             Application.Current!.RequestedThemeVariant = theme;
@@ -212,12 +214,24 @@ public sealed class ArchitectureViewTests
             Ui.Settle();
             var bands = graph.Children.OfType<Border>().Where(band => band.Classes.Contains("layer-band")).ToArray();
             bands.Should().HaveCount(2);
+            graph.Children.OfType<TextBlock>().First(label => label.Text == "first").Margin.Left.Should().BeGreaterThan(0);
+            var first = graph.NodeFor("model")!;
+            var second = graph.NodeFor("base")!;
+            first.Bounds.Height.Should().Be(second.Bounds.Height);
+            var meta = ((StackPanel)((Border)first.Content!).Child!).Children.OfType<StackPanel>().Single();
+            meta.Children.OfType<TextBlock>().Single().Classes.Should().Contain("muted");
+            var row = roles.Keys.Select(role => graph.NodeFor(role)!).Where(node => Math.Abs(node.Bounds.Y - first.Bounds.Y) < 0.1).ToArray();
+            var left = row.Min(node => node.Bounds.Left);
+            var right = row.Max(node => node.Bounds.Right);
+            (left - LayerGraph.LabelWidth).Should().BeApproximately(graph.Bounds.Width - right, 1);
+            graph.TryFindResource("Border", theme, out var neutral).Should().BeTrue();
+            first.BorderBrush.Should().Be(neutral);
             graph.TryFindResource("Surface2", theme, out var background).Should().BeTrue();
             bands.Should().OnlyContain(band => band.Background == background);
             foreach (var (role, token) in roles)
             {
                 graph.TryFindResource(token, theme, out var brush).Should().BeTrue();
-                graph.NodeFor(role)!.BorderBrush.Should().Be(brush);
+                ((Border)graph.NodeFor(role)!.Content!).BorderBrush.Should().Be(brush);
             }
             graph.Selected = "model";
             Ui.Settle();

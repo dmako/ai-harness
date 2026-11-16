@@ -113,7 +113,7 @@ public sealed class LayerGraph : Panel
                 band = new Border { Classes = { "layer-band" }, IsHitTestVisible = false };
                 Children.Insert(0, band);
             }
-            var label = new TextBlock { Text = row.Label, Classes = { "muted", "small" }, VerticalAlignment = VerticalAlignment.Center };
+            var label = new TextBlock { Text = row.Label, Margin = new Thickness(10, 0, 0, 0), Classes = { "muted", "small" }, VerticalAlignment = VerticalAlignment.Center };
             Children.Add(label);
             var buttons = new List<Button>();
             foreach (var node in row.Nodes)
@@ -125,7 +125,7 @@ public sealed class LayerGraph : Panel
                     var meta = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
                     if (node.Meta is { Length: > 0 } m)
                     {
-                        meta.Children.Add(new TextBlock { Text = m, Classes = { "small" }, TextTrimming = TextTrimming.CharacterEllipsis });
+                        meta.Children.Add(new TextBlock { Text = m, Classes = { "small", "muted" }, TextTrimming = TextTrimming.CharacterEllipsis });
                     }
                     if (node.Badge is { Length: > 0 } b)
                     {
@@ -133,7 +133,8 @@ public sealed class LayerGraph : Panel
                     }
                     text.Children.Add(meta);
                 }
-                var button = new Button { Content = text, Classes = { "anode" }, MaxWidth = 220, Tag = node.Id };
+                var accent = new Border { Classes = { "node-accent" }, Child = text };
+                var button = new Button { Content = accent, Classes = { "anode" }, MaxWidth = 220, MinHeight = 60, Tag = node.Id };
                 if (node.Role is "model" or "base" or "data" or "logic" or "feature" or "api" or "page" or "test" or "hooks" or "ui")
                 {
                     button.Classes.Add("role-" + node.Role);
@@ -214,20 +215,37 @@ public sealed class LayerGraph : Panel
         var y = 0.0;
         foreach (var (label, nodes, band) in _rows)
         {
-            var x = LabelWidth;
             var top = y;
             var line = 0.0;
-            foreach (var node in nodes)
+            var index = 0;
+            while (index < nodes.Count)
             {
-                if (x + node.DesiredSize.Width > finalSize.Width && x > LabelWidth)
+                var end = index;
+                var lineWidth = 0.0;
+                while (end < nodes.Count)
+                {
+                    var nextWidth = lineWidth + (end > index ? Gap : 0) + nodes[end].DesiredSize.Width;
+                    if (end > index && LabelWidth + nextWidth > finalSize.Width)
+                    {
+                        break;
+                    }
+                    lineWidth = nextWidth;
+                    end++;
+                }
+                var x = LabelWidth + Math.Max(0, (finalSize.Width - LabelWidth - lineWidth) / 2);
+                line = 0;
+                for (var i = index; i < end; i++)
+                {
+                    var node = nodes[i];
+                    node.Arrange(new Rect(new Point(x, y), node.DesiredSize));
+                    x += node.DesiredSize.Width + Gap;
+                    line = Math.Max(line, node.DesiredSize.Height);
+                }
+                index = end;
+                if (index < nodes.Count)
                 {
                     y += line + Gap;
-                    x = LabelWidth;
-                    line = 0;
                 }
-                node.Arrange(new Rect(new Point(x, y), node.DesiredSize));
-                x += node.DesiredSize.Width + Gap;
-                line = Math.Max(line, node.DesiredSize.Height);
             }
             var height = Math.Max(line, label.DesiredSize.Height);
             label.Arrange(new Rect(0, top, LabelWidth, Math.Max(height, (y + height) - top)));

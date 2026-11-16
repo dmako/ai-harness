@@ -41,29 +41,33 @@
     <Setter Property="Foreground" Value="{DynamicResource Critical}" />
   </Style>
   <Style Selector="Button.anode">
-    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Padding" Value="0" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
   </Style>
-  <Style Selector="Button.anode.role-model, Button.anode.role-base">
+  <Style Selector="Border.node-accent">
+    <Setter Property="BorderThickness" Value="3,0,0,0" />
+    <Setter Property="Padding" Value="7,6,10,6" />
+  </Style>
+  <Style Selector="Button.anode.role-model Border.node-accent, Button.anode.role-base Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource CFact}" />
   </Style>
-  <Style Selector="Button.anode.role-data">
+  <Style Selector="Button.anode.role-data Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource CConstraint}" />
   </Style>
-  <Style Selector="Button.anode.role-logic, Button.anode.role-feature">
+  <Style Selector="Button.anode.role-logic Border.node-accent, Button.anode.role-feature Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource CDecision}" />
   </Style>
-  <Style Selector="Button.anode.role-api, Button.anode.role-page">
+  <Style Selector="Button.anode.role-api Border.node-accent, Button.anode.role-page Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource CConvention}" />
   </Style>
-  <Style Selector="Button.anode.role-test">
+  <Style Selector="Button.anode.role-test Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource CWarning}" />
   </Style>
-  <Style Selector="Button.anode.role-hooks">
+  <Style Selector="Button.anode.role-hooks Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource COpenQuestion}" />
   </Style>
-  <Style Selector="Button.anode.role-ui">
+  <Style Selector="Button.anode.role-ui Border.node-accent">
     <Setter Property="BorderBrush" Value="{DynamicResource CGoal}" />
   </Style>
   <Style Selector="Button.anode.sel">
