@@ -26,7 +26,7 @@
     <Setter Property="Opacity" Value="0.7" />
   </Style>
   <Style Selector="DockPanel.drag-blueprint.movable, Border.bpcard">
-    <Setter Property="Cursor" Value="SizeAll" />
+    <Setter Property="Cursor" Value="Hand" />
   </Style>
   <!-- while dragging: the targets outlined in the accent -->
   <Style Selector="StackPanel.dragging Border.drop-blueprint">
