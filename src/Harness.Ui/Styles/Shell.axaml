@@ -91,6 +91,13 @@
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="Padding" Value="16,6" />
   </Style>
+  <Style Selector="Button.doc-nav">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
   <Style Selector="StackPanel.phead">
     <Setter Property="Spacing" Value="4" />
   </Style>

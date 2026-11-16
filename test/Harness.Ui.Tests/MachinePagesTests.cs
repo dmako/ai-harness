@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Styling;
@@ -6,6 +7,7 @@ using AwesomeAssertions;
 using Harness.Ui.Controls;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
+using Harness.Ui.Views;
 using Xunit;
 
 namespace Harness.Ui.Tests;
@@ -261,6 +263,43 @@ public sealed class MachinePagesTests
         var links = text.GetVisualDescendants().OfType<AppLink>().ToArray();
         links.Should().ContainSingle(l => l.Href == "#/docs/commands");
         text.GetVisualDescendants().OfType<HyperlinkButton>().Should().ContainSingle(h => h.NavigateUri == new Uri("https://example.com/x"));
+    });
+
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task DocsHaveReadableArticleAndOutlinedNavigation(int width) => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Answers["/api/docs/{slug}"] = Doc;
+        var (window, _, model) = await Ui.OpenMainAsync(width, 800, api: api, address: "#/docs/guide-what-harness-is-for");
+        var page = (DocsPage)model.Page!;
+        await Ui.UntilAsync(() => page.Doc is not null);
+        Ui.Settle();
+        var view = window.GetVisualDescendants().OfType<DocsView>().Single();
+        var article = view.FindControl<StackPanel>("Article")!;
+        article.Bounds.Width.Should().BeLessThanOrEqualTo(660);
+        view.FindControl<Border>("HeaderSeparator")!.Bounds.Width.Should().BeApproximately(130, 1);
+        view.FindControl<Border>("NavigationSeparator")!.Bounds.Height.Should().BeApproximately(1, 0.1);
+        var previous = view.FindControl<AppLink>("PreviousDoc")!;
+        var next = view.FindControl<AppLink>("NextDoc")!;
+        previous.GetVisualDescendants().OfType<TextBlock>().Should().Contain(text => text.Text == "Previous");
+        next.GetVisualDescendants().OfType<TextBlock>().Should().Contain(text => text.Text == "Next");
+        foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        {
+            Application.Current!.RequestedThemeVariant = theme;
+            Ui.Settle();
+            view.TryFindResource("Border", theme, out var border).Should().BeTrue();
+            previous.BorderBrush.Should().Be(border);
+            next.BorderBrush.Should().Be(border);
+            previous.BorderThickness.Left.Should().BeGreaterThan(0);
+            next.BorderThickness.Left.Should().BeGreaterThan(0);
+            UiChecks.Check(window).Should().BeEmpty();
+        }
+        next.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        model.Route.Item.Should().Be("guide-how-knowledge-gets-into-memory");
+        window.Close();
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
     });
 
     [Fact]

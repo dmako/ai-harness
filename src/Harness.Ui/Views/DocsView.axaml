@@ -9,7 +9,8 @@
   <StackPanel Spacing="12">
     <StackPanel Classes="phead">
       <TextBlock Classes="h2" Text="Docs" />
-      <TextBlock Classes="path" Text="The guide and the reference this harness carries; 'harness docs &lt;section&gt;' prints the same." />
+      <TextBlock Classes="path" TextWrapping="Wrap" Text="The guide and the reference this harness carries; 'harness docs &lt;section&gt;' prints the same." />
+      <Border Name="HeaderSeparator" Width="130" Height="1" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="0,6,0,0" />
     </StackPanel>
     <Grid Name="Columns" ColumnSpacing="24" RowSpacing="16">
       <ItemsControl Name="DocList" ItemsSource="{Binding Groups}">
@@ -33,25 +34,26 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <StackPanel Name="Article" Spacing="16">
+      <StackPanel Name="Article" Spacing="16" MaxWidth="660" HorizontalAlignment="Left">
         <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <c:MarkdownBlock Name="DocText" Source="{Binding Doc.Body}" />
-        <DockPanel>
-          <c:AppLink DockPanel.Dock="Right" Classes="row" Href="{Binding Next.Href}" AutomationProperties.Name="{Binding Next.Title, StringFormat='Next: {0}'}" IsVisible="{Binding Next, Converter={x:Static ObjectConverters.IsNotNull}}"
+        <Border Name="NavigationSeparator" Height="1" Background="{DynamicResource Border}" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+          <c:AppLink Name="NextDoc" Grid.Column="1" Classes="doc-nav" Href="{Binding Next.Href}" AutomationProperties.Name="{Binding Next.Title, StringFormat='Next: {0}'}" IsVisible="{Binding Next, Converter={x:Static ObjectConverters.IsNotNull}}"
                      HorizontalAlignment="Right" MaxWidth="320">
-            <StackPanel>
+            <StackPanel Spacing="4">
               <TextBlock Classes="muted small" Text="Next" HorizontalAlignment="Right" />
               <TextBlock FontWeight="SemiBold" Text="{Binding Next.Title, StringFormat='{}{0} →'}" TextWrapping="Wrap" TextAlignment="Right" />
             </StackPanel>
           </c:AppLink>
-          <c:AppLink Classes="row" Href="{Binding Previous.Href}" AutomationProperties.Name="{Binding Previous.Title, StringFormat='Previous: {0}'}" IsVisible="{Binding Previous, Converter={x:Static ObjectConverters.IsNotNull}}"
+          <c:AppLink Name="PreviousDoc" Grid.Column="0" Classes="doc-nav" Href="{Binding Previous.Href}" AutomationProperties.Name="{Binding Previous.Title, StringFormat='Previous: {0}'}" IsVisible="{Binding Previous, Converter={x:Static ObjectConverters.IsNotNull}}"
                      HorizontalAlignment="Left" MaxWidth="320">
-            <StackPanel>
+            <StackPanel Spacing="4">
               <TextBlock Classes="muted small" Text="Previous" />
               <TextBlock FontWeight="SemiBold" Text="{Binding Previous.Title, StringFormat='← {0}'}" TextWrapping="Wrap" />
             </StackPanel>
           </c:AppLink>
-        </DockPanel>
+        </Grid>
       </StackPanel>
     </Grid>
   </StackPanel>
