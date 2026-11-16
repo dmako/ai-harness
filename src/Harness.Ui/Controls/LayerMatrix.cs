@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Media;
 
 namespace Harness.Ui.Controls;
 
@@ -24,6 +25,13 @@ public sealed class LayerMatrix : Panel
     private readonly List<(Button Row, Button Column)> _labels = [];
     private readonly List<(Button Button, int Row, int Column)> _marks = [];
     private readonly List<(Border Band, int Row)> _bands = [];
+    private readonly List<(TextBlock Label, int Start, int Count)> _groups = [];
+    private readonly GuideLayer _guides;
+
+    public LayerMatrix()
+    {
+        _guides = new GuideLayer(this) { IsHitTestVisible = false };
+    }
 
     static LayerMatrix() => AffectsMeasure<LayerMatrix>(RowsProperty, EdgesProperty);
 
@@ -50,6 +58,15 @@ public sealed class LayerMatrix : Panel
         _labels.Clear();
         _marks.Clear();
         _bands.Clear();
+        _groups.Clear();
+        var offset = 0;
+        foreach (var group in Rows ?? [])
+        {
+            var label = new TextBlock { Text = group.Label.StartsWith("layer ", StringComparison.Ordinal) ? "L" + group.Label[6..] : group.Label, Classes = { "muted", "small", "matrix-group" }, TextAlignment = TextAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            Children.Add(label);
+            _groups.Add((label, offset, group.Nodes.Count));
+            offset += group.Nodes.Count;
+        }
         var nodes = (Rows ?? []).SelectMany(row => row.Nodes).ToArray();
         var index = nodes.Select((node, i) => (node.Id, Index: i)).ToDictionary(item => item.Id, item => item.Index, StringComparer.Ordinal);
         for (var i = 0; i < nodes.Length; i++)
@@ -61,7 +78,7 @@ public sealed class LayerMatrix : Panel
                 Children.Add(band);
                 _bands.Add((band, i));
             }
-            var row = Label(node, $"{i + 1}. {node.Label}", "matrix-row");
+            var row = Label(node, node.Label, "matrix-row");
             var column = Label(node, (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), "matrix-column");
             Children.Add(row);
             Children.Add(column);
@@ -76,19 +93,24 @@ public sealed class LayerMatrix : Panel
             var from = nodes[row];
             var to = nodes[column];
             var detail = $"{from.Label} {(edge.Dashed ? "builds first" : "references")} {to.Label}";
+            var isBack = !edge.Dashed && column < row && from.Role is not "test";
+            var mark = new Border { Width = 18, Height = 18, Classes = { "matrix-mark" } };
+            mark.Classes.Set("build", edge.Dashed);
+            mark.Classes.Set("back", isBack);
             var button = new Button
             {
-                Content = new Icon { Kind = edge.Dashed ? "status-backlog" : "status-ready", Size = 14 },
+                Content = mark,
                 Tag = edge,
                 Classes = { "matrix-edge" },
             };
-            button.Classes.Set("back", !edge.Dashed && column < row && from.Role is not "test");
+            button.Classes.Set("back", isBack);
             ToolTip.SetTip(button, detail);
             AutomationProperties.SetName(button, detail);
             button.Click += (_, _) => Selected = edge.From;
             Children.Add(button);
             _marks.Add((button, row, column));
         }
+        Children.Add(_guides);
         Mark();
     }
 
@@ -96,7 +118,7 @@ public sealed class LayerMatrix : Panel
     {
         var button = new Button
         {
-            Content = new TextBlock { Text = text, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis },
+            Content = new TextBlock { Text = style is "matrix-column" ? "" : text, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis },
             Tag = node.Id,
             Classes = { style },
         };
@@ -140,10 +162,49 @@ public sealed class LayerMatrix : Panel
             _labels[i].Row.Arrange(new Rect(0, (i + 1) * CellSize, LabelWidth, CellSize));
             _labels[i].Column.Arrange(new Rect(LabelWidth + i * CellSize, 0, CellSize, CellSize));
         }
+        foreach (var (label, start, count) in _groups)
+        {
+            label.Arrange(new Rect(LabelWidth + start * CellSize, 0, count * CellSize, CellSize));
+        }
+        _guides.Arrange(new Rect(finalSize));
         foreach (var (button, row, column) in _marks)
         {
             button.Arrange(new Rect(LabelWidth + column * CellSize, (row + 1) * CellSize, CellSize, CellSize));
         }
         return finalSize;
+    }
+    internal IReadOnlyList<(Point Start, Point End, bool Dashed)> Guides()
+    {
+        var count = _labels.Count;
+        var lines = new List<(Point, Point, bool)>
+        {
+            (new Point(LabelWidth, CellSize), new Point(LabelWidth + count * CellSize, (count + 1) * CellSize), true),
+        };
+        foreach (var (_, start, _) in _groups.Skip(1))
+        {
+            var at = start * CellSize;
+            lines.Add((new Point(LabelWidth + at, 0), new Point(LabelWidth + at, (count + 1) * CellSize), false));
+            lines.Add((new Point(0, CellSize + at), new Point(LabelWidth + count * CellSize, CellSize + at), false));
+        }
+        return lines;
+    }
+
+    private sealed class GuideLayer(LayerMatrix owner) : Control
+    {
+        public override void Render(DrawingContext context)
+        {
+            if (!owner.TryFindResource("Border", owner.ActualThemeVariant, out var value) || value is not IBrush brush)
+            {
+                return;
+            }
+            var pen = new Pen(brush, 1);
+            var diagonal = new Pen(brush, 1, new DashStyle([3, 3], 0));
+            foreach (var (start, end, dashed) in owner.Guides())
+            {
+                context.DrawLine(dashed ? diagonal : pen, start, end);
+            }
+        }
+
+        protected override Size MeasureOverride(Size availableSize) => new(0, 0);
     }
 }

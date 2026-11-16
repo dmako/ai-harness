@@ -281,20 +281,27 @@ public sealed class ArchitectureViewTests
         var structure = Architecture(model).Structure;
         structure.Big.Should().BeTrue();
         var view = window.GetVisualDescendants().OfType<ArchitectureView>().Single();
-        var toggle = view.FindControl<ToggleButton>("MatrixSwitch")!;
+        var toggle = view.FindControl<Button>("MatrixSwitch")!;
+        var map = view.FindControl<Button>("MapSwitch")!;
         toggle.IsVisible.Should().BeTrue();
         var graph = view.FindControl<LayerGraph>("Graph")!;
         var matrix = view.FindControl<LayerMatrix>("Matrix")!;
-        toggle.IsChecked = true;
+        toggle.Command!.Execute(null);
         Ui.Settle();
         matrix.IsEffectivelyVisible.Should().BeTrue();
         graph.IsEffectivelyVisible.Should().BeFalse();
         var marks = matrix.Children.OfType<Button>().Where(button => button.Tag is GraphEdge).ToArray();
+        var guides = matrix.Guides();
+        guides.Should().HaveCount(3);
+        guides.Should().ContainSingle(line => line.Dashed && line.Start.X < line.End.X && line.Start.Y < line.End.Y);
+        guides.Should().ContainSingle(line => !line.Dashed && Math.Abs(line.Start.X - line.End.X) < 0.1);
+        guides.Should().ContainSingle(line => !line.Dashed && Math.Abs(line.Start.Y - line.End.Y) < 0.1);
         marks.Should().HaveCount(3);
         marks.Select(AutomationProperties.GetName).Should().Contain(name => name.Contains("references", StringComparison.Ordinal));
         marks.Select(AutomationProperties.GetName).Should().Contain(name => name.Contains("builds first", StringComparison.Ordinal));
         marks.Should().ContainSingle(button => button.Classes.Contains("back"));
-        ((Icon)marks.Single(button => ((GraphEdge)button.Tag!).Dashed).Content!).Kind.Should().Be("status-backlog");
+        ((Border)marks.Single(button => ((GraphEdge)button.Tag!).Dashed).Content!).Classes.Should().Contain("build");
+        matrix.Children.OfType<TextBlock>().Where(text => text.Classes.Contains("matrix-group")).Select(text => text.Text).Should().Equal("L1", "L0");
         var row = matrix.Children.OfType<Button>().First(button => button.Classes.Contains("matrix-row") && (string?)button.Tag == "src/Project00.csproj");
         row.Focus().Should().BeTrue();
         window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
@@ -305,13 +312,13 @@ public sealed class ArchitectureViewTests
             Application.Current!.RequestedThemeVariant = theme;
             UiChecks.Check(window).Should().BeEmpty($"the matrix should fit and remain readable in {theme}");
         }
-        toggle.IsChecked = false;
+        map.Command!.Execute(null);
         Ui.Settle();
         graph.Selected.Should().Be("src/Project00.csproj");
         graph.IsEffectivelyVisible.Should().BeTrue();
         if (width == 390)
         {
-            toggle.IsChecked = true;
+            toggle.Command.Execute(null);
             Ui.Settle();
             matrix.GetVisualAncestors().OfType<ScrollViewer>().Should().Contain(viewer => viewer.Extent.Width > viewer.Viewport.Width);
         }

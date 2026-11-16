@@ -89,8 +89,12 @@
               <TextBlock Classes="hint" Text="{Binding LayersHint}" TextWrapping="Wrap" />
               <Grid Name="LayersGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                 <StackPanel Spacing="8" Margin="0,0,12,0">
-                  <ToggleButton Name="MatrixSwitch" Classes="chip" Content="Matrix view" AutomationProperties.Name="Matrix view"
-                                IsVisible="{Binding Big}" IsChecked="{Binding Matrix}" HorizontalAlignment="Left" />
+                  <Border Classes="subnav" HorizontalAlignment="Left" IsVisible="{Binding Big}">
+                    <StackPanel Orientation="Horizontal">
+                      <Button Name="MapSwitch" Classes="matrix-switch" Classes.selected="{Binding !Matrix}" Content="Map" AutomationProperties.Name="Map" Command="{Binding ShowMapCommand}" />
+                      <Button Name="MatrixSwitch" Classes="matrix-switch" Classes.selected="{Binding Matrix}" Content="Matrix" AutomationProperties.Name="Matrix" Command="{Binding ShowMatrixCommand}" />
+                    </StackPanel>
+                  </Border>
                   <TextBlock Classes="hint" IsVisible="{Binding Matrix}" TextWrapping="Wrap"
                              Text="Rows reference numbered columns. Select a name or column for details; hollow marks build first, red marks reach up a layer or form a cycle." />
                   <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !Matrix}">

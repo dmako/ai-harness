@@ -255,6 +255,12 @@ public sealed partial class StructureSection : SectionViewModel
 
     partial void OnSelectedChanged(string? value) => DrawSide();
 
+    [RelayCommand]
+    private void ShowMap() => Matrix = false;
+
+    [RelayCommand]
+    private void ShowMatrix() => Matrix = true;
+
     partial void OnMatrixChanged(bool value) => DrawSide();
 
     protected override async Task LoadCoreAsync(CancellationToken token)

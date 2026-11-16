@@ -50,6 +50,27 @@
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
   </Style>
+  <Style Selector="Button.matrix-switch">
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.matrix-switch.selected">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Border.matrix-mark">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <Style Selector="Border.matrix-mark.build">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.matrix-mark.back">
+    <Setter Property="Background" Value="{DynamicResource Critical}" />
+  </Style>
   <Style Selector="Button.matrix-row, Button.matrix-column, Button.matrix-edge">
     <Setter Property="Padding" Value="2" />
     <Setter Property="Background" Value="Transparent" />
