@@ -224,8 +224,10 @@
                                   <TextBlock Classes="num" Classes.critical="{Binding IsProblem}" Classes.gold="{Binding IsWarn}" FontWeight="SemiBold"
                                              Text="{Binding Function.Complexity}" Margin="0,0,12,0" />
                                   <SelectableTextBlock Grid.Column="1" Classes="mono small" Text="{Binding Function.Name}" TextWrapping="Wrap" Margin="0,0,8,0" />
-                                  <Button Grid.Column="2" Classes="ghost small" Content="{Binding Place}" HorizontalAlignment="Left"
-                                          Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).ShowEvidenceCommand}" CommandParameter="{Binding Place}" />
+                                  <Button Grid.Column="2" Classes="ghost small" HorizontalContentAlignment="Left" AutomationProperties.Name="{Binding Place}"
+                                          Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).ShowEvidenceCommand}" CommandParameter="{Binding Place}">
+                                    <TextBlock Text="{Binding Place}" TextWrapping="Wrap" />
+                                  </Button>
                                 </Grid>
                               </Border>
                             </DataTemplate>

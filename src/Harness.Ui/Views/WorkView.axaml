@@ -292,28 +292,28 @@
                                 </StackPanel>
                                 <Button Classes="row" AutomationProperties.Name="{Binding AccessibleName}"
                                         Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.OpenTaskCommand}" CommandParameter="{Binding Id}">
-                                  <DockPanel>
-                                    <Border DockPanel.Dock="Right" Classes="pill" c:StyleClass.Name="{Binding StatusClass}" Margin="8,0,0,0">
-                                      <StackPanel Orientation="Horizontal">
-                                        <c:Icon Kind="{Binding StatusIcon}" />
-                                        <TextBlock Text="{Binding StatusWords}" />
-                                      </StackPanel>
-                                    </Border>
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0" VerticalAlignment="Center">
-                                      <c:Icon Classes="prio" c:StyleClass.Name="{Binding PriorityClass}" Kind="{Binding PriorityIcon}" />
-                                      <TextBlock Classes="small" Text="{Binding Priority}" />
-                                    </StackPanel>
-                                    <TextBlock DockPanel.Dock="Right" Classes="muted small" Text="{Binding Acceptance}" Margin="8,0,0,0"
-                                               VerticalAlignment="Center" ToolTip.Tip="acceptance criteria met" />
-                                    <TextBlock DockPanel.Dock="Left" Classes="mono small muted" Text="{Binding Id}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                    <c:Icon DockPanel.Dock="Left" Classes="type" c:StyleClass.Name="{Binding TypeIcon, StringFormat='ty-{0}'}" Kind="{Binding TypeIcon}" ToolTip.Tip="{Binding Type}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                  <WrapPanel ItemSpacing="8" LineSpacing="4">
+                                    <TextBlock Classes="mono small muted" Text="{Binding Id}" VerticalAlignment="Center" />
+                                    <c:Icon Classes="type" c:StyleClass.Name="{Binding TypeIcon, StringFormat='ty-{0}'}" Kind="{Binding TypeIcon}" ToolTip.Tip="{Binding Type}" VerticalAlignment="Center" />
                                     <WrapPanel VerticalAlignment="Center" ItemSpacing="8">
                                       <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
                                       <Border Classes="claimtag" Classes.warn="{Binding ClaimWarn}" Classes.bad="{Binding ClaimBad}" IsVisible="{Binding HasClaim}">
                                         <TextBlock Classes="small" Text="{Binding Claim}" TextWrapping="Wrap" />
                                       </Border>
                                     </WrapPanel>
-                                  </DockPanel>
+                                    <Border Classes="pill" c:StyleClass.Name="{Binding StatusClass}">
+                                      <StackPanel Orientation="Horizontal">
+                                        <c:Icon Kind="{Binding StatusIcon}" />
+                                        <TextBlock Text="{Binding StatusWords}" />
+                                      </StackPanel>
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                      <c:Icon Classes="prio" c:StyleClass.Name="{Binding PriorityClass}" Kind="{Binding PriorityIcon}" />
+                                      <TextBlock Classes="small" Text="{Binding Priority}" />
+                                    </StackPanel>
+                                    <TextBlock Classes="muted small" Text="{Binding Acceptance}"
+                                               VerticalAlignment="Center" ToolTip.Tip="acceptance criteria met" />
+                                  </WrapPanel>
                                 </Button>
                               </DockPanel>
                             </Border>

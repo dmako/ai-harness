@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
@@ -35,7 +36,16 @@ public sealed partial class App : Application
                     single.MainView = view;
                     break;
                 case IClassicDesktopStyleApplicationLifetime desktop:
-                    desktop.MainWindow = new Window { Title = "harness", Content = view, Width = 1280, Height = 800 };
+                    desktop.MainWindow = new Window
+                    {
+                        Title = "harness",
+                        Content = view,
+                        Width = 1280,
+                        Height = 800,
+#pragma warning disable S1075 // Avalonia's assembly resource URI, not a machine-specific path.
+                        Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://Harness.Ui/Assets/logo.png"))),
+#pragma warning restore S1075
+                    };
                     break;
                 default:
                     break;

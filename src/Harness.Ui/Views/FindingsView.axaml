@@ -90,9 +90,9 @@
           <Expander Header="{Binding EvidenceHead}" AutomationProperties.Name="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
             <StackPanel>
             <WrapPanel ItemSpacing="6">
-              <Button Classes="ghost small" Content="Compare 2 places" IsVisible="{Binding CanCompare}"
+              <Button Classes="ghost small" Content="Compare 2 places" AutomationProperties.Name="Compare 2 places" IsVisible="{Binding CanCompare}"
                       Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).CompareEvidenceCommand}" CommandParameter="{Binding}" />
-              <Button Classes="ghost small" Content="Compare 3 places" IsVisible="{Binding CanCompareThree}"
+              <Button Classes="ghost small" Content="Compare 3 places" AutomationProperties.Name="Compare 3 places" IsVisible="{Binding CanCompareThree}"
                       Command="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).CompareThreeEvidenceCommand}" CommandParameter="{Binding}" />
             </WrapPanel>
             <ItemsControl ItemsSource="{Binding EvidencePlaces}">

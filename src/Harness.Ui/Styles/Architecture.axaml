@@ -17,6 +17,10 @@
   <Style Selector="Border.project-mark.pc5"><Setter Property="BorderBrush" Value="{DynamicResource CFact}" /></Style>
   <Style Selector="Border.project-mark.pc6"><Setter Property="BorderBrush" Value="{DynamicResource COpenQuestion}" /></Style>
   <Style Selector="Border.project-mark.pc7"><Setter Property="BorderBrush" Value="{DynamicResource Accent}" /></Style>
+  <Style Selector="Border.project-mark TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
   <Style Selector="Border.project-mark.compact">
     <Setter Property="Width" Value="20" />
     <Setter Property="Height" Value="20" />
@@ -43,10 +47,6 @@
   <Style Selector="Border.project-mark.compact.pc6 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk6}" /></Style>
   <Style Selector="Border.project-mark.compact.pc7"><Setter Property="Background" Value="{DynamicResource ProjectMarkFill7}" /><Setter Property="BorderBrush" Value="{DynamicResource ProjectMarkBorder7}" /></Style>
   <Style Selector="Border.project-mark.compact.pc7 TextBlock"><Setter Property="Foreground" Value="{DynamicResource ProjectMarkInk7}" /></Style>
-  <Style Selector="Border.project-mark TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
-    <Setter Property="FontWeight" Value="Bold" />
-  </Style>
   <Style Selector="Button.health-badge">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />

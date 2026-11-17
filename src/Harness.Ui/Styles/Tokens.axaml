@@ -12,28 +12,28 @@
       <SolidColorBrush x:Key="Ink" Color="#1c1c1b" />
       <SolidColorBrush x:Key="ProjectMarkFill0" Color="#2e1b8f66" />
       <SolidColorBrush x:Key="ProjectMarkBorder0" Color="#661b8f66" />
-      <SolidColorBrush x:Key="ProjectMarkInk0" Color="#1b6c4f" />
+      <SolidColorBrush x:Key="ProjectMarkInk0" Color="#1c4a39" />
       <SolidColorBrush x:Key="ProjectMarkFill1" Color="#2e5b4bb3" />
       <SolidColorBrush x:Key="ProjectMarkBorder1" Color="#665b4bb3" />
-      <SolidColorBrush x:Key="ProjectMarkInk1" Color="#483d85" />
+      <SolidColorBrush x:Key="ProjectMarkInk1" Color="#352f58" />
       <SolidColorBrush x:Key="ProjectMarkFill2" Color="#2ed0612c" />
       <SolidColorBrush x:Key="ProjectMarkBorder2" Color="#66d0612c" />
-      <SolidColorBrush x:Key="ProjectMarkInk2" Color="#9a4c27" />
+      <SolidColorBrush x:Key="ProjectMarkInk2" Color="#643822" />
       <SolidColorBrush x:Key="ProjectMarkFill3" Color="#2e006b6c" />
       <SolidColorBrush x:Key="ProjectMarkBorder3" Color="#66006b6c" />
-      <SolidColorBrush x:Key="ProjectMarkInk3" Color="#085354" />
+      <SolidColorBrush x:Key="ProjectMarkInk3" Color="#113c3b" />
       <SolidColorBrush x:Key="ProjectMarkFill4" Color="#2ec7413b" />
       <SolidColorBrush x:Key="ProjectMarkBorder4" Color="#66c7413b" />
-      <SolidColorBrush x:Key="ProjectMarkInk4" Color="#943631" />
+      <SolidColorBrush x:Key="ProjectMarkInk4" Color="#602b28" />
       <SolidColorBrush x:Key="ProjectMarkFill5" Color="#2e3f7d2a" />
       <SolidColorBrush x:Key="ProjectMarkBorder5" Color="#663f7d2a" />
-      <SolidColorBrush x:Key="ProjectMarkInk5" Color="#346026" />
+      <SolidColorBrush x:Key="ProjectMarkInk5" Color="#2a4321" />
       <SolidColorBrush x:Key="ProjectMarkFill6" Color="#2eb47a12" />
       <SolidColorBrush x:Key="ProjectMarkBorder6" Color="#66b47a12" />
-      <SolidColorBrush x:Key="ProjectMarkInk6" Color="#865e15" />
+      <SolidColorBrush x:Key="ProjectMarkInk6" Color="#594217" />
       <SolidColorBrush x:Key="ProjectMarkFill7" Color="#2e006b6c" />
       <SolidColorBrush x:Key="ProjectMarkBorder7" Color="#66006b6c" />
-      <SolidColorBrush x:Key="ProjectMarkInk7" Color="#085354" />
+      <SolidColorBrush x:Key="ProjectMarkInk7" Color="#113c3b" />
       <SolidColorBrush x:Key="Ink2" Color="#494949" />
       <SolidColorBrush x:Key="Muted" Color="#6e6e6d" />
       <SolidColorBrush x:Key="Border" Color="#241c1c1b" />
@@ -79,28 +79,28 @@
       <SolidColorBrush x:Key="Ink" Color="#f3ecdf" />
       <SolidColorBrush x:Key="ProjectMarkFill0" Color="#2e3fbf8f" />
       <SolidColorBrush x:Key="ProjectMarkBorder0" Color="#663fbf8f" />
-      <SolidColorBrush x:Key="ProjectMarkInk0" Color="#75cca7" />
+      <SolidColorBrush x:Key="ProjectMarkInk0" Color="#abdabf" />
       <SolidColorBrush x:Key="ProjectMarkFill1" Color="#2e9d90f0" />
       <SolidColorBrush x:Key="ProjectMarkBorder1" Color="#669d90f0" />
-      <SolidColorBrush x:Key="ProjectMarkInk1" Color="#b7aceb" />
+      <SolidColorBrush x:Key="ProjectMarkInk1" Color="#d1c7e6" />
       <SolidColorBrush x:Key="ProjectMarkFill2" Color="#2ee07a45" />
       <SolidColorBrush x:Key="ProjectMarkBorder2" Color="#66e07a45" />
-      <SolidColorBrush x:Key="ProjectMarkInk2" Color="#e69c73" />
+      <SolidColorBrush x:Key="ProjectMarkInk2" Color="#ebbea1" />
       <SolidColorBrush x:Key="ProjectMarkFill3" Color="#2e4fb4b1" />
       <SolidColorBrush x:Key="ProjectMarkBorder3" Color="#664fb4b1" />
-      <SolidColorBrush x:Key="ProjectMarkInk3" Color="#80c5bf" />
+      <SolidColorBrush x:Key="ProjectMarkInk3" Color="#b1d6cd" />
       <SolidColorBrush x:Key="ProjectMarkFill4" Color="#2ee66767" />
       <SolidColorBrush x:Key="ProjectMarkBorder4" Color="#66e66767" />
-      <SolidColorBrush x:Key="ProjectMarkInk4" Color="#ea8f8b" />
+      <SolidColorBrush x:Key="ProjectMarkInk4" Color="#eeb7af" />
       <SolidColorBrush x:Key="ProjectMarkFill5" Color="#2e7fb860" />
       <SolidColorBrush x:Key="ProjectMarkBorder5" Color="#667fb860" />
-      <SolidColorBrush x:Key="ProjectMarkInk5" Color="#a2c886" />
+      <SolidColorBrush x:Key="ProjectMarkInk5" Color="#c5d7ac" />
       <SolidColorBrush x:Key="ProjectMarkFill6" Color="#2ee2a33b" />
       <SolidColorBrush x:Key="ProjectMarkBorder6" Color="#66e2a33b" />
-      <SolidColorBrush x:Key="ProjectMarkInk6" Color="#e7b96c" />
+      <SolidColorBrush x:Key="ProjectMarkInk6" Color="#eccf9d" />
       <SolidColorBrush x:Key="ProjectMarkFill7" Color="#2e4fb4b1" />
       <SolidColorBrush x:Key="ProjectMarkBorder7" Color="#664fb4b1" />
-      <SolidColorBrush x:Key="ProjectMarkInk7" Color="#80c5bf" />
+      <SolidColorBrush x:Key="ProjectMarkInk7" Color="#b1d6cd" />
       <SolidColorBrush x:Key="Ink2" Color="#c2bbae" />
       <SolidColorBrush x:Key="Muted" Color="#9b958a" />
       <SolidColorBrush x:Key="Border" Color="#1af3ecdf" />

@@ -120,7 +120,7 @@ public sealed class ArchitectureViewTests
         var (window, _, model) = await OpenAsync("architecture/complexity", api, width);
         window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
         var button = window.GetVisualDescendants().OfType<Button>()
-            .Single(b => b.Content is string text && text == "src/Fixture.Core/Rules.cs:5");
+            .Single(b => AutomationProperties.GetName(b) == "src/Fixture.Core/Rules.cs:5");
         button.Command.Should().NotBeNull();
         button.Command.Execute(button.CommandParameter);
         var dialog = await DialogAsync<EvidenceDialog>(model);
