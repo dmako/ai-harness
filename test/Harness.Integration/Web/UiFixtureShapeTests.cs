@@ -6,6 +6,7 @@ using Harness.Core.Tasks;
 using Harness.Infrastructure.Findings;
 using Harness.Infrastructure.Memory;
 using Harness.Infrastructure.Tasks;
+using Harness.Integration.Providers;
 using Harness.Integration.Sync;
 using Xunit;
 
@@ -31,9 +32,32 @@ public sealed class UiFixtureShapeTests
     public async Task CommittedUiFixturesMatchTheServersShapes()
     {
         using var fixture = await SyncFixture.CreateAsync();
+        using var graphify = new GraphifyFixture();
+        graphify.Ready("fixture-session");
+        var executable = Path.ChangeExtension(ProviderFixture.Worker, ".exe");
+        if (!OperatingSystem.IsWindows())
+        {
+            executable = Path.Combine(fixture.DirectoryRoot, "graphify-fixture");
+            await File.WriteAllTextAsync(
+                executable,
+                "#!/bin/sh\nexec dotnet '"
+                    + ProviderFixture.Worker.Replace("'", "'\\''", StringComparison.Ordinal)
+                    + "' \"$@\"\n",
+                Token
+            );
+            File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        await File.WriteAllTextAsync(
+            fixture.Lifecycle.GlobalConfigurationPath,
+            "[providers.graphify-csharp]\nargs = ['--graphify', '" + executable.Replace('\\', '/') + "']\n",
+            Token
+        );
         Seed(fixture);
         await CodeAsync(fixture);
-        await using var server = await UiFixture.StartAsync(fixture);
+        await using var server = await UiFixture.StartAsync(
+            fixture,
+            environment: new Dictionary<string, string> { ["HARNESS_FAKE_GRAPHIFY"] = graphify.Data }
+        );
         var projects = JsonNode.Parse(await server.Client.GetStringAsync("/api/projects", Token))!;
         var id = (string)projects["projects"]![0]!["id"]!;
         await TitleAsync(server, id, "Fixture project");

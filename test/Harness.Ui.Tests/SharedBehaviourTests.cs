@@ -175,6 +175,8 @@ public sealed class SharedBehaviourTests
         var tasks = new TestSection(services, "p1 tasks", null, "p1", ["tasks"]);
         var knowledge = new TestSection(services, "p1 knowledge", null, "p1", ["knowledge"]);
         var other = new TestSection(services, "p2 tasks", null, "p2", ["tasks"]);
+        var applyTimes = new List<long>();
+        services.Live.Applied += (_, _) => applyTimes.Add(System.Diagnostics.Stopwatch.GetTimestamp());
         foreach (var s in new[] { tasks, knowledge, other })
         {
             s.Follow(services.Live);
@@ -190,10 +192,10 @@ public sealed class SharedBehaviourTests
         knowledge.Loads.Should().Be(0);
         other.Loads.Should().Be(0);
 
-        var applied = DateTime.UtcNow;
         services.Live.Changed(Change("p1", "knowledge"));
         await Ui.UntilAsync(() => services.Live.Applies is 2);
-        (DateTime.UtcNow - applied).Should().BeGreaterThan(TimeSpan.FromMilliseconds(400), "applies keep their gap");
+        System.Diagnostics.Stopwatch.GetElapsedTime(applyTimes[0], applyTimes[1])
+            .Should().BeGreaterThan(TimeSpan.FromMilliseconds(400), "applies keep their gap");
         knowledge.Loads.Should().Be(1);
         tasks.Loads.Should().Be(1);
 
