@@ -46,8 +46,7 @@ public static class AgentHostFiles
     public static string NewKey() => Guid.NewGuid().ToString("N");
 
     /// <summary>
-    /// Creates the agents folder, which keeps itself out of Git: its own .gitignore ignores everything in it, while
-    /// projects' .harness/.gitignore (older ones included) only the database.
+    /// Creates the agents folder and, when absent, a .gitignore for database files and their sidecars.
     /// </summary>
     public static void Prepare(string directory)
     {

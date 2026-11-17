@@ -72,7 +72,9 @@ public sealed class AgentServerTests : IDisposable
             .Should()
             .BeInAscendingOrder()
             .And.OnlyHaveUniqueItems();
-        (await File.ReadAllLinesAsync(Path.Combine(State, ".gitignore"), Token)).Should().Contain("*");
+        (await File.ReadAllLinesAsync(Path.Combine(State, ".gitignore"), Token))
+            .Should().Contain(["*.db", "*.db-wal", "*.db-shm", "*.db.findings-inputs"])
+            .And.NotContain("*");
         await ProviderFixture.GoneAsync(ClientPid());
     }
 
