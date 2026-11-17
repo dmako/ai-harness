@@ -118,7 +118,9 @@ public static class ScmTypes
 /// <summary>A graphify-csharp session (app.js graphifySessions row): its solution, state, detail and actions.</summary>
 public sealed record GraphifyRow(GraphifySession Session)
 {
-    public string Solution => Session.ProjectName is { Length: > 0 } name ? name : Path.GetFileName(Session.Root.TrimEnd('\\', '/'));
+    public string Solution => Session.ProjectName is { Length: > 0 } name
+        ? name
+        : Path.GetFileName(Session.Root.Replace('\\', '/').TrimEnd('/'));
     public string Href => Session.ProjectId is { } id ? Route.ProjectHref(id, "agents", "tools") : "";
     public bool HasProject => Session.ProjectId is not null;
     public string StateWord => (Session.Summary ?? Session.State ?? "").Split(", ")[0];

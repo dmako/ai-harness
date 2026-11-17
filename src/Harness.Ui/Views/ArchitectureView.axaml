@@ -277,7 +277,7 @@
                   <TextBlock Classes="th" Text="file" TextWrapping="Wrap" />
                   <TextBlock Grid.Column="1" Classes="th" Text="commits" />
                   <TextBlock Grid.Column="2" Classes="th num" Text="complexity" />
-                  <TextBlock Grid.Column="3" Classes="th" Text="changes together with" Margin="12,0,0,0" />
+                  <TextBlock Grid.Column="3" Classes="th" Text="changes together with" />
                 </Grid>
               </Border>
               <ItemsControl Name="CouplingRows" ItemsSource="{Binding Rows}">
@@ -295,8 +295,8 @@
                         </StackPanel>
                         <TextBlock Grid.Column="2" Classes="num small" Classes.critical="{Binding IsProblem}" Classes.gold="{Binding IsWarn}"
                                    Text="{Binding ComplexityText}" />
-                        <TextBlock Grid.Column="3" Classes="muted small" Text="nothing often" IsVisible="{Binding !HasPartners}" Margin="12,0,0,0" />
-                        <ItemsControl Grid.Column="3" Classes="coupling-partners" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}" Margin="12,0,0,0">
+                        <TextBlock Grid.Column="3" Classes="muted small" Text="nothing often" IsVisible="{Binding !HasPartners}" />
+                        <ItemsControl Grid.Column="3" Classes="coupling-partners" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
                           </ItemsControl.ItemsPanel>

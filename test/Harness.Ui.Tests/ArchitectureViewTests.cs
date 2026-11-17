@@ -543,6 +543,7 @@ public sealed class ArchitectureViewTests
         api.Answers[Root + "/coupling"] = data.ToJsonString();
         var (window, _, model) = await OpenAsync("architecture/coupling", api, width, 800);
         await Ui.UntilAsync(() => Architecture(model).Coupling.HasContent);
+        Ui.Settle();
         var view = window.GetVisualDescendants().OfType<ArchitectureView>().Single();
         var header = view.FindControl<Grid>("CouplingHeader")!;
         var rows = view.FindControl<ItemsControl>("CouplingRows")!;

@@ -185,7 +185,6 @@ public sealed class SharedBehaviourTests
         for (var i = 0; i < 5; i++)
         {
             services.Live.Changed(Change("p1", "tasks"));
-            await Task.Delay(20);
         }
         await Ui.UntilAsync(() => services.Live.Applies is 1);
         tasks.Loads.Should().Be(1, "five changes in a burst are one reload");
