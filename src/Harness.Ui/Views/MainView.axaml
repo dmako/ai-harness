@@ -13,6 +13,10 @@
   <!-- the page frame: the sidebar (beside the page when wide, over it when narrow), the top bar, and the page the
        address names; toasts and the open dialog above everything -->
   <UserControl.Styles>
+    <Style Selector="ToggleButton#Menu:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton#Menu:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton#Menu:checked:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
     <Style Selector=":is(UserControl).pointer-hover Border.trow Button.hover-remove, :is(UserControl).pointer-hover Border.bpcard Button.hover-remove">
       <Setter Property="Opacity" Value="0" />
     </Style>

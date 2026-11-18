@@ -1,10 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Presenters;
 using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
@@ -361,6 +363,14 @@ public sealed class ShellTests
         {
             firstWidth.Should().BeGreaterThan(page.Bounds.Width);
         }
+        menu.IsChecked = true;
+        Ui.Settle();
+        Application.Current!.TryGetResource("AccentWash", window.ActualThemeVariant, out var accentWash).Should().BeTrue();
+        var presenter = menu.GetVisualDescendants().OfType<ContentPresenter>().Single(p => p.Name is "PART_ContentPresenter");
+        ((ISolidColorBrush)presenter.Background!).Color.Should().Be(((ISolidColorBrush)accentWash!).Color);
+        window.MouseMove(menu.TranslatePoint(new Point(menu.Bounds.Width / 2, menu.Bounds.Height / 2), window)!.Value);
+        Ui.Settle();
+        ((ISolidColorBrush)presenter.Background).Color.Should().Be(((ISolidColorBrush)accentWash).Color);
         window.Close();
     });
 
