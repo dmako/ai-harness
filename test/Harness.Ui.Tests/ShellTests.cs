@@ -68,6 +68,37 @@ public sealed class ShellTests
     });
 
     [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task ProjectBadgesUseTheSameColorsInTheHeaderAndSidebar(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await Ui.OpenMainAsync(width, 800, address: "#/p/prj_fixture/architecture");
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        await Ui.UntilAsync(() => model.Page is ProjectPage { Stack: not null });
+        var main = window.GetVisualDescendants().OfType<MainView>().Single();
+        main.FindControl<ToggleButton>("Menu")!.IsChecked = true;
+        Ui.Settle();
+        var header = window.GetVisualDescendants().OfType<ProjectPageView>().Single()
+            .GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("project-mark"));
+        var color = "pc" + ((ProjectPage)model.Page!).Project.MarkColor;
+        var sidebar = main.FindControl<Border>("Sidebar")!.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("project-mark") && b.Classes.Contains(color));
+        header.Classes.Should().Contain(color);
+        foreach (var mark in new[] { header, sidebar })
+        {
+            mark.Bounds.Width.Should().BeApproximately(mark.Bounds.Height, 0.1);
+        }
+        ((ISolidColorBrush)header.Background!).Color.Should().Be(((ISolidColorBrush)sidebar.Background!).Color);
+        ((ISolidColorBrush)header.BorderBrush!).Color.Should().Be(((ISolidColorBrush)sidebar.BorderBrush!).Color);
+        var headerText = (TextBlock)header.Child!;
+        var sidebarText = (TextBlock)sidebar.Child!;
+        ((ISolidColorBrush)headerText.Foreground!).Color.Should().Be(((ISolidColorBrush)sidebarText.Foreground!).Color);
+        window.Close();
+    });
+
+    [Theory]
     [InlineData("ok", 0, 0, null, "healthy", "ok")]
     [InlineData("ok", 1, 0, null, "1 check failing", "bad")]
     [InlineData("ok", 0, 2, null, "2 warnings", "warn")]
