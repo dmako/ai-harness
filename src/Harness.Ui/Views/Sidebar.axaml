@@ -43,10 +43,10 @@
                   <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}" ToolTip.Tip="waiting for you in its projects">
                     <TextBlock Text="{Binding Waiting}" />
                   </Border>
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <c:Icon Kind="workspace" />
-                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <c:Icon Kind="workspace" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+                  </Grid>
                 </DockPanel>
               </c:AppLink>
               <ItemsControl ItemsSource="{Binding Members}">
@@ -63,7 +63,7 @@
                                 Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
                                 Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
                                 Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
-                        <StackPanel Orientation="Horizontal" Spacing="6"><Border Classes="project-mark compact" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /></StackPanel>
+                        <Grid ColumnDefinitions="Auto,*"><Border Classes="project-mark compact" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Grid.Column="1" Margin="6,0,0,0" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" /></Grid>
                       </DockPanel>
                     </c:AppLink>
                   </DataTemplate>
@@ -92,7 +92,7 @@
                         Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
                         Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
                         Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
-                <StackPanel Orientation="Horizontal" Spacing="6"><Border Classes="project-mark compact" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /></StackPanel>
+                <Grid ColumnDefinitions="Auto,*"><Border Classes="project-mark compact" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Grid.Column="1" Margin="6,0,0,0" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" /></Grid>
               </DockPanel>
             </c:AppLink>
           </DataTemplate>

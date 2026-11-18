@@ -232,6 +232,39 @@ public sealed class ShellTests
         other.Waiting.Should().Be(2, "a failing check, and its state cannot be read");
     });
 
+    [Theory]
+    [InlineData(390)]
+    [InlineData(1280)]
+    public Task LongSidebarNamesAreTruncatedAndHaveTooltips(int width) => Ui.RunAsync(async () =>
+    {
+        const string Workspace = "A very long workspace name that should never stretch the navigation sidebar";
+        const string Member = "A very long project name inside the workspace that must be truncated";
+        const string Outside = "A very long project name outside the workspace that must be truncated";
+        var api = new FixtureApi();
+        api.Answers["/api/projects"] = $$$"""
+            {"projects":[
+              {"id":"prj_fixture","title":"{{{Member}}}","root":"/fixture","live":{"state":"ok","pending_proposals":0,"pending_arch_proposals":0,"pending_task_proposals":0,"pending_blueprint_proposals":0,"removed_from_project":0,"checks_failed":0,"checks_warned":0},"workspaces":["main"]},
+              {"id":"prj_other","title":"{{{Outside}}}","root":"/other","live":{"state":"ok","pending_proposals":0,"pending_arch_proposals":0,"pending_task_proposals":0,"pending_blueprint_proposals":0,"removed_from_project":0,"checks_failed":0,"checks_warned":0}}]}
+            """;
+        api.Answers["/api/workspaces"] = $$$"""
+            {"workspaces":[{"id":"ws_fixture","name":"main","title":"{{{Workspace}}}","members":[{"project_id":"prj_fixture"}]}]}
+            """;
+        var (window, _, _) = await Ui.OpenMainAsync(width, 800, api: api, address: "#/");
+        var main = window.GetVisualDescendants().OfType<MainView>().Single();
+        main.FindControl<ToggleButton>("Menu")!.IsChecked = true;
+        Ui.Settle();
+        var sidebar = main.FindControl<Border>("Sidebar")!;
+        sidebar.Bounds.Width.Should().BeApproximately(264, 1);
+        foreach (var name in new[] { Workspace, Member, Outside })
+        {
+            var text = sidebar.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == name);
+            text.TextTrimming.Should().Be(TextTrimming.CharacterEllipsis);
+            ToolTip.GetTip(text).Should().Be(name);
+            text.Bounds.Width.Should().BeLessThan(220);
+        }
+        window.Close();
+    });
+
     [Fact]
     public Task HomeShowsTheTilesTheWorkspacesAndTheProjectsOutside() => Ui.RunAsync(async () =>
     {
