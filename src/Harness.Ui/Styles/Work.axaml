@@ -2,10 +2,10 @@
      and the Inbox's proposals. While something is dragged (WorkView.axaml.cs) the targets are outlined. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="using:Harness.Ui.Controls" xmlns:views="using:Harness.Ui.Views">
-  <Style Selector="StackPanel.task-metadata">
+  <Style Selector="Grid.task-metadata">
     <Setter Property="Grid.Column" Value="1" />
   </Style>
-  <Style Selector=":is(views|WorkView).compact StackPanel.task-metadata">
+  <Style Selector=":is(views|WorkView).compact Grid.task-metadata">
     <Setter Property="Grid.Column" Value="0" />
     <Setter Property="Grid.Row" Value="1" />
     <Setter Property="Grid.ColumnSpan" Value="2" />

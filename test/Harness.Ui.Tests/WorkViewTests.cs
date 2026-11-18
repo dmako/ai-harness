@@ -49,7 +49,7 @@ public sealed class WorkViewTests
         (titleLeft - iconRight).Should().BeInRange(0, 8);
         title.Bounds.Width.Should().BeGreaterThan(0);
         title.TextWrapping.Should().Be(Avalonia.Media.TextWrapping.Wrap);
-        var metadata = row.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Classes.Contains("task-metadata"));
+        var metadata = row.GetVisualDescendants().OfType<Grid>().Single(p => p.Classes.Contains("task-metadata"));
         metadata.Children[0].Should().BeOfType<TextBlock>().Which.Text.Should().Be(((TaskRow)row.DataContext!).Acceptance);
         metadata.Children[1].Should().BeOfType<StackPanel>();
         metadata.Children[2].Should().BeOfType<Border>();
@@ -64,6 +64,17 @@ public sealed class WorkViewTests
             headingRight.Should().BeLessThanOrEqualTo(metadataLeft);
         }
         row.GetVisualDescendants().OfType<Button>().Count(b => Avalonia.Automation.AutomationProperties.GetName(b) is "Edit TASK-0001" or "Delete TASK-0001").Should().Be(2);
+        var other = window.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("drag-task") && b.DataContext is TaskRow { Id: "TASK-0003" });
+        var otherHeading = other.GetVisualDescendants().OfType<Grid>().Single(g => g.Classes.Contains("task-heading"));
+        var otherMetadata = other.GetVisualDescendants().OfType<Grid>().Single(g => g.Classes.Contains("task-metadata"));
+        for (var i = 0; i < 3; i++)
+        {
+            heading.ColumnDefinitions[i].ActualWidth.Should().BeApproximately(otherHeading.ColumnDefinitions[i].ActualWidth, 1);
+            metadata.ColumnDefinitions[i].ActualWidth.Should().BeApproximately(otherMetadata.ColumnDefinitions[i].ActualWidth, 1);
+            metadata.Children[i].TranslatePoint(default, row)!.Value.X.Should().BeApproximately(
+                otherMetadata.Children[i].TranslatePoint(default, other)!.Value.X, 1);
+        }
         UiChecks.Check(window).Should().BeEmpty();
         window.Close();
     });
