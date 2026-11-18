@@ -615,7 +615,27 @@ public sealed class ArchitectureViewTests
         var file = grids[0].GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("coupling-file-name"));
         file.TextWrapping.Should().Be(Avalonia.Media.TextWrapping.Wrap);
         file.Text.Should().EndWith("WithoutBeingCutOff.cs");
-        grids[0].GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("coupling-badge")).Should().HaveCount(3);
+        var badges = grids[0].GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("coupling-badge")).ToArray();
+        badges.Should().HaveCount(3);
+        var partnerColumn = grids[0].Children.OfType<ItemsControl>().Single(control => control.Classes.Contains("coupling-partners"));
+        var positions = badges.Select(badge => badge.TranslatePoint(default, partnerColumn)!.Value).ToArray();
+        positions.Select(point => point.Y).Distinct().Count().Should().BeGreaterThan(1, $"column {partnerColumn.Bounds}, badges {string.Join(", ", badges.Select((b, i) => $"{positions[i]} {b.Bounds}"))}");
+        for (var i = 0; i < badges.Length; i++)
+        {
+            var badge = badges[i];
+            var partner = Architecture(model).Coupling.Rows[0].Partners[i];
+            var name = badge.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Classes.Contains("coupling-partner-name"));
+            var percent = badge.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Classes.Contains("coupling-partner-percent"));
+            name.Text.Should().Be(partner.Name);
+            name.TextTrimming.Should().Be(Avalonia.Media.TextTrimming.CharacterEllipsis);
+            name.TextWrapping.Should().Be(Avalonia.Media.TextWrapping.NoWrap);
+            percent.Text.Should().Be(partner.Percentage);
+            percent.Bounds.Width.Should().BeGreaterThan(0);
+            name.Bounds.Height.Should().BeApproximately(percent.Bounds.Height, 1);
+            (positions[i].X + badge.Bounds.Width).Should().BeLessThanOrEqualTo(partnerColumn.Bounds.Width + 1);
+            ToolTip.GetTip(badge).Should().Be(partner.Detail);
+            Avalonia.Automation.AutomationProperties.GetName(badge).Should().Be(partner.Detail);
+        }
         grids[0].GetVisualDescendants().OfType<Meter>().Single().BrushKey.Should().Be("Accent");
         foreach (var theme in new[] { ThemeVariant.Light, ThemeVariant.Dark })
         {

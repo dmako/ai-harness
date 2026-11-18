@@ -296,14 +296,17 @@
                         <TextBlock Grid.Column="2" Classes="num small" Classes.critical="{Binding IsProblem}" Classes.gold="{Binding IsWarn}"
                                    Text="{Binding ComplexityText}" TextAlignment="Center" />
                         <TextBlock Grid.Column="3" Classes="muted small" Text="nothing often" IsVisible="{Binding !HasPartners}" />
-                        <ItemsControl Grid.Column="3" Classes="coupling-partners" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}">
+                        <ItemsControl Grid.Column="3" Classes="coupling-partners" MaxWidth="480" HorizontalAlignment="Left" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
                           </ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PartnerBadge">
-                              <Border Classes="pill coupling-badge" ToolTip.Tip="{Binding Detail}" AutomationProperties.Name="{Binding Detail}">
-                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" MaxWidth="220" />
+                              <Border Classes="pill coupling-badge" MaxWidth="180" ToolTip.Tip="{Binding Detail}" AutomationProperties.Name="{Binding Detail}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                  <TextBlock Classes="coupling-partner-name" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Grid.Column="1" Classes="coupling-partner-percent" Text="{Binding Percentage}" />
+                                </Grid>
                               </Border>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>

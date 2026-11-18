@@ -579,7 +579,9 @@ public sealed partial class ComplexitySection(UiServices services, string projec
 /// <summary>A file that often changes with a hotspot, shown as a badge with its full details.</summary>
 public sealed record PartnerBadge(Partner Partner)
 {
-    public string Label => $"{Partner.Path.Split('/')[^1]} {Overview.Pct(Partner.Share)}";
+    public string Name => Partner.Path.Split('/')[^1];
+    public string Percentage => Overview.Pct(Partner.Share);
+    public string Label => $"{Name} {Percentage}";
     public string Detail => $"{Partner.Path}: {Partner.Together} commits together, {Overview.Pct(Partner.Share)} of its commits";
 }
 
