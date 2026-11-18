@@ -25,6 +25,42 @@ public sealed class WorkViewTests
     private const string Root = "/api/projects/prj_fixture";
 
     [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task TaskDialogsKeepActionsVisibleWithLongContent(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        var tasks = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(Fixtures.Folder, "api/projects/{id}/tasks.json")))!;
+        tasks["tasks"]![0]!["goal"] = string.Join("\n", Enumerable.Repeat("Long task detail", 80));
+        api.Answers[Root + "/tasks"] = tasks.ToJsonString();
+        var (window, _, model) = await OpenAsync("tasks", api, width, 600);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        _ = Work(model).Plan.OpenTaskCommand.ExecuteAsync("TASK-0001");
+        var detail = await DialogAsync<TaskDialog>(model);
+        await detail.Loaded;
+        Ui.Settle();
+        var layer = window.GetVisualDescendants().OfType<DialogLayer>().Single();
+        var detailScroll = layer.FindControl<ScrollViewer>("DialogScroll")!;
+        detailScroll.Extent.Height.Should().BeGreaterThan(detailScroll.Viewport.Height);
+        var accept = layer.FindControl<Button>("Accept")!;
+        accept.TranslatePoint(new Point(0, accept.Bounds.Height), window)!.Value.Y.Should().BeLessThanOrEqualTo(window.Bounds.Height);
+        detail.Cancel();
+        await Ui.UntilAsync(() => !model.Services.Dialogs.IsOpen);
+        _ = Work(model).Plan.NewTaskCommand.ExecuteAsync(null);
+        var form = await DialogAsync<TaskFormDialog>(model);
+        form.Goal = string.Join("\n", Enumerable.Repeat("Long task description", 80));
+        Ui.Settle();
+        var scroll = layer.FindControl<ScrollViewer>("DialogScroll")!;
+        accept = layer.FindControl<Button>("Accept")!;
+        scroll.Extent.Height.Should().BeGreaterThan(scroll.Viewport.Height);
+        accept.TranslatePoint(new Point(0, accept.Bounds.Height), window)!.Value.Y.Should().BeLessThanOrEqualTo(window.Bounds.Height);
+        form.Cancel();
+        window.Close();
+    });
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public Task NeutralButtonGetsAnAccentOutlineOnHover(bool dark) => Ui.RunAsync(() =>

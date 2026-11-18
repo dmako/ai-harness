@@ -1,5 +1,5 @@
 <!-- Feedback (style.css .toast, .dlg): a toast is a pill with a round tick (good, or critical with .bad and its detail
-     below); a dialog is a raised Surface card over a Backdrop, 520 px wide (680 with .wide). -->
+     below); dialogs use the available viewport, with a wider limit for comparisons and long forms. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="using:Harness.Ui.Controls">
   <Style Selector="Border.toast">
@@ -59,13 +59,13 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusXl}" />
     <Setter Property="BoxShadow" Value="{DynamicResource Shadow2}" />
-    <Setter Property="MaxWidth" Value="520" />
+    <Setter Property="MaxWidth" Value="900" />
     <Setter Property="Margin" Value="16" />
-    <Setter Property="HorizontalAlignment" Value="Center" />
-    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
   </Style>
   <Style Selector="Border.dialog.wide">
-    <Setter Property="MaxWidth" Value="680" />
+    <Setter Property="MaxWidth" Value="1280" />
   </Style>
   <Style Selector="Border.dialog TextBlock.title">
     <Setter Property="FontSize" Value="{StaticResource TextLg}" />

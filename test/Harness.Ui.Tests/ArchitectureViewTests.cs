@@ -109,6 +109,38 @@ public sealed class ArchitectureViewTests
     });
 
     [Theory]
+    [InlineData(390, false, 1)]
+    [InlineData(390, true, 3)]
+    [InlineData(1280, false, 2)]
+    [InlineData(1280, true, 3)]
+    public Task EvidenceComparisonUsesWideScrollableDialog(int width, bool dark, int count) => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        api.Answers[Root + "/snippet"] = """{"snippet":{"path":"src/A.cs","start":1,"lines":["line"]}}""";
+        var (window, _, model) = await OpenAsync("architecture", api, width);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var finding = new FindingRow(new Harness.Ui.Api.Finding
+        {
+            Kind = "duplicate", Level = "warn", Title = "Copies", Evidence = ["src/A.cs:1", "src/B.cs:1", "src/C.cs:1"],
+        }, false);
+        if (count == 1) { _ = model.ShowEvidenceCommand.ExecuteAsync("src/A.cs:1"); }
+        else if (count == 2) { _ = model.CompareEvidenceCommand.ExecuteAsync(finding); }
+        else { _ = model.CompareThreeEvidenceCommand.ExecuteAsync(finding); }
+        var dialog = await DialogAsync<EvidenceDialog>(model);
+        await Ui.UntilAsync(() => dialog.Panes.Count == count && dialog.Panes.All(p => p.Text != "Loading…"));
+        Ui.Settle();
+        var layer = window.GetVisualDescendants().OfType<DialogLayer>().Single();
+        var frame = layer.FindControl<Border>("Dialog")!;
+        frame.Bounds.Width.Should().BeApproximately(width - 32, 2);
+        var panes = layer.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("inset") && b.DataContext is EvidencePane).ToArray();
+        panes.Should().HaveCount(count);
+        foreach (var pane in panes) { pane.Bounds.Width.Should().BeApproximately(360, 1); }
+        layer.FindControl<Button>("Accept")!.IsEffectivelyVisible.Should().BeTrue();
+        dialog.Cancel();
+        window.Close();
+    });
+
+    [Theory]
     [InlineData(390, false)]
     [InlineData(390, true)]
     [InlineData(1280, false)]

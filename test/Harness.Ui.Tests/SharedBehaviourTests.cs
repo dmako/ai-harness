@@ -9,6 +9,7 @@ using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
@@ -27,6 +28,36 @@ namespace Harness.Ui.Tests;
 /// </summary>
 public sealed class SharedBehaviourTests
 {
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task LongDialogContentScrollsWhileActionsStayVisible(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        using var http = new HttpClient(new FixtureApi()) { BaseAddress = Ui.Server };
+        using var services = Ui.Services(http);
+        var layer = new DialogLayer { DataContext = services.Dialogs };
+        var window = Ui.Show(layer, width, 600);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var open = services.Dialogs.ConfirmAsync(new ConfirmDialog { Title = "Long content", Message = string.Join("\n", Enumerable.Repeat("A long line of content", 100)) });
+        await Ui.UntilAsync(() => services.Dialogs.IsOpen);
+        Ui.Settle();
+        var dialog = layer.FindControl<Border>("Dialog")!;
+        var scroll = layer.FindControl<ScrollViewer>("DialogScroll")!;
+        var accept = layer.FindControl<Button>("Accept")!;
+        dialog.Bounds.Width.Should().BeApproximately(Math.Min(width - 32, 900), 2);
+        dialog.Bounds.Height.Should().BeLessThanOrEqualTo(window.Bounds.Height);
+        scroll.Extent.Height.Should().BeGreaterThan(scroll.Viewport.Height);
+        var before = accept.TranslatePoint(new Point(0, accept.Bounds.Height), window)!.Value.Y;
+        before.Should().BeLessThanOrEqualTo(window.Bounds.Height);
+        scroll.Offset = new Vector(0, scroll.Extent.Height - scroll.Viewport.Height);
+        Ui.Settle();
+        accept.TranslatePoint(new Point(0, accept.Bounds.Height), window)!.Value.Y.Should().BeApproximately(before, 1);
+        services.Dialogs.Current!.Cancel();
+        await open;
+        window.Close();
+    });
     [Fact]
     public Task ASlowOrFailingSectionNeverHoldsUpTheOthers() => Ui.RunAsync(async () =>
     {
