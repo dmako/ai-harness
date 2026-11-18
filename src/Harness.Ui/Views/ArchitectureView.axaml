@@ -275,8 +275,8 @@
               <Border Classes="thead">
                 <Grid Name="CouplingHeader" ColumnDefinitions="260,110,90,*">
                   <TextBlock Classes="th" Text="file" TextWrapping="Wrap" />
-                  <TextBlock Grid.Column="1" Classes="th" Text="commits" />
-                  <TextBlock Grid.Column="2" Classes="th num" Text="complexity" />
+                  <TextBlock Grid.Column="1" Classes="th" Text="commits" TextAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="th" Text="complexity" TextAlignment="Center" />
                   <TextBlock Grid.Column="3" Classes="th" Text="changes together with" />
                 </Grid>
               </Border>
@@ -289,12 +289,12 @@
                           <TextBlock Classes="mono small coupling-file-name" FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" />
                           <TextBlock Classes="muted small coupling-file-folder" Text="{Binding Folder}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" HorizontalAlignment="Center">
                           <c:Meter Value="{Binding Ratio}" BrushKey="Accent" Width="60" VerticalAlignment="Center" />
                           <TextBlock Classes="num small" Text="{Binding Hotspot.Commits}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Grid.Column="2" Classes="num small" Classes.critical="{Binding IsProblem}" Classes.gold="{Binding IsWarn}"
-                                   Text="{Binding ComplexityText}" />
+                                   Text="{Binding ComplexityText}" TextAlignment="Center" />
                         <TextBlock Grid.Column="3" Classes="muted small" Text="nothing often" IsVisible="{Binding !HasPartners}" />
                         <ItemsControl Grid.Column="3" Classes="coupling-partners" ItemsSource="{Binding Partners}" IsVisible="{Binding HasPartners}">
                           <ItemsControl.ItemsPanel>

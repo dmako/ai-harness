@@ -505,9 +505,31 @@ public sealed class ComplexityChart : ThresholdChart
     protected override Size MeasureOverride(Size availableSize) =>
         new(double.IsInfinity(availableSize.Width) ? 720 : availableSize.Width, Band + Plot + AxisHeight);
 
+    internal static IReadOnlyList<ComplexityBar> DisplayBins(IReadOnlyList<ComplexityBar> bins, int binWidth, int problem)
+    {
+        var width = Math.Max(1, binWidth);
+        var target = (int)Math.Ceiling(Math.Max(0, problem) * 1.2 / width);
+        if (bins.Count >= target)
+        {
+            return bins;
+        }
+        List<ComplexityBar> result = [.. bins];
+        while (result.Count < target)
+        {
+            var from = result.Count is 0 ? 1 : result[^1].To + 1;
+            result.Add(new ComplexityBar(from, from + width - 1, 0));
+        }
+        return result;
+    }
+
     public override void Render(DrawingContext context)
     {
-        if (Bins is not { Count: > 0 } bins)
+        if (Bins is null)
+        {
+            return;
+        }
+        var bins = DisplayBins(Bins, BinWidth, Problem);
+        if (bins.Count is 0)
         {
             return;
         }

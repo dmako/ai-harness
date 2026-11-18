@@ -463,6 +463,20 @@ public sealed class ArchitectureViewTests
     });
 
     [Fact]
+    public void ComplexityChartExtendsSparseBinsPastTheProblemThreshold()
+    {
+        ComplexityBar[] sparse = [new(1, 5, 3)];
+        var shown = ComplexityChart.DisplayBins(sparse, 5, 51);
+        shown.Should().HaveCount(13);
+        shown[^1].To.Should().BeGreaterThanOrEqualTo(62);
+        shown.Sum(bin => bin.Count).Should().Be(3);
+        shown.Skip(1).Should().OnlyContain(bin => bin.Count == 0);
+        var high = Enumerable.Range(0, 15).Select(i => new ComplexityBar(i * 5 + 1, (i + 1) * 5, i)).ToArray();
+        ComplexityChart.DisplayBins(high, 5, 51).Should().Equal(high);
+        ComplexityChart.DisplayBins([], 10, 20)[^1].To.Should().BeGreaterThanOrEqualTo(24);
+    }
+
+    [Fact]
     public Task ComplexityShowsEachLanguageAndItsMostComplexFunctions() => Ui.RunAsync(async () =>
     {
         var (_, _, model) = await OpenAsync("architecture/complexity", Api(complexity: false));
@@ -512,7 +526,14 @@ public sealed class ArchitectureViewTests
         var header = view.FindControl<Grid>("CouplingHeader")!;
         header.Children.OfType<TextBlock>().Select(text => text.Text)
             .Should().Equal("file", "commits", "complexity", "changes together with");
+        header.Children.OfType<TextBlock>().Where(text => Grid.GetColumn(text) is 1 or 2)
+            .Should().OnlyContain(text => text.TextAlignment == Avalonia.Media.TextAlignment.Center);
         var rows = view.FindControl<ItemsControl>("CouplingRows")!;
+        var row = rows.GetVisualDescendants().OfType<Grid>().First(grid => grid.ColumnDefinitions.Count == 4);
+        row.Children.OfType<StackPanel>().Single(panel => Grid.GetColumn(panel) == 1).HorizontalAlignment
+            .Should().Be(Avalonia.Layout.HorizontalAlignment.Center);
+        row.Children.OfType<TextBlock>().Single(text => Grid.GetColumn(text) == 2).TextAlignment
+            .Should().Be(Avalonia.Media.TextAlignment.Center);
         var partnerColumn = rows.GetVisualDescendants().OfType<ItemsControl>()
             .First(control => control.Classes.Contains("coupling-partners") && control.IsVisible);
         Grid.GetColumn(partnerColumn).Should().Be(3);
