@@ -273,7 +273,7 @@
           <Border Classes="card" MinWidth="680">
             <StackPanel>
               <Border Classes="thead">
-                <Grid Name="CouplingHeader" ColumnDefinitions="2*,110,90,3*">
+                <Grid Name="CouplingHeader" ColumnDefinitions="260,110,90,*">
                   <TextBlock Classes="th" Text="file" TextWrapping="Wrap" />
                   <TextBlock Grid.Column="1" Classes="th" Text="commits" />
                   <TextBlock Grid.Column="2" Classes="th num" Text="complexity" />
@@ -284,7 +284,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:HotspotRow">
                     <Border Classes="trow" Padding="14,6">
-                      <Grid ColumnDefinitions="2*,110,90,3*">
+                      <Grid ColumnDefinitions="260,110,90,*">
                         <StackPanel Margin="0,0,8,0" ToolTip.Tip="{Binding Hotspot.Path}">
                           <TextBlock Classes="mono small coupling-file-name" FontWeight="SemiBold" Text="{Binding Name}" TextWrapping="Wrap" />
                           <TextBlock Classes="muted small coupling-file-folder" Text="{Binding Folder}" TextWrapping="Wrap" />

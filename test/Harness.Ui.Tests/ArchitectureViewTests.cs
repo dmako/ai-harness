@@ -550,9 +550,12 @@ public sealed class ArchitectureViewTests
         var grids = rows.GetVisualDescendants().OfType<Grid>().Where(grid => grid.ColumnDefinitions.Count == 4).ToArray();
         grids.Should().HaveCount(3);
         grids[0].Bounds.Height.Should().BeGreaterThan(grids[1].Bounds.Height);
-        for (var column = 0; column < 4; column++)
+        foreach (var grid in grids)
         {
-            grids[0].ColumnDefinitions[column].ActualWidth.Should().BeApproximately(header.ColumnDefinitions[column].ActualWidth, 1);
+            for (var column = 0; column < 4; column++)
+            {
+                grid.ColumnDefinitions[column].ActualWidth.Should().BeApproximately(header.ColumnDefinitions[column].ActualWidth, 1);
+            }
         }
         HotspotChart.WarningBandBrush.Should().Be("Warning");
         HotspotChart.WarningBandOpacity.Should().BeApproximately(0.08, 0.001);
