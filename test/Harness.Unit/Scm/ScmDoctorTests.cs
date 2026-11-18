@@ -201,12 +201,9 @@ public sealed class ScmDoctorTests : IDisposable
 
         var checks = await DoctorAsync(server);
 
-        checks["scm:forge"].Level.Should().Be("fail");
-        checks["scm:forge"].Detail.Should().Contain("wrong_server");
-        checks["scm:forge"].Fix.Should().Contain("type");
-        checks["scm:env"].Level.Should().Be("fail");
-        checks["scm:env"].Detail.Should().Contain("HARNESS_TEST_UNSET_SCM_TOKEN");
-        checks["scm:env"].Fix.Should().Contain("Set HARNESS_TEST_UNSET_SCM_TOKEN");
+        checks.Should().NotContainKey("scm:forge").And.NotContainKey("scm:env");
+        checks["scm:work"].Level.Should().Be("ok");
+        server.Requests.Should().OnlyContain(request => request.Uri.Host == "gitlab.example.com");
         checks["scm project"].Level.Should().Be("fail");
         checks["scm project"].Detail.Should().Contain("group/other").And.Contain("not_found");
         checks["scm project"].Fix.Should().Contain("[scm] project");
@@ -252,9 +249,50 @@ public sealed class ScmDoctorTests : IDisposable
             .Contain("origin git@github.com:me/repo.git")
             .And.Contain("work https://gitlab.example.com");
         unmatched["scm project"].Fix.Should().Contain("[scm]");
+        unmatched.Should().NotContainKey("scm:work");
+        server.Requests.Should().BeEmpty();
 
         Repo(null);
         (await DoctorAsync(server))["scm project"].Level.Should().Be("info");
+        server.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AmbiguousAndInvalidChoicesDoNotTestAnyConnectionAndExplicitChoiceWins()
+    {
+        Repo("git@gitlab.example.com:group/repo.git");
+        await Store.AddAsync(new("work", "gitlab", "https://gitlab.example.com", Good, null), Token);
+        await Store.AddAsync(new("bot", "gitlab", "https://gitlab.example.com", Good, null), Token);
+        using var server = Gitlab();
+
+        var ambiguous = await DoctorAsync(server);
+        ambiguous["scm project"].Level.Should().Be("warn");
+        ambiguous["scm project"].Detail.Should().Contain("work").And.Contain("bot");
+        ambiguous.Keys.Should().NotContain(key => key.StartsWith("scm:", StringComparison.Ordinal));
+        server.Requests.Should().BeEmpty();
+
+        await Store.SetChoiceAsync(Path.Combine(Repository, ".git"), "work", Token);
+        var machineChoice = await DoctorAsync(server);
+        machineChoice["scm:work"].Level.Should().Be("ok");
+        machineChoice.Should().NotContainKey("scm:bot");
+        machineChoice["scm project"].Detail.Should().Contain("chosen on this machine");
+        server.Requests.Clear();
+
+        var config = Path.Combine(Repository, ".harness");
+        Directory.CreateDirectory(config);
+        await File.WriteAllTextAsync(Path.Combine(config, "config.toml"), "[scm]\nname = \"missing\"\n", Token);
+        var invalid = await DoctorAsync(server);
+        invalid["scm project"].Level.Should().Be("warn");
+        invalid["scm project"].Detail.Should().Contain("missing");
+        invalid.Keys.Should().NotContain(key => key.StartsWith("scm:", StringComparison.Ordinal));
+        server.Requests.Should().BeEmpty();
+
+        await File.WriteAllTextAsync(Path.Combine(config, "config.toml"), "[scm]\nname = \"bot\"\n", Token);
+        var chosen = await DoctorAsync(server);
+        chosen["scm:bot"].Level.Should().Be("ok");
+        chosen.Should().NotContainKey("scm:work");
+        chosen["scm project"].Level.Should().Be("ok");
+        chosen["scm project"].Detail.Should().Contain("bot").And.Contain("set in .harness/config.toml");
     }
 
     [Fact]
@@ -310,5 +348,18 @@ public sealed class ScmDoctorTests : IDisposable
         var missing = await RunAsync(server, "scm", "test", "nope");
         missing.Code.Should().Be(1);
         missing.Error.Should().Contain("No SCM is named 'nope'");
+    }
+
+    [Fact]
+    public async Task MachineDoctorStillTestsAllConnections()
+    {
+        await Store.AddAsync(new("work", "gitlab", "https://gitlab.example.com", Good, null), Token);
+        await Store.AddAsync(new("forge", "forgejo", "https://git.example.org", Good, null), Token);
+        using var server = Gitlab();
+
+        var checks = await ScmDoctor.ChecksAsync(Store, null, server, Token);
+
+        checks.Should().Contain(check => check.Name == "scm:work" && check.Level == "ok");
+        checks.Should().Contain(check => check.Name == "scm:forge" && check.Level == "fail");
     }
 }

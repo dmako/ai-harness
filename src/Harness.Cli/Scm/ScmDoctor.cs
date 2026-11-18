@@ -68,8 +68,11 @@ internal static class ScmDoctor
         CancellationToken cancellationToken
     )
     {
-        var (checks, outcomes) = await MachineAsync(store, handler, cancellationToken).ConfigureAwait(false);
-        if (project is not null && outcomes.Count > 0)
+        var (checks, outcomes) = await MachineAsync(store, handler, cancellationToken, project).ConfigureAwait(false);
+        if (
+            project is { Status: not ScmResolutionStatus.NoScm }
+            && checks.All(check => check.Name != "scm" || check.Level != "fail")
+        )
         {
             checks.Add(await ProjectCheckAsync(project, outcomes, handler, cancellationToken).ConfigureAwait(false));
         }
@@ -81,7 +84,8 @@ internal static class ScmDoctor
     internal static async Task<(List<HealthCheck> Checks, IReadOnlyList<ScmTestOutcome> Outcomes)> MachineAsync(
         IScmConfiguration store,
         HttpMessageHandler? handler,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        ScmResolution? project = null
     )
     {
         List<HealthCheck> checks = [];
@@ -128,7 +132,12 @@ internal static class ScmDoctor
             checks.Add(keys);
         }
 
-        var outcomes = await TestAllAsync(store, entries, handler, cancellationToken).ConfigureAwait(false);
+        var selected = project is null
+            ? entries
+            : entries.Where(entry =>
+                string.Equals(entry.Name, project.Match?.Endpoint.Name, StringComparison.OrdinalIgnoreCase)
+            );
+        var outcomes = await TestAllAsync(store, selected, handler, cancellationToken).ConfigureAwait(false);
         checks.AddRange(outcomes.Select(Check));
         return (checks, outcomes);
     }
