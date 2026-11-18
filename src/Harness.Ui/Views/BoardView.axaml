@@ -15,15 +15,18 @@
     <views:SectionView.Body>
       <DockPanel x:DataType="vm:BoardViewModel">
         <WrapPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
-          <TextBlock Classes="label" Text="Sort by:" Margin="0,0,6,0" />
-          <ComboBox Name="SortPicker" ItemsSource="{Binding Sorts}" SelectedItem="{Binding Sort}"
-                    AutomationProperties.Name="Sort by" Margin="0,0,16,4" />
-          <TextBlock Classes="label" Text="Hide done tasks older than:" Margin="0,0,6,0" />
-          <ComboBox Name="HideDonePicker" ItemsSource="{Binding HideDoneOptions}" SelectedItem="{Binding HideDone}"
-                    AutomationProperties.Name="Hide done tasks older than" Margin="0,0,16,4" />
-          <TextBlock Classes="label" Text="Blueprint:" Margin="0,0,6,0" />
-          <ComboBox Name="BlueprintPicker" ItemsSource="{Binding Blueprints}" SelectedItem="{Binding Blueprint}"
-                    AutomationProperties.Name="Blueprint" MaxWidth="320" Margin="0,0,0,4" />
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,4">
+            <TextBlock Name="SortLabel" Classes="label" Text="Sort by:" VerticalAlignment="Center" />
+            <ComboBox Name="SortPicker" ItemsSource="{Binding Sorts}" SelectedItem="{Binding Sort}" AutomationProperties.Name="Sort by" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,16,4">
+            <TextBlock Name="HideDoneLabel" Classes="label" Text="Hide done tasks older than:" VerticalAlignment="Center" />
+            <ComboBox Name="HideDonePicker" ItemsSource="{Binding HideDoneOptions}" SelectedItem="{Binding HideDone}" AutomationProperties.Name="Hide done tasks older than" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
+            <TextBlock Name="BlueprintLabel" Classes="label" Text="Blueprint:" VerticalAlignment="Center" />
+            <ComboBox Name="BlueprintPicker" ItemsSource="{Binding Blueprints}" SelectedItem="{Binding Blueprint}" AutomationProperties.Name="Blueprint" MaxWidth="320" />
+          </StackPanel>
         </WrapPanel>
         <!-- the board scrolls sideways inside itself, never the page; each column scrolls on its own -->
         <ScrollViewer Name="BoardScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"

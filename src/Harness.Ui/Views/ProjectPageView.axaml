@@ -44,9 +44,9 @@
         </ItemsControl>
       </WrapPanel>
       <WrapPanel ItemSpacing="10">
-        <Border Classes="language-mark" IsVisible="{Binding Stack, Converter={x:Static ObjectConverters.IsNotNull}}"><TextBlock Text="{Binding Stack.Mark}" /></Border>
-        <TextBlock Classes="facts" Text="{Binding Stack.Badge}" />
-        <TextBlock Classes="facts" Text="{Binding Facts}" IsVisible="{Binding HasFacts}" />
+        <Border Name="LanguageMark" Classes="language-mark" VerticalAlignment="Center" IsVisible="{Binding Stack, Converter={x:Static ObjectConverters.IsNotNull}}"><TextBlock Text="{Binding Stack.Mark}" /></Border>
+        <TextBlock Name="LanguageBadge" Classes="facts" Text="{Binding Stack.Badge}" VerticalAlignment="Center" />
+        <TextBlock Classes="facts" Text="{Binding Facts}" IsVisible="{Binding HasFacts}" VerticalAlignment="Center" />
       </WrapPanel>
       <TextBlock Classes="facts" Text="{Binding Detail}" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </StackPanel>

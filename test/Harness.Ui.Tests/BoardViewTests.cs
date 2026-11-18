@@ -23,6 +23,26 @@ namespace Harness.Ui.Tests;
 /// </summary>
 public sealed class BoardViewTests
 {
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task SortLabelsAreCenteredWithTheirPickers(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var (window, _, _) = await Ui.OpenMainAsync(width, 800);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        Ui.Settle();
+        var board = window.GetVisualDescendants().OfType<BoardView>().Single();
+        foreach (var (label, picker) in new[] { ("SortLabel", "SortPicker"), ("HideDoneLabel", "HideDonePicker"), ("BlueprintLabel", "BlueprintPicker") })
+        {
+            var text = board.FindControl<TextBlock>(label)!;
+            var combo = board.FindControl<ComboBox>(picker)!;
+            text.Bounds.Center.Y.Should().BeApproximately(combo.Bounds.Center.Y, 1);
+        }
+        window.Close();
+    });
+
     [Fact]
     public Task TheBoardShowsTheServersColumnsAndCards() => Ui.RunAsync(async () =>
     {

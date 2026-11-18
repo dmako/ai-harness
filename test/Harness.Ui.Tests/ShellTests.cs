@@ -82,6 +82,9 @@ public sealed class ShellTests
         Ui.Settle();
         var header = window.GetVisualDescendants().OfType<ProjectPageView>().Single()
             .GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("project-mark"));
+        var projectView = window.GetVisualDescendants().OfType<ProjectPageView>().Single();
+        projectView.FindControl<Border>("LanguageMark")!.Bounds.Center.Y.Should()
+            .BeApproximately(projectView.FindControl<TextBlock>("LanguageBadge")!.Bounds.Center.Y, 1);
         var color = "pc" + ((ProjectPage)model.Page!).Project.MarkColor;
         var sidebar = main.FindControl<Border>("Sidebar")!.GetVisualDescendants().OfType<Border>()
             .First(b => b.Classes.Contains("project-mark") && b.Classes.Contains(color));
