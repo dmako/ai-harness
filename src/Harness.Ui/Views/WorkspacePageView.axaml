@@ -17,10 +17,20 @@
                 AutomationProperties.Name="Rename this workspace" VerticalAlignment="Center">
           <c:Icon Kind="edit" />
         </Button>
+        <Border Name="HealthBadge" Classes="health-badge" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="●" Classes="health-dot" Classes.g-ok="{Binding HealthKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                       Classes.g-warn="{Binding HealthKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                       Classes.g-bad="{Binding HealthKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}" />
+            <TextBlock Text="{Binding HealthWords}" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+      <WrapPanel ItemSpacing="8">
+        <SelectableTextBlock Classes="path" Text="{Binding Path}" VerticalAlignment="Center" />
         <Button Name="CopyName" Classes="copychip" Content="{Binding Copy}" AutomationProperties.Name="{Binding Copy}" c:Links.Copy="{Binding Copy}" VerticalAlignment="Center"
                 ToolTip.Tip="Agents and commands name this workspace so. Click to copy." />
       </WrapPanel>
-      <SelectableTextBlock Classes="path" Text="{Binding Path}" />
     </StackPanel>
     <Border DockPanel.Dock="Top" Classes="tabs">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">

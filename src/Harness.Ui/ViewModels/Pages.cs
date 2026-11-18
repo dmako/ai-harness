@@ -401,6 +401,12 @@ public sealed partial class WorkspacePage : PageViewModel
     public partial string Path { get; private set; } = "";
 
     [ObservableProperty]
+    public partial string HealthWords { get; private set; } = "healthy";
+
+    [ObservableProperty]
+    public partial string HealthKind { get; private set; } = "ok";
+
+    [ObservableProperty]
     public partial object? Body { get; private set; }
 
     public string Copy => "workspace:" + Workspace.Name;
@@ -410,6 +416,20 @@ public sealed partial class WorkspacePage : PageViewModel
         Workspace = workspace;
         var members = workspace.Members.Select(m => projects.FirstOrDefault(p => p.Id == m.ProjectId)).OfType<ProjectInfo>().ToArray();
         var waiting = members.Sum(p => p.Waiting);
+        var unavailable = workspace.Members.Count - members.Length + members.Count(p => p.Live.HealthKind == "bad" && p.Live.State != "ok");
+        var failures = members.Where(p => p.Live.State == "ok").Sum(p => p.Live.ChecksFailed);
+        var unknown = members.Count(p => p.Live.State != "ok" && p.Live.HealthKind != "bad");
+        var stale = members.Count(p => p.Live.State == "ok" && p.Live.Stale is { Length: > 0 });
+        var warnings = members.Where(p => p.Live.State == "ok").Sum(p => p.Live.ChecksWarned);
+        (HealthWords, HealthKind) = (unavailable, failures, unknown, stale, warnings) switch
+        {
+            (> 0, _, _, _, _) => ($"{Shell.Plural(unavailable, "project")} unavailable", "bad"),
+            (_, > 0, _, _, _) => ($"{Shell.Plural(failures, "check")} failing", "bad"),
+            (_, _, > 0, _, _) => ($"{Shell.Plural(unknown, "project")} needs attention", "warn"),
+            (_, _, _, > 0, _) => ($"{Shell.Plural(stale, "index")} stale", "warn"),
+            (_, _, _, _, > 0) => (Shell.Plural(warnings, "warning"), "warn"),
+            _ => ("healthy", "ok"),
+        };
         Path = $"{Shell.Plural(workspace.Members.Count, "project")}, created {Shell.Ago(workspace.Created)}"
             + (waiting > 0 ? $" · {waiting} waiting for you" : "");
         Lists.Sync(

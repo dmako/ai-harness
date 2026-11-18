@@ -325,6 +325,12 @@ public sealed class WorkspaceViewTests
 
         members.Common.Should().Be("C:/repos");
         members.Rows.Select(r => (r.Name, r.Path)).Should().Equal(("Api", "api"), ("Core", "core"), ("Fixture project", "fixture"), ("Worker", "worker"));
+        (Page(model).HealthWords, Page(model).HealthKind).Should().Be(("healthy", "ok"));
+        var absent = members.Rows.Single(r => r.Name == "Api");
+        (absent.Used, absent.Context).Should().Be(("N/A", "N/A"));
+        var present = members.Rows.Single(r => r.Name == "Fixture project");
+        present.Used.Should().NotBe("N/A");
+        present.Context.Should().Be("60%");
         members.Query = "wor";
         members.Rows.Select(r => r.Name).Should().Equal("Worker");
         members.AllChosen = true;

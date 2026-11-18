@@ -50,6 +50,13 @@
     <Setter Property="CornerRadius" Value="12" />
     <Setter Property="Padding" Value="8,3" />
   </Style>
+  <Style Selector="Border.health-badge">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="8,3" />
+  </Style>
   <Style Selector="TextBlock.health-dot.g-ok"><Setter Property="Foreground" Value="{DynamicResource GoodInk}" /></Style>
   <Style Selector="TextBlock.health-dot.g-warn"><Setter Property="Foreground" Value="{DynamicResource GoldInk}" /></Style>
   <Style Selector="TextBlock.health-dot.g-bad"><Setter Property="Foreground" Value="{DynamicResource Critical}" /></Style>

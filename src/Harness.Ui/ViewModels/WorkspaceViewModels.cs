@@ -378,8 +378,8 @@ public sealed partial class MemberRow(WorkspaceMember member, ProjectInfo? proje
     public string Stack => stack ?? "—";
     public string Waiting => Project is { Waiting: > 0 } p ? p.Waiting.ToString(CultureInfo.InvariantCulture) : "—";
     public string Synced => Project?.Live.SyncedAt is { Length: > 0 } at ? Shell.Ago(at) : "never";
-    public string Used => Project?.LastMcp is { Length: > 0 } at ? Shell.Ago(at) : "—";
-    public string Context => Project is { Live.ContextAnswers30d: > 0 } p ? Overview.Pct(p.Live.ContextHitRate30d) : "—";
+    public string Used => Project?.LastMcp is { Length: > 0 } at ? Shell.Ago(at) : "N/A";
+    public string Context => Project is { Live.ContextAnswers30d: > 0 } p ? Overview.Pct(p.Live.ContextHitRate30d) : "N/A";
     public string Path { get; } = path;
     public string FullPath => Member.Root ?? "";
 

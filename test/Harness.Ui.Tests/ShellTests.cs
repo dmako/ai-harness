@@ -277,6 +277,8 @@ public sealed class ShellTests
 
         var page = model.Page.Should().BeOfType<WorkspacePage>().Subject;
         page.Copy.Should().Be("workspace:main");
+        (page.HealthWords, page.HealthKind).Should().Be(("1 warning", "warn"));
+        window.GetVisualDescendants().OfType<Border>().Should().Contain(b => b.Name == "HealthBadge");
         page.Tabs.Should().ContainSingle(t => t.Selected).Which.View.Should().Be("members");
         page.Path.Should().StartWith("1 project, created ");
         window.GetVisualDescendants().OfType<Button>().Should().Contain(b => b.Name == "CopyName" && (string?)b.Content == "workspace:main");
