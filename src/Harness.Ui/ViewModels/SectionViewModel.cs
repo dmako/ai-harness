@@ -30,6 +30,7 @@ public abstract partial class SectionViewModel : ObservableObject, ILiveSection,
 
     public string? ProjectId { get; }
     public IReadOnlyList<string> Kinds { get; }
+    public virtual bool AnyProject => false;
 
     /// <summary>Loading for the first time: the content is not there yet.</summary>
     [ObservableProperty]

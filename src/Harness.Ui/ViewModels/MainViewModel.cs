@@ -297,7 +297,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             default:
                 if (Page is not HomePage home)
                 {
-                    home = new HomePage { NewWorkspaceCommand = NewWorkspaceCommand };
+                    home = new HomePage(Services) { NewWorkspaceCommand = NewWorkspaceCommand };
                     Replace(home);
                 }
                 home.Update(_projects, _workspaces, route);

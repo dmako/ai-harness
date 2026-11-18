@@ -278,6 +278,74 @@ public sealed class ShellTests
         home.OutsideTitle.Should().Be("Projects outside workspaces");
     });
 
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task HomeShowsVisitProjectDetailsAndActivity(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var preferences = new InMemoryPreferences();
+        preferences.Set("seen.home", DateTimeOffset.UtcNow.AddHours(-3).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        var now = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        var api = new FixtureApi();
+        var projects = System.Text.Json.Nodes.JsonNode.Parse(Fixtures.Projects)!;
+        projects["projects"]![0]!["title"] = "A very long project name that must stay within its Home card and be ellipsized";
+        projects["projects"]![0]!["last_mcp"] = now;
+        projects["projects"]![0]!["live"]!["context_answers_30d"] = 10;
+        projects["projects"]![0]!["live"]!["context_hit_rate_30d"] = 0.6;
+        api.Answers["/api/projects"] = projects.ToJsonString();
+        api.Answers["/api/activity"] = $$$"""
+            {"days":7,"items":[
+              {"at":"{{{now}}}","kind":"task","title":"TASK-1 done: Finished","ref":"TASK-1","project_id":"prj_fixture","project":"Fixture project"},
+              {"at":"{{{now}}}","kind":"task","title":"TASK-2 updated: Changed","ref":"TASK-2","project_id":"prj_fixture","project":"Fixture project"},
+              {"at":"{{{now}}}","kind":"session","title":"Codex used harness: 2 call(s) over 1 min, 1 failed","project_id":"prj_other","project":"Other"}]}
+            """;
+        var (window, _, model) = await Ui.OpenMainAsync(width, 800, api: api, address: "#/", preferences: preferences);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var home = (HomePage)model.Page!;
+        await Ui.UntilAsync(() => home.Activity is { HasContent: true } && home.WorkspaceCards[0].Members[0].HasLanguage);
+        home.Activity!.Since.Should().Contain("1 task done").And.Contain("1 other task change");
+        home.Activity.Rows.Should().Contain(row => row.Meta.Contains("Fixture project", StringComparison.Ordinal));
+        home.Activity.Bars.Sum(bar => bar.Calls).Should().Be(2);
+        home.WorkspaceCards[0].Members[0].Language.Should().Be("C# · .NET 10");
+        home.WorkspaceCards[0].Members[0].ContextLine.Should().Be("60% context hits");
+        home.WorkspaceCards[0].Members[0].AgentLine.Should().StartWith("Agents ");
+        var homeView = window.GetVisualDescendants().OfType<HomeView>().Single();
+        var name = homeView.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == home.WorkspaceCards[0].Members[0].Name);
+        name.TextTrimming.Should().Be(TextTrimming.CharacterEllipsis);
+        ToolTip.GetTip(name).Should().Be(name.Text);
+        UiChecks.Check(window).Should().BeEmpty();
+        window.Close();
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task HomeExplainsFirstVisitAndNoChanges(bool returning) => Ui.RunAsync(async () =>
+    {
+        var preferences = new InMemoryPreferences();
+        if (returning)
+        {
+            preferences.Set("seen.home", DateTimeOffset.UtcNow.AddHours(-2).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        var api = new FixtureApi();
+        api.Answers["/api/activity"] = """{"days":7,"items":[]}""";
+        var (window, _, model) = await Ui.OpenMainAsync(1280, 800, api: api, address: "#/", preferences: preferences);
+        var home = (HomePage)model.Page!;
+        await Ui.UntilAsync(() => home.Activity is { HasContent: true });
+        if (returning)
+        {
+            home.Activity!.Since.Should().Contain("0 tasks done").And.Contain("0 other task changes");
+        }
+        else
+        {
+            home.Activity!.Since.Should().Contain("no previous visit");
+        }
+        home.Activity.Quiet.Should().BeTrue();
+        window.Close();
+    });
+
     [Fact]
     public Task FollowingTheSidebarAndTabsNavigatesAndBackReturns() => Ui.RunAsync(async () =>
     {

@@ -4,6 +4,7 @@
              xmlns:vm="using:Harness.Ui.ViewModels"
              xmlns:preview="using:Harness.Ui.Preview"
              xmlns:c="using:Harness.Ui.Controls"
+             xmlns:views="using:Harness.Ui.Views"
              x:Class="Harness.Ui.Views.HomeView"
              x:DataType="vm:HomePage"
              d:DataContext="{x:Static preview:PreviewData.Home}">
@@ -13,6 +14,9 @@
       <TextBlock Classes="h2" Text="Home" />
       <TextBlock Classes="path" Text="Every repository on this machine that uses harness." />
     </StackPanel>
+    <Border Classes="inset" Margin="0,12,0,0" IsVisible="{Binding Activity.Since, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Name="SinceVisit" Text="{Binding Activity.Since}" TextWrapping="Wrap" />
+    </Border>
     <ItemsControl Name="Tiles" ItemsSource="{Binding Tiles}" Margin="0,16,0,0">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate><WrapPanel ItemSpacing="12" LineSpacing="12" /></ItemsPanelTemplate>
@@ -30,6 +34,8 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
+    <Grid Name="Columns" ColumnDefinitions="*,340" RowDefinitions="Auto">
+    <StackPanel Name="MainColumn" Grid.Column="0" Margin="0,0,12,0">
     <StackPanel Classes="section">
       <DockPanel>
         <Button Name="NewWorkspace" DockPanel.Dock="Right" Classes="primary" Content="New workspace" AutomationProperties.Name="New workspace" Command="{Binding NewWorkspaceCommand}" />
@@ -63,6 +69,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:NavProject">
                       <c:AppLink Classes="nav" Href="{Binding Href}" Margin="0" AutomationProperties.Name="{Binding Name}">
+                        <StackPanel>
                         <DockPanel>
                           <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}"><TextBlock Text="{Binding Waiting}" /></Border>
                           <c:Icon DockPanel.Dock="Right" Classes="state" Classes.g-ok="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
@@ -70,8 +77,13 @@
                                   Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
                                   Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
                                   Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
-                          <StackPanel Orientation="Horizontal" Spacing="8"><Border Classes="project-mark" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /></StackPanel>
+                          <Grid ColumnDefinitions="Auto,*"><Border Classes="project-mark" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Grid.Column="1" Margin="8,0,0,0" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" /></Grid>
                         </DockPanel>
+                        <Border Classes="pill" HorizontalAlignment="Left" IsVisible="{Binding HasLanguage}"><TextBlock Text="{Binding Language}" /></Border>
+                        <TextBlock Classes="muted small" Text="Language: N/A" IsVisible="{Binding !HasLanguage}" />
+                        <TextBlock Classes="muted small" Text="{Binding ContextLine}" />
+                        <TextBlock Classes="muted small" Text="{Binding AgentLine}" />
+                        </StackPanel>
                       </c:AppLink>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
@@ -104,8 +116,12 @@
                             Classes.g-warn="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
                             Classes.g-bad="{Binding StateKind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
                             Kind="{Binding StateIcon}" Margin="6,0" ToolTip.Tip="{Binding StateWords}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8"><Border Classes="project-mark" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /></StackPanel>
+                    <Grid ColumnDefinitions="Auto,*"><Border Classes="project-mark" Classes.pc0="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=0}" Classes.pc1="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=1}" Classes.pc2="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=2}" Classes.pc3="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=3}" Classes.pc4="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=4}" Classes.pc5="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=5}" Classes.pc6="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=6}" Classes.pc7="{Binding MarkColor, Converter={x:Static c:Converters.Is}, ConverterParameter=7}"><TextBlock Text="{Binding Mark}" /></Border><TextBlock Grid.Column="1" Margin="8,0,0,0" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" /></Grid>
                   </DockPanel>
+                  <Border Classes="pill" HorizontalAlignment="Left" IsVisible="{Binding HasLanguage}"><TextBlock Text="{Binding Language}" /></Border>
+                  <TextBlock Classes="muted small" Text="Language: N/A" IsVisible="{Binding !HasLanguage}" />
+                  <TextBlock Classes="muted small" Text="{Binding ContextLine}" />
+                  <TextBlock Classes="muted small" Text="{Binding AgentLine}" />
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Border Classes="badge" IsVisible="{Binding HasWaiting}"><TextBlock Text="{Binding Waiting}" /></Border>
                     <TextBlock Classes="muted small" Text="waiting" IsVisible="{Binding HasWaiting}" />
@@ -118,5 +134,26 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </StackPanel>
+    </StackPanel>
+    <views:SectionView Name="ActivitySection" Grid.Column="1" DataContext="{Binding Activity}">
+      <views:SectionView.Body>
+        <StackPanel x:DataType="vm:ActivityViewModel" Spacing="8">
+          <TextBlock Classes="muted small" Text="{Binding WeekSummary}" TextWrapping="Wrap" />
+          <c:DayBars Days="{Binding Bars}" AutomationProperties.Name="{Binding WeekName}" />
+          <TextBlock Classes="empty" Text="No recent activity." IsVisible="{Binding Quiet}" />
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ActivityRow">
+                <c:AppLink Classes="row" Href="{Binding Href}" AutomationProperties.Name="{Binding Head}">
+                  <StackPanel><TextBlock Text="{Binding Head}" TextWrapping="Wrap" /><TextBlock Classes="muted small" Text="{Binding Meta}" TextWrapping="Wrap" /><TextBlock Classes="muted small" Text="{Binding When}" /></StackPanel>
+                </c:AppLink>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Classes="ghost small" Content="{Binding MoreLabel}" AutomationProperties.Name="{Binding MoreLabel}" Command="{Binding ShowAllCommand}" IsVisible="{Binding HasMore}" />
+        </StackPanel>
+      </views:SectionView.Body>
+    </views:SectionView>
+    </Grid>
   </StackPanel>
 </UserControl>

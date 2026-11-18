@@ -520,7 +520,7 @@ public sealed partial class ActivityViewModel : SectionViewModel
     private readonly UiServices _services;
     private IReadOnlyList<ActivityItem> _items = [];
 
-    public ActivityViewModel(UiServices services, string projectId)
+    public ActivityViewModel(UiServices services, string? projectId)
         : base("Recent activity", projectId, ["activity", "tasks", "knowledge", "sync"])
     {
         _services = services;
@@ -528,6 +528,12 @@ public sealed partial class ActivityViewModel : SectionViewModel
 
     public ObservableCollection<ActivityRow> Rows { get; } = [];
     public ObservableCollection<ActivityDay> Week { get; } = [];
+    public override bool AnyProject => ProjectId is null;
+
+    [ObservableProperty]
+    public partial string? Since { get; private set; }
+
+    private string? _previousVisit;
 
     [ObservableProperty]
     public partial IReadOnlyList<DayBar> Bars { get; private set; } = [];
@@ -555,14 +561,46 @@ public sealed partial class ActivityViewModel : SectionViewModel
     private void ShowAll()
     {
         ShowingAll = true;
-        Lists.Sync(Rows, _items.Select(Row));
+        Lists.Sync(Rows, _items.Select(x => Row(x, ProjectId is null)));
     }
 
     protected override async Task LoadCoreAsync(CancellationToken token)
     {
-        _items = (await _services.Api.ActivityAsync(ProjectId, 7, 200, token)).Items;
+        if (ProjectId is null)
+        {
+            const string Key = "seen.home";
+            if (_previousVisit is null)
+            {
+                if (!_services.Host.Visits.TryGetValue(Key, out var previous))
+                {
+                    previous = _services.Host.Preferences.Get(Key) ?? "";
+                    _services.Host.Visits[Key] = previous;
+                    _services.Host.Preferences.Set(Key, DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                }
+                _previousVisit = previous;
+            }
+        }
+        var sinceDays = DateTimeOffset.TryParse(_previousVisit, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var visit)
+            ? Math.Max(7, (int)Math.Ceiling((DateTimeOffset.UtcNow - visit).TotalDays))
+            : 7;
+        _items = (await _services.Api.ActivityAsync(ProjectId, Math.Min(sinceDays, 90), 200, token)).Items;
+        if (ProjectId is null)
+        {
+            if (DateTimeOffset.TryParse(_previousVisit, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var from))
+            {
+                var tasks = _items.Where(x => x.Kind is "task" && DateTimeOffset.TryParse(x.At, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) && at > from).ToArray();
+                var done = tasks.Count(x => x.Title.Contains(" done: ", StringComparison.Ordinal));
+                var window = sinceDays > 90 ? " (last 90 days)" : "";
+                var partial = _items.Count >= 200 ? "at least " : "";
+                Since = $"Since your last visit {Shell.Ago(_previousVisit)}{window}: {partial}{Shell.Plural(done, "task")} done · {Shell.Plural(tasks.Length - done, "other task change")}";
+            }
+            else
+            {
+                Since = "Welcome to Home: no previous visit recorded.";
+            }
+        }
         HasItems = _items.Count > 0;
-        Lists.Sync(Rows, (ShowingAll ? _items : _items.Take(Shown)).Select(Row));
+        Lists.Sync(Rows, (ShowingAll ? _items : _items.Take(Shown)).Select(x => Row(x, ProjectId is null)));
         OnPropertyChanged(nameof(HasMore));
         OnPropertyChanged(nameof(MoreLabel));
         ShowWeek();
@@ -615,7 +653,7 @@ public sealed partial class ActivityViewModel : SectionViewModel
         WeekName = string.Join(", ", Enumerable.Range(0, 7).Select(i => $"{days[i].ToString("ddd", CultureInfo.InvariantCulture)}: {calls[i]} calls"));
     }
 
-    private static ActivityRow Row(ActivityItem x)
+    private static ActivityRow Row(ActivityItem x, bool allProjects)
     {
         var href = x.Kind switch
         {
@@ -630,6 +668,7 @@ public sealed partial class ActivityViewModel : SectionViewModel
             var (calls, failed, span) = Overview.Session(x.Title);
             var client = x.Actor is { Length: > 0 } actor ? Clients.GetValueOrDefault(actor, actor) : "an agent";
             var meta = x.Detail is { Length: > 0 } detail ? $"{client} · {detail}" : client;
+            if (allProjects) { meta = x.Project + " · " + meta; }
             return new ActivityRow(
                 "session",
                 client[..1],
@@ -643,6 +682,7 @@ public sealed partial class ActivityViewModel : SectionViewModel
             );
         }
         var parts = new List<string>();
+        if (allProjects) { parts.Add(x.Project); }
         if (x.Detail is { Length: > 0 } d)
         {
             parts.Add(d);

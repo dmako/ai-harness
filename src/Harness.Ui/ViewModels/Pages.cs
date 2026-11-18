@@ -11,6 +11,10 @@ namespace Harness.Ui.ViewModels;
 /// <summary>A project's row in the sidebar or a workspace card (app.js navProject): its name, state shape and badge.</summary>
 public sealed record NavProject(string Id, string Name, string Href, string StateKind, string StateWords, int Waiting, bool Current)
 {
+    public string ContextLine { get; init; } = "Context hits: N/A";
+    public string AgentLine { get; init; } = "Agents: N/A";
+    public string Language { get; init; } = "";
+    public bool HasLanguage => Language.Length > 0;
     public string Mark => ProjectInfo.MarkFor(Name);
     public string MarkColor => ProjectInfo.MarkColorFor(Id);
     public bool HasWaiting => Waiting > 0;
@@ -18,7 +22,7 @@ public sealed record NavProject(string Id, string Name, string Href, string Stat
     public string StateIcon => Shell.StateIcon(StateKind);
 
     public static NavProject Of(ProjectInfo p, Route route, string view) =>
-        new(
+        new NavProject(
             p.Id,
             p.DisplayName,
             Route.ProjectHref(p.Id, view),
@@ -26,7 +30,11 @@ public sealed record NavProject(string Id, string Name, string Href, string Stat
             p.Live.Words,
             p.Waiting,
             route.Page is "project" && route.Id == p.Id
-        );
+        )
+        {
+            ContextLine = p.Live.ContextAnswers30d > 0 ? $"{Overview.Pct(p.Live.ContextHitRate30d)} context hits" : "Context hits: N/A",
+            AgentLine = p.LastMcp is { Length: > 0 } at ? "Agents " + Shell.Ago(at) : "Agents: N/A",
+        };
 }
 
 /// <summary>A workspace in the sidebar: its name and badge, and its first projects (at most 8, app.js NAV_CAP).</summary>
@@ -87,6 +95,27 @@ public sealed class PlaceholderPage(string title, string task, Uri current) : Pa
 /// <summary>Home (app.js renderHome): the tiles, the workspaces' cards and the projects outside workspaces.</summary>
 public sealed partial class HomePage : PageViewModel
 {
+    private readonly UiServices? _services;
+    private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal);
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2213:Disposable fields should be disposed", Justification = "Outstanding stack reads release this gate after the page closes.")]
+    private readonly SemaphoreSlim _stackGate = new(4);
+    private IReadOnlyList<ProjectInfo> _projects = [];
+    private IReadOnlyList<WorkspaceInfo> _workspaces = [];
+    private Route _route = Route.Home;
+    private bool _disposed;
+
+    public HomePage(UiServices? services = null)
+    {
+        _services = services;
+        if (services is not null)
+        {
+            Activity = new ActivityViewModel(services, null);
+            Activity.Follow(services.Live);
+            _ = Activity.LoadAsync();
+        }
+    }
+
+    public ActivityViewModel? Activity { get; }
     /// <summary>Opens the new workspace wizard.</summary>
     public System.Windows.Input.ICommand? NewWorkspaceCommand { get; init; }
 
@@ -105,6 +134,9 @@ public sealed partial class HomePage : PageViewModel
 
     public void Update(IReadOnlyList<ProjectInfo> projects, IReadOnlyList<WorkspaceInfo> workspaces, Route route)
     {
+        _projects = projects;
+        _workspaces = workspaces;
+        _route = route;
         var inWorkspace = workspaces.SelectMany(w => w.Members.Select(m => m.ProjectId)).ToHashSet(StringComparer.Ordinal);
         var knowledge = projects.Sum(p => p.Live.KnowledgeWaiting);
         var work = projects.Sum(p => p.Live.WorkProposals);
@@ -138,10 +170,22 @@ public sealed partial class HomePage : PageViewModel
                 ),
             ]
         );
-        Lists.Sync(WorkspaceCards, workspaces.Select(w => Shell.Card(w, projects, route, 6)));
+        Lists.Sync(WorkspaceCards, workspaces.Select(w =>
+        {
+            var card = Shell.Card(w, projects, route, 6);
+            return card with { Members = [.. card.Members.Select(WithLanguage)] };
+        }));
         HasWorkspaces = workspaces.Count > 0;
         var outside = projects.Where(p => !inWorkspace.Contains(p.Id)).ToArray();
-        Lists.Sync(Outside, outside.Select(p => NavProject.Of(p, route, "")));
+        Lists.Sync(Outside, outside.Select(p => WithLanguage(NavProject.Of(p, route, ""))));
+        if (_services is not null)
+        {
+            foreach (var id in projects.Where(p => p.Live.State == "ok" && !_languages.ContainsKey(p.Id)).Select(p => p.Id))
+            {
+                _languages[id] = "";
+                _ = LoadLanguageAsync(id);
+            }
+        }
         OutsideTitle = HasWorkspaces ? "Projects outside workspaces" : "Projects";
         OutsideEmpty = null;
         if (outside.Length is 0)
@@ -153,6 +197,34 @@ public sealed partial class HomePage : PageViewModel
     }
 
     private static string Text(int n) => n.ToString(CultureInfo.InvariantCulture);
+
+    private NavProject WithLanguage(NavProject project) => project with { Language = _languages.GetValueOrDefault(project.Id, "") };
+
+    private async Task LoadLanguageAsync(string id)
+    {
+        await _stackGate.WaitAsync();
+        try
+        {
+            if (_disposed) { return; }
+            var stack = (await _services!.Api.StackAsync(id, CancellationToken.None)).Stack;
+            _languages[id] = stack?.Badge ?? stack?.Language ?? "";
+            if (!_disposed) { Update(_projects, _workspaces, _route); }
+        }
+        catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
+        {
+            // A missing stack leaves the card's language unavailable without holding up Home.
+        }
+        finally
+        {
+            _stackGate.Release();
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) { _disposed = true; Activity?.Dispose(); }
+        base.Dispose(disposing);
+    }
 }
 
 /// <summary>
