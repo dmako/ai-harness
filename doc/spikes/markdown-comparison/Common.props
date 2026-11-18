@@ -1,0 +1,15 @@
+<Project>
+  <ItemGroup>
+    <ProjectReference Include="../../../../src/Harness.Ui/Harness.Ui.csproj" />
+    <PackageReference Include="Avalonia" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.6" />
+    <PackageReference Include="SkiaSharp" Version="4.156.0" />
+    <PackageReference Include="HarfBuzzSharp" Version="14.4.0.100" />
+    <PackageReference Include="System.Reactive" Version="7.0.0" />
+    <PackageReference Include="LiveMarkdown.Avalonia" Version="2.7.0" Condition="'$(Candidate)' == 'live'" />
+    <PackageReference Include="MarkView.Avalonia" Version="12.4.1" Condition="'$(Candidate)' == 'markview'" />
+    <Compile Include="../Shared.cs" Link="Shared.cs" />
+    <AvaloniaResource Include="../Styles/$(Candidate).axaml" Link="App.axaml" />
+  </ItemGroup>
+</Project>
