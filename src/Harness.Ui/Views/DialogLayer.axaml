@@ -8,6 +8,13 @@
              x:DataType="s:DialogService"
              IsVisible="{Binding IsOpen}"
              d:DataContext="{x:Static preview:PreviewData.Dialog}">
+  <UserControl.Styles>
+    <Style Selector="Button.primary.evidence-close">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+  </UserControl.Styles>
   <!-- the open dialog over the page (app.js dialog()): Esc cancels, Enter accepts (not in a multi-line field), the
        first field takes the focus when it opens. A form's fields are its view model's DataTemplate. -->
   <Border Classes="backdrop">

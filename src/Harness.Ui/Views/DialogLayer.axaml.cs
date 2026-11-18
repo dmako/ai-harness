@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Harness.Ui.Services;
+using Harness.Ui.ViewModels;
 
 namespace Harness.Ui.Views;
 
@@ -30,6 +31,8 @@ public sealed partial class DialogLayer : UserControl
     {
         if (e.PropertyName is nameof(DialogService.Current) && _service?.Current is not null)
         {
+            var evidence = _service.Current is EvidenceDialog;
+            Accept.Classes.Set("evidence-close", evidence);
             // after the dialog is laid out: its first field, else the accept button
             Dispatcher.UIThread.Post(
                 () =>
@@ -38,7 +41,7 @@ public sealed partial class DialogLayer : UserControl
                             .OfType<Control>()
                             .FirstOrDefault(c => c is TextBox or ComboBox or CheckBox && c.IsEffectivelyEnabled)
                         ?? Accept
-                    ).Focus(NavigationMethod.Tab),
+                    ).Focus(evidence ? NavigationMethod.Unspecified : NavigationMethod.Tab),
                 DispatcherPriority.Loaded
             );
         }

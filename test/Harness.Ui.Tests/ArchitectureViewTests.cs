@@ -110,13 +110,26 @@ public sealed class ArchitectureViewTests
 
     [Theory]
     [InlineData(390, false, 1)]
+    [InlineData(390, true, 1)]
+    [InlineData(390, false, 2)]
+    [InlineData(390, true, 2)]
+    [InlineData(390, false, 3)]
     [InlineData(390, true, 3)]
+    [InlineData(1280, false, 1)]
+    [InlineData(1280, true, 1)]
     [InlineData(1280, false, 2)]
+    [InlineData(1280, true, 2)]
+    [InlineData(1280, false, 3)]
     [InlineData(1280, true, 3)]
     public Task EvidenceComparisonUsesWideScrollableDialog(int width, bool dark, int count) => Ui.RunAsync(async () =>
     {
         var api = Api();
-        api.Answers[Root + "/snippet"] = """{"snippet":{"path":"src/A.cs","start":1,"lines":["line"]}}""";
+        var line = new string('x', 500);
+        var lines = new JsonArray(Enumerable.Range(0, 80).Select(_ => (JsonNode?)JsonValue.Create(line)).ToArray());
+        api.Answers[Root + "/snippet"] = new JsonObject
+        {
+            ["snippet"] = new JsonObject { ["path"] = "src/A.cs", ["start"] = 1, ["lines"] = lines },
+        }.ToJsonString();
         var (window, _, model) = await OpenAsync("architecture", api, width);
         window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
         var finding = new FindingRow(new Harness.Ui.Api.Finding
@@ -134,9 +147,26 @@ public sealed class ArchitectureViewTests
         frame.Bounds.Width.Should().BeApproximately(width - 32, 2);
         var panes = layer.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("inset") && b.DataContext is EvidencePane).ToArray();
         panes.Should().HaveCount(count);
-        foreach (var pane in panes) { pane.Bounds.Width.Should().BeApproximately(360, 1); }
-        layer.FindControl<Button>("Accept")!.IsEffectivelyVisible.Should().BeTrue();
-        dialog.Cancel();
+        var paneList = layer.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "EvidencePanes");
+        foreach (var pane in panes)
+        {
+            pane.Bounds.Width.Should().BeApproximately(paneList.Bounds.Width / count - 12, 2);
+            var source = pane.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Classes.Contains("evidence-source"));
+            source.Extent.Width.Should().BeGreaterThan(source.Viewport.Width);
+            source.GetVisualDescendants().OfType<SelectableTextBlock>().Single().Text.Should().Contain(line);
+        }
+        var close = layer.FindControl<Button>("Accept")!;
+        close.IsEffectivelyVisible.Should().BeTrue();
+        close.IsFocused.Should().BeTrue();
+        close.Classes.Should().Contain("evidence-close");
+        close.CornerRadius.TopLeft.Should().BeGreaterThan(0);
+        close.TryFindResource("Surface", close.ActualThemeVariant, out var surface).Should().BeTrue();
+        close.Background.Should().Be(surface);
+        var dialogScroll = layer.FindControl<ScrollViewer>("DialogScroll")!;
+        dialogScroll.Extent.Height.Should().BeGreaterThan(dialogScroll.Viewport.Height);
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        await Ui.UntilAsync(() => !model.Services.Dialogs.IsOpen);
         window.Close();
     });
 

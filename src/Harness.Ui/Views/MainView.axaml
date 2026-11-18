@@ -136,21 +136,21 @@
   </Panel>
   <UserControl.DataTemplates>
     <DataTemplate DataType="vm:EvidenceDialog">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <ItemsControl ItemsSource="{Binding Panes}">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl Name="EvidencePanes" ItemsSource="{Binding Panes}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:EvidencePane">
-              <Border Classes="inset" Width="360" Padding="8">
+              <Border Classes="inset" Margin="0,0,12,0" Padding="8">
                 <StackPanel Spacing="6">
                   <TextBlock Text="{Binding Location}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <SelectableTextBlock Classes="mono small" Text="{Binding Text}" />
+                  <ScrollViewer Classes="evidence-source" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <SelectableTextBlock Classes="mono small" Text="{Binding Text}" />
+                  </ScrollViewer>
                 </StackPanel>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-      </ScrollViewer>
     </DataTemplate>
     <DataTemplate DataType="vm:HomePage">
       <views:HomeView />
