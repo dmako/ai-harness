@@ -130,6 +130,15 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T17:16:51.135209500Z"
 
 [[memory]]
+id = "mem_3a7b345562f73576"
+type = "decision"
+scope = "path:src/Harness.Ui/Preview"
+content = "Avalonia design previews use d:DataContext with PreviewData and an offline read-only fixture handler; preview fixtures are embedded only in Debug builds."
+source_ref = "TASK-0181; src/Harness.Ui/Preview; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-18T21:47:01.119658300Z"
+
+[[memory]]
 id = "mem_3fcfdf6586ec0f87"
 type = "warning"
 scope = "project"
@@ -362,6 +371,15 @@ content = "On Windows, a reader of an agent host's state file can fail for a mom
 source_ref = "TASK-0135; AgentHostFiles.ReadState"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:55:06.522497800Z"
+
+[[memory]]
+id = "mem_fc56705303261864"
+type = "decision"
+scope = "path:src/Harness.Ui.Browser"
+content = "The browser host displays a branded startup splash until Avalonia's canvas has rendered; initialization failures leave a reload message instead of an endless spinner."
+source_ref = "TASK-0167; src/Harness.Ui.Browser/wwwroot/main.js"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-18T21:48:08.105344000Z"
 
 [[memory]]
 id = "mem_fe5c72573c884733"

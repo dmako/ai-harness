@@ -16,8 +16,8 @@
     </StackPanel>
     <Border Name="VisitBanner" Classes="since" Margin="0,12,0,0" Background="{DynamicResource VisitGradient}" IsVisible="{Binding Activity.Since, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-        <c:Icon Name="VisitIcon" Kind="refresh" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
-        <TextBlock Name="SinceVisit" Grid.Column="1" Text="{Binding Activity.Since}" TextWrapping="Wrap" />
+        <TextBlock Text="✦" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+        <TextBlock Name="SinceVisit" Grid.Column="1" Text="{Binding Activity.Since}" VerticalAlignment="Center" TextWrapping="Wrap" />
       </Grid>
     </Border>
     <ItemsControl Name="Tiles" ItemsSource="{Binding Tiles}" Margin="0,16,0,0">

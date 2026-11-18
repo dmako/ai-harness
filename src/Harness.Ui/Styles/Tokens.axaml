@@ -42,7 +42,10 @@
       <SolidColorBrush x:Key="Axis" Color="#c4c4c4" />
       <SolidColorBrush x:Key="Accent" Color="#006b6c" />
       <SolidColorBrush x:Key="AccentWash" Color="#cfe6e4" />
-      <LinearGradientBrush x:Key="VisitGradient" StartPoint="0%,0%" EndPoint="100%,0%"><GradientStop Color="#cfe6e4" Offset="0" /><GradientStop Color="#f1f6f6" Offset="1" /></LinearGradientBrush>
+      <LinearGradientBrush x:Key="VisitGradient" StartPoint="0%,50%" EndPoint="100%,50%">
+        <GradientStop Color="#cfe6e4" Offset="0" />
+        <GradientStop Color="#00cfe6e4" Offset="0.8" />
+      </LinearGradientBrush>
       <SolidColorBrush x:Key="Selected" Color="#f0f6f6" />
       <SolidColorBrush x:Key="Fill" Color="#006b6c" />
       <SolidColorBrush x:Key="OnFill" Color="#ffffff" />
@@ -110,7 +113,10 @@
       <SolidColorBrush x:Key="Axis" Color="#3c3b37" />
       <SolidColorBrush x:Key="Accent" Color="#4fb4b1" />
       <SolidColorBrush x:Key="AccentWash" Color="#0d3f40" />
-      <LinearGradientBrush x:Key="VisitGradient" StartPoint="0%,0%" EndPoint="100%,0%"><GradientStop Color="#0d3f40" Offset="0" /><GradientStop Color="#202524" Offset="1" /></LinearGradientBrush>
+      <LinearGradientBrush x:Key="VisitGradient" StartPoint="0%,50%" EndPoint="100%,50%">
+        <GradientStop Color="#0d3f40" Offset="0.0" />
+        <GradientStop Color="#000d3f40" Offset="0.8" />
+      </LinearGradientBrush>
       <SolidColorBrush x:Key="Selected" Color="#1f2524" />
       <SolidColorBrush x:Key="Fill" Color="#006b6c" />
       <SolidColorBrush x:Key="OnFill" Color="#f3ecdf" />
