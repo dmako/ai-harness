@@ -14,8 +14,11 @@
       <TextBlock Classes="h2" Text="Home" />
       <TextBlock Classes="path" Text="Every repository on this machine that uses harness." />
     </StackPanel>
-    <Border Classes="inset" Margin="0,12,0,0" IsVisible="{Binding Activity.Since, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-      <TextBlock Name="SinceVisit" Text="{Binding Activity.Since}" TextWrapping="Wrap" />
+    <Border Name="VisitBanner" Classes="since" Margin="0,12,0,0" Background="{DynamicResource VisitGradient}" IsVisible="{Binding Activity.Since, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+        <c:Icon Name="VisitIcon" Kind="refresh" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+        <TextBlock Name="SinceVisit" Grid.Column="1" Text="{Binding Activity.Since}" TextWrapping="Wrap" />
+      </Grid>
     </Border>
     <ItemsControl Name="Tiles" ItemsSource="{Binding Tiles}" Margin="0,16,0,0">
       <ItemsControl.ItemsPanel>
@@ -138,8 +141,28 @@
     <views:SectionView Name="ActivitySection" Grid.Column="1" DataContext="{Binding Activity}">
       <views:SectionView.Body>
         <StackPanel x:DataType="vm:ActivityViewModel" Spacing="8">
-          <TextBlock Classes="muted small" Text="{Binding WeekSummary}" TextWrapping="Wrap" />
-          <c:DayBars Days="{Binding Bars}" AutomationProperties.Name="{Binding WeekName}" />
+          <Border Name="ActivityChart" Classes="card" Padding="12,10">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="small" Text="{Binding WeekSummary}" TextWrapping="Wrap" />
+              <WrapPanel Name="ActivityLegend" ItemSpacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="4"><c:Swatch BrushKey="Accent" Size="8" VerticalAlignment="Center" /><TextBlock Classes="muted small" Text="agents' calls" /></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4"><c:Swatch BrushKey="Critical" Size="8" VerticalAlignment="Center" /><TextBlock Classes="muted small" Text="failed" /></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4"><c:Swatch BrushKey="CDecision" Size="6" VerticalAlignment="Center" /><TextBlock Classes="muted small" Text="a task or knowledge change" /></StackPanel>
+              </WrapPanel>
+              <c:DayBars Name="HomeDayBars" Days="{Binding Bars}" AutomationProperties.Name="{Binding WeekName}" />
+              <ItemsControl Name="ActivityDays" ItemsSource="{Binding Week}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ActivityDay">
+                    <StackPanel>
+                      <c:Dots Count="{Binding Changes}" HorizontalAlignment="Center" Margin="0,0,0,2" />
+                      <TextBlock Classes="muted small" Text="{Binding Label}" HorizontalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
           <TextBlock Classes="empty" Text="No recent activity." IsVisible="{Binding Quiet}" />
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>

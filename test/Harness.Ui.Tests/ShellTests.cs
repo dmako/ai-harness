@@ -312,6 +312,38 @@ public sealed class ShellTests
         home.WorkspaceCards[0].Members[0].ContextLine.Should().Be("60% context hits");
         home.WorkspaceCards[0].Members[0].AgentLine.Should().StartWith("Agents ");
         var homeView = window.GetVisualDescendants().OfType<HomeView>().Single();
+        Ui.Settle();
+        var banner = homeView.FindControl<Border>("VisitBanner")!;
+        banner.IsVisible.Should().BeTrue();
+        banner.Background.Should().BeOfType<LinearGradientBrush>();
+        homeView.FindControl<TextBlock>("SinceVisit")!.Text.Should().Be(home.Activity.Since);
+        homeView.TryFindResource("Accent", homeView.ActualThemeVariant, out var accent).Should().BeTrue();
+        homeView.FindControl<Icon>("VisitIcon")!.Foreground.Should().Be(accent);
+        var menu = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "Menu");
+        if (width < 760)
+        {
+            menu.IsChecked = true;
+            Ui.Settle();
+        }
+        var sidebar = window.GetVisualDescendants().OfType<Sidebar>().Single();
+        sidebar.GetVisualDescendants().OfType<Icon>().Where(i => i.Kind is "home" or "workspace")
+            .Should().HaveCountGreaterThanOrEqualTo(2).And.OnlyContain(i => Equals(i.Foreground, accent));
+        if (width < 760)
+        {
+            menu.IsChecked = false;
+            Ui.Settle();
+        }
+        var chart = homeView.FindControl<Border>("ActivityChart")!;
+        var legend = homeView.FindControl<WrapPanel>("ActivityLegend")!;
+        legend.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text)
+            .Should().Contain(["agents' calls", "failed", "a task or knowledge change"]);
+        var bars = homeView.FindControl<DayBars>("HomeDayBars")!;
+        var days = homeView.FindControl<ItemsControl>("ActivityDays")!;
+        days.GetVisualDescendants().OfType<Dots>().Select(d => d.Count).Should().Equal(home.Activity.Week.Select(d => d.Changes));
+        days.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).Should().Equal(home.Activity.Week.Select(d => d.Label));
+        bars.Bounds.Width.Should().BeApproximately(days.Bounds.Width, 0.1);
+        chart.Bounds.Width.Should().BeLessThanOrEqualTo(homeView.Bounds.Width);
+        banner.Bounds.Width.Should().BeLessThanOrEqualTo(homeView.Bounds.Width);
         var name = homeView.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == home.WorkspaceCards[0].Members[0].Name);
         name.TextTrimming.Should().Be(TextTrimming.CharacterEllipsis);
         ToolTip.GetTip(name).Should().Be(name.Text);

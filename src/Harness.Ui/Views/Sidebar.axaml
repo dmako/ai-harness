@@ -24,7 +24,7 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="0,8,0,12">
       <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=home}" Href="#/" AutomationProperties.Name="Home">
-        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="home" /><TextBlock Text="Home" /></StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="home" Foreground="{DynamicResource Accent}" /><TextBlock Text="Home" /></StackPanel>
       </c:AppLink>
       <c:AppLink Classes="nav" Classes.current="{Binding Route.Page, Converter={x:Static c:Converters.Is}, ConverterParameter=search}" Href="#/search" AutomationProperties.Name="Search">
         <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="search" /><TextBlock Text="Search" /></StackPanel>
@@ -44,7 +44,7 @@
                     <TextBlock Text="{Binding Waiting}" />
                   </Border>
                   <Grid ColumnDefinitions="Auto,*">
-                    <c:Icon Kind="workspace" Margin="0,0,8,0" />
+                    <c:Icon Kind="workspace" Foreground="{DynamicResource Accent}" Margin="0,0,8,0" />
                     <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
                   </Grid>
                 </DockPanel>
