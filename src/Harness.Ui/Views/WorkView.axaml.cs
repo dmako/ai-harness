@@ -25,6 +25,7 @@ public sealed partial class WorkView : UserControl
     public WorkView()
     {
         InitializeComponent();
+        SizeChanged += (_, e) => Classes.Set("compact", e.NewSize.Width < 600);
         AddHandler(PointerPressedEvent, Pressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerMovedEvent, Moved, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerReleasedEvent, Released, RoutingStrategies.Tunnel, handledEventsToo: true);

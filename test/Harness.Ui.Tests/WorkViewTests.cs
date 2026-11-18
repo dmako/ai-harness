@@ -29,6 +29,50 @@ public sealed class WorkViewTests
     [InlineData(390, true)]
     [InlineData(1280, false)]
     [InlineData(1280, true)]
+    public Task TaskRowsKeepTitleAndMetadataReadable(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        var tasks = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(Fixtures.Folder, "api/projects/{id}/tasks.json")))!;
+        tasks["tasks"]![0]!["title"] = "A long task title that must remain readable when the available space is narrow";
+        api.Answers[Root + "/tasks"] = tasks.ToJsonString();
+        var (window, _, _) = await OpenAsync("tasks", api, width, 800);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        Ui.Settle();
+        var row = window.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("drag-task") && b.DataContext is TaskRow { Id: "TASK-0001" });
+        row.Padding.Top.Should().BeGreaterThan(4);
+        var heading = row.GetVisualDescendants().OfType<Grid>().Single(g => g.Classes.Contains("task-heading"));
+        var icon = heading.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().Single();
+        var title = heading.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text?.StartsWith("A long task title", StringComparison.Ordinal) == true);
+        var iconRight = icon.TranslatePoint(new Point(icon.Bounds.Width, 0), row)!.Value.X;
+        var titleLeft = title.TranslatePoint(default, row)!.Value.X;
+        (titleLeft - iconRight).Should().BeInRange(0, 8);
+        title.Bounds.Width.Should().BeGreaterThan(0);
+        title.TextWrapping.Should().Be(Avalonia.Media.TextWrapping.Wrap);
+        var metadata = row.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Classes.Contains("task-metadata"));
+        metadata.Children[0].Should().BeOfType<TextBlock>().Which.Text.Should().Be(((TaskRow)row.DataContext!).Acceptance);
+        metadata.Children[1].Should().BeOfType<StackPanel>();
+        metadata.Children[2].Should().BeOfType<Border>();
+        var headingRight = heading.TranslatePoint(new Point(heading.Bounds.Width, 0), row)!.Value.X;
+        var metadataLeft = metadata.TranslatePoint(default, row)!.Value.X;
+        if (width < 760)
+        {
+            metadata.TranslatePoint(default, row)!.Value.Y.Should().BeGreaterThan(heading.TranslatePoint(default, row)!.Value.Y);
+        }
+        else
+        {
+            headingRight.Should().BeLessThanOrEqualTo(metadataLeft);
+        }
+        row.GetVisualDescendants().OfType<Button>().Count(b => Avalonia.Automation.AutomationProperties.GetName(b) is "Edit TASK-0001" or "Delete TASK-0001").Should().Be(2);
+        UiChecks.Check(window).Should().BeEmpty();
+        window.Close();
+    });
+
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
     public Task TaskDialogsKeepActionsVisibleWithLongContent(int width, bool dark) => Ui.RunAsync(async () =>
     {
         var api = new FixtureApi();
