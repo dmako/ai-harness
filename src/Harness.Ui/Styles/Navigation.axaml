@@ -18,7 +18,7 @@
   </Style>
   <Style Selector="ToggleButton.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.tab:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="ToggleButton.tab:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.tab:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
@@ -41,7 +41,7 @@
   </Style>
   <Style Selector="Button.tablink:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="Button.tablink.selected">
@@ -74,7 +74,7 @@
   </Style>
   <Style Selector="ToggleButton.seg:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.seg:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="ToggleButton.seg:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.seg:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">

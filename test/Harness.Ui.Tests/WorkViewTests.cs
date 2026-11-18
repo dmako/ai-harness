@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -24,6 +25,24 @@ public sealed class WorkViewTests
     private const string Root = "/api/projects/prj_fixture";
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task NeutralButtonGetsAnAccentOutlineOnHover(bool dark) => Ui.RunAsync(() =>
+    {
+        var window = Ui.Show(new StyleGallery(), 1280, 800);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        Ui.Settle();
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "Neutral"));
+        window.MouseMove(Center(button, window));
+        Ui.Settle();
+        button.TryFindResource("Accent", button.ActualThemeVariant, out var accent).Should().BeTrue();
+        button.GetVisualDescendants().OfType<ContentPresenter>().Single(p => p.Name == "PART_ContentPresenter")
+            .BorderBrush.Should().BeEquivalentTo(accent);
+        window.Close();
+        return Task.CompletedTask;
+    });
+
+    [Theory]
     [InlineData("tasks", false)]
     [InlineData("tasks", true)]
     [InlineData("blueprints", false)]
@@ -35,6 +54,8 @@ public sealed class WorkViewTests
         var button = window.GetVisualDescendants().OfType<Button>()
             .First(b => b.Classes.Contains("hover-remove") && b.IsEffectivelyVisible);
         button.Opacity.Should().Be(1, "touch and other non-hover input starts with visible actions");
+        button.TryFindResource("Critical", button.ActualThemeVariant, out var critical).Should().BeTrue();
+        button.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().Single().Foreground.Should().BeEquivalentTo(critical);
         window.MouseMove(new Point(1, 1));
         Ui.Settle();
         button.Opacity.Should().Be(0);
@@ -44,9 +65,10 @@ public sealed class WorkViewTests
         window.MouseMove(Center(button, window));
         Ui.Settle();
         button.Opacity.Should().Be(1);
-        button.TryFindResource("Critical", button.ActualThemeVariant, out var critical).Should().BeTrue();
         button.GetVisualDescendants().OfType<Harness.Ui.Controls.Icon>().Single().Foreground
             .Should().BeEquivalentTo(critical);
+        button.GetVisualDescendants().OfType<ContentPresenter>().Single(p => p.Name == "PART_ContentPresenter")
+            .BorderBrush.Should().BeEquivalentTo(critical);
         window.Close();
     });
 

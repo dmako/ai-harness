@@ -94,7 +94,7 @@
                               Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.EditCommand}" CommandParameter="{Binding}">
                         <c:Icon Kind="edit" />
                       </Button>
-                      <Button Classes="icon" AutomationProperties.Name="{Binding Entry.Name, StringFormat='Remove SCM {0}'}"
+                      <Button Classes="icon destructive" AutomationProperties.Name="{Binding Entry.Name, StringFormat='Remove SCM {0}'}"
                               Command="{Binding $parent[views:MachineView].((vm:MachinePage)DataContext).Scm.RemoveCommand}" CommandParameter="{Binding}">
                         <c:Icon Kind="trash" />
                       </Button>

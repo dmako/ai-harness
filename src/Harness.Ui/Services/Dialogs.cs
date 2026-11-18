@@ -61,6 +61,9 @@ public abstract partial class DialogViewModel : ObservableObject
     /// <summary>Whether accepting destroys something (the accept button is a danger button).</summary>
     public bool Danger { get; init; }
 
+    /// <summary>Whether the destructive action removes or deletes an item.</summary>
+    public bool Trash { get; init; }
+
     /// <summary>A refusal of the form or of the write it sent, shown in the dialog, which stays open.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]

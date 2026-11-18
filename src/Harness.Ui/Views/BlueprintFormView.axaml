@@ -32,9 +32,9 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:LineItem">
             <DockPanel Margin="0,0,0,4">
-              <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Remove"
+              <Button DockPanel.Dock="Right" Classes="icon destructive" AutomationProperties.Name="Remove"
                       Command="{Binding $parent[ItemsControl].((vm:BlueprintFormDialog)DataContext).RemoveExitCommand}" CommandParameter="{Binding}">
-                <c:Icon Kind="close" />
+                <c:Icon Kind="trash" />
               </Button>
               <TextBox Text="{Binding Text}" PlaceholderText="A criterion that says it is done" AutomationProperties.Name="Done when" />
             </DockPanel>

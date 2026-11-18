@@ -18,7 +18,7 @@
   </Style>
   <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
@@ -66,18 +66,6 @@
     <Setter Property="Foreground" Value="{DynamicResource OnGold}" />
   </Style>
 
-  <Style Selector="Button.danger">
-    <Setter Property="Background" Value="{DynamicResource Critical}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
-    <Setter Property="Foreground" Value="{DynamicResource OnCritical}" />
-    <Setter Property="FontWeight" Value="Medium" />
-  </Style>
-  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Critical}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
-    <Setter Property="Foreground" Value="{DynamicResource OnCritical}" />
-  </Style>
-
   <Style Selector="Button.ghost">
     <Setter Property="Background" Value="Transparent" />
   </Style>
@@ -96,8 +84,18 @@
   </Style>
   <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.icon:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <Style Selector="Button.danger, Button.destructive">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.destructive:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.destructive:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
   </Style>
 
   <!-- every link gets Open in new tab / Copy link and middle-click (Controls/Links.cs) -->

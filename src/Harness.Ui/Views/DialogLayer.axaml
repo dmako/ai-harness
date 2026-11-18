@@ -46,7 +46,9 @@
               <Button Name="Back" Classes="ghost" Content="Back" AutomationProperties.Name="Back" Command="{Binding BackCommand}"
                       IsVisible="{Binding Reviewing}" />
               <Button Name="Accept" Classes.primary="{Binding !Danger}" Classes.danger="{Binding Danger}"
-                      Content="{Binding AcceptLabel}" AutomationProperties.Name="{Binding AcceptLabel}" Command="{Binding AcceptCommand}" IsEnabled="{Binding !Busy}" />
+                      AutomationProperties.Name="{Binding AcceptLabel}" Command="{Binding AcceptCommand}" IsEnabled="{Binding !Busy}">
+                <StackPanel Orientation="Horizontal"><c:Icon Kind="trash" IsVisible="{Binding Trash}" /><TextBlock Text="{Binding AcceptLabel}" /></StackPanel>
+              </Button>
             </StackPanel>
           </Border>
         </StackPanel>

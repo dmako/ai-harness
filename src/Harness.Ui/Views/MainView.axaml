@@ -213,7 +213,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LineItem">
                 <DockPanel Margin="0,0,0,4">
-                  <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Remove alias"
+                  <Button DockPanel.Dock="Right" Classes="icon destructive" AutomationProperties.Name="Remove alias"
                           Command="{Binding $parent[ItemsControl].((vm:ScmFormDialog)DataContext).RemoveAliasCommand}"
                           CommandParameter="{Binding}">
                     <c:Icon Kind="trash" />

@@ -73,9 +73,9 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:LineItem">
             <DockPanel Margin="0,0,0,4">
-              <Button DockPanel.Dock="Right" Classes="icon" AutomationProperties.Name="Remove"
+              <Button DockPanel.Dock="Right" Classes="icon destructive" AutomationProperties.Name="Remove"
                       Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).RemoveCriterionCommand}" CommandParameter="{Binding}">
-                <c:Icon Kind="close" />
+                <c:Icon Kind="trash" />
               </Button>
               <TextBox Text="{Binding Text}" PlaceholderText="A criterion one can check" AutomationProperties.Name="Criterion" />
             </DockPanel>
@@ -94,11 +94,11 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="x:String">
-            <Button Classes="ghost small" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
+            <Button Classes="ghost small destructive" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
                     Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).ToggleDependencyCommand}" CommandParameter="{Binding}">
               <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Classes="mono" Text="{Binding}" />
-                <c:Icon Kind="close" />
+                <c:Icon Kind="trash" />
               </StackPanel>
             </Button>
           </DataTemplate>
@@ -136,11 +136,11 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="x:String">
-            <Button Classes="ghost small" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
+            <Button Classes="ghost small destructive" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
                     Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).RemoveScopeCommand}" CommandParameter="{Binding}">
               <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Classes="mono" Text="{Binding}" />
-                <c:Icon Kind="close" />
+                <c:Icon Kind="trash" />
               </StackPanel>
             </Button>
           </DataTemplate>

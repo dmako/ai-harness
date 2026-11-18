@@ -230,6 +230,7 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
             ),
             AcceptLabel = "Delete task",
             Danger = true,
+            Trash = true,
         };
         if (!await services.Dialogs.ConfirmAsync(confirm))
         {
@@ -1017,6 +1018,7 @@ public sealed partial class RemoveBlueprintDialog : FormDialog<bool>
                     Sub = $"It has {Shell.Plural(blueprint.Total, "task")}. What happens to them?",
                     AcceptLabel = "Remove the blueprint",
                     Danger = true,
+                    Trash = true,
                 }
             );
             return;
@@ -1028,6 +1030,7 @@ public sealed partial class RemoveBlueprintDialog : FormDialog<bool>
             Message = "• It has no tasks.\n• " + Backlog,
             AcceptLabel = "Remove the blueprint",
             Danger = true,
+            Trash = true,
         };
         if (!await services.Dialogs.ConfirmAsync(confirm))
         {

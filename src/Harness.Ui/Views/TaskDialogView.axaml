@@ -29,7 +29,7 @@
                     AutomationProperties.Name="Move to blueprint" />
           <Button Name="Move" Content="Move" AutomationProperties.Name="Move" Command="{Binding MoveCommand}" />
         </WrapPanel>
-        <Button Name="Delete" Classes="ghost" AutomationProperties.Name="Delete task" Command="{Binding DeleteCommand}">
+        <Button Name="Delete" Classes="ghost destructive" AutomationProperties.Name="Delete task" Command="{Binding DeleteCommand}">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <c:Icon Kind="trash" /><TextBlock Text="Delete" />
           </StackPanel>

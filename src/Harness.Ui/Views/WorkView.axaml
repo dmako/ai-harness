@@ -134,7 +134,7 @@
                                   Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.EditBlueprintCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="edit" />
                           </Button>
-                          <Button Classes="icon hover-remove" AutomationProperties.Name="{Binding Id, StringFormat='Remove blueprint {0}'}"
+                          <Button Classes="icon hover-remove destructive" AutomationProperties.Name="{Binding Id, StringFormat='Remove blueprint {0}'}"
                                   Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.RemoveBlueprintCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="trash" />
                           </Button>
@@ -285,7 +285,7 @@
                                           Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.EditTaskCommand}" CommandParameter="{Binding Id}">
                                     <c:Icon Kind="edit" />
                                   </Button>
-                                  <Button Classes="icon hover-remove" AutomationProperties.Name="{Binding Id, StringFormat='Delete {0}'}"
+                                  <Button Classes="icon hover-remove destructive" AutomationProperties.Name="{Binding Id, StringFormat='Delete {0}'}"
                                           Command="{Binding $parent[views:WorkView].((vm:WorkViewModel)DataContext).Plan.DeleteTaskCommand}" CommandParameter="{Binding Id}">
                                     <c:Icon Kind="trash" />
                                   </Button>

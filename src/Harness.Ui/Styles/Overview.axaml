@@ -26,7 +26,7 @@
   </Style>
   <Style Selector="Button.row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
 

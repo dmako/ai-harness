@@ -557,6 +557,7 @@ public sealed partial class WorkspaceMembersViewModel : ObservableObject
             Message = review.ToString(),
             AcceptLabel = "Remove",
             Danger = true,
+            Trash = true,
         };
         if (!await _context.Services.Dialogs.ConfirmAsync(confirm))
         {
@@ -600,6 +601,7 @@ public sealed partial class WorkspaceMembersViewModel : ObservableObject
                 $"The workspace and its membership list go; its {Shell.Plural(w.Members.Count, "project")} keep all their state.\nKnowledge recorded at workspace scope stays on disk but no longer applies to any project.\n{WorkspaceText.Note}",
             AcceptLabel = "Delete workspace",
             Danger = true,
+            Trash = true,
         };
         if (!await _context.Services.Dialogs.ConfirmAsync(confirm))
         {

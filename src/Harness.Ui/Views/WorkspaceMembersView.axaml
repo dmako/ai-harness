@@ -11,7 +11,7 @@
   <StackPanel Classes="section" Spacing="10">
     <WrapPanel ItemSpacing="8" LineSpacing="8">
       <TextBox Name="Filter" Text="{Binding Query}" PlaceholderText="Filter members" Width="220" AutomationProperties.Name="Filter members" />
-      <Button Name="RemoveChosen" Classes="ghost" Content="{Binding RemoveLabel}" AutomationProperties.Name="{Binding RemoveLabel}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemove}" />
+      <Button Name="RemoveChosen" Classes="ghost destructive" AutomationProperties.Name="{Binding RemoveLabel}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanRemove}"><StackPanel Orientation="Horizontal"><c:Icon Kind="trash" /><TextBlock Text="{Binding RemoveLabel}" /></StackPanel></Button>
       <Button Name="AddProjects" Content="Add projects" AutomationProperties.Name="Add projects" Command="{Binding AddCommand}" IsVisible="{Binding CanAdd}" />
     </WrapPanel>
     <TextBlock Classes="hint" Text="{Binding CommonLine}" IsVisible="{Binding HasCommon}" TextWrapping="Wrap" />
@@ -55,9 +55,9 @@
     </Border>
     <Border Classes="card" Padding="14,10">
       <DockPanel>
-        <Button Name="DeleteWorkspace" DockPanel.Dock="Right" Classes="ghost" Content="Delete workspace…" AutomationProperties.Name="Delete workspace…" Command="{Binding DeleteCommand}" VerticalAlignment="Center" />
+        <Button Name="DeleteWorkspace" DockPanel.Dock="Right" Classes="ghost destructive" AutomationProperties.Name="Delete workspace…" Command="{Binding DeleteCommand}" VerticalAlignment="Center"><StackPanel Orientation="Horizontal"><c:Icon Kind="trash" /><TextBlock Text="Delete workspace…" /></StackPanel></Button>
         <StackPanel Spacing="2" Margin="0,0,12,0">
-          <TextBlock FontWeight="SemiBold" Text="Delete this workspace" />
+          <TextBlock FontWeight="SemiBold" Text="Delete this workspace" TextWrapping="Wrap" />
           <TextBlock Classes="muted small" TextWrapping="Wrap" Text="Its projects keep all their state; its workspace knowledge no longer applies." />
         </StackPanel>
       </DockPanel>

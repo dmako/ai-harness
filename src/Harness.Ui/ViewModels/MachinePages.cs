@@ -368,6 +368,7 @@ public sealed partial class ScmSection(UiServices services) : SectionViewModel("
             Message = "• Its token is deleted from this machine.\n• Projects on this server lose the merge request tools until it is added again.",
             AcceptLabel = "Remove",
             Danger = true,
+            Trash = true,
         };
         if (!await services.Dialogs.ConfirmAsync(confirm))
         {
