@@ -1,5 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Styling;
+using Avalonia.VisualTree;
 using AwesomeAssertions;
+using Harness.Ui.Controls;
 using Harness.Ui.ViewModels;
 using Xunit;
 
@@ -13,6 +16,26 @@ namespace Harness.Ui.Tests;
 public sealed class AgentsViewTests
 {
     private const string Root = "/api/projects/prj_fixture";
+
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    public Task ProviderTrendChartStaysCompact(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Answers[Root + "/report"] = Report;
+        var (window, _, _) = await OpenAsync("agents", api, width);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        Ui.Settle();
+        var chart = window.GetVisualDescendants().OfType<DayBars>()
+            .Single(c => c.IsVisible && c.Days is { Count: > 0 });
+        chart.Bounds.Width.Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(360);
+        chart.Days.Should().NotBeNull().And.Contain(day => day.Failed > 0);
+        UiChecks.Check(window).Should().BeEmpty();
+        window.Close();
+    });
 
     private const string Report = """
         {"days":30,"context":{"calls":40,"changed":20,"hits":13,"hit_rate":0.65,"after_read":{"touched":10,"hits":7,"hit_rate":0.7}},

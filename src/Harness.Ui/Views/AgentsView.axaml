@@ -284,7 +284,7 @@
           </WrapPanel>
           <SelectableTextBlock Text="{Binding Finding.Message}" TextWrapping="Wrap" />
           <StackPanel Spacing="2" IsVisible="{Binding HasTrend}">
-            <c:DayBars Days="{Binding Bars}" />
+            <c:DayBars Days="{Binding Bars}" MaxWidth="360" HorizontalAlignment="Left" />
             <TextBlock Classes="muted small" Text="{Binding TrendNote}" />
           </StackPanel>
           <SelectableTextBlock Classes="mono small" Text="{Binding Finding.History}" IsVisible="{Binding HasHistory}" TextWrapping="Wrap" />
