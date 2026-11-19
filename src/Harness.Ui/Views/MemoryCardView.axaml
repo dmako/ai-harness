@@ -12,9 +12,7 @@
   <Border Classes="mem" c:StyleClass.Name="{Binding Memory.Type, StringFormat='ty-{0}'}" Classes.inactive="{Binding Inactive}"
           AutomationProperties.Name="{Binding Lead}">
     <StackPanel Spacing="4">
-      <SelectableTextBlock TextWrapping="Wrap">
-        <Run FontWeight="SemiBold" Text="{Binding Lead, Mode=OneWay}" /><Run Text="{Binding Rest, Mode=OneWay, StringFormat=' {0}'}" />
-      </SelectableTextBlock>
+      <c:HarnessMarkdown Markdown="{Binding Memory.Content}" />
       <WrapPanel ItemSpacing="8" LineSpacing="2">
         <Border Classes="tag" IsVisible="{Binding IsShared}" ToolTip.Tip="The team's: in .harness/knowledge.toml, shared through Git">
           <TextBlock Text="PROJECT" />

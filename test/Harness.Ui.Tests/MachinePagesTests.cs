@@ -8,6 +8,11 @@ using Harness.Ui.Controls;
 using Harness.Ui.Services;
 using Harness.Ui.ViewModels;
 using Harness.Ui.Views;
+using Markdig;
+using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
+using MarkView.Avalonia;
+using MarkView.Avalonia.Rendering;
 using Xunit;
 
 namespace Harness.Ui.Tests;
@@ -251,18 +256,15 @@ public sealed class MachinePagesTests
         page.Groups[0].Items[0].Current.Should().BeTrue();
         (page.Previous?.Slug, page.Next?.Slug).Should().Be(("guide", "guide-how-knowledge-gets-into-memory"));
 
-        var text = window.GetVisualDescendants().OfType<MarkdownBlock>().Single();
-        var blocks = text.Children;
-        blocks[0].Should().BeOfType<SelectableTextBlock>().Which.Classes.Should().Contain("h2");
-        blocks.OfType<Border>().Should().ContainSingle(b => b.Classes.Contains("inset"), "the fenced code");
-        blocks.OfType<ScrollViewer>().Should().ContainSingle(s => s.Content is Grid, "the table");
-        blocks.OfType<StackPanel>().Should().ContainSingle("the list");
-        var paragraph = blocks.OfType<SelectableTextBlock>().First(b => !b.Classes.Contains("h2") && !b.Classes.Contains("h3"));
-        paragraph.Inlines!.OfType<Run>().Should().Contain(r => r.Classes.Contains("code") && r.Text == "harness docs");
-        paragraph.Inlines!.OfType<Run>().Should().Contain(r => r.Text == "bold" && r.FontWeight == Avalonia.Media.FontWeight.SemiBold);
-        var links = text.GetVisualDescendants().OfType<AppLink>().ToArray();
-        links.Should().ContainSingle(l => l.Href == "#/docs/commands");
-        text.GetVisualDescendants().OfType<HyperlinkButton>().Should().ContainSingle(h => h.NavigateUri == new Uri("https://example.com/x"));
+        var text = window.GetVisualDescendants().OfType<DocsMarkdown>().Single();
+        text.Markdown.Should().Be(page.Doc!.Body);
+        var document = Markdown.Parse(text.Markdown, text.Pipeline);
+        document.Descendants<LinkInline>().Select(link => link.Url).Should().Contain("harness-doc:commands");
+        document.Descendants<LinkInline>().Select(link => link.Url).Should().Contain("https://example.com/x");
+        var linkEvent = new LinkClickedEventArgs("harness-doc:commands") { RoutedEvent = MarkdownViewer.LinkClickedEvent };
+        text.RaiseEvent(linkEvent);
+        linkEvent.Handled.Should().BeTrue();
+        model.Route.Item.Should().Be("commands");
     });
 
     [Theory]

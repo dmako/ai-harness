@@ -34,7 +34,7 @@ public sealed class PreviewTests
         architectureWindow.GetVisualDescendants().OfType<TextBlock>().Should().Contain(text => text.Text == "Built on");
         architectureWindow.Close();
         var docsWindow = Ui.Show(new DocsView { DataContext = docs }, 1280, 800);
-        docsWindow.GetVisualDescendants().OfType<MarkdownBlock>().Single().Children.Should().NotBeEmpty();
+        docsWindow.GetVisualDescendants().OfType<DocsMarkdown>().Single().Markdown.Should().NotBeNullOrEmpty();
         docsWindow.Close();
         var theme = Application.Current!.RequestedThemeVariant;
         new MainView().DataContext.Should().BeNull();

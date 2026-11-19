@@ -10,6 +10,8 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="DynamicData" />
+    <PackageReference Include="MarkView.Avalonia" />
+    <PackageReference Include="MarkView.Avalonia.Mermaid" />
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
     <EmbeddedResource Include="../../test/Harness.Ui.Tests/Fixtures/**/*.json"

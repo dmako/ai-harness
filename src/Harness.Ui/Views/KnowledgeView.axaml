@@ -150,7 +150,7 @@
                       <c:Swatch BrushKey="{Binding Brush}" Size="8" VerticalAlignment="Center" />
                       <TextBlock Classes="label" Text="{Binding Kind}" />
                     </StackPanel>
-                    <SelectableTextBlock Text="{Binding Proposal.Content}" TextWrapping="Wrap" />
+                    <c:HarnessMarkdown Markdown="{Binding Proposal.Content}" />
                     <SelectableTextBlock TextWrapping="Wrap" IsVisible="{Binding HasRationale}">
                       <Run FontWeight="SemiBold" Text="Why: " /><Run Text="{Binding Proposal.Rationale, Mode=OneWay}" />
                     </SelectableTextBlock>

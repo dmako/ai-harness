@@ -13,6 +13,8 @@
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://MarkView.Avalonia/Themes/MarkdownTheme.axaml" />
+    <StyleInclude Source="avares://MarkView.Avalonia.Mermaid/Themes/MermaidTheme.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Base.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Buttons.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Chips.axaml" />

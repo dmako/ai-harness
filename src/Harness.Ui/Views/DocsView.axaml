@@ -39,7 +39,7 @@
       </ItemsControl>
       <StackPanel Name="Article" Spacing="16" MaxWidth="660" HorizontalAlignment="Left">
         <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        <c:MarkdownBlock Name="DocText" Source="{Binding Doc.Body}" />
+        <c:DocsMarkdown Name="DocText" Markdown="{Binding Doc.Body}" />
         <Border Name="NavigationSeparator" Height="1" Background="{DynamicResource Border}" />
         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
           <c:AppLink Name="NextDoc" Grid.Column="1" Classes="doc-nav" Href="{Binding Next.Href}" AutomationProperties.Name="{Binding Next.Title, StringFormat='Next: {0}'}" IsVisible="{Binding Next, Converter={x:Static ObjectConverters.IsNotNull}}"

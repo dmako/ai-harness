@@ -41,6 +41,14 @@
       <SolidColorBrush x:Key="Grid" Color="#e8e8e8" />
       <SolidColorBrush x:Key="Axis" Color="#c4c4c4" />
       <SolidColorBrush x:Key="Accent" Color="#006b6c" />
+      <SolidColorBrush x:Key="MarkdownLinkForeground" Color="#006b6c" />
+      <SolidColorBrush x:Key="MarkdownCodeBlockBackground" Color="#f6f7f8" />
+      <SolidColorBrush x:Key="MarkdownCodeBlockForeground" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="MarkdownCodeInlineBackground" Color="#f6f7f8" />
+      <SolidColorBrush x:Key="MarkdownCodeInlineForeground" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="MarkdownMermaidBackground" Color="#ffffff" />
+      <SolidColorBrush x:Key="MarkdownMermaidForeground" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="MarkdownMermaidAccent" Color="#006b6c" />
       <SolidColorBrush x:Key="AccentWash" Color="#cfe6e4" />
       <LinearGradientBrush x:Key="VisitGradient" StartPoint="0%,50%" EndPoint="100%,50%">
         <GradientStop Color="#cfe6e4" Offset="0" />
@@ -112,6 +120,14 @@
       <SolidColorBrush x:Key="Grid" Color="#2d2d2a" />
       <SolidColorBrush x:Key="Axis" Color="#3c3b37" />
       <SolidColorBrush x:Key="Accent" Color="#4fb4b1" />
+      <SolidColorBrush x:Key="MarkdownLinkForeground" Color="#4fb4b1" />
+      <SolidColorBrush x:Key="MarkdownCodeBlockBackground" Color="#252523" />
+      <SolidColorBrush x:Key="MarkdownCodeBlockForeground" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="MarkdownCodeInlineBackground" Color="#252523" />
+      <SolidColorBrush x:Key="MarkdownCodeInlineForeground" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="MarkdownMermaidBackground" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="MarkdownMermaidForeground" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="MarkdownMermaidAccent" Color="#4fb4b1" />
       <SolidColorBrush x:Key="AccentWash" Color="#0d3f40" />
       <LinearGradientBrush x:Key="VisitGradient" StartPoint="0%,50%" EndPoint="100%,50%">
         <GradientStop Color="#0d3f40" Offset="0.0" />
