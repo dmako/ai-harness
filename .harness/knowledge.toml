@@ -40,6 +40,15 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:35:46.629438400Z"
 
 [[memory]]
+id = "mem_0af764c00692760f"
+type = "convention"
+scope = "path:src/Harness.Infrastructure/Tasks"
+content = "A new blueprint's default id is the next number of the last numbered blueprint's prefix (M16 -> M17), or BP-001 when none is numbered; the user may change it before creating."
+source_ref = "TASK-0048"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:54:11.952405100Z"
+
+[[memory]]
 id = "mem_0b231b92ff1d6015"
 type = "convention"
 scope = "path:test"
@@ -56,6 +65,15 @@ content = "Developer telemetry export is opt-in and runs after sync in a separat
 source_ref = "TASK-0029; commit 4496897; doc/port/developer-export-and-companions.md"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T17:22:55.873800600Z"
+
+[[memory]]
+id = "mem_1025dac39affb8c7"
+type = "decision"
+scope = "project"
+content = "Supported release RIDs are win-x64, linux-x64, linux-arm64 and osx-arm64. Intel macOS/osx-x64 is not supported."
+source_ref = "TASK-0031 completion instructions 2026-10-22: remove osx-x64 support"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:44:42.297862300Z"
 
 [[memory]]
 id = "mem_10defc6490b3fa38"
@@ -83,6 +101,42 @@ content = "CLI/console output writes (TextWriter.WriteLineAsync/WriteAsync) pass
 source_ref = "TASK-0118; user decision 2026-11-10"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:36:16.412345100Z"
+
+[[memory]]
+id = "mem_190eafc7ac64e423"
+type = "convention"
+scope = "path:src/Harness.Ui"
+content = "Ctrl+F / Command+F and the visible Find field search rendered text in the current view or dialog, stepping through occurrences; collapsed and unrealized content is excluded."
+source_ref = "TASK-0162; commit 86dd937"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:42:14.518722100Z"
+
+[[memory]]
+id = "mem_1a0e574764f87568"
+type = "warning"
+scope = "path:src/Harness.Infrastructure/Processes"
+content = "On Windows a provider command that resolves to a .bat/.cmd shim (dnx, npx) runs through cmd.exe /d /s /c; its arguments must not contain a double quote, % or a line break, which are refused because cmd would rewrite them (BatBadBut)."
+source_ref = "TASK-0067"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:12:12.153040400Z"
+
+[[memory]]
+id = "mem_1c776af0f6901007"
+type = "warning"
+scope = "path:src/Harness.Ui.Browser"
+content = "Avalonia 12.1.6 browser UI exposes a Canvas but not the Board's button roles in Edge's accessibility tree; in-app find does not provide screen-reader access. Recheck on Avalonia upgrades; see the accessibility follow-up."
+source_ref = "TASK-0162; doc/architecture/avalonia-spike.md; commit 86dd937"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:36:35.338323900Z"
+
+[[memory]]
+id = "mem_217ab3633bc1770d"
+type = "fact"
+scope = "path:src/Harness.Ui/ViewModels/OverviewViewModel.cs"
+content = "Home activity uses the machine-wide activity feed, bounded by its server limit of 200 items and 90 days; the visit summary discloses truncated history."
+source_ref = "TASK-0197"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:55:46.868984600Z"
 
 [[memory]]
 id = "mem_230dab96acf52e73"
@@ -139,6 +193,15 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-18T21:47:01.119658300Z"
 
 [[memory]]
+id = "mem_3bee8aa1a0d69a74"
+type = "convention"
+scope = "path:src/Harness.Ui"
+content = "In the Avalonia UI, Critical text is drawn only on Surface or Page (dark Critical on Surface2 is 4.38:1); status and level hues colour icons, never words; Warning gold is never a text colour (GoldInk is). DesignSystemTests lists the text-on-fill pairs the styles may use."
+source_ref = "TASK-0147"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:39:23.527810500Z"
+
+[[memory]]
 id = "mem_3fcfdf6586ec0f87"
 type = "warning"
 scope = "project"
@@ -146,6 +209,15 @@ content = "Trimmed Native AOT releases load the packaged SQLite sidecar beside e
 source_ref = "TASK-0035; doc/releases.md; doc/native-aot.md; doc/testing.md"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T17:17:12.177719900Z"
+
+[[memory]]
+id = "mem_424996d1d964b7fa"
+type = "decision"
+scope = "subsystem:providers"
+content = "Reject generic mapping absolute request paths that are lexically outside the configured project root."
+source_ref = "TASK-0013; doc/port/downstream-mcp.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:44:32.348473200Z"
 
 [[memory]]
 id = "mem_483246ff220d172f"
@@ -166,6 +238,15 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:56:43.018379700Z"
 
 [[memory]]
+id = "mem_4eb02c783246bc5b"
+type = "fact"
+scope = "path:test/Harness.Integration/Web"
+content = "UiLiveHub sends initial SSE frames before the background change-source factory necessarily runs. Lifecycle tests await explicit source creation and first-poll signals, including on reconnect; the delayed-factory case verifies initial frames remain responsive."
+source_ref = "macOS CI artifact 2026-10-23; UiLiveLifecycleTests.PagesShareOneWatcherAndLastDisconnectDisposesItBeforeReconnect; Windows and WSL SSE regression tests"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:58:16.230429400Z"
+
+[[memory]]
 id = "mem_5045ea97eb52ee98"
 type = "warning"
 scope = "project"
@@ -173,6 +254,15 @@ content = "BinaryReader/BinaryWriter directly on a Brotli/Deflate stream make on
 source_ref = "TASK-0105"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:59:51.863470900Z"
+
+[[memory]]
+id = "mem_5063d4015280127b"
+type = "warning"
+scope = "path:src/Harness.Ui"
+content = "The browser build of the Avalonia UI has no system fonts: only embedded ones (Inter) exist, so the Mono family (Cascadia Mono, Consolas, Menlo) falls back to Inter in the browser. Ids and code need an embedded monospace font (with its licence in third-party notices) before parity."
+source_ref = "TASK-0147"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:33:46.955322500Z"
 
 [[memory]]
 id = "mem_506a985006d765a7"
@@ -191,6 +281,15 @@ content = "Keep command dispatch methods small: switch arms call named command h
 source_ref = "User request 2026-10-21: TaskCommandRunner.RunAsync maintainability"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:34:09.525647900Z"
+
+[[memory]]
+id = "mem_54f79a7175d38012"
+type = "decision"
+scope = "project"
+content = "Standardize new .NET test projects on xunit.v3 4.0.0 with native Microsoft Testing Platform v2 and the existing TRX reporter. Bootstrap should select MTP in global.json alongside a stable .NET 10 SDK pin, without adding xUnit v2, VSTest runner or Microsoft.NET.Test.Sdk references."
+source_ref = "TASK-0003; doc/port/solution-and-packages.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:43:40.901504300Z"
 
 [[memory]]
 id = "mem_5516581c8f5dcc78"
@@ -220,6 +319,24 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T17:20:31.626855800Z"
 
 [[memory]]
+id = "mem_610ecb986d1612fb"
+type = "warning"
+scope = "path:src/Harness.Cli/Ui/UiReadService.Reviews.cs"
+content = "Triaging a published project's 'unused' finding needs a prior harness sync: without one, findings/mark answers 400 'no such finding now', because quick reads do not recompute that finding."
+source_ref = "TASK-0156"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:35:39.848282900Z"
+
+[[memory]]
+id = "mem_618d19cfa8926cf2"
+type = "convention"
+scope = "path:src/Harness.Ui"
+content = "Harness.Ui lists that live updates reload are kept in a DynamicData SourceCache keyed by id and updated with EditDiff over value-equal records; views bind to TransformWithInlineUpdate + SortAndBind output, never Clear()-and-refill collections, so reloads keep controls, scroll position and selection."
+source_ref = "TASK-0165"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:38:58.873179300Z"
+
+[[memory]]
 id = "mem_67ceb557c979422b"
 type = "warning"
 scope = "path:src/Harness.Infrastructure/Storage"
@@ -229,6 +346,15 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:58:34.447409600Z"
 
 [[memory]]
+id = "mem_67f75ba74a18b707"
+type = "convention"
+scope = "path:src/Harness.Ui/Styles"
+content = "Avalonia UI style files style a view's own classes (bcol, bcard, …) and never redefine shared component classes (Border.card, TextBlock.count, TextBlock.empty); shared ones live in Sections, Chips, BlueprintFrames."
+source_ref = "TASK-0160"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:54:27.376583700Z"
+
+[[memory]]
 id = "mem_6d66e93d63433fe9"
 type = "warning"
 scope = "path:src/Harness.Providers"
@@ -236,6 +362,15 @@ content = "A provider without dir = \"project\" starts in harness's own working 
 source_ref = "TASK-0140 (GenericMcpProvider WorkingDirectory; NugetMcpServer 1.1.10 experiments)"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:55:37.350862500Z"
+
+[[memory]]
+id = "mem_72fede511087874e"
+type = "warning"
+scope = "path:test/Harness.Ui.Tests/Fixtures"
+content = "GET /api/graphify/sessions lists every graphify session on the machine (other repositories' paths too); never copy its answer into a committed fixture unedited."
+source_ref = "TASK-0159"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:35:13.059600000Z"
 
 [[memory]]
 id = "mem_7a67804dd97751e4"
@@ -256,6 +391,24 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:34:53.296116400Z"
 
 [[memory]]
+id = "mem_7d3cc92bf3e70212"
+type = "warning"
+scope = "project"
+content = "The shipped price table (src/Harness.Infrastructure/Configuration/Pricing/pricing.toml) holds Anthropic first-party prices as of 2026-10-06 and no OpenAI/Codex prices; update it when prices change. Cache writes use the 5-minute rate (1.25x input), although Claude Code mostly writes 1-hour cache (2x input), so Claude cache-write cost is understated."
+source_ref = "TASK-0114"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:15:34.037850100Z"
+
+[[memory]]
+id = "mem_847cbe777b0261cc"
+type = "decision"
+scope = "path:src/Harness.Core/Memory"
+content = "Memory semantics retain expired exact duplicates without reactivation, scope-independent near-duplicate candidates, and narrower layered overrides; standalone .NET tests cover these rules."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:46:30.188701000Z"
+
+[[memory]]
 id = "mem_86b9e5b5c3582772"
 type = "decision"
 scope = "path:src/Harness.Infrastructure/Architecture"
@@ -265,6 +418,33 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:39:55.812953700Z"
 
 [[memory]]
+id = "mem_88a3713d4b4de219"
+type = "fact"
+scope = "path:src/Harness.Infrastructure/Graphify"
+content = "After an acknowledged Graphify stop, remove pending-launch records matching the observed stopped PID; the OS may keep that PID alive briefly, and retaining its pending record makes an immediate restart return unchanged."
+source_ref = "GraphifySessionManager.StopAsync; GraphifyTests.AcknowledgedStopClearsOnlyTheMatchingPendingLaunchBeforeTheProcessExits; macOS CI artifact 2026-10-23"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:58:42.704454000Z"
+
+[[memory]]
+id = "mem_88b0e8d7c3ff9146"
+type = "decision"
+scope = "path:src/Harness.Providers/Registry"
+content = "Bound registry execution waits even when an adapter ignores cancellation, observe late faults, and distinguish caller cancellation from deadline expiry."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:47:12.339416700Z"
+
+[[memory]]
+id = "mem_8aaf7d68db8b3ce0"
+type = "fact"
+scope = "path:test/Harness.Integration"
+content = "SyncFixture and ProviderFixture cleanup uses TestDirectory.Delete with a five-second Windows IOException retry window because terminated MCP descendants can briefly retain working-directory handles; locks persisting beyond the deadline still fail the test."
+source_ref = "Windows GitHub CI artifact 2026-10-23; TestDirectory.Delete; DirectoryAliasTests.CleanupWaitsForTransientWindowsFileLocks"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:58:52.459343600Z"
+
+[[memory]]
 id = "mem_9516fd71f1a2236b"
 type = "convention"
 scope = "path:test"
@@ -272,6 +452,24 @@ content = "Use C# raw string literals for JSON text in test data so JSON is read
 source_ref = "User request 2026-10-21: raw JSON test literals"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:34:01.455673200Z"
+
+[[memory]]
+id = "mem_984bd700c47e91f9"
+type = "decision"
+scope = "project"
+content = "Use System.CommandLine instead of Spectre.Console.Cli for the CLI so trimming and Native AOT are supported; Spectre.Console can remain for terminal rendering."
+source_ref = "TASK-0034; user instruction 2026-10-22: replace Spectre.Console.Cli with System.CommandLine for AOT/trimming."
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:44:51.626260000Z"
+
+[[memory]]
+id = "mem_99ec423ed5877cbc"
+type = "convention"
+scope = "path:src/Harness.Ui"
+content = "Avalonia UI preferences (IPreferences on UiHostContext) live in the browser's localStorage under the JS UI's own keys (harness.<key>), so both UIs on one address share them (days, seen.<project>)."
+source_ref = "TASK-0151"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:40:27.078808300Z"
 
 [[memory]]
 id = "mem_9a1effdf4ca49d03"
@@ -346,6 +544,15 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T17:17:58.178737400Z"
 
 [[memory]]
+id = "mem_b5ffe41e5cb54373"
+type = "convention"
+scope = "path:src/Harness.Ui/Views/SectionView.axaml.cs"
+content = "SectionView sets its content in code (Body, else the DataContext) rather than binding it, so a view that is its own section's DataTemplate does not nest itself."
+source_ref = "TASK-0157"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:39:52.770308400Z"
+
+[[memory]]
 id = "mem_b8f5391540545f5e"
 type = "convention"
 scope = "project"
@@ -353,6 +560,24 @@ content = "Regexes with a constant pattern are [GeneratedRegex] static partial p
 source_ref = "task:TASK-0045"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:33:20.301055200Z"
+
+[[memory]]
+id = "mem_c75eff134893b3f6"
+type = "convention"
+scope = "path:src/Harness.Infrastructure/Configuration"
+content = "Every configuration option has a commented example in ConfigurationExample.Tables (config.toml as harness init writes it); removing an option means adding \"table.key\" (or \"[table]\") to ConfigurationExample.Dropped, so init deletes its settings instead of a typo-style load error."
+source_ref = "TASK-0068"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:38:09.667805500Z"
+
+[[memory]]
+id = "mem_cc1e2a4527ca9514"
+type = "decision"
+scope = "path:src/Harness.Infrastructure/Storage"
+content = "Use HarnessDatabase as a synchronous pooled connection factory: each operation owns its connection, write transactions begin immediately, read transactions are deferred/query-only, and cancellation is checked around synchronous provider work. Reuse the factory across repeated MCP/UI operations."
+source_ref = "TASK-0004; doc/port/storage-implementation.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:43:52.512648300Z"
 
 [[memory]]
 id = "mem_cc7a19f3534a27a6"
@@ -364,6 +589,51 @@ shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:40:59.522120700Z"
 
 [[memory]]
+id = "mem_ce7c6d912cc0fca3"
+type = "constraint"
+scope = "path:src/Harness.Infrastructure/Agents/AgentHostFiles.cs"
+content = "Keep the agent state .gitignore database patterns as currently written; do not replace them with a blanket * rule."
+source_ref = "User instruction 2026-11-17: native regression tests and gitignore"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T22:56:20.955356400Z"
+
+[[memory]]
+id = "mem_cebfbb1337ed16b3"
+type = "decision"
+scope = "project"
+content = "Use direct Microsoft.Data.Sqlite SQL, Tomlyn, YamlDotNet, MCP SDK, System.CommandLine and Spectre.Console rendering with ASP.NET shared framework, external Git, Channels and generated System.Text.Json metadata; publish trimmed Native AOT executables."
+source_ref = "TASK-0035; doc/architecture/README.md; doc/testing.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:46:04.583158800Z"
+
+[[memory]]
+id = "mem_d1e81ea8ac454aac"
+type = "warning"
+scope = "path:src/Harness.Ui"
+content = "In Avalonia, a Run's Text binding writes back to its source; with a StringFormat it loops until the stack overflows. Bind a computed string to TextBlock.Text instead."
+source_ref = "TASK-0157"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:34:18.463344400Z"
+
+[[memory]]
+id = "mem_e32c023e6a20604a"
+type = "warning"
+scope = "project"
+content = "Claude Code's result.total_cost_usd is the session's running total, so a resumed turn's figure includes earlier turns; codex exec --json names no model and its resume subcommand does not accept --sandbox (use -c sandbox_mode=...)."
+source_ref = "TASK-0115 real-CLI runs (claude 2.1.317, codex-cli 0.165.0)"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:15:54.027207700Z"
+
+[[memory]]
+id = "mem_e74592a24c2787b5"
+type = "convention"
+scope = "path:test/Harness.Integration/Web"
+content = "UiBrowserTests share one headless Edge per run (SharedBrowser assembly fixture, started lazily, in a kill-on-close job, closed with Browser.close and its profile deleted at the end). Every page comes from BrowseAsync/BrowsePagesAsync in its own CDP browser context (Target.createBrowserContext, disposed after the test), so tests never share storage, cookies or cache; a dead or unanswering browser is replaced before the next page. Open further pages with BrowsePagesAsync rather than Target.createTarget on an existing context, and pass BrowseAsync a profile only when a test needs a browser process of its own."
+source_ref = "TASK-0079"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:38:36.279329700Z"
+
+[[memory]]
 id = "mem_eacb8418bb353347"
 type = "warning"
 scope = "project"
@@ -371,6 +641,24 @@ content = "On Windows, a reader of an agent host's state file can fail for a mom
 source_ref = "TASK-0135; AgentHostFiles.ReadState"
 shared_by = "human:DAVID-NTB25\\david"
 shared_at = "2026-11-13T16:55:06.522497800Z"
+
+[[memory]]
+id = "mem_eb929603d487a4f5"
+type = "fact"
+scope = "path:src/Harness.Cli/Scm/ScmDoctor.cs"
+content = "Project doctor tests only the resolved SCM connection and reports unresolved selections without testing unrelated connections; machine-wide doctor still tests all connections."
+source_ref = "TASK-0204; commit d58e4fa"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:55:08.915878900Z"
+
+[[memory]]
+id = "mem_f2790a3a5827a78b"
+type = "decision"
+scope = "subsystem:providers"
+content = "On downstream MCP call timeout, terminate the session and permit supervised restart; ordinary caller cancellation leaves a healthy session reusable."
+source_ref = "TASK-0013; doc/port/downstream-mcp.md"
+shared_by = "human:DAVID-NTB25\\david"
+shared_at = "2026-11-19T23:44:14.464020900Z"
 
 [[memory]]
 id = "mem_fc56705303261864"
