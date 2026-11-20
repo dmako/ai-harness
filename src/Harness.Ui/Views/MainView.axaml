@@ -112,7 +112,7 @@
           <!-- the page scrolls up and down only when the window is shorter than PageMinHeight; otherwise the page is
                exactly the window's height and a view that scrolls (the Board's columns) scrolls inside itself -->
           <ScrollViewer Name="PageScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <ContentControl Name="Page" Content="{Binding Page}" Margin="16,12,16,16" />
+            <ContentControl Name="Page" Content="{Binding Page}" Margin="16" />
           </ScrollViewer>
         </DockPanel>
       </Grid>

@@ -15,7 +15,7 @@
       <TextBlock Classes="path" TextWrapping="Wrap" Text="The guide and the reference this harness carries; 'harness docs &lt;section&gt;' prints the same." />
       <Border Name="HeaderSeparator" Width="130" Height="1" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="0,6,0,0" />
     </StackPanel>
-    <Grid Name="Columns" ColumnSpacing="24" RowSpacing="16">
+    <Grid Name="Columns" ColumnSpacing="24" RowSpacing="24">
       <ItemsControl Name="DocList" ItemsSource="{Binding Groups}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:DocGroup">
