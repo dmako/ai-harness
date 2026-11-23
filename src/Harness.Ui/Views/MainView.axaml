@@ -13,9 +13,30 @@
   <!-- the page frame: the sidebar (beside the page when wide, over it when narrow), the top bar, and the page the
        address names; toasts and the open dialog above everything -->
   <UserControl.Styles>
-    <Style Selector="ToggleButton#Menu:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton#Menu:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton#Menu:checked:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <!-- the navigation toggle: closed, a plain button (style.css .menu, brand.css button) whose hover lifts the fill;
+         open, washed in the theme accent in every state (8781e3c). Later styles win, so open comes last. -->
+    <Style Selector="ToggleButton#Menu">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
+      <Setter Property="MinWidth" Value="{StaticResource ControlMin}" />
+    </Style>
+    <Style Selector="ToggleButton#Menu:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton#Menu:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Surface2}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+    <Style Selector="ToggleButton#Menu:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+    <Style Selector="ToggleButton#Menu:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="BorderThickness" Value="2" />
     </Style>
     <Style Selector=":is(UserControl).pointer-hover Border.trow Button.hover-remove, :is(UserControl).pointer-hover Border.bpcard Button.hover-remove">
       <Setter Property="Opacity" Value="0" />

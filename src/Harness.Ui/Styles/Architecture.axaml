@@ -245,15 +245,40 @@
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
 
-  <!-- a design issue in the list (app.js .irow): the one shown is marked -->
+  <!-- a design issue in the list (style.css .irow): hover lifts the fill, the one shown is washed and outlined in the
+       accent; Fluent's state fills are replaced, the checked state last so it wins -->
   <Style Selector="ToggleButton.irow">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
     <Setter Property="Padding" Value="8,6" />
     <Setter Property="Margin" Value="0,0,0,2" />
   </Style>
-  <Style Selector="ToggleButton.irow:checked /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Selected}" />
+  <Style Selector="ToggleButton.irow:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.irow:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ToggleButton.irow:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ToggleButton.irow:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ToggleButton.irow:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.irow:disabled">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+  <!-- its summary in Ink 2 (style.css .irow .isum), which keeps AA on the accent wash -->
+  <Style Selector="ToggleButton.irow TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
 </Styles>

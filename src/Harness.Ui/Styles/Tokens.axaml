@@ -75,6 +75,24 @@
       <SolidColorBrush x:Key="CFact" Color="#3f7d2a" />
       <SolidColorBrush x:Key="CConvention" Color="#5b4bb3" />
       <SolidColorBrush x:Key="CWarning" Color="#c7413b" />
+      <!-- a picker option's own colour (style.css .segpick, its oc variable): Wash = 20 % of it over Surface (the chosen fill),
+           Hover = 60 % of it over Border (the hovered outline) -->
+      <SolidColorBrush x:Key="Opt.Accent.Wash" Color="#cce1e2" />
+      <SolidColorBrush x:Key="Opt.Accent.Hover" Color="#59999a" />
+      <SolidColorBrush x:Key="Opt.Critical.Wash" Color="#f4d9d8" />
+      <SolidColorBrush x:Key="Opt.Critical.Hover" Color="#d1807d" />
+      <SolidColorBrush x:Key="Opt.Ink2.Wash" Color="#dbdbdb" />
+      <SolidColorBrush x:Key="Opt.Ink2.Hover" Color="#858585" />
+      <SolidColorBrush x:Key="Opt.GoldInk.Wash" Color="#e5dcce" />
+      <SolidColorBrush x:Key="Opt.GoldInk.Hover" Color="#a48a5e" />
+      <SolidColorBrush x:Key="Opt.CConvention.Wash" Color="#dedbf0" />
+      <SolidColorBrush x:Key="Opt.CConvention.Hover" Color="#9086c5" />
+      <SolidColorBrush x:Key="Opt.Good.Wash" Color="#d2ebdd" />
+      <SolidColorBrush x:Key="Opt.Good.Hover" Color="#6cb78c" />
+      <SolidColorBrush x:Key="Opt.COpenQuestion.Wash" Color="#f0e4d0" />
+      <SolidColorBrush x:Key="Opt.COpenQuestion.Hover" Color="#c5a264" />
+      <SolidColorBrush x:Key="Opt.Warning.Wash" Color="#f9edd8" />
+      <SolidColorBrush x:Key="Opt.Warning.Hover" Color="#e1bb7d" />
       <SolidColorBrush x:Key="Backdrop" Color="#8cffffff" />
       <SolidColorBrush x:Key="InsetLine" Color="#241c1c1b" />
       <BoxShadows x:Key="CardShadow">0 1 2 0 #12141413, 0 4 14 0 #0d141413</BoxShadows>
@@ -153,6 +171,22 @@
       <SolidColorBrush x:Key="CFact" Color="#7fb860" />
       <SolidColorBrush x:Key="CConvention" Color="#9d90f0" />
       <SolidColorBrush x:Key="CWarning" Color="#e66767" />
+      <SolidColorBrush x:Key="Opt.Accent.Wash" Color="#263a39" />
+      <SolidColorBrush x:Key="Opt.Accent.Hover" Color="#43807d" />
+      <SolidColorBrush x:Key="Opt.Critical.Wash" Color="#432a28" />
+      <SolidColorBrush x:Key="Opt.Critical.Hover" Color="#9a4d49" />
+      <SolidColorBrush x:Key="Opt.Ink2.Wash" Color="#3d3c38" />
+      <SolidColorBrush x:Key="Opt.Ink2.Hover" Color="#88847b" />
+      <SolidColorBrush x:Key="Opt.GoldInk.Wash" Color="#463d2b" />
+      <SolidColorBrush x:Key="Opt.GoldInk.Hover" Color="#a48852" />
+      <SolidColorBrush x:Key="Opt.CConvention.Wash" Color="#363346" />
+      <SolidColorBrush x:Key="Opt.CConvention.Hover" Color="#726aa3" />
+      <SolidColorBrush x:Key="Opt.Good.Wash" Color="#203a2b" />
+      <SolidColorBrush x:Key="Opt.Good.Hover" Color="#307f52" />
+      <SolidColorBrush x:Key="Opt.COpenQuestion.Wash" Color="#443721" />
+      <SolidColorBrush x:Key="Opt.COpenQuestion.Hover" Color="#9c7536" />
+      <SolidColorBrush x:Key="Opt.Warning.Wash" Color="#443721" />
+      <SolidColorBrush x:Key="Opt.Warning.Hover" Color="#9c7536" />
       <SolidColorBrush x:Key="Backdrop" Color="#8c141413" />
       <SolidColorBrush x:Key="InsetLine" Color="#00000000" />
       <BoxShadows x:Key="CardShadow">0 0 0 0 #00000000</BoxShadows>

@@ -1,7 +1,8 @@
 <!-- Work (style.css .mcard, .mstone, .trow, .claimtag, .aprop): blueprint cards, task groups and rows, a claim's tag
      and the Inbox's proposals. While something is dragged (WorkView.axaml.cs) the targets are outlined. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:c="using:Harness.Ui.Controls" xmlns:views="using:Harness.Ui.Views">
+        xmlns:c="using:Harness.Ui.Controls" xmlns:views="using:Harness.Ui.Views"
+        xmlns:vm="using:Harness.Ui.ViewModels">
   <Style Selector="Grid.task-metadata">
     <Setter Property="Grid.Column" Value="1" />
   </Style>
@@ -61,28 +62,191 @@
   <Style Selector="TextBlock.mark.fail">
     <Setter Property="Foreground" Value="{DynamicResource Critical}" />
   </Style>
-  <!-- a picker of a few (Type, Priority, Colour): a ListBox of choices side by side -->
+  <!-- a picker of a few (style.css .segpick, .bpswatch): a ListBox of choices side by side, each its own outlined
+       chip on Surface. ListBox.opts (Type, Priority) names each item opt-<value>: hovered, its outline takes 60 % of
+       the option's colour; chosen, it is outlined in that colour over a 20 % wash (Opt.<colour>.Wash/Hover tokens).
+       ListBox.swatches (Colour) holds round swatches, the chosen one ringed in its blueprint colour. Fluent's state
+       fills are replaced; the chosen state comes last so it wins. -->
   <Style Selector="ListBox.seg">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="ListBox.seg ListBoxItem">
-    <Setter Property="Padding" Value="8,4" />
-    <Setter Property="MinHeight" Value="28" />
-    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Margin" Value="0,0,4,4" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Margin" Value="0,0,6,6" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem" x:DataType="x:String">
+    <Setter Property="c:StyleClass.Name" Value="{Binding StringFormat='opt-{0}'}" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="Margin" Value="0,0,8,8" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem" x:DataType="vm:ColorChoice">
+    <Setter Property="c:StyleClass.Name" Value="{Binding Class}" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusPill}" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="MinWidth" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ListBox.seg ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.seg ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Accent.Hover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
   <Style Selector="ListBox.seg ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="Background" Value="{DynamicResource Opt.Accent.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-feature:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Accent.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-feature:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Accent.Wash}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
   </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-bug:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Critical.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-bug:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Critical.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-chore:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Ink2.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-chore:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Ink2.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-spike:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.GoldInk.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-spike:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.GoldInk.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource GoldInk}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-docs:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.CConvention.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-docs:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.CConvention.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CConvention}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-test:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Good.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-test:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Good.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Good}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-process:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.COpenQuestion.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-process:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.COpenQuestion.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource COpenQuestion}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-low:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Good.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-low:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Good.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Good}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-medium:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Accent.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-medium:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Accent.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-high:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Warning.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-high:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Warning.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Warning}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-critical:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Opt.Critical.Hover}" />
+  </Style>
+  <Style Selector="ListBox.opts ListBoxItem.opt-critical:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Opt.Critical.Wash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.swatches ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderThickness" Value="3" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-teal:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.teal}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-orange:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.orange}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-blue:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.blue}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-rose:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.rose}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-green:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.green}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-violet:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.violet}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-amber:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.amber}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-cyan:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.cyan}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-pink:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.pink}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-lime:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.lime}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-indigo:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.indigo}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-red:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.red}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-fuchsia:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.fuchsia}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-yellow:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.yellow}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-slate:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.slate}" />
+  </Style>
+  <Style Selector="ListBox.swatches ListBoxItem.bp-purple:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Bp.purple}" />
+  </Style>
+  <Style Selector="ListBox.seg ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ListBox.seg ListBoxItem:disabled">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
   <Style Selector="Border.swatch">
-    <Setter Property="Width" Value="18" />
-    <Setter Property="Height" Value="18" />
-    <Setter Property="CornerRadius" Value="9" />
-    <Setter Property="BorderThickness" Value="6" />
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderThickness" Value="8" />
   </Style>
 </Styles>

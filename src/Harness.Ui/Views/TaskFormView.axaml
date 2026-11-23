@@ -23,7 +23,7 @@
     </Grid>
     <StackPanel Classes="field">
       <TextBlock Classes="label" Text="Type" />
-      <ListBox Name="TypePicker" Classes="seg" ItemsSource="{x:Static vm:TaskFormDialog.Types}" SelectedItem="{Binding TaskType}"
+      <ListBox Name="TypePicker" Classes="seg opts" ItemsSource="{x:Static vm:TaskFormDialog.Types}" SelectedItem="{Binding TaskType}"
                AutomationProperties.Name="Type">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -41,7 +41,7 @@
     <WrapPanel ItemSpacing="16" LineSpacing="8">
       <StackPanel Classes="field">
         <TextBlock Classes="label" Text="Priority" />
-        <ListBox Name="PriorityPicker" Classes="seg" ItemsSource="{x:Static vm:TaskFormDialog.Priorities}" SelectedItem="{Binding Priority}"
+        <ListBox Name="PriorityPicker" Classes="seg opts" ItemsSource="{x:Static vm:TaskFormDialog.Priorities}" SelectedItem="{Binding Priority}"
                  AutomationProperties.Name="Priority">
           <ListBox.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>

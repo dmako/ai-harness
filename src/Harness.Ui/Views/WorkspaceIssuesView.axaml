@@ -60,7 +60,7 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:FilterChip">
                         <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
-                          <TextBlock><Run Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+                          <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="{Binding Label}" /><TextBlock Classes="count" Text="{Binding Count}" /></StackPanel>
                         </ToggleButton>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -266,7 +266,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:FilterChip">
                 <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
-                  <TextBlock><Run Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+                  <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="{Binding Label}" /><TextBlock Classes="count" Text="{Binding Count}" /></StackPanel>
                 </ToggleButton>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

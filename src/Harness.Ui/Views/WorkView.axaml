@@ -103,7 +103,7 @@
                     <ToggleButton Classes="chip" IsChecked="{Binding On}" AutomationProperties.Name="{Binding AccessibleName}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="{Binding Label}" />
-                        <TextBlock Text="{Binding Count}" />
+                        <TextBlock Classes="count" Text="{Binding Count}" />
                       </StackPanel>
                     </ToggleButton>
                   </DataTemplate>
@@ -224,7 +224,7 @@
                             <TextBlock Text="{Binding Label}" />
                           </StackPanel>
                         </Border>
-                        <TextBlock Text="{Binding Count}" VerticalAlignment="Center" />
+                        <TextBlock Classes="count" Text="{Binding Count}" />
                       </StackPanel>
                     </ToggleButton>
                   </DataTemplate>

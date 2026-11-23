@@ -1,12 +1,21 @@
-<!-- Navigation (style.css .tabs, .subnav/.seg): a page's views as ToggleButton.tab in a Border.tabs row, the chosen one
-     underlined in the accent; a view's parts as ToggleButton.seg in an outlined Border.subnav. -->
+<!-- Navigation (style.css .tabs, .subnav/.seg): a page's views as tabs (Button.tablink, or ToggleButton.tab) in a
+     Border.tabs row, the chosen one in the accent and underlined, its underline over the row's line; a view's sections
+     as one segmented control: Button.tablink or ToggleButton.seg in an outlined Border.subnav, a line between them, the
+     chosen one washed in the accent. Hover only changes the ink (tabs) or lifts the fill (sections); disabled keeps
+     its colours at 55 %. Fluent's state fills are replaced in every state; later styles win, so the chosen state
+     comes after hover, pressed and disabled. -->
 <Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Style Selector="Border.tabs">
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="Margin" Value="0,24,0,16" />
   </Style>
-  <Style Selector="ToggleButton.tab">
+  <!-- the underline overlaps the row's 1 px line (style.css .tabs a: margin-bottom -1px) -->
+  <Style Selector="Border.tabs > ScrollViewer, Border.tabs > StackPanel">
+    <Setter Property="Margin" Value="0,0,0,-1" />
+  </Style>
+
+  <Style Selector="ToggleButton.tab, Button.tablink">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
     <Setter Property="BorderBrush" Value="Transparent" />
@@ -16,42 +25,23 @@
     <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />
   </Style>
-  <Style Selector="ToggleButton.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.tab:pressed /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="ToggleButton.tab:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.tab:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
-  </Style>
-  <Style Selector="ToggleButton.tab:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.tab:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
-  </Style>
-  <Style Selector="ToggleButton.tab:checked">
-    <Setter Property="FontWeight" Value="SemiBold" />
-  </Style>
-
-  <!-- a tab that is a link (AppLink): the same look, the chosen one marked by .selected -->
-  <Style Selector="Button.tablink">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
     <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0,0,0,2" />
-    <Setter Property="CornerRadius" Value="0" />
-    <Setter Property="Padding" Value="12,8" />
-  </Style>
-  <Style Selector="Button.tablink:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
-  <Style Selector="Button.tablink.selected">
-    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
+  <Style Selector="ToggleButton.tab:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
-  <Style Selector="Button.tablink.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="ToggleButton.tab:checked /template/ ContentPresenter#PART_ContentPresenter, Button.tablink.selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.tab:checked, Button.tablink.selected">
+    <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
   <Style Selector="Border.subnav">
@@ -62,22 +52,43 @@
     <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="Margin" Value="0,0,0,16" />
   </Style>
-  <Style Selector="ToggleButton.seg">
+  <Style Selector="ToggleButton.seg, Border.subnav Button.tablink">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="CornerRadius" Value="0" />
     <Setter Property="Padding" Value="16,6" />
     <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
   </Style>
-  <Style Selector="ToggleButton.seg:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.seg:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Surface2}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  <!-- a line before every section but the first (style.css .subnav a + a): the sections are a panel's children, or
+       an ItemsControl's items -->
+  <Style Selector="ToggleButton.seg:nth-child(n+2), Border.subnav ContentPresenter:nth-child(n+2) Button.tablink">
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
   </Style>
-  <Style Selector="ToggleButton.seg:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.seg:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <!-- the outer sections round to the outline's inner radius (CSS clips inside the border; Avalonia clips at its
+       outer edge, so a square fill would paint over the rounded corner) -->
+  <Style Selector="ToggleButton.seg:nth-child(1), Border.subnav ContentPresenter:nth-child(1) Button.tablink">
+    <Setter Property="CornerRadius" Value="7,0,0,7" />
+  </Style>
+  <Style Selector="ToggleButton.seg:nth-last-child(1), Border.subnav ContentPresenter:nth-last-child(1) Button.tablink">
+    <Setter Property="CornerRadius" Value="0,7,7,0" />
+  </Style>
+  <Style Selector="ToggleButton.seg:nth-child(1):nth-last-child(1), Border.subnav ContentPresenter:nth-child(1):nth-last-child(1) Button.tablink">
+    <Setter Property="CornerRadius" Value="7" />
+  </Style>
+  <Style Selector="ToggleButton.seg:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.seg:pressed /template/ ContentPresenter#PART_ContentPresenter, Border.subnav Button.tablink:pointerover /template/ ContentPresenter#PART_ContentPresenter, Border.subnav Button.tablink:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="ToggleButton.seg:disabled /template/ ContentPresenter#PART_ContentPresenter, Border.subnav Button.tablink:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="ToggleButton.seg:checked /template/ ContentPresenter#PART_ContentPresenter, Border.subnav Button.tablink.selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource AccentWash}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
@@ -85,8 +96,12 @@
   <Style Selector="ToggleButton.seg:checked">
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
+
   <Style Selector="ToggleButton:focus-visible /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="ToggleButton.tab:disabled, Button.tablink:disabled, ToggleButton.seg:disabled">
+    <Setter Property="Opacity" Value="0.55" />
   </Style>
 </Styles>

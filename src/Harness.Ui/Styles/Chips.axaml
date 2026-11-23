@@ -63,15 +63,29 @@
     <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
   </Style>
+  <!-- style.css .chip: hover only lifts the fill (brand.css button:hover); on (aria-pressed) is washed and outlined in
+       the accent in every state; disabled keeps its colours at 55 % (Fluent's grey fills replaced). Later styles win,
+       so the checked one comes after hover, pressed and disabled. -->
   <Style Selector="ToggleButton.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.chip:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
-  <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.chip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="ToggleButton.chip:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource AccentWash}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ToggleButton.chip:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.chip:disabled">
+    <Setter Property="Opacity" Value="0.55" />
   </Style>
 
   <Style Selector="Button.copychip">

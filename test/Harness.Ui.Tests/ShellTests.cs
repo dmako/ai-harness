@@ -318,7 +318,9 @@ public sealed class ShellTests
         banner.Background.Should().BeOfType<LinearGradientBrush>();
         homeView.FindControl<TextBlock>("SinceVisit")!.Text.Should().Be(home.Activity.Since);
         homeView.TryFindResource("Accent", homeView.ActualThemeVariant, out var accent).Should().BeTrue();
-        homeView.FindControl<Icon>("VisitIcon")!.Foreground.Should().Be(accent);
+        var mark = banner.GetVisualDescendants().OfType<TextBlock>().First();
+        mark.Text.Should().Be("✦");
+        mark.Foreground.Should().Be(accent);
         var menu = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "Menu");
         if (width < 760)
         {

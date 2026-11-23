@@ -18,7 +18,7 @@
       <TextBlock Classes="path" Text="C:\repos\personal\ai-harness-cs" Margin="0,4,0,0" />
 
       <Border Classes="tabs">
-        <StackPanel Orientation="Horizontal">
+        <StackPanel Orientation="Horizontal" Spacing="4">
           <ToggleButton Classes="tab" Content="Overview" AutomationProperties.Name="Overview" IsChecked="True" />
           <ToggleButton Classes="tab" Content="Work" AutomationProperties.Name="Work" />
           <ToggleButton Classes="tab" Content="Board" AutomationProperties.Name="Board" />
@@ -28,7 +28,7 @@
         <StackPanel Orientation="Horizontal">
           <ToggleButton Classes="seg" Content="Blueprints" AutomationProperties.Name="Blueprints" IsChecked="True" />
           <ToggleButton Classes="seg" Content="Tasks" AutomationProperties.Name="Tasks" />
-          <ToggleButton Classes="seg" Content="Inbox" AutomationProperties.Name="Inbox" BorderThickness="0" />
+          <ToggleButton Classes="seg" Content="Inbox" AutomationProperties.Name="Inbox" />
         </StackPanel>
       </Border>
 
@@ -80,6 +80,58 @@
             <c:Icon Classes="prio p-critical" Kind="p-critical" /><TextBlock Text="critical" />
           </StackPanel>
         </WrapPanel>
+      </StackPanel>
+
+      <StackPanel Classes="section">
+        <TextBlock Classes="h3" Text="Toggles" />
+        <TextBlock Classes="hint" TextWrapping="Wrap" Text="Each toggle off, on and disabled: filter chips with counts, tabs, a view's sections, a list row and a picker's options. Hover lifts the fill; on is washed in the accent or the option's colour." />
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
+          <ToggleButton Classes="chip" AutomationProperties.Name="Open, 3" IsChecked="True">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="Open" /><TextBlock Classes="count" Text="3" /></StackPanel>
+          </ToggleButton>
+          <ToggleButton Classes="chip" AutomationProperties.Name="Done, 12">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="Done" /><TextBlock Classes="count" Text="12" /></StackPanel>
+          </ToggleButton>
+          <ToggleButton Classes="chip" Content="Off, disabled" AutomationProperties.Name="Off, disabled" IsEnabled="False" />
+          <ToggleButton Classes="chip" Content="On, disabled" AutomationProperties.Name="On, disabled" IsChecked="True" IsEnabled="False" />
+        </WrapPanel>
+        <Border Classes="tabs" Margin="0,16,0,16">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ToggleButton Classes="tab" Content="Chosen" AutomationProperties.Name="Chosen" IsChecked="True" />
+            <ToggleButton Classes="tab" Content="Other" AutomationProperties.Name="Other" />
+            <ToggleButton Classes="tab" Content="Disabled" AutomationProperties.Name="Disabled tab" IsEnabled="False" />
+          </StackPanel>
+        </Border>
+        <Border Classes="subnav">
+          <StackPanel Orientation="Horizontal">
+            <ToggleButton Classes="seg" Content="Chosen" AutomationProperties.Name="Chosen section" IsChecked="True" />
+            <ToggleButton Classes="seg" Content="Other" AutomationProperties.Name="Other section" />
+            <ToggleButton Classes="seg" Content="Disabled" AutomationProperties.Name="Disabled section" IsEnabled="False" />
+          </StackPanel>
+        </Border>
+        <StackPanel MaxWidth="420" HorizontalAlignment="Left">
+          <ToggleButton Classes="irow" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" AutomationProperties.Name="A list row">
+            <StackPanel Spacing="1">
+              <TextBlock FontWeight="SemiBold" Text="A list row" />
+              <TextBlock Classes="muted small" Text="its summary" />
+            </StackPanel>
+          </ToggleButton>
+          <ToggleButton Classes="irow" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" AutomationProperties.Name="The row shown" IsChecked="True">
+            <StackPanel Spacing="1">
+              <TextBlock FontWeight="SemiBold" Text="The row shown" />
+              <TextBlock Classes="muted small" Text="its summary" />
+            </StackPanel>
+          </ToggleButton>
+        </StackPanel>
+        <ListBox Classes="seg opts" SelectedIndex="1" AutomationProperties.Name="Priority" Margin="0,8,0,0">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <x:String>low</x:String>
+          <x:String>medium</x:String>
+          <x:String>high</x:String>
+          <x:String>critical</x:String>
+        </ListBox>
       </StackPanel>
 
       <StackPanel Classes="section">

@@ -240,7 +240,7 @@
                   <ToggleButton Classes="chip" IsChecked="{Binding Selected, Mode=OneWay}"
                                 Command="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).Libraries.PickCommand}"
                                 CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
-                    <TextBlock><Run Text="{Binding Label, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Count, Mode=OneWay}" /></TextBlock>
+                    <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="{Binding Label}" /><TextBlock Classes="count" Text="{Binding Count}" /></StackPanel>
                   </ToggleButton>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

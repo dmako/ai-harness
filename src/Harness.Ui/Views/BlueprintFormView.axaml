@@ -51,7 +51,7 @@
     </StackPanel>
     <StackPanel Classes="field">
       <TextBlock Classes="label" Text="Colour" />
-      <ListBox Name="ColorPicker" Classes="seg" ItemsSource="{Binding Colors}" SelectedItem="{Binding Color}" AutomationProperties.Name="Colour">
+      <ListBox Name="ColorPicker" Classes="seg swatches" ItemsSource="{Binding Colors}" SelectedItem="{Binding Color}" AutomationProperties.Name="Colour">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
         </ListBox.ItemsPanel>
