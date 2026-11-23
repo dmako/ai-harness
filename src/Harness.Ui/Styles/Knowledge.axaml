@@ -42,6 +42,18 @@
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
+  <!-- a quiet tag (style.css .tag): outlined on the chip fill, in Ink 2: a finding's basis, a sync's mode. After Border.tag,
+       whose accent wash it replaces (later styles win). -->
+  <Style Selector="Border.tag.quiet">
+    <Setter Property="Background" Value="{DynamicResource Chip}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusPill}" />
+  </Style>
+  <Style Selector="Border.tag.quiet TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+
   <Style Selector="Border.tag.removed">
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Warning}" />

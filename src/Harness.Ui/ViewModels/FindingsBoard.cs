@@ -95,6 +95,9 @@ public sealed record FindingRow(Finding Finding, bool InGroup)
     public bool IsProblem => Finding.Level is "problem";
     public bool IsWarn => Finding.Level is "warn";
 
+    /// <summary>The level pill's class (lv-warn, lv-problem, lv-info), which colours its icon.</summary>
+    public string LevelClass => "lv-" + Finding.Level;
+
     public string? Basis =>
         Finding.Basis switch
         {
@@ -129,7 +132,6 @@ public sealed record FindingRow(Finding Finding, bool InGroup)
     public string? Risk => InGroup ? null : Findings.Risk(Finding.Kind);
     public bool HasRisk => Risk is not null;
     public bool HasFix => !InGroup && Finding.Fix is { Length: > 0 };
-    public string FixLine => "Could help: " + Finding.Fix;
     public bool HasWhy => Finding.Why is { Length: > 0 };
 
     public string? RuleLine
@@ -221,11 +223,11 @@ public sealed partial class FindingGroup : ObservableObject
     public bool HasChips => Chips.Count > 0;
     public string? SameFix { get; }
     public bool HasSameFix => SameFix is { Length: > 0 };
-    public string SameFixLine => "Could help: " + SameFix;
     public string Level => Findings.Levels.First(l => _all.Any(f => f.Level == l.Level) || l.Level is "info").Level;
     public string Icon => Findings.Icon(Level);
     public bool IsProblem => Level is "problem";
     public bool IsWarn => Level is "warn";
+    public string LevelClass => "lv-" + Level;
     public string Title => $"{_all.Count} × {Findings.Kind(Kind)}";
     public int Fresh => _all.Count(f => f.Status is "new" or "changed");
     public bool HasFresh => Fresh > 0;

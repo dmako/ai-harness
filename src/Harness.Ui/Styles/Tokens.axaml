@@ -93,6 +93,40 @@
       <SolidColorBrush x:Key="Opt.COpenQuestion.Hover" Color="#c5a264" />
       <SolidColorBrush x:Key="Opt.Warning.Wash" Color="#f9edd8" />
       <SolidColorBrush x:Key="Opt.Warning.Hover" Color="#e1bb7d" />
+      <!-- the hover fill one step past Surface 2 (an Expander header under the pointer) -->
+      <SolidColorBrush x:Key="Surface3" Color="#eceef0" />
+      <!-- a status halo behind its icon (style.css .hico, .cico): the hue at 15 % (22 % for warning) -->
+      <SolidColorBrush x:Key="GoodWash" Color="#261f9d55" />
+      <SolidColorBrush x:Key="CriticalWash" Color="#26c7413b" />
+      <SolidColorBrush x:Key="WarningWash" Color="#38e2a33b" />
+      <!-- Fluent's Expander resources in the design system's colours: the header a subtle band (Surface 2, one step
+           more under the pointer), the body on Surface, one border; the chevron muted, never a filled square -->
+      <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#f6f7f8" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#eceef0" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#eceef0" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#f6f7f8" />
+      <SolidColorBrush x:Key="ExpanderHeaderForeground" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="ExpanderHeaderForegroundPointerOver" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="ExpanderHeaderForegroundPressed" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="ExpanderHeaderForegroundDisabled" Color="#6e6e6d" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#241c1c1b" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#241c1c1b" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="#241c1c1b" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="#241c1c1b" />
+      <SolidColorBrush x:Key="ExpanderChevronBackground" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBackgroundPointerOver" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBackgroundPressed" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBackgroundDisabled" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronForeground" Color="#6e6e6d" />
+      <SolidColorBrush x:Key="ExpanderChevronForegroundPointerOver" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="ExpanderChevronForegroundPressed" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="ExpanderChevronForegroundDisabled" Color="#6e6e6d" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrushPointerOver" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrushPressed" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrushDisabled" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderContentBackground" Color="#ffffff" />
+      <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#241c1c1b" />
       <SolidColorBrush x:Key="Backdrop" Color="#8cffffff" />
       <SolidColorBrush x:Key="InsetLine" Color="#241c1c1b" />
       <BoxShadows x:Key="CardShadow">0 1 2 0 #12141413, 0 4 14 0 #0d141413</BoxShadows>
@@ -187,6 +221,36 @@
       <SolidColorBrush x:Key="Opt.COpenQuestion.Hover" Color="#9c7536" />
       <SolidColorBrush x:Key="Opt.Warning.Wash" Color="#443721" />
       <SolidColorBrush x:Key="Opt.Warning.Hover" Color="#9c7536" />
+      <SolidColorBrush x:Key="Surface3" Color="#2e2e2b" />
+      <SolidColorBrush x:Key="GoodWash" Color="#262fb36a" />
+      <SolidColorBrush x:Key="CriticalWash" Color="#26e0605a" />
+      <SolidColorBrush x:Key="WarningWash" Color="#38e2a33b" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#252523" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#2e2e2b" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#2e2e2b" />
+      <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#252523" />
+      <SolidColorBrush x:Key="ExpanderHeaderForeground" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="ExpanderHeaderForegroundPointerOver" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="ExpanderHeaderForegroundPressed" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="ExpanderHeaderForegroundDisabled" Color="#9b958a" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#1af3ecdf" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#1af3ecdf" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="#1af3ecdf" />
+      <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="#1af3ecdf" />
+      <SolidColorBrush x:Key="ExpanderChevronBackground" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBackgroundPointerOver" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBackgroundPressed" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBackgroundDisabled" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronForeground" Color="#9b958a" />
+      <SolidColorBrush x:Key="ExpanderChevronForegroundPointerOver" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="ExpanderChevronForegroundPressed" Color="#f3ecdf" />
+      <SolidColorBrush x:Key="ExpanderChevronForegroundDisabled" Color="#9b958a" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrushPointerOver" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrushPressed" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderChevronBorderBrushDisabled" Color="#00000000" />
+      <SolidColorBrush x:Key="ExpanderContentBackground" Color="#1c1c1b" />
+      <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#1af3ecdf" />
       <SolidColorBrush x:Key="Backdrop" Color="#8c141413" />
       <SolidColorBrush x:Key="InsetLine" Color="#00000000" />
       <BoxShadows x:Key="CardShadow">0 0 0 0 #00000000</BoxShadows>

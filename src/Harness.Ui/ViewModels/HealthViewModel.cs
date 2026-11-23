@@ -122,11 +122,10 @@ public sealed partial class HealthViewModel : SectionViewModel
     private bool _probe;
 
     public HealthViewModel(UiServices services, string projectId)
-        : base("Health", projectId)
-    {
-        _services = services;
-        Hint = "What 'harness doctor' reports. Checking the providers starts each one, so it runs only on request.";
-    }
+        : base("", projectId) => _services = services;
+
+    /// <summary>What the view shows, on one line with Check providers (app.js viewHealth .shead): no title above it.</summary>
+    public static string Intro => "What 'harness doctor' reports. Checking the providers starts each one, so it runs only on request.";
 
     public ObservableCollection<CheckItem> Failing { get; } = [];
     public ObservableCollection<CheckArea> Passing { get; } = [];

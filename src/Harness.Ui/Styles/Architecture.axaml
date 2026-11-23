@@ -190,13 +190,29 @@
     <Setter Property="Padding" Value="12,8" />
     <Setter Property="Margin" Value="0,0,0,8" />
   </Style>
-  <Style Selector="Border.smell Expander /template/ ToggleButton">
+  <!-- a kind's group (three or more) is its Expander: the shared card with its header band, so no frame around it -->
+  <Style Selector="Border.smell.group">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="Border.smell.quiet">
     <Setter Property="Background" Value="{DynamicResource Page}" />
+  </Style>
+  <!-- a smell's head (style.css .attn li.smell summary): its level as a pill, the title, its tags -->
+  <Style Selector="Border.smell Border.pill">
+    <Setter Property="Padding" Value="8,1" />
+  </Style>
+  <Style Selector="Border.smell Border.pill c|Icon">
+    <Setter Property="Size" Value="12" />
+  </Style>
+  <!-- what could help (style.css .sfix): its label in the accent, first in the body -->
+  <Style Selector="SelectableTextBlock.sfix">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.smell Expander">
+    <Setter Property="Margin" Value="0,2" />
   </Style>
 
   <Style Selector="Border.bar">

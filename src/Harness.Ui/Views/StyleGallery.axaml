@@ -134,6 +134,20 @@
         </ListBox>
       </StackPanel>
 
+      <StackPanel Classes="section" Spacing="8">
+        <TextBlock Classes="h3" Text="Expanders" />
+        <TextBlock Classes="hint" TextWrapping="Wrap" Text="One card: the header a subtle band over the body, lifting a step under the pointer; plain ones (an area of checks, paths) have no band." />
+        <Expander Header="Closed" AutomationProperties.Name="A closed expander" HorizontalAlignment="Stretch">
+          <TextBlock Text="Its body" />
+        </Expander>
+        <Expander Header="Open" AutomationProperties.Name="An open expander" IsExpanded="True" HorizontalAlignment="Stretch">
+          <TextBlock Text="Its body, on Surface under the header, in the same frame." TextWrapping="Wrap" />
+        </Expander>
+        <Expander Classes="plain" Header="Plain, open" AutomationProperties.Name="A plain expander" IsExpanded="True" HorizontalAlignment="Stretch">
+          <TextBlock Text="A card whose header is the card itself." TextWrapping="Wrap" />
+        </Expander>
+      </StackPanel>
+
       <StackPanel Classes="section">
         <TextBlock Classes="h3" Text="Cards, insets, empty and error" />
         <Border Classes="card">

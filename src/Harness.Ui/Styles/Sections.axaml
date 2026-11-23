@@ -15,7 +15,7 @@
     <Setter Property="LetterSpacing" Value="1" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="TextBlock.path">
+  <Style Selector="TextBlock.path, SelectableTextBlock.path">
     <Setter Property="FontSize" Value="{StaticResource TextSm}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -36,7 +36,7 @@
   <Style Selector="v|SectionView.page DockPanel.section">
     <Setter Property="Margin" Value="0" />
   </Style>
-  <Style Selector="TextBlock.h3">
+  <Style Selector="TextBlock.h3, SelectableTextBlock.h3">
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="TextWrapping" Value="Wrap" />
@@ -87,10 +87,10 @@
     <Setter Property="VerticalAlignment" Value="Top" />
   </Style>
 
-  <Style Selector="TextBlock.muted">
+  <Style Selector="TextBlock.muted, SelectableTextBlock.muted">
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
-  <Style Selector="TextBlock.small">
+  <Style Selector="TextBlock.small, SelectableTextBlock.small">
     <Setter Property="FontSize" Value="{StaticResource TextXs}" />
   </Style>
   <!-- inline code in the docs: the monospace font on a faint ground -->
@@ -121,5 +121,41 @@
   </Style>
   <Style Selector="TextBlock.critical">
     <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+
+  <!-- an Expander (style.css details.more, .evfold): one card, its header a subtle band over the body, one border and
+       radius around both; the colours are Fluent's Expander resources, set to the tokens in Tokens.axaml. Expander.plain
+       (style.css .chkarea, Paths and identifiers) is a card with no band: the header on Surface, lifting to Surface 2
+       under the pointer, a line over the body when open. -->
+  <Style Selector="Expander">
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+  <Style Selector="Expander /template/ ToggleButton#ExpanderHeader">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="12,6,0,6" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+  <Style Selector="Expander /template/ ToggleButton#ExpanderHeader /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Expander /template/ Border#ExpandCollapseChevronBorder">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Margin" Value="8,0,10,0" />
+  </Style>
+
+  <Style Selector="Expander.plain">
+    <Setter Property="Padding" Value="16,4,16,12" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+  </Style>
+  <Style Selector="Expander.plain /template/ ToggleButton#ExpanderHeader">
+    <Setter Property="Padding" Value="16,12,0,12" />
+  </Style>
+  <Style Selector="Expander.plain /template/ ToggleButton#ExpanderHeader /template/ Border#ToggleButtonBackground">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+  </Style>
+  <Style Selector="Expander.plain /template/ ToggleButton#ExpanderHeader:pointerover /template/ Border#ToggleButtonBackground, Expander.plain /template/ ToggleButton#ExpanderHeader:pressed /template/ Border#ToggleButtonBackground">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
   </Style>
 </Styles>

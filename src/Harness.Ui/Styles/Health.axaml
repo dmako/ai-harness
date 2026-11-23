@@ -1,0 +1,115 @@
+<!-- Health (style.css .hsum, .chk, .chkarea, .synclist): the summary with its status in a round halo, a check that
+     needs a fix as a card with its fix, the passing checks as rows in their area's card, and the recent syncs. A halo
+     is the status hue at 15 % (22 % for warning) behind its icon in the status ink. -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <Style Selector="Border.hsum">
+    <Setter Property="Padding" Value="16,14" />
+  </Style>
+  <Style Selector="Border.hsum.lv-fail">
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+  </Style>
+
+  <!-- the halos: 32 px for the summary and a check to fix, 20 px in a list -->
+  <Style Selector="Border.hico">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+  <Style Selector="Border.cico">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+  </Style>
+  <Style Selector="Border.chk.wide Border.cico">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+  <Style Selector="Border.hico c|Icon, Border.cico c|Icon">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.lv-ok Border.hico, Border.lv-ok Border.cico">
+    <Setter Property="Background" Value="{DynamicResource GoodWash}" />
+  </Style>
+  <Style Selector="Border.lv-ok Border.hico c|Icon, Border.lv-ok Border.cico c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
+  </Style>
+  <Style Selector="Border.lv-warn Border.hico, Border.lv-warn Border.cico">
+    <Setter Property="Background" Value="{DynamicResource WarningWash}" />
+  </Style>
+  <Style Selector="Border.lv-warn Border.hico c|Icon, Border.lv-warn Border.cico c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource GoldInk}" />
+  </Style>
+  <Style Selector="Border.lv-fail Border.hico, Border.lv-fail Border.cico">
+    <Setter Property="Background" Value="{DynamicResource CriticalWash}" />
+  </Style>
+  <Style Selector="Border.lv-fail Border.hico c|Icon, Border.lv-fail Border.cico c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+
+  <!-- a check to fix (style.css .chkgrid.wide .chk): a card, its edge in the level's hue -->
+  <Style Selector="Border.chk.wide">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="16,12" />
+  </Style>
+  <Style Selector="Border.chk.wide.lv-warn">
+    <Setter Property="BorderBrush" Value="{DynamicResource Warning}" />
+    <Setter Property="BorderThickness" Value="3,1,1,1" />
+  </Style>
+  <Style Selector="Border.chk.wide.lv-fail">
+    <Setter Property="BorderBrush" Value="{DynamicResource Critical}" />
+    <Setter Property="BorderThickness" Value="3,1,1,1" />
+  </Style>
+  <Style Selector="Border.chk.wide TextBlock.cname">
+    <Setter Property="FontSize" Value="{StaticResource TextMd}" />
+  </Style>
+
+  <!-- an area's card (style.css .chkarea): its count in the good ink; its checks as rows, a line between them -->
+  <Style Selector="TextBlock.acount">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource GoodInk}" />
+  </Style>
+  <Style Selector="Border.chkrow">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="2,7" />
+  </Style>
+  <Style Selector="ContentPresenter:nth-child(1) > Border.chkrow">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBlock.cname">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.cvalue">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="TextAlignment" Value="Right" />
+    <Setter Property="Margin" Value="8,0,0,0" />
+  </Style>
+  <Style Selector="SelectableTextBlock.cdetail">
+    <Setter Property="FontFamily" Value="{StaticResource Mono}" />
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- index freshness: rows padded like the table head (Work.axaml narrows Border.trow); a failed outcome in the critical ink -->
+  <Style Selector="Border.trow.fresh">
+    <Setter Property="Padding" Value="14,8" />
+  </Style>
+  <Style Selector="Border.trow.lv-fail TextBlock.outcome">
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+  <!-- a recent sync: its row padding (style.css .synclist .sync) -->
+  <Style Selector="Border.trow.sync">
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+</Styles>

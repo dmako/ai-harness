@@ -22,21 +22,23 @@
               <!-- fewer than three: one by one -->
               <ItemsControl ItemsSource="{Binding Shown}" ItemTemplate="{StaticResource FindingRowTemplate}" IsVisible="{Binding !IsGroup}" />
               <!-- three or more: one row opening to the list -->
-              <Border Classes="smell" IsVisible="{Binding IsGroup}">
+              <Border Classes="smell group" IsVisible="{Binding IsGroup}">
                 <Expander HorizontalAlignment="Stretch" AutomationProperties.Name="{Binding Title}">
                   <Expander.Header>
                     <StackPanel Spacing="2">
-                      <WrapPanel ItemSpacing="8">
-                        <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" Margin="0,2,0,0" />
-                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+                      <WrapPanel ItemSpacing="8" LineSpacing="4">
+                        <Border Classes="pill" c:StyleClass.Name="{Binding LevelClass}">
+                          <StackPanel Orientation="Horizontal"><c:Icon Kind="{Binding Icon}" /><TextBlock Text="{Binding Level}" /></StackPanel>
+                        </Border>
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" />
                         <Border Classes="tag" IsVisible="{Binding HasFresh}"><TextBlock Classes="small" Text="{Binding FreshTag}" /></Border>
                       </WrapPanel>
-                      <TextBlock Classes="muted small" Text="{Binding Summary}" TextWrapping="Wrap" />
+                      <TextBlock Classes="path" Text="{Binding Summary}" />
                     </StackPanel>
                   </Expander.Header>
                   <StackPanel Spacing="6">
-                    <SelectableTextBlock Classes="small" Text="{Binding Why}" TextWrapping="Wrap" />
-                    <SelectableTextBlock Classes="small" Text="{Binding SameFixLine}" IsVisible="{Binding HasSameFix}" TextWrapping="Wrap" />
+                    <SelectableTextBlock Classes="sfix" IsVisible="{Binding HasSameFix}"><Run Text="Could help: " FontWeight="SemiBold" Foreground="{DynamicResource Accent}" /><Run Text="{Binding SameFix, Mode=OneWay}" /></SelectableTextBlock>
+                    <SelectableTextBlock Classes="muted small" Text="{Binding Why}" TextWrapping="Wrap" />
                     <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
@@ -77,15 +79,17 @@
       <Border Classes="smell" Classes.quiet="{Binding Quiet}">
         <StackPanel Spacing="4">
           <WrapPanel ItemSpacing="8" LineSpacing="4">
-            <c:Icon Classes="lv" Classes.warn="{Binding IsWarn}" Classes.problem="{Binding IsProblem}" Kind="{Binding Icon}" Margin="0,2,0,0" />
-            <SelectableTextBlock FontWeight="SemiBold" Text="{Binding Finding.Title}" TextWrapping="Wrap" />
+            <Border Classes="pill" c:StyleClass.Name="{Binding LevelClass}">
+              <StackPanel Orientation="Horizontal"><c:Icon Kind="{Binding Icon}" /><TextBlock Text="{Binding Finding.Level}" /></StackPanel>
+            </Border>
+            <SelectableTextBlock FontWeight="SemiBold" Text="{Binding Finding.Title}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <Border Classes="tag quiet" IsVisible="{Binding HasBasis}"><TextBlock Classes="small" Text="{Binding Basis}" /></Border>
             <Border Classes="tag" IsVisible="{Binding Fresh}"><TextBlock Classes="small" Text="{Binding Finding.Status}" /></Border>
             <Border Classes="tag" IsVisible="{Binding HasMark}"><TextBlock Classes="small" Text="{Binding MarkTag}" /></Border>
-            <TextBlock Classes="muted small" Text="{Binding Basis}" IsVisible="{Binding HasBasis}" VerticalAlignment="Center" />
           </WrapPanel>
-          <TextBlock Classes="small" Text="{Binding Risk}" IsVisible="{Binding HasRisk}" TextWrapping="Wrap" />
-          <SelectableTextBlock Classes="small" Text="{Binding Finding.Why}" IsVisible="{Binding HasWhy}" TextWrapping="Wrap" />
-          <SelectableTextBlock Classes="small" Text="{Binding FixLine}" IsVisible="{Binding HasFix}" TextWrapping="Wrap" />
+          <TextBlock Classes="path" Text="{Binding Risk}" IsVisible="{Binding HasRisk}" />
+          <SelectableTextBlock Classes="sfix" IsVisible="{Binding HasFix}"><Run Text="Could help: " FontWeight="SemiBold" Foreground="{DynamicResource Accent}" /><Run Text="{Binding Finding.Fix, Mode=OneWay}" /></SelectableTextBlock>
+          <SelectableTextBlock Classes="muted small" Text="{Binding Finding.Why}" IsVisible="{Binding HasWhy}" TextWrapping="Wrap" />
           <SelectableTextBlock Classes="small" Text="{Binding RuleLine}" IsVisible="{Binding HasRule}" TextWrapping="Wrap" />
           <Expander Header="{Binding EvidenceHead}" AutomationProperties.Name="{Binding EvidenceHead}" IsVisible="{Binding HasEvidence}" HorizontalAlignment="Stretch">
             <StackPanel>
