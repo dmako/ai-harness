@@ -55,6 +55,15 @@ public sealed record CheckRow(string Result, string Text, string? Evidence, bool
     public bool HasEvidence => Evidence is { Length: > 0 };
 }
 
+/// <summary>A task it waits for, in the task dialog's facts: its id and its status as a pill.</summary>
+public sealed record DependencyRow(string Id, string? Status)
+{
+    public bool HasStatus => Status is { Length: > 0 };
+    public string StatusClass => "st-" + Status;
+    public string StatusIcon => TaskStates.Icon(Status ?? "");
+    public string StatusWord => TaskStates.Words(Status ?? "");
+}
+
 /// <summary>An audit trail line: what happened, the states it moved between, who and when, and the detail.</summary>
 public sealed record EventRow(string Event, string? From, string? To, string Who, string? Detail)
 {
@@ -146,6 +155,11 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
         _taskId = taskId;
         AgentSessions = new AgentSessionsViewModel(services, projectId, taskId);
         _ = DisposeAgentSessionsAsync();
+        // app.js taskDialog: Delete… and Edit… beside Close, in an 880 px dialog
+        Detail = true;
+        Actions.Add(new DialogAction("Delete…", "trash", DeleteCommand, Danger: true));
+        Actions.Add(new DialogAction("Edit…", "edit", EditCommand,
+            Tip: "Only a ready or backlog task can be edited: once claimed, its definition is fixed"));
         if (plan is { HasContent: true })
         {
             _blueprints = plan.AllBlueprints;
@@ -175,7 +189,9 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
 
     public ObservableCollection<CheckRow> Criteria { get; } = [];
     public ObservableCollection<CheckRow> Checks { get; } = [];
-    public ObservableCollection<Fact> Facts { get; } = [];
+    public ObservableCollection<DependencyRow> DependsOn { get; } = [];
+    public ObservableCollection<string> Scope { get; } = [];
+    public ObservableCollection<string> Validation { get; } = [];
     public ObservableCollection<SessionRow> Sessions { get; } = [];
     public ObservableCollection<EventRow> Trail { get; } = [];
     public ObservableCollection<Choice> MoveChoices { get; } = [];
@@ -188,6 +204,26 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
 
     [ObservableProperty]
     public partial string CriteriaHead { get; private set; } = "";
+
+    /// <summary>How many criteria are met, beside the section's label ("3 of 5 met").</summary>
+    [ObservableProperty]
+    public partial string CriteriaCount { get; private set; } = "";
+
+    /// <summary>Who claimed it, since when and the lease, line by line.</summary>
+    [ObservableProperty]
+    public partial string? ClaimedBy { get; private set; }
+
+    [ObservableProperty]
+    public partial string? ClaimedSince { get; private set; }
+
+    [ObservableProperty]
+    public partial string? CompletedBy { get; private set; }
+
+    [ObservableProperty]
+    public partial string? CompletedAgo { get; private set; }
+
+    [ObservableProperty]
+    public partial string? CompletedCommit { get; private set; }
 
     [ObservableProperty]
     public partial string? SessionsNote { get; private set; }
@@ -202,7 +238,20 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
     public partial string? TrailError { get; private set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanMove))]
     public partial Choice? MoveTo { get; set; }
+
+    /// <summary>Whether another blueprint is chosen in the facts' Blueprint, so Move can send it.</summary>
+    public bool CanMove => Task is { } t && MoveTo is { } to && to.Value != (t.Blueprint ?? "");
+    public string StatusClass => "st-" + Task?.Status;
+    public string StatusIcon => TaskStates.Icon(Task?.Status ?? "");
+    public string StatusWord => TaskStates.Words(Task?.Status ?? "");
+    public bool HasDependsOn => DependsOn.Count > 0;
+    public bool HasScope => Scope.Count > 0;
+    public bool HasValidation => Validation.Count > 0;
+    public bool HasClaim => ClaimedBy is not null;
+    public bool HasDone => CompletedBy is not null;
+    public bool HasCommit => CompletedCommit is { Length: > 0 };
 
     public bool Editable => Task is { } t && TaskStates.Editable(t);
     public string EditTip => Editable ? $"Edit {_taskId}" : "Only a ready or backlog task can be edited: once claimed, its definition is fixed";
@@ -256,7 +305,7 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
         return System.Threading.Tasks.Task.CompletedTask;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(Editable))]
     private async Task EditAsync()
     {
         if (Task is { } task && Editable)
@@ -355,30 +404,25 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
         }
         var passed = t.Acceptance.Count(c => c.Result is "pass" or "n/a");
         CriteriaHead = $"Acceptance criteria · {passed} of {t.Acceptance.Count} met";
+        CriteriaCount = $"{passed} of {t.Acceptance.Count} met";
         Lists.Sync(Criteria, t.Acceptance.Select(c => new CheckRow(c.Result, c.Criterion, c.Evidence)));
         Lists.Sync(Checks, (t.Completion?.Checks ?? []).Select(c => new CheckRow(c.Result, c.Command, c.Output, Mono: true)));
-        var facts = new List<Fact>
-        {
-            new("Status", TaskStates.Words(t.Status)),
-            new("Priority", t.Priority),
-            new("Type", t.Type),
-            new("Blueprint", t.Blueprint ?? ""),
-            new("Depends on", string.Join("\n", t.DependsOn.Select(d => d.Status is { } s ? $"{d.Id} ({TaskStates.Words(s)})" : d.Id))),
-            new("Scope", string.Join("\n", t.Scope)),
-        };
+        Lists.Sync(DependsOn, t.DependsOn.Select(d => new DependencyRow(d.Id, d.Status)));
+        Lists.Sync(Scope, t.Scope);
+        Lists.Sync(Validation, t.Validation);
         if (t.Claim is { } claim)
         {
             var (left, _) = TaskStates.Lease(claim);
             var until = claim.LeaseUntil is { Length: >= 16 } u ? $" (until {u[..16].Replace('T', ' ')})" : "";
-            facts.Add(new("Claimed by", $"{claim.Claimant}\nsince {Shell.Ago(claim.ClaimedAt)}" + (left.Length > 0 ? $"\n{left}{until}" : "")));
+            ClaimedBy = claim.Claimant;
+            ClaimedSince = $"since {Shell.Ago(claim.ClaimedAt)}" + (left.Length > 0 ? $"\n{left}{until}" : "");
         }
         if (t.Completion is { } done)
         {
-            var commit = done.Commit is { Length: > 0 } c ? "\n" + c[..Math.Min(12, c.Length)] : "";
-            facts.Add(new("Done", $"{done.CompletedBy}\n{Shell.Ago(done.CompletedAt)}{commit}"));
+            CompletedBy = done.CompletedBy;
+            CompletedAgo = Shell.Ago(done.CompletedAt);
+            CompletedCommit = done.Commit is { Length: > 0 } c ? c[..Math.Min(12, c.Length)] : null;
         }
-        facts.Add(new("Validation", string.Join("\n", t.Validation)));
-        Lists.Sync(Facts, facts.Where(f => f.Value.Trim().Length > 0));
         Lists.Sync(
             MoveChoices,
             new[] { new Choice("", "no blueprint") }.Concat(_blueprints.Select(b => new Choice(b.Id, b.Title is { Length: > 0 } title ? $"{b.Id} · {title}" : b.Id)))
@@ -395,11 +439,22 @@ public sealed partial class TaskDialog : DialogViewModel<bool>
                 nameof(HasCompletion),
                 nameof(HasChecks),
                 nameof(HasNotes),
+                nameof(StatusClass),
+                nameof(StatusIcon),
+                nameof(StatusWord),
+                nameof(CanMove),
+                nameof(HasDependsOn),
+                nameof(HasScope),
+                nameof(HasValidation),
+                nameof(HasClaim),
+                nameof(HasDone),
+                nameof(HasCommit),
             }
         )
         {
             OnPropertyChanged(name);
         }
+        EditCommand.NotifyCanExecuteChanged();
     }
 
     private void ShowSessions(TaskSessions answer)

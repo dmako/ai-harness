@@ -62,6 +62,61 @@
   <Style Selector="TextBlock.mark.fail">
     <Setter Property="Foreground" Value="{DynamicResource Critical}" />
   </Style>
+
+  <!-- the task dialog (style.css .taskdlg .tdetail, .tblock, .checklist, .tside): the detail inset on Selected in a
+       rounded frame; each block under a small uppercase label; a criterion or check its own card, its mark beside it
+       and its evidence in Ink 2 under it; the facts a card of muted labels and their values -->
+  <Style Selector="Border.tdetail">
+    <Setter Property="Background" Value="{DynamicResource Selected}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Grid}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+  <Style Selector="TextBlock.tlabel">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.tcount">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="Border.crit">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="10,7" />
+  </Style>
+  <Style Selector="Border.crit TextBlock.mark">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,6,0" />
+  </Style>
+  <Style Selector="SelectableTextBlock.evidence">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.tside">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="14,12" />
+  </Style>
+  <Style Selector="TextBlock.kvlabel">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+  </Style>
+  <Style Selector="TextBlock.kvvalue, SelectableTextBlock.kvvalue">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
   <!-- a picker of a few (style.css .segpick, .bpswatch): a ListBox of choices side by side, each its own outlined
        chip on Surface. ListBox.opts (Type, Priority) names each item opt-<value>: hovered, its outline takes 60 % of
        the option's colour; chosen, it is outlined in that colour over a 20 % wash (Opt.<colour>.Wash/Hover tokens).

@@ -46,7 +46,7 @@ public sealed class SharedBehaviourTests
         var dialog = layer.FindControl<Border>("Dialog")!;
         var scroll = layer.FindControl<ScrollViewer>("DialogScroll")!;
         var accept = layer.FindControl<Button>("Accept")!;
-        dialog.Bounds.Width.Should().BeApproximately(Math.Min(width - 32, 900), 2);
+        dialog.Bounds.Width.Should().BeApproximately(Math.Min(width - 32, 520), 2);
         dialog.Bounds.Height.Should().BeLessThanOrEqualTo(window.Bounds.Height);
         scroll.Extent.Height.Should().BeGreaterThan(scroll.Viewport.Height);
         var before = accept.TranslatePoint(new Point(0, accept.Bounds.Height), window)!.Value.Y;

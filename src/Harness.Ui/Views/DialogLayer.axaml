@@ -19,14 +19,21 @@
        first field takes the focus when it opens. A form's fields are its view model's DataTemplate. -->
   <Border Classes="backdrop">
       <Border Name="Dialog" Classes="dialog" DataContext="{Binding Current}" Classes.wide="{Binding Wide}"
-              x:DataType="s:DialogViewModel">
+              Classes.detail="{Binding Detail}" Classes.full="{Binding Full}" x:DataType="s:DialogViewModel">
         <Grid RowDefinitions="Auto,*,Auto">
           <Border Grid.Row="0" Classes="dialog-head">
-            <StackPanel Spacing="2">
-              <TextBlock Classes="title" Text="{Binding Title}" />
-              <TextBlock Classes="sub" Text="{Binding Sub}"
-                         IsVisible="{Binding Sub, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-            </StackPanel>
+            <DockPanel>
+              <!-- the title's × (app.js dialog(): iconButton close): closes as Cancel or Esc do -->
+              <Button Name="CloseX" DockPanel.Dock="Right" Classes="icon" ToolTip.Tip="Close" AutomationProperties.Name="Close"
+                      Command="{Binding CancelCommand}" VerticalAlignment="Top" Margin="12,0,0,0">
+                <c:Icon Kind="close" />
+              </Button>
+              <StackPanel Spacing="2">
+                <TextBlock Classes="title" Text="{Binding Title}" />
+                <TextBlock Classes="sub" Text="{Binding Sub}"
+                           IsVisible="{Binding Sub, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+            </DockPanel>
           </Border>
           <ScrollViewer Name="DialogScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <Border Classes="dialog-body">
@@ -49,6 +56,19 @@
           </ScrollViewer>
           <Border Grid.Row="2" Classes="dialog-foot">
             <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="4" HorizontalAlignment="Right">
+              <ItemsControl Name="Actions" ItemsSource="{Binding Actions}" IsVisible="{Binding Actions.Count}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="4" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="s:DialogAction">
+                    <Button Classes="ghost" Classes.danger="{Binding Danger}" Command="{Binding Command}"
+                            AutomationProperties.Name="{Binding Label}" ToolTip.Tip="{Binding Tip}">
+                      <StackPanel Orientation="Horizontal"><c:Icon Kind="{Binding Icon}" IsVisible="{Binding HasIcon}" /><TextBlock Text="{Binding Label}" /></StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
               <Button Name="Cancel" Classes="ghost" Content="Cancel" AutomationProperties.Name="Cancel" Command="{Binding CancelCommand}"
                       IsVisible="{Binding HasCancel}" />
               <Button Name="Back" Classes="ghost" Content="Back" AutomationProperties.Name="Back" Command="{Binding BackCommand}"

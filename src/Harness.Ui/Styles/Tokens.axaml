@@ -95,6 +95,10 @@
       <SolidColorBrush x:Key="Opt.Warning.Hover" Color="#e1bb7d" />
       <!-- the hover fill one step past Surface 2 (an Expander header under the pointer) -->
       <SolidColorBrush x:Key="Surface3" Color="#eceef0" />
+      <!-- a ghost danger button (style.css .ghost.danger): its words 80 % Critical into Ink (AA on Surface 2 too), its
+           outline 45 % Critical into Border -->
+      <SolidColorBrush x:Key="DangerInk" Color="#a53a35" />
+      <SolidColorBrush x:Key="DangerEdge" Color="#d09492" />
       <!-- a status halo behind its icon (style.css .hico, .cico): the hue at 15 % (22 % for warning) -->
       <SolidColorBrush x:Key="GoodWash" Color="#261f9d55" />
       <SolidColorBrush x:Key="CriticalWash" Color="#26c7413b" />
@@ -222,6 +226,8 @@
       <SolidColorBrush x:Key="Opt.Warning.Wash" Color="#443721" />
       <SolidColorBrush x:Key="Opt.Warning.Hover" Color="#9c7536" />
       <SolidColorBrush x:Key="Surface3" Color="#2e2e2b" />
+      <SolidColorBrush x:Key="DangerInk" Color="#e47c75" />
+      <SolidColorBrush x:Key="DangerEdge" Color="#844a46" />
       <SolidColorBrush x:Key="GoodWash" Color="#262fb36a" />
       <SolidColorBrush x:Key="CriticalWash" Color="#26e0605a" />
       <SolidColorBrush x:Key="WarningWash" Color="#38e2a33b" />

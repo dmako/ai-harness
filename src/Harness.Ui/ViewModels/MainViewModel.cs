@@ -118,7 +118,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var dialog = new EvidenceDialog
         {
             Title = locations.Length > 1 ? "Compare source" : "Source evidence",
-            Wide = true,
+            Full = true,
             HasCancel = false,
             AcceptLabel = "Close",
         };

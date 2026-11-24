@@ -33,14 +33,19 @@ public sealed partial class DialogLayer : UserControl
         {
             var evidence = _service.Current is EvidenceDialog;
             Accept.Classes.Set("evidence-close", evidence);
-            // after the dialog is laid out: its first field, else the accept button
+            // after the dialog is laid out: a detail that only closes (no Cancel, as app.js taskDialog) its Close; a form
+            // its first field, else the accept button
+            var detail = !_service.Current.HasCancel;
             Dispatcher.UIThread.Post(
                 () =>
                     (
-                        Body.GetVisualDescendants()
-                            .OfType<Control>()
-                            .FirstOrDefault(c => c is TextBox or ComboBox or CheckBox && c.IsEffectivelyEnabled)
-                        ?? Accept
+                        (
+                            detail
+                                ? null
+                                : Body.GetVisualDescendants()
+                                    .OfType<Control>()
+                                    .FirstOrDefault(c => c is TextBox or ComboBox or CheckBox && c.IsEffectivelyEnabled)
+                        ) ?? Accept
                     ).Focus(evidence ? NavigationMethod.Unspecified : NavigationMethod.Tab),
                 DispatcherPriority.Loaded
             );

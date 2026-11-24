@@ -328,7 +328,13 @@ public sealed class WorkViewTests
         dialog.Task!.Title.Should().Be("Ready one");
         dialog.CriteriaHead.Should().Be("Acceptance criteria · 0 of 1 met");
         dialog.Criteria.Select(c => (c.Mark, c.Text)).Should().Equal(("○", "It runs"));
-        dialog.Facts.Select(f => f.Label).Should().Equal("Status", "Priority", "Type", "Blueprint", "Scope", "Validation");
+        dialog.CriteriaCount.Should().Be("0 of 1 met");
+        (dialog.StatusWord, dialog.StatusClass).Should().Be(("ready", "st-ready"));
+        dialog.HasScope.Should().BeTrue();
+        dialog.HasValidation.Should().BeTrue();
+        dialog.HasDone.Should().BeFalse();
+        dialog.Actions.Select(a => a.Label).Should().Equal("Delete…", "Edit…");
+        dialog.EditCommand.CanExecute(null).Should().BeTrue();
         dialog.Editable.Should().BeTrue();
         dialog.SessionsNote.Should().StartWith("None recorded.");
         api.Gets.Should().Contain(Root + "/tasks/TASK-0001/sessions");

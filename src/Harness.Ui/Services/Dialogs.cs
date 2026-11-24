@@ -52,6 +52,18 @@ public abstract partial class DialogViewModel : ObservableObject
     /// <summary>A wider dialog (680 px instead of 520), for details and forms with long fields.</summary>
     public bool Wide { get; init; }
 
+    /// <summary>A task's detail (880 px, style.css .dlg.wide:has(.taskdlg)): its content beside a column of facts.</summary>
+    public bool Detail { get; init; }
+
+    /// <summary>As wide as the window allows (up to 1280 px): source side by side in an evidence comparison.</summary>
+    public bool Full { get; init; }
+
+    /// <summary>
+    /// More actions in the footer, before Cancel and the accept button (app.js dlg.set's buttons): a task's Delete… and
+    /// Edit… beside its Close.
+    /// </summary>
+    public System.Collections.ObjectModel.ObservableCollection<DialogAction> Actions { get; } = [];
+
     /// <summary>The label of the button that accepts.</summary>
     public string AcceptLabel { get; init; } = "OK";
 
@@ -95,6 +107,15 @@ public abstract partial class DialogViewModel : ObservableObject
 
     [RelayCommand]
     protected abstract Task AcceptAsync();
+}
+
+/// <summary>
+/// A footer action of a dialog: its words, its icon, what it runs, and whether it destroys something (a ghost danger
+/// button). It is disabled while its command cannot run; <see cref="Tip"/> says why.
+/// </summary>
+public sealed record DialogAction(string Label, string? Icon, System.Windows.Input.ICommand Command, bool Danger = false, string? Tip = null)
+{
+    public bool HasIcon => Icon is { Length: > 0 };
 }
 
 /// <summary>A dialog that ends with a <typeparamref name="TResult"/> (default when cancelled).</summary>

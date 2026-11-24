@@ -6,7 +6,8 @@ namespace Harness.Ui.Controls;
 /// <summary>
 /// A panel beside a map (a layer graph, the build map, a list) that goes under it on a narrow page: set
 /// <c>SidePanel.Follows</c> on a grid with the map in column 0 and the panel, its last child, in column 1; the grid
-/// needs a second row for the narrow layout. The panel keeps the width it was given while beside the map.
+/// needs a second row for the narrow layout. The panel keeps the width it was given while beside the map, and
+/// <c>SidePanel.Gap</c> apart from it (12 px above it once under).
 /// </summary>
 public sealed class SidePanel : AvaloniaObject
 {
@@ -14,6 +15,9 @@ public sealed class SidePanel : AvaloniaObject
     public const double Narrow = 720;
 
     public static readonly AttachedProperty<bool> FollowsProperty = AvaloniaProperty.RegisterAttached<SidePanel, Grid, bool>("Follows");
+
+    /// <summary>The space between the map and the panel beside it.</summary>
+    public static readonly AttachedProperty<double> GapProperty = AvaloniaProperty.RegisterAttached<SidePanel, Grid, double>("Gap");
 
     private static readonly AttachedProperty<double> WideProperty = AvaloniaProperty.RegisterAttached<SidePanel, Control, double>("Wide", double.NaN);
 
@@ -36,6 +40,10 @@ public sealed class SidePanel : AvaloniaObject
 
     public static void SetFollows(Grid grid, bool value) => grid.SetValue(FollowsProperty, value);
 
+    public static double GetGap(Grid grid) => grid.GetValue(GapProperty);
+
+    public static void SetGap(Grid grid, double value) => grid.SetValue(GapProperty, value);
+
     private static void Place(object? sender, SizeChangedEventArgs e)
     {
         if (sender is not Grid { Children.Count: > 1 } grid || grid.Children[^1] is not Control side)
@@ -51,6 +59,6 @@ public sealed class SidePanel : AvaloniaObject
         Grid.SetColumn(side, below ? 0 : 1);
         Grid.SetColumnSpan(side, below ? 2 : 1);
         side.Width = below ? double.NaN : side.GetValue(WideProperty);
-        side.Margin = below ? new Thickness(0, 12, 0, 0) : default;
+        side.Margin = below ? new Thickness(0, 12, 0, 0) : new Thickness(grid.GetValue(GapProperty), 0, 0, 0);
     }
 }

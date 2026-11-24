@@ -31,10 +31,10 @@ public sealed class DesignSystemTests
     {
         ["Surface"] =
         [
-            "Ink", "Ink2", "Muted", "Accent", "GoodInk", "GoldInk", "Critical", .. BlueprintColors.Select(b => "Bp." + b),
+            "Ink", "Ink2", "Muted", "Accent", "GoodInk", "GoldInk", "Critical", "DangerInk", .. BlueprintColors.Select(b => "Bp." + b),
         ],
         ["Page"] = ["Ink", "Ink2", "Muted", "Accent", "Critical"],
-        ["Surface2"] = ["Ink", "Ink2", "Muted", .. BlueprintColors.Select(b => "Bp." + b)],
+        ["Surface2"] = ["Ink", "Ink2", "Muted", "DangerInk", .. BlueprintColors.Select(b => "Bp." + b)],
         ["Chip"] = ["Ink", "Ink2"],
         ["Inset"] = ["Ink", "Ink2", "Muted"],
         ["Selected"] = ["Ink", "Ink2", "Muted"],
