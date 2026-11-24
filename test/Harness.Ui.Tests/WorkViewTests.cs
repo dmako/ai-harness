@@ -530,6 +530,45 @@ public sealed class WorkViewTests
     });
 
     [Fact]
+    public Task TheTaskFormsListsAndChipFieldsWorkFromTheKeyboard() => Ui.RunAsync(async () =>
+    {
+        var (window, _, model) = await OpenAsync("tasks");
+        _ = Work(model).Plan.NewTaskCommand.ExecuteAsync("BP-009");
+        var form = await DialogAsync<TaskFormDialog>(model);
+
+        // Done when (app.js listBuilder): Enter adds the next criterion after this one; Backspace in an empty one removes it
+        var view = window.GetVisualDescendants().OfType<TaskFormView>().Single();
+        var first = view.GetVisualDescendants().OfType<TextBox>().Single(t => t.DataContext == form.Criteria[0]);
+        first.Text = "Works offline";
+        first.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, Source = first });
+        Ui.Settle();
+        form.Criteria.Select(c => c.Text).Should().Equal("Works offline", "");
+        model.Services.Dialogs.Current.Should().BeSameAs(form, "Enter in a criterion does not send the form");
+        form.RemoveEmptyCriterion(form.Criteria[1]).Should().BeSameAs(form.Criteria[0]);
+        form.Criteria.Should().ContainSingle();
+        form.RemoveEmptyCriterion(form.Criteria[0]).Should().BeNull("a criterion with words, or the last one, stays");
+
+        // Scope (app.js tokenInput): a comma takes the paths before it; Backspace in the empty field drops the last chip
+        form.ScopeText = "src/search, doc,";
+        form.Scope.Should().Equal("src/search", "doc");
+        form.ScopeText.Should().BeEmpty();
+        form.RemoveLastScope();
+        form.Scope.Should().Equal("src/search");
+
+        // Depends on (app.js taskPicker): Enter picks the first task shown, or takes another project's as typed
+        form.DependsQuery = "Claimed";
+        form.PickDependency();
+        form.Depends.Should().Equal("TASK-0003");
+        form.DependsQuery = "other:TASK-0007";
+        form.PickDependency();
+        form.Depends.Should().Equal("TASK-0003", "other:TASK-0007");
+        form.RemoveLastDependency();
+        form.Depends.Should().Equal("TASK-0003");
+        form.Cancel();
+        window.Close();
+    });
+
+    [Fact]
     public Task EditingATaskKeepsItsIdAndDeletingOneAsksFirst() => Ui.RunAsync(async () =>
     {
         var (_, api, model) = await OpenAsync("tasks");

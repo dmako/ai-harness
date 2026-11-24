@@ -7,150 +7,189 @@
              x:Class="Harness.Ui.Views.TaskFormView"
              x:DataType="vm:TaskFormDialog"
              d:DataContext="{x:Static preview:PreviewData.TaskForm}">
-  <!-- a task's definition (app.js taskFields): title and id, sorting, goal, Done when, depends on and scope -->
-  <StackPanel Spacing="12">
-    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-      <StackPanel Classes="field">
-        <TextBlock Classes="label" Text="Title" />
-        <TextBox Name="TitleField" Text="{Binding TaskTitle}" PlaceholderText="What should be done" AutomationProperties.Name="Title" />
+  <!-- a task's definition (app.js taskFields): the title (large) beside its id; Sorting (type, priority, blueprint),
+       the goal, Done when (one criterion a row: Enter adds the next, Backspace in an empty one removes it) and Around
+       it (the tasks it waits for and the paths it may touch, as chips in one field), each group in its own frame -->
+  <StackPanel Spacing="16">
+    <Grid ColumnDefinitions="*,150" ColumnSpacing="12">
+      <StackPanel Classes="dfield">
+        <TextBlock Classes="dlabel" Text="Title" />
+        <TextBox Name="TitleField" Classes="tbig" Text="{Binding TaskTitle}" PlaceholderText="What should be done" AutomationProperties.Name="Title" />
       </StackPanel>
-      <StackPanel Grid.Column="1" Classes="field" Width="150">
-        <TextBlock Classes="label" Text="Id" />
-        <TextBox Name="IdField" Classes="mono" Text="{Binding TaskId}" PlaceholderText="{Binding IdHint}" IsEnabled="{Binding IdEditable}"
-                 AutomationProperties.Name="Id" />
-        <TextBlock Classes="muted small" Text="{Binding IdNote}" TextWrapping="Wrap" />
+      <StackPanel Grid.Column="1" Classes="dfield">
+        <TextBlock Classes="dlabel" Text="Id" />
+        <TextBox Name="IdField" Classes="mono tall" Text="{Binding TaskId}" PlaceholderText="{Binding IdHint}"
+                 IsReadOnly="{Binding !IdEditable}" AutomationProperties.Name="Id" />
+        <TextBlock Classes="dhint" Text="{Binding IdNote}" />
       </StackPanel>
     </Grid>
-    <StackPanel Classes="field">
-      <TextBlock Classes="label" Text="Type" />
-      <ListBox Name="TypePicker" Classes="seg opts" ItemsSource="{x:Static vm:TaskFormDialog.Types}" SelectedItem="{Binding TaskType}"
-               AutomationProperties.Name="Type">
-        <ListBox.ItemsPanel>
-          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-        </ListBox.ItemsPanel>
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="x:String">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <c:Icon Classes="type" c:StyleClass.Name="{Binding StringFormat='ty-{0}'}" Kind="{Binding}" />
-              <TextBlock Text="{Binding}" />
-            </StackPanel>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-    </StackPanel>
-    <WrapPanel ItemSpacing="16" LineSpacing="8">
-      <StackPanel Classes="field">
-        <TextBlock Classes="label" Text="Priority" />
-        <ListBox Name="PriorityPicker" Classes="seg opts" ItemsSource="{x:Static vm:TaskFormDialog.Priorities}" SelectedItem="{Binding Priority}"
-                 AutomationProperties.Name="Priority">
-          <ListBox.ItemsPanel>
-            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-          </ListBox.ItemsPanel>
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="x:String">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <c:Icon Classes="prio" c:StyleClass.Name="{Binding StringFormat='p-{0}'}" Kind="{Binding StringFormat='p-{0}'}" />
-                <TextBlock Text="{Binding}" />
-              </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+
+    <Border Classes="fgroup">
+      <StackPanel Spacing="12">
+        <TextBlock Classes="legend" Text="SORTING" />
+        <StackPanel Classes="dfield">
+          <TextBlock Classes="dlabel" Text="Type" />
+          <ListBox Name="TypePicker" Classes="seg opts" ItemsSource="{x:Static vm:TaskFormDialog.Types}" SelectedItem="{Binding TaskType}"
+                   AutomationProperties.Name="Type">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Classes="type" c:StyleClass.Name="{Binding StringFormat='ty-{0}'}" Kind="{Binding}" />
+                  <TextBlock Text="{Binding Converter={x:Static c:Converters.Capitalize}}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+        <Border Classes="fsep" />
+        <StackPanel Classes="dfield">
+          <TextBlock Classes="dlabel" Text="Priority" />
+          <ListBox Name="PriorityPicker" Classes="seg opts" ItemsSource="{x:Static vm:TaskFormDialog.Priorities}" SelectedItem="{Binding Priority}"
+                   AutomationProperties.Name="Priority">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Classes="prio" c:StyleClass.Name="{Binding StringFormat='p-{0}'}" Kind="{Binding StringFormat='p-{0}'}" />
+                  <TextBlock Text="{Binding Converter={x:Static c:Converters.Capitalize}}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+        <Border Classes="fsep" />
+        <StackPanel Classes="dfield">
+          <TextBlock Classes="dlabel" Text="Blueprint" />
+          <ComboBox Name="BlueprintField" ItemsSource="{Binding BlueprintChoices}" SelectedItem="{Binding Blueprint}" HorizontalAlignment="Stretch"
+                    AutomationProperties.Name="Blueprint">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:Choice"><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" /></DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
       </StackPanel>
-      <StackPanel Classes="field">
-        <TextBlock Classes="label" Text="Blueprint" />
-        <ComboBox Name="BlueprintField" ItemsSource="{Binding BlueprintChoices}" SelectedItem="{Binding Blueprint}" MinWidth="200" MaxWidth="320"
-                  AutomationProperties.Name="Blueprint" />
-      </StackPanel>
-    </WrapPanel>
-    <StackPanel Classes="field">
-      <TextBlock Classes="label" Text="Goal" />
-      <TextBox Name="GoalField" Text="{Binding Goal}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
+    </Border>
+
+    <StackPanel Classes="dfield">
+      <TextBlock Classes="dlabel" Text="Goal" />
+      <TextBox Name="GoalField" Classes="goal" Text="{Binding Goal}" AcceptsReturn="True" TextWrapping="Wrap"
                PlaceholderText="The outcome wanted, and why" AutomationProperties.Name="Goal" />
     </StackPanel>
-    <StackPanel Classes="field">
-      <TextBlock Classes="label" Text="Done when" />
-      <ItemsControl Name="CriteriaField" ItemsSource="{Binding Criteria}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:LineItem">
-            <DockPanel Margin="0,0,0,4">
-              <Button DockPanel.Dock="Right" Classes="icon destructive" AutomationProperties.Name="Remove"
-                      Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).RemoveCriterionCommand}" CommandParameter="{Binding}">
-                <c:Icon Kind="trash" />
-              </Button>
-              <TextBox Text="{Binding Text}" PlaceholderText="A criterion one can check" AutomationProperties.Name="Criterion" />
-            </DockPanel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <Button Name="AddCriterion" Classes="ghost small" AutomationProperties.Name="Add criterion" Command="{Binding AddCriterionCommand}" HorizontalAlignment="Left">
-        <StackPanel Orientation="Horizontal" Spacing="4"><c:Icon Kind="plus" /><TextBlock Text="Add another" /></StackPanel>
-      </Button>
-    </StackPanel>
-    <StackPanel Classes="field">
-      <TextBlock Classes="label" Text="Depends on" />
-      <ItemsControl ItemsSource="{Binding Depends}">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="4" /></ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="x:String">
-            <Button Classes="ghost small destructive" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
-                    Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).ToggleDependencyCommand}" CommandParameter="{Binding}">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Classes="mono" Text="{Binding}" />
-                <c:Icon Kind="trash" />
-              </StackPanel>
-            </Button>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Add" AutomationProperties.Name="Add" Command="{Binding AddTypedDependencyCommand}" Margin="6,0,0,0" />
-        <TextBox Name="DependsField" Text="{Binding DependsQuery}" PlaceholderText="Search tasks by id or title; another project's as project:TASK-1"
-                 AutomationProperties.Name="Depends on" />
-      </DockPanel>
-      <TextBlock Classes="muted small" Text="{Binding OptionsNote}" IsVisible="{Binding OptionsNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-      <ScrollViewer MaxHeight="180">
-        <ItemsControl Name="DependsOptions" ItemsSource="{Binding Options}">
+
+    <Border Classes="fgroup">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="legend" Text="DONE WHEN" />
+        <ItemsControl Name="CriteriaField" ItemsSource="{Binding Criteria}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:DependencyOption">
-              <CheckBox IsChecked="{Binding Chosen, Mode=OneWay}" AutomationProperties.Name="{Binding Id}"
-                        Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).ToggleDependencyCommand}" CommandParameter="{Binding Id}">
-                <WrapPanel ItemSpacing="8">
-                  <TextBlock Classes="mono small" Text="{Binding Id}" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
-                  <TextBlock Classes="muted small" Text="{Binding StatusWords}" VerticalAlignment="Center" />
-                </WrapPanel>
-              </CheckBox>
+            <DataTemplate x:DataType="vm:LineItem">
+              <DockPanel>
+                <Border DockPanel.Dock="Left" Classes="lbox" />
+                <Button DockPanel.Dock="Right" Classes="icon" ToolTip.Tip="Remove" AutomationProperties.Name="Remove"
+                        Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).RemoveCriterionCommand}" CommandParameter="{Binding}">
+                  <c:Icon Kind="close" />
+                </Button>
+                <TextBox Classes="own-enter" Text="{Binding Text}" PlaceholderText="A criterion one can check" AutomationProperties.Name="Criterion"
+                         KeyDown="CriterionKey" />
+              </DockPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-      </ScrollViewer>
-      <TextBlock Classes="muted small" Text="Tasks that must be done first." />
-    </StackPanel>
-    <StackPanel Classes="field">
-      <TextBlock Classes="label" Text="Scope" />
-      <ItemsControl ItemsSource="{Binding Scope}">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="4" /></ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="x:String">
-            <Button Classes="ghost small destructive" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
-                    Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).RemoveScopeCommand}" CommandParameter="{Binding}">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Classes="mono" Text="{Binding}" />
-                <c:Icon Kind="trash" />
-              </StackPanel>
-            </Button>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Add" AutomationProperties.Name="Add" Command="{Binding AddScopeCommand}" Margin="6,0,0,0" />
-        <TextBox Name="ScopeField" Text="{Binding ScopeText}" PlaceholderText="a path, e.g. src/tasks" AutomationProperties.Name="Scope" />
-      </DockPanel>
-      <TextBlock Classes="muted small" Text="Paths it may touch." />
-    </StackPanel>
+        <Button Name="AddCriterion" Classes="ladd" AutomationProperties.Name="Add criterion" Command="{Binding AddCriterionCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Kind="plus" /><TextBlock Text="Add another (or press Enter)" /></StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="fgroup">
+      <StackPanel Spacing="12">
+        <TextBlock Classes="legend" Text="AROUND IT" />
+        <StackPanel Classes="dfield">
+          <TextBlock Classes="dlabel" Text="Depends on" />
+          <!-- the tasks waited for as chips, the search beside them; its menu under the field while it has the focus -->
+          <Border Classes="tokens">
+            <WrapPanel ItemSpacing="6" LineSpacing="4">
+              <ItemsControl ItemsSource="{Binding Depends}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="4" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Border Classes="tchip">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                        <Button Classes="tchipx" Content="×" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
+                                Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).ToggleDependencyCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBox Name="DependsField" Classes="bare own-enter" Text="{Binding DependsQuery}" PlaceholderText="Search tasks by id or title"
+                       AutomationProperties.Name="Depends on" KeyDown="DependsKey" GotFocus="DependsFocus" LostFocus="DependsBlur" />
+            </WrapPanel>
+          </Border>
+          <Border Classes="tpmenu" IsVisible="{Binding DependsOpen}">
+            <StackPanel>
+              <TextBlock Classes="muted small" Margin="8,6" Text="{Binding OptionsNote}"
+                         IsVisible="{Binding OptionsNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <ScrollViewer MaxHeight="256">
+                <ItemsControl Name="DependsOptions" ItemsSource="{Binding Options}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DependencyOption">
+                      <Button Classes="tpopt" Classes.on="{Binding Chosen}" Focusable="False" AutomationProperties.Name="{Binding Id}"
+                              Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).ToggleDependencyCommand}" CommandParameter="{Binding Id}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Left" Classes="tpcheck" Text="{Binding Check}" />
+                          <TextBlock DockPanel.Dock="Left" Classes="mono small" Text="{Binding Id}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                          <Border DockPanel.Dock="Right" Classes="pill" c:StyleClass.Name="{Binding StatusClass}" Margin="8,0,0,0">
+                            <StackPanel Orientation="Horizontal"><c:Icon Kind="{Binding StatusIcon}" /><TextBlock Text="{Binding StatusWords}" /></StackPanel>
+                          </Border>
+                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        </DockPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </StackPanel>
+          </Border>
+          <TextBlock Classes="dhint" Text="Tasks that must be done first: search by id or title; another project's as project:TASK-1." />
+        </StackPanel>
+        <StackPanel Classes="dfield">
+          <TextBlock Classes="dlabel" Text="Scope" />
+          <Border Classes="tokens">
+            <WrapPanel ItemSpacing="6" LineSpacing="4">
+              <ItemsControl ItemsSource="{Binding Scope}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="4" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Border Classes="tchip">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                        <Button Classes="tchipx" Content="×" AutomationProperties.Name="{Binding StringFormat='Remove {0}'}"
+                                Command="{Binding $parent[ItemsControl].((vm:TaskFormDialog)DataContext).RemoveScopeCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBox Name="ScopeField" Classes="bare own-enter" Text="{Binding ScopeText}" PlaceholderText="a path, e.g. internal/tasks"
+                       AutomationProperties.Name="Scope" KeyDown="ScopeKey" LostFocus="ScopeBlur" />
+            </WrapPanel>
+          </Border>
+          <TextBlock Classes="dhint" Text="Paths it may touch." />
+        </StackPanel>
+      </StackPanel>
+    </Border>
   </StackPanel>
 </UserControl>

@@ -27,6 +27,10 @@ public static class Converters
     /// <summary>Converts string to its upper case invariant form</summary>
     public static IValueConverter Uppercase { get; } = new UppercaseConverter();
 
+    /// <summary>A word with its first letter in capitals (style.css text-transform: capitalize): "feature" -&gt; "Feature".</summary>
+    public static IValueConverter Capitalize { get; } =
+        new FuncValueConverter<string?, string>(s => s is { Length: > 0 } ? char.ToUpperInvariant(s[0]) + s[1..] : "");
+
     private sealed class EqualsConverter : IValueConverter
     {
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>

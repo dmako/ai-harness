@@ -77,7 +77,13 @@ public sealed partial class DialogLayer : UserControl
             e.Handled = true;
             dialog.Cancel();
         }
-        else if (e.Key is Key.Enter && e.Source is not TextBox { AcceptsReturn: true } && e.Source is not Button)
+        else if (
+            e.Key is Key.Enter
+            && e.Source is not TextBox { AcceptsReturn: true }
+            && e.Source is not Button
+            // a field with its own Enter (a criterion adds the next one, a chip field takes its chip)
+            && !(e.Source is TextBox field && field.Classes.Contains("own-enter"))
+        )
         {
             e.Handled = true;
             dialog.AcceptCommand.Execute(null);

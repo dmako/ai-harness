@@ -35,7 +35,11 @@ public sealed partial class DependencyOption(string id, string title, string sta
     public string StatusWords => TaskStates.Words(Status);
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Check))]
     public partial bool Chosen { get; set; }
+
+    /// <summary>The tick of a chosen one in the picker's menu (app.js .tpcheck).</summary>
+    public string Check => Chosen ? "✓" : "";
 }
 
 /// <summary>An acceptance criterion or validation check in the task dialog: its result's mark, words and evidence.</summary>
@@ -635,6 +639,10 @@ public sealed partial class TaskFormDialog : FormDialog<bool>
     [ObservableProperty]
     public partial string? OptionsNote { get; private set; }
 
+    /// <summary>Whether the Depends on menu shows (app.js taskPicker: while its search has the focus).</summary>
+    [ObservableProperty]
+    public partial bool DependsOpen { get; set; }
+
     public static Task NewAsync(UiServices services, string projectId, IReadOnlyList<BlueprintInfo> blueprints, IReadOnlyList<TaskSummary> tasks, string blueprint) =>
         services.Dialogs.ShowAsync(
             new TaskFormDialog(services, projectId, blueprints, tasks, new TaskDraft { Title = "", Blueprint = blueprint }, null, null)
@@ -688,8 +696,79 @@ public sealed partial class TaskFormDialog : FormDialog<bool>
 
     partial void OnDependsQueryChanged(string value) => FilterOptions();
 
+    /// <summary>A comma typed in Scope takes the paths before it as chips (app.js tokenInput); the rest stays typed.</summary>
+    partial void OnScopeTextChanged(string value)
+    {
+        var comma = value.LastIndexOf(',');
+        if (comma < 0)
+        {
+            return;
+        }
+        foreach (var part in value[..comma].Split(',').Select(s => s.Trim()).Where(s => s.Length > 0 && !Scope.Contains(s)))
+        {
+            Scope.Add(part);
+        }
+        ScopeText = value[(comma + 1)..].TrimStart();
+    }
+
     [RelayCommand]
     private void AddCriterion() => Criteria.Add(new LineItem(""));
+
+    /// <summary>Enter in a criterion (app.js listBuilder): a new empty one right after it, to type next.</summary>
+    public LineItem InsertCriterionAfter(LineItem line)
+    {
+        var next = new LineItem("");
+        Criteria.Insert(Criteria.IndexOf(line) + 1, next);
+        return next;
+    }
+
+    /// <summary>Backspace in an empty criterion while others remain: it goes; the one before it (if any) is returned.</summary>
+    public LineItem? RemoveEmptyCriterion(LineItem line)
+    {
+        var at = Criteria.IndexOf(line);
+        if (line.Text.Length > 0 || Criteria.Count < 2 || at < 0)
+        {
+            return null;
+        }
+        Criteria.RemoveAt(at);
+        return Criteria[Math.Max(0, at - 1)];
+    }
+
+    /// <summary>Backspace in the empty Scope field (app.js tokenInput): the last path goes.</summary>
+    public void RemoveLastScope()
+    {
+        if (ScopeText.Length is 0 && Scope.Count > 0)
+        {
+            Scope.RemoveAt(Scope.Count - 1);
+        }
+    }
+
+    /// <summary>Backspace in the empty Depends on search (app.js taskPicker): the last task waited for goes.</summary>
+    public void RemoveLastDependency()
+    {
+        if (DependsQuery.Length is 0 && Depends.Count > 0)
+        {
+            ToggleDependency(Depends[^1]);
+        }
+    }
+
+    /// <summary>
+    /// Enter in the Depends on search: another project's task typed as project:TASK-1 is taken as written, otherwise
+    /// the first task the search shows is chosen (or dropped); the search empties.
+    /// </summary>
+    public void PickDependency()
+    {
+        if (DependsQuery.Contains(':', StringComparison.Ordinal))
+        {
+            AddTypedDependency();
+            return;
+        }
+        if (Options.FirstOrDefault() is { } first)
+        {
+            ToggleDependency(first.Id);
+            DependsQuery = "";
+        }
+    }
 
     [RelayCommand]
     private void RemoveCriterion(LineItem line)

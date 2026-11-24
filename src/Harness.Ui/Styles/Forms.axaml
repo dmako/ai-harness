@@ -66,4 +66,168 @@
     <Setter Property="FontSize" Value="{StaticResource TextMd}" />
     <Setter Property="MinHeight" Value="{StaticResource ControlMin}" />
   </Style>
+  <!-- a dialog's form (style.css .dfield, .fgroup, .lbuild, .tokens, .tpmenu; app.js taskFields): a field is its label
+       (StackPanel.dfield: TextBlock.dlabel, the input, TextBlock.dhint); fields that belong together sit in a framed
+       group under a small uppercase legend, a line between them; a list is one row per entry, a square mark before it
+       and a muted × after it, ending in an Add another row; a few short values are chips inline with their input -->
+  <Style Selector="StackPanel.dfield">
+    <Setter Property="Spacing" Value="6" />
+  </Style>
+  <Style Selector="TextBlock.dlabel">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBlock.dhint">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- the title, large; the id beside it as tall; an id in the monospace font -->
+  <Style Selector="TextBox.tbig">
+    <Setter Property="FontSize" Value="{StaticResource TextLg}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox.tall">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox.mono">
+    <Setter Property="FontFamily" Value="{StaticResource Mono}" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+  <!-- a goal: about four lines, scrolling inside -->
+  <Style Selector="TextBox.goal">
+    <Setter Property="Height" Value="96" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+  </Style>
+  <Style Selector="Border.fgroup">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.legend">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="0.7" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="Border.fsep">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Border}" />
+  </Style>
+  <Style Selector="Border.lbox">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Axis}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusXs}" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="DockPanel > Button.icon">
+    <Setter Property="Margin" Value="6,0,0,0" />
+  </Style>
+  <Style Selector="Button.ladd">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Margin" Value="22,0,0,0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.ladd:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.ladd:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <!-- chips in a field: the field framed like an input (the accent outline while its input has the focus), each value
+       a pill on the accent wash in the monospace font with its × -->
+  <Style Selector="Border.tokens">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="6,4" />
+    <Setter Property="MinHeight" Value="38" />
+  </Style>
+  <Style Selector="Border.tokens:focus-within">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="TextBox.bare">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="MinWidth" Value="160" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="4,4" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+  <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement, TextBox.bare:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Border.tchip">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusPill}" />
+    <Setter Property="Padding" Value="10,0,2,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.tchip TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Mono}" />
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.tchipx">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="MinWidth" Value="24" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.tchipx:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tchipx:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Critical}" />
+  </Style>
+  <!-- a search's menu under its field (style.css .tpmenu): a raised card of options, the chosen ones washed -->
+  <Style Selector="Border.tpmenu">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource Shadow2}" />
+    <Setter Property="Padding" Value="4" />
+  </Style>
+  <Style Selector="Button.tpopt">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Button.tpopt:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tpopt:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.tpopt.on /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+  </Style>
+  <Style Selector="TextBlock.tpcheck">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
 </Styles>
