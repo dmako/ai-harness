@@ -225,7 +225,7 @@ UI, not a Markdown package.
 - **Why our own.** It has no reflection, so trimming and AOT stay clean, and it adds nothing to the bundle.
   Markdown.Avalonia and similar packages bring an HTML/CSS layer and reflection-based styling the docs do not need.
 - **When to revisit.** If the docs ever need more than this subset (images, nested lists, block quotes), extend this
-  parser first. Adopt a package only if it publishes without trim warnings and stays within the 6.0 MB budget.
+  parser first. Adopt a package only if it publishes without trim warnings and stays within the 10.0 MB budget.
 
 ## Follow-up blueprint
 

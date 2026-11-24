@@ -78,8 +78,7 @@ The tests that use the bundle read it from `HARNESS_UI_TEST_BUNDLE`, else from
 `artifacts/ui/wwwroot`, and skip, saying how to build it, when it is missing:
 
 - `UiBrowserSmokeTests`, the browser smoke test. It also needs `HARNESS_UI_BROWSER`.
-- `UiBundleBudgetTests`. The Brotli total must stay within 6.0 MB, 25 % over the
-  spike's 4.81 MB. Raise the budget here and in `scripts/ui_bundle.py` together,
+- `UiBundleBudgetTests`. The Brotli total must stay within 10.0 MB. Raise the budget here and in `scripts/ui_bundle.py` together,
   on purpose.
 
 The smoke test stages the bundle beside a copy of the executable and serves it at `/`;

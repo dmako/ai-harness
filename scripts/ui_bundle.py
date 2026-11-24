@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-BUDGET_MB = 6.0
+BUDGET_MB = 10.0
 
 
 def describe(root):

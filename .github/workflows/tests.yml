@@ -39,9 +39,6 @@ jobs:
             artifacts/tests
             artifacts/**/*.binlog
   ui:
-    # The Avalonia UI's WebAssembly bundle (TASK-0163): built once here with the wasm-tools workload (the solution
-    # build above does not need it), then its size budget, its headless view tests, the contract tests and the
-    # browser smoke test against it in Chrome.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
