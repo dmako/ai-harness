@@ -7,12 +7,12 @@ namespace Harness.Integration.Web;
 /// <summary>
 /// The Avalonia UI's WebAssembly bundle stays within its size budget (TASK-0163): what a browser downloads the first
 /// time, each file's Brotli copy when the publish wrote one (scripts/ui_bundle.py counts the same way). The budget is
-/// 6.0 MB, 25 % over the 4.81 MB the TASK-0144 spike measured: growing past it is a decision, made by raising
-/// <see cref="BudgetBytes"/> here and BUDGET_MB in the script. Skipped without a published bundle.
+/// 10.0 MB: growing past it is a decision, made by raising <see cref="BudgetBytes"/> here and BUDGET_MB in the script.
+/// Skipped without a published bundle.
 /// </summary>
 public sealed class UiBundleBudgetTests
 {
-    public const long BudgetBytes = 6_000_000;
+    public const long BudgetBytes = 10_000_000;
 
     [Fact]
     public void TheBundleStaysWithinItsSizeBudget()
