@@ -14,6 +14,12 @@ public sealed class UiStartup
 {
     public required Api.HarnessApi Api { get; init; }
     public required UiHostContext Host { get; init; }
+
+    /// <summary>
+    /// What must happen before the UI talks to its API (the desktop app: find or start harness ui). The window shows
+    /// what it reports meanwhile; a <see cref="Hosting.UiServerException"/> is shown in place of the UI.
+    /// </summary>
+    public Func<IProgress<string>, CancellationToken, Task>? Connect { get; init; }
 }
 
 /// <summary>harness ui's Avalonia application: resources, styles and the main view, the same for every host.</summary>
@@ -28,18 +34,17 @@ public sealed partial class App : Application
     {
         if (Startup is { } startup)
         {
-            var model = new MainViewModel(new UiServices(startup.Api, startup.Host));
-            var view = new MainView { DataContext = model };
+            var host = new ContentControl();
             switch (ApplicationLifetime)
             {
                 case ISingleViewApplicationLifetime single:
-                    single.MainView = view;
+                    single.MainView = host;
                     break;
                 case IClassicDesktopStyleApplicationLifetime desktop:
                     desktop.MainWindow = new Window
                     {
                         Title = "harness",
-                        Content = view,
+                        Content = host,
                         Width = 1280,
                         Height = 800,
 #pragma warning disable S1075 // Avalonia's assembly resource URI, not a machine-specific path.
@@ -50,8 +55,30 @@ public sealed partial class App : Application
                 default:
                     break;
             }
-            _ = model.StartAsync(CancellationToken.None);
+            _ = ShowAsync(startup, host);
         }
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Connects first when the host asks to (showing its progress, or why it failed), then shows the UI.</summary>
+    internal static async Task ShowAsync(UiStartup startup, ContentControl host)
+    {
+        if (startup.Connect is { } connect)
+        {
+            var status = new StartupView();
+            host.Content = status;
+            try
+            {
+                await connect(new Progress<string>(status.Report), CancellationToken.None);
+            }
+            catch (Hosting.UiServerException exception)
+            {
+                status.Fail(exception.Message);
+                return;
+            }
+        }
+        var model = new MainViewModel(new UiServices(startup.Api, startup.Host));
+        host.Content = new MainView { DataContext = model };
+        await model.StartAsync(CancellationToken.None);
     }
 }
