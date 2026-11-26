@@ -116,6 +116,42 @@ public sealed class SharedBehaviourTests
     });
 
     [Fact]
+    public Task ADialogShowsTheFocusRingOnlyWhenOpenedFromTheKeyboard() => Ui.RunAsync(async () =>
+    {
+        using var http = new HttpClient(new FixtureApi()) { BaseAddress = Ui.Server };
+        using var services = Ui.Services(http);
+        var layer = new DialogLayer { DataContext = services.Dialogs };
+        var window = Ui.Show(layer, 800, 600);
+        var accept = layer.FindControl<Button>("Accept")!;
+        FocusRing? Ring() => window.GetVisualDescendants().OfType<FocusRing>().FirstOrDefault();
+
+        // opened after a click: focused, but no ring (a browser's :focus-visible after a mouse click)
+        window.MouseDown(new Point(4, 4), MouseButton.Left);
+        window.MouseUp(new Point(4, 4), MouseButton.Left);
+        var clicked = services.Dialogs.ConfirmAsync(new ConfirmDialog { Title = "Approve?" });
+        await Ui.UntilAsync(() => window.FocusManager.GetFocusedElement() == accept);
+        accept.Classes.Should().NotContain(":focus-visible");
+        Ring().Should().BeNull();
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        (await clicked).Should().BeFalse();
+
+        // opened from the keyboard: the accent ring, 2 px outside the button and following its corners
+        window.KeyPress(Key.A, RawInputModifiers.None, PhysicalKey.A, "a");
+        var typed = services.Dialogs.ConfirmAsync(new ConfirmDialog { Title = "Approve?" });
+        await Ui.UntilAsync(() => window.FocusManager.GetFocusedElement() == accept && Ring() is not null);
+        accept.Classes.Should().Contain(":focus-visible");
+        var ring = Ring()!;
+        ring.TryFindResource("Accent", ring.ActualThemeVariant, out var accent).Should().BeTrue();
+        ring.BorderBrush.Should().Be(accent);
+        ring.BorderThickness.Should().Be(new Thickness(2));
+        ring.Margin.Should().Be(new Thickness(-4));
+        ring.CornerRadius.TopLeft.Should().Be(accept.CornerRadius.TopLeft + 4);
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        (await typed).Should().BeFalse();
+        window.Close();
+    });
+
+    [Fact]
     public Task PickerKeysDoNotSubmitOrCancelTheContainingDialog() => Ui.RunAsync(async () =>
     {
         using var http = new HttpClient(new FixtureApi()) { BaseAddress = Ui.Server };

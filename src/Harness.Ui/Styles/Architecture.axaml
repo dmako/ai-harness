@@ -287,9 +287,6 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
-  <Style Selector="ToggleButton.irow:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-  </Style>
   <Style Selector="ToggleButton.irow:disabled">
     <Setter Property="Opacity" Value="0.55" />
   </Style>

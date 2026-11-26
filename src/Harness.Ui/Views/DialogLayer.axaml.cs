@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -12,12 +13,36 @@ namespace Harness.Ui.Views;
 public sealed partial class DialogLayer : UserControl
 {
     private DialogService? _service;
+    private TopLevel? _top;
+
+    /// <summary>Whether the window's last input was a key (true) or the pointer (false).</summary>
+    private bool _keyboard;
 
     public DialogLayer()
     {
         InitializeComponent();
         AddHandler(KeyDownEvent, Keys, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _top = TopLevel.GetTopLevel(this);
+        _top?.AddHandler(KeyDownEvent, KeyInput, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        _top?.AddHandler(PointerPressedEvent, PointerInput, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        _top?.RemoveHandler(KeyDownEvent, KeyInput);
+        _top?.RemoveHandler(PointerPressedEvent, PointerInput);
+        _top = null;
+    }
+
+    private void KeyInput(object? sender, KeyEventArgs e) => _keyboard = true;
+
+    private void PointerInput(object? sender, PointerPressedEventArgs e) => _keyboard = false;
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -34,8 +59,10 @@ public sealed partial class DialogLayer : UserControl
             var evidence = _service.Current is EvidenceDialog;
             Accept.Classes.Set("evidence-close", evidence);
             // after the dialog is laid out: a detail that only closes (no Cancel, as app.js taskDialog) its Close; a form
-            // its first field, else the accept button
+            // its first field, else the accept button. As a browser's :focus-visible, the focus ring shows only when
+            // the dialog was opened from the keyboard, not after a click.
             var detail = !_service.Current.HasCancel;
+            var how = _keyboard && !evidence ? NavigationMethod.Tab : NavigationMethod.Unspecified;
             Dispatcher.UIThread.Post(
                 () =>
                     (
@@ -46,7 +73,7 @@ public sealed partial class DialogLayer : UserControl
                                     .OfType<Control>()
                                     .FirstOrDefault(c => c is TextBox or ComboBox or CheckBox && c.IsEffectivelyEnabled)
                         ) ?? Accept
-                    ).Focus(evidence ? NavigationMethod.Unspecified : NavigationMethod.Tab),
+                    ).Focus(how),
                 DispatcherPriority.Loaded
             );
         }

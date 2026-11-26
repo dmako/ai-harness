@@ -49,11 +49,7 @@
     <Setter Property="Background" Value="{DynamicResource Surface2}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
   </Style>
-  <Style Selector="ComboBox:focus-visible /template/ Border#Background">
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="BorderThickness" Value="2" />
-  </Style>
-  <!-- Fluent fills a focused ComboBox with its accent blue (Border#HighlightBackground): the accent outline above marks
+  <!-- Fluent fills a focused ComboBox with its accent blue (Border#HighlightBackground): the focus ring (Base.axaml) marks
        the focus instead, so the field keeps its fill and ink -->
   <Style Selector="ComboBox /template/ Border#HighlightBackground">
     <Setter Property="IsVisible" Value="False" />

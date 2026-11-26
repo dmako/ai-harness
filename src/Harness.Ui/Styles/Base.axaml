@@ -1,5 +1,19 @@
 <!-- Page-wide styles: the page itself, the header and the live state. Components are in their own files. -->
-<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <!-- keyboard focus (brand.css :focus-visible): the Accent ring 2 px outside a control, following its corners, in place
+       of Fluent's square white-and-black adorner -->
+  <Style Selector=":is(Control)">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <c:FocusRing BorderBrush="{DynamicResource Accent}" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+  <!-- a text field marks its focus with its own Accent border (style.css input:focus), not a ring around it -->
+  <Style Selector="TextBox">
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+  </Style>
   <Style Selector=":is(UserControl).page">
     <Setter Property="Background" Value="{DynamicResource Page}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />

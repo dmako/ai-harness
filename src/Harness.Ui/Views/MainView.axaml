@@ -34,10 +34,6 @@
       <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
-    <Style Selector="ToggleButton#Menu:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-      <Setter Property="BorderThickness" Value="2" />
-    </Style>
     <Style Selector=":is(UserControl).pointer-hover Border.trow Button.hover-remove, :is(UserControl).pointer-hover Border.bpcard Button.hover-remove">
       <Setter Property="Opacity" Value="0" />
     </Style>

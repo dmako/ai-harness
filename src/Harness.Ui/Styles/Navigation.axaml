@@ -97,10 +97,6 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
-  <Style Selector="ToggleButton:focus-visible /template/ ContentPresenter#PART_ContentPresenter, Button.tablink:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-    <Setter Property="BorderThickness" Value="2" />
-  </Style>
   <Style Selector="ToggleButton.tab:disabled, Button.tablink:disabled, ToggleButton.seg:disabled">
     <Setter Property="Opacity" Value="0.55" />
   </Style>

@@ -81,9 +81,6 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
-  <Style Selector="ToggleButton.chip:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-  </Style>
   <Style Selector="ToggleButton.chip:disabled">
     <Setter Property="Opacity" Value="0.55" />
   </Style>

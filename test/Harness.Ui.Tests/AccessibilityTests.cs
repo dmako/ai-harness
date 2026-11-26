@@ -1,7 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
-using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -30,7 +29,7 @@ public sealed class AccessibilityTests
     });
 
     [Fact]
-    public Task KeyboardFocusShowsAnAccentBorderOnTaskButtons() => Ui.RunAsync(async () =>
+    public Task KeyboardFocusShowsTheAccentRingOnTaskButtons() => Ui.RunAsync(async () =>
     {
         var (window, _, _) = await Ui.OpenMainAsync(1280, 800);
         Button? focused = null;
@@ -45,10 +44,14 @@ public sealed class AccessibilityTests
             }
         }
         focused.Should().NotBeNull();
-        var presenter = focused.GetVisualDescendants().OfType<ContentPresenter>()
-            .First(p => p.Name is "PART_ContentPresenter");
-        presenter.BorderThickness.Left.Should().Be(2);
-        presenter.BorderBrush.Should().NotBeNull();
+        // brand.css :focus-visible: an Accent outline 2 px outside the button, its corners following the button's
+        var ring = window.GetVisualDescendants().OfType<FocusRing>()
+            .Single(r => ReferenceEquals(AdornerLayer.GetAdornedElement(r), focused));
+        ring.TryFindResource("Accent", ring.ActualThemeVariant, out var accent).Should().BeTrue();
+        ring.BorderBrush.Should().Be(accent);
+        ring.BorderThickness.Left.Should().Be(2);
+        ring.Margin.Left.Should().Be(-4);
+        ring.Bounds.Width.Should().BeApproximately(focused.Bounds.Width + 8, 0.5);
     });
 
     [Theory]

@@ -292,9 +292,6 @@
   <Style Selector="ListBox.swatches ListBoxItem.bp-purple:selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource Bp.purple}" />
   </Style>
-  <Style Selector="ListBox.seg ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-  </Style>
   <Style Selector="ListBox.seg ListBoxItem:disabled">
     <Setter Property="Opacity" Value="0.55" />
   </Style>
