@@ -427,7 +427,9 @@ public sealed class WorkViewTests
             {"status":"idle","alive":true,"events":[{"seq":1,"event":"text","text":"first"}]}
             """;
         api.Delays[Root + "/agents/host1234/log"] = TimeSpan.FromMilliseconds(250);
-        var (_, _, model) = await OpenAsync("tasks", api);
+        // test live timings: with the real 3 s reconnect the replay after Drop() left too little of UntilAsync's 5 s
+        // on a slow runner (failed on macos-15)
+        var (_, _, model) = await OpenAsync("tasks", api, fastLive: true);
         _ = Work(model).Plan.OpenTaskCommand.ExecuteAsync("TASK-0001");
         var dialog = await DialogAsync<TaskDialog>(model);
         await dialog.Loaded;
@@ -788,10 +790,11 @@ public sealed class WorkViewTests
         string section,
         FixtureApi? api = null,
         int width = 1280,
-        int height = 800
+        int height = 800,
+        bool fastLive = false
     )
     {
-        var opened = await Ui.OpenMainAsync(width, height, api: api, address: $"#/p/prj_fixture/work/{section}");
+        var opened = await Ui.OpenMainAsync(width, height, api: api, fastLive: fastLive, address: $"#/p/prj_fixture/work/{section}");
         await Ui.UntilAsync(() =>
             opened.Model.Page is ProjectPage { Body: WorkViewModel { Plan.HasContent: true, Inbox.HasContent: true } }
         );
