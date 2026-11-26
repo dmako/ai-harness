@@ -177,7 +177,57 @@
                           <TextBlock Classes="hint" TextWrapping="Wrap"
                                      Text="Counts of what the provider found in the code: a check that it indexed the project, not the architecture. Loading starts it." />
                           <Button Content="Load" AutomationProperties.Name="Load" Command="{Binding LoadIndexCommand}" HorizontalAlignment="Left" />
-                          <SelectableTextBlock Classes="small mono" Text="{Binding Indexed}" TextWrapping="Wrap" />
+                          <!-- app.js indexedSection: the notes, the provider's errors, its counts as bars and the whole
+                               summary under Raw -->
+                          <TextBlock Name="IndexNote" Classes.empty="{Binding !IndexFailed}" Classes.error="{Binding IndexFailed}" Text="{Binding IndexNote}"
+                                     IsVisible="{Binding HasIndexNote}" TextWrapping="Wrap" />
+                          <ItemsControl ItemsSource="{Binding IndexNotes}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String"><TextBlock Classes="detail" Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <ItemsControl ItemsSource="{Binding IndexErrors}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String"><TextBlock Classes="error" Text="{Binding}" /></DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <ItemsControl Name="IndexBars" ItemsSource="{Binding IndexBars}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><c:AutoGrid MinColumnWidth="320" Spacing="16" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:OverviewBars">
+                                <StackPanel Spacing="6">
+                                  <TextBlock Classes="obtitle" Text="{Binding Title}" />
+                                  <Border Classes="card obars" Grid.IsSharedSizeScope="True">
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                      <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                                      </ItemsControl.ItemsPanel>
+                                      <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:OverviewBar">
+                                          <Grid ColumnSpacing="14">
+                                            <Grid.ColumnDefinitions>
+                                              <ColumnDefinition Width="Auto" SharedSizeGroup="kind" MinWidth="80" />
+                                              <ColumnDefinition Width="*" />
+                                              <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Classes="obkind" Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                                            <c:Meter Grid.Column="1" Classes="obmeter" Value="{Binding Ratio}" BrushKey="Accent" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Classes="obnum" Text="{Binding CountText}" />
+                                          </Grid>
+                                        </DataTemplate>
+                                      </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                  </Border>
+                                </StackPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <StackPanel Spacing="2" IsVisible="{Binding HasIndexTree}">
+                            <ToggleButton Name="IndexRaw" Classes="cut" Content="Raw" AutomationProperties.Name="Raw" />
+                            <ContentControl Name="IndexTree" Content="{Binding IndexTree}" IsVisible="{Binding #IndexRaw.IsChecked}" />
+                          </StackPanel>
                         </StackPanel>
                       </Expander>
                       <StackPanel Spacing="4" IsVisible="{Binding IsGraphify}">
@@ -306,4 +356,50 @@
       </Border>
     </DataTemplate>
   </UserControl.Resources>
+
+  <!-- a provider summary's Raw tree (app.js tree(), style.css .kv, .tree): an object's keys in a muted column with their
+       values beside them, a list as bullets with "… N more", a value deeper than three levels as compact JSON -->
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:TreeText">
+      <SelectableTextBlock Classes="tvalue" Classes.muted="{Binding Muted}" Classes.mono="{Binding Code}" Classes.small="{Binding Code}"
+                           Text="{Binding Text}" TextWrapping="Wrap" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:TreeList">
+      <StackPanel Spacing="2">
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TreeValue">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Classes="tbullet" Text="•" />
+                <ContentControl Content="{Binding}" />
+              </DockPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <DockPanel IsVisible="{Binding HasMore}">
+          <TextBlock DockPanel.Dock="Left" Classes="tbullet" Text="•" />
+          <TextBlock Classes="muted tvalue" Text="{Binding More}" />
+        </DockPanel>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:TreeObject">
+      <ItemsControl ItemsSource="{Binding Entries}" Grid.IsSharedSizeScope="True">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TreeEntry">
+            <Grid ColumnSpacing="14">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="key" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Classes="tkey" Text="{Binding Key}" />
+              <ContentControl Grid.Column="1" Content="{Binding Value}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DataTemplate>
+  </UserControl.DataTemplates>
 </UserControl>

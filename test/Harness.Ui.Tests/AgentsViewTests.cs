@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -181,7 +182,70 @@ public sealed class AgentsViewTests
         await graphify.LoadIndexCommand.ExecuteAsync(null);
 
         api.UiGets.Should().Contain(Root + "/architecture");
-        graphify.Indexed.Should().Be("symbols: class 12, method 80");
+        graphify.HasIndexNote.Should().BeFalse();
+        var bars = graphify.IndexBars.Should().ContainSingle().Subject;
+        bars.Title.Should().Be("symbols");
+        bars.Items.Should().Equal(new OverviewBar("class", 12, 12 / 80.0), new OverviewBar("method", 80, 1));
+        graphify.IndexTree.Should().BeOfType<TreeObject>().Which.Entries.Select(e => e.Key).Should().Equal("symbols", "version");
+    });
+
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(1280, true)]
+    public Task WhatAProviderHasIndexedShowsBarsAndARawTree(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Answers[Root + "/providers"] = Providers;
+        var labels = string.Join(",", Enumerable.Range(1, 22).Select(i => $"[\"Kind_{i}\",{100 - i}]"));
+        api.Answers[Root + "/architecture"] = $$$$$"""
+            {"stale":"Indexed before the last sync.","withheld":["graphify-csharp"],"errors":["graphify-csharp: arch.layers timed out","ripwire: other"],
+             "structure":{"graphify-csharp":{
+               "project":"C-repos-fixture","aspects_hint":"Summary view \u2014 \"all\" for everything","total_nodes":21897,"empty":[],"missing":null,
+               "node_labels":{"cols":["label","count"],"rows":[{{{{{labels}}}}}]},
+               "edge_types":{"cols":["type","count"],"rows":[["CALLS",21356],["USAGE",45041]]},
+               "packages":{"cols":["name","nodes","fan_in"],"rows":[["Harness",8670,0]]}}}}
+            """;
+        var (window, _, model) = await OpenAsync("agents/tools", api, width);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var graphify = Agents(model).Tools.Used.Single();
+        var expander = window.GetVisualDescendants().OfType<Expander>().Single(e => e.Header is "What it has indexed");
+        expander.IsExpanded = true;
+
+        await graphify.LoadIndexCommand.ExecuteAsync(null);
+        Ui.Settle();
+
+        graphify.IndexNotes.Should().Equal("Indexed before the last sync.", "Withheld until the next sync (index from another branch).");
+        graphify.IndexErrors.Should().Equal("graphify-csharp: arch.layers timed out");
+        graphify.IndexBars.Select(b => b.Title).Should().Equal("Things in the code", "Relations in the code");
+        var things = graphify.IndexBars[0].Items;
+        things.Should().HaveCount(12);
+        things[0].Should().Be(new OverviewBar("kind 1", 99, 1));
+        graphify.IndexBars[1].Items.Select(i => (i.Name, i.CountText)).Should().Equal(("calls", "21,356"), ("usage", "45,041"));
+
+        var tree = graphify.IndexTree.Should().BeOfType<TreeObject>().Subject;
+        tree.Entries.Select(e => e.Key).Should().Equal("project", "aspects_hint", "total_nodes", "empty", "missing", "node_labels", "edge_types", "packages");
+        tree.Entries[1].Value.Should().Be(new TreeText("Summary view — \"all\" for everything"));
+        tree.Entries[3].Value.Should().Be(new TreeText("none", Muted: true));
+        tree.Entries[4].Value.Should().Be(new TreeText("—", Muted: true));
+        var rows = ((TreeObject)tree.Entries[5].Value).Entries.Single(e => e.Key is "rows").Value.Should().BeOfType<TreeList>().Subject;
+        rows.Items.Should().HaveCount(20);
+        rows.Items[0].Should().Be(new TreeText("[\"Kind_1\",99]", Code: true));
+        rows.More.Should().Be("… 2 more");
+
+        // the bars show, the tree waits under Raw
+        var card = expander.GetVisualDescendants();
+        card.OfType<ItemsControl>().Single(c => c.Name == "IndexBars").IsEffectivelyVisible.Should().BeTrue();
+        card.OfType<Meter>().Should().HaveCount(14);
+        var tree0 = card.OfType<ContentControl>().Single(c => c.Name == "IndexTree");
+        tree0.IsVisible.Should().BeFalse();
+        card.OfType<ToggleButton>().Single(b => b.Name == "IndexRaw").IsChecked = true;
+        Ui.Settle();
+        tree0.IsEffectivelyVisible.Should().BeTrue();
+        tree0.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("tkey")).Select(t => t.Text)
+            .Should().Contain(["project", "node_labels", "cols", "rows"]);
+        tree0.GetVisualDescendants().OfType<TextBlock>().Should().Contain(t => t.Text == "… 2 more");
+        UiChecks.Check(window).Should().BeEmpty();
+        window.Close();
     });
 
     [Fact]

@@ -269,26 +269,82 @@ public sealed partial class ProviderCard(ProviderInfo info, int days, UiServices
     public bool HasCheck => Info.Check is { Level: not "ok" };
     public bool CanIndex => (Info.Capabilities ?? []).Any(c => c.Capability is "project.overview");
 
+    /// <summary>While loading, or what instead of an overview ("It returned no overview.", the error).</summary>
     [ObservableProperty]
-    public partial string? Indexed { get; private set; }
+    [NotifyPropertyChangedFor(nameof(HasIndexNote))]
+    public partial string? IndexNote { get; private set; }
+
+    public bool HasIndexNote => IndexNote is not null;
+
+    /// <summary>Whether <see cref="IndexNote"/> is an error (else a muted note).</summary>
+    [ObservableProperty]
+    public partial bool IndexFailed { get; private set; }
+
+    /// <summary>The architecture view's notes about it: stale, withheld until the next sync, the provider's errors.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<string> IndexNotes { get; private set; } = [];
+
+    [ObservableProperty]
+    public partial IReadOnlyList<string> IndexErrors { get; private set; } = [];
+
+    /// <summary>Its lists of counts by kind as bars (app.js overviewBars).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<OverviewBars> IndexBars { get; private set; } = [];
+
+    /// <summary>The whole summary as keys and values (app.js tree()), under Raw.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasIndexTree))]
+    public partial TreeValue? IndexTree { get; private set; }
+
+    public bool HasIndexTree => IndexTree is not null;
 
     /// <summary>What the provider has indexed (app.js indexedSection): its project overview, asked on request.</summary>
     [RelayCommand]
     private async Task LoadIndexAsync()
     {
-        Indexed = "Asking the provider (starts it; can take a while)…";
+        IndexFailed = false;
+        IndexNote = "Asking the provider (starts it; can take a while)…";
+        IndexNotes = [];
+        IndexErrors = [];
+        IndexBars = [];
+        IndexTree = null;
         try
         {
             var a = await services.Api.ArchitectureRawAsync(projectId, CancellationToken.None);
-            Indexed = a.TryGetProperty("structure", out var structure) && structure.ValueKind is JsonValueKind.Object && structure.TryGetProperty(Info.Name, out var mine)
-                ? Counts(mine)
-                : "It returned no overview.";
+            var notes = new List<string>();
+            if (a.TryGetProperty("stale", out var stale) && stale.ValueKind is JsonValueKind.String && stale.GetString() is { Length: > 0 } staleNote)
+            {
+                notes.Add(staleNote);
+            }
+            if (Strings(a, "withheld").Contains(Info.Name))
+            {
+                notes.Add("Withheld until the next sync (index from another branch).");
+            }
+            IndexNotes = notes;
+            IndexErrors = [.. Strings(a, "errors").Where(e => e.Contains(Info.Name, StringComparison.Ordinal))];
+            if (a.TryGetProperty("structure", out var structure) && structure.ValueKind is JsonValueKind.Object && structure.TryGetProperty(Info.Name, out var mine)
+                && mine.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
+            {
+                IndexBars = ProviderOverview.Bars(mine);
+                IndexTree = ProviderOverview.Tree(mine);
+                IndexNote = null;
+            }
+            else
+            {
+                IndexNote = "It returned no overview.";
+            }
         }
         catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
         {
-            Indexed = exception.Message;
+            IndexFailed = true;
+            IndexNote = exception.Message;
         }
     }
+
+    private static IEnumerable<string> Strings(JsonElement answer, string name) =>
+        answer.TryGetProperty(name, out var list) && list.ValueKind is JsonValueKind.Array
+            ? list.EnumerateArray().Where(e => e.ValueKind is JsonValueKind.String).Select(e => e.GetString()!)
+            : [];
 
     /// <summary>The fix for its check, shown first like Health's (it writes the project's configuration).</summary>
     [RelayCommand]
@@ -299,39 +355,6 @@ public sealed partial class ProviderCard(ProviderInfo info, int days, UiServices
     }
 
     private static string Short(string capability) => capability.StartsWith("code.", StringComparison.Ordinal) ? capability[5..] : capability;
-
-    /// <summary>The overview's lists of counts by kind, one line each; anything else as its JSON.</summary>
-    private static string Counts(JsonElement summary)
-    {
-        var lines = new List<string>();
-        if (summary.ValueKind is JsonValueKind.Object)
-        {
-            foreach (var list in summary.EnumerateObject().Where(p => p.Value.ValueKind is JsonValueKind.Array))
-            {
-                var items = list.Value.EnumerateArray()
-                    .Where(x => x.ValueKind is JsonValueKind.Object && x.TryGetProperty("count", out var n) && n.ValueKind is JsonValueKind.Number)
-                    .Select(x => $"{Label(x)} {x.GetProperty("count").GetInt32().ToString(CultureInfo.InvariantCulture)}")
-                    .ToArray();
-                if (items.Length > 0)
-                {
-                    lines.Add($"{list.Name}: {string.Join(", ", items)}");
-                }
-            }
-        }
-        return lines.Count > 0 ? string.Join("\n", lines) : summary.GetRawText();
-    }
-
-    private static string Label(JsonElement item)
-    {
-        foreach (var name in new[] { "type", "label", "name" })
-        {
-            if (item.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.String)
-            {
-                return value.GetString()!;
-            }
-        }
-        return "?";
-    }
 }
 
 /// <summary>A provider not used here: why (disabled, or serving other languages).</summary>

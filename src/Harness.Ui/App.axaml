@@ -30,6 +30,7 @@
     <StyleInclude Source="avares://Harness.Ui/Styles/Work.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Knowledge.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Architecture.axaml" />
+    <StyleInclude Source="avares://Harness.Ui/Styles/Agents.axaml" />
     <StyleInclude Source="avares://Harness.Ui/Styles/Health.axaml" />
   </Application.Styles>
 </Application>

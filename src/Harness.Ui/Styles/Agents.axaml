@@ -1,0 +1,64 @@
+<!-- Agents › Tools & providers: what a provider has indexed (app.js indexedSection, overviewBars, tree; style.css .obars,
+     .bars, .meter, .kv, .tree, details.cut) -->
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Harness.Ui.Controls">
+  <!-- a note about the overview (stale, withheld) -->
+  <Style Selector="TextBlock.detail">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+
+  <!-- a list of counts by kind: its title, then a card of kind, bar and count rows -->
+  <Style Selector="TextBlock.obtitle">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="Border.card.obars">
+    <Setter Property="Padding" Value="14,12" />
+  </Style>
+  <Style Selector="TextBlock.obkind">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="c|Meter.obmeter">
+    <Setter Property="Height" Value="8" />
+  </Style>
+  <Style Selector="TextBlock.obnum">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Raw: a quiet disclosure, muted small text that opens the tree under it -->
+  <Style Selector="ToggleButton.cut">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="ToggleButton.cut:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.cut:pressed /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.cut:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+
+  <!-- the tree: muted keys in a column, values beside them, lists as bullets -->
+  <Style Selector="TextBlock.tkey">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="SelectableTextBlock.tvalue, TextBlock.tvalue">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+  </Style>
+  <Style Selector="SelectableTextBlock.tvalue.small">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+  </Style>
+  <Style Selector="TextBlock.tbullet">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+  </Style>
+</Styles>
