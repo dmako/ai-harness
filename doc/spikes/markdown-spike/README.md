@@ -1,6 +1,15 @@
-# Streaming Markdown renderer comparison (TASK-0205)
+# Spike: a streaming Markdown renderer for the Avalonia UI? (TASK-0205)
 
-Tested 19 November 2026 against .NET SDK 11.0.100, Avalonia 12.1.6, and the repository's SkiaSharp 4.156.0 / HarfBuzzSharp 14.4.0.100 pins. The candidate versions are LiveMarkdown.Avalonia 2.7.0 and MarkView.Avalonia 12.4.1. Production still uses `MarkdownBlock`; this spike changes no production renderer.
+**Recommendation: try MarkView first, but adopt neither package yet.** Harness kept its own `MarkdownBlock` while the
+spike ran; it changed no production renderer.
+
+**What came of it:** harness adopted MarkView with its Mermaid extension for documentation and knowledge (TASK-0206,
+commit `8d18442`); syntax highlighting is deferred. See [Integration follow-up](#integration-follow-up-task-0206).
+
+The question: which Avalonia Markdown viewer should replace `MarkdownBlock`, with GitHub-flavoured Markdown, streaming
+updates, Unicode and emoji, Mermaid, and a working WebAssembly (browser) publish on .NET 11? The candidates were
+LiveMarkdown.Avalonia 2.7.0 and MarkView.Avalonia 12.4.1. How it was measured, and the commands to rerun it, are in
+[measurements.md](measurements.md).
 
 ## Recommendation
 
@@ -18,23 +27,6 @@ Investigate MarkView first for a replacement, but do not adopt either package ye
 | Maintenance | One named upstream maintainer; [repository and release history](https://github.com/DearVa/LiveMarkdown.Avalonia/releases) show active development. | One named upstream maintainer; [repository and release history](https://github.com/Kryptos-FR/MarkView.Avalonia/releases) show active development. Both are smaller third-party projects; release activity is not a support guarantee. |
 
 Feature descriptions are based on the pinned packages' bundled README and manifests, and the upstream [LiveMarkdown README](https://github.com/DearVa/LiveMarkdown.Avalonia/blob/05203e511542059a9e4eb1b1421093d0db2fb44e/README.md) and [MarkView README](https://github.com/Kryptos-FR/MarkView.Avalonia/blob/790cbc20145c6ceb52b25b3d98acd1f163e6b152/README.md). Upstream descriptions are not independent proof of visual correctness or complete GFM conformance.
-
-## Reproducible proof of concept
-
-The two hosts use the same `Shared.cs` and sample: headings, an emoji, emphasis, a link, a table, a task list and a code fence. `Candidate=baseline` instantiates the existing `Harness.Ui.Controls.MarkdownBlock`; `live` and `markview` instantiate the respective package. Styles are included in compiled XAML. Each host references the same Harness.Ui project and uses the same native-library pins. The sample exercises construction, not streaming or exhaustive syntax conformance. The extra reference to Harness.Ui is trimmed on publish; results describe this **small host**, not an exact whole-product delta. No Mermaid, math or optional syntax-highlighting packages were added.
-
-Use a fresh output directory for each run, with the repository SDK and wasm-tools installed. From the repository root in PowerShell:
-
-```powershell
-foreach ($candidate in @('baseline', 'live', 'markview')) {
-  dotnet restore doc/spikes/markdown-comparison/Desktop/Desktop.csproj -p:Candidate=$candidate -p:RuntimeIdentifier=win-x64 -p:PublishAot=true
-  dotnet publish doc/spikes/markdown-comparison/Desktop/Desktop.csproj -c Release -r win-x64 -p:Candidate=$candidate -p:PublishAot=true --no-restore -o "artifacts/markdown-comparison/aot-$candidate" -m:1 -nodeReuse:false
-  dotnet restore doc/spikes/markdown-comparison/Browser/Browser.csproj -p:Candidate=$candidate
-  dotnet publish doc/spikes/markdown-comparison/Browser/Browser.csproj -c Release -p:Candidate=$candidate --no-restore -o "artifacts/markdown-comparison/browser-$candidate" -m:1 -nodeReuse:false
-}
-```
-
-The loop intentionally continues to the next candidate if one publish fails; inspect each exit code and output. Native size is the sum of published files recursively excluding `.pdb`; executable size is reported separately. Browser size below sums all `.br` files under published `wwwroot`: this is a compressed artifact-set comparison, not a measurement of a browser's first-load requests. These totals exclude uncompressed-only files and optional extensions. Published directories may contain multiple encodings; do not sum them together as a download.
 
 ## Build results and limits
 

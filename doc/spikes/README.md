@@ -3,7 +3,8 @@
 A spike measures one question before harness commits to an answer: a library, an engine or a framework, tried
 against harness's real workload. Each folder here keeps a spike's write-up, how it was measured, and the raw output of
 its runs. The spikes' code was removed in TASK-0119; it is in the Git history up to commit `a3e435a` under
-`benchmarks/<spike>/`.
+`benchmarks/<spike>/`. The Markdown renderers spike's code was removed in TASK-0213; it is in the Git history up to
+commit `cb74345` under `doc/spikes/markdown-comparison/`.
 
 | Spike | What it measured | Decision |
 | --- | --- | --- |
@@ -11,6 +12,7 @@ its runs. The spikes' code was removed in TASK-0119; it is in the Git history up
 | [LiteDB](litedb-spike/README.md) (TASK-0110) | LiteDB 5 against SQLite on a real `harness.db`: hot-operation speed, several processes writing at once, Native AOT cleanliness and executable size | Stay on SQLite |
 | [Microsoft.Extensions.AI](meai-spike/README.md) (TASK-0111) | MCP tool calls through `AIFunction` and M.E.AI middleware against harness's provider path: latency, allocations, AOT size and composition | Not in the provider layer; use `IChatClient`/`IEmbeddingGenerator` only for a future model-backed provider |
 | [Microsoft Agent Framework sessions](maf-spike/README.md) (TASK-0112) | agent sessions per task through ClaudeCodeSdk.MAF and CodexSdk.MAF: session identity and resume, cancel and pause, usage and cost, Native AOT | Do not adopt MAF; use hooks, transcripts and harness's own runner over the CLIs' stdio protocols |
+| [Markdown renderers](markdown-spike/README.md) (TASK-0205) | LiveMarkdown.Avalonia against MarkView.Avalonia for the Avalonia UI's Markdown: GFM, streaming, Unicode, Mermaid, licences, Native AOT and browser publish size against harness's own `MarkdownBlock` | Try MarkView first; LiveMarkdown's browser publish fails on .NET 11. MarkView with Mermaid was then integrated (TASK-0206), syntax highlighting deferred |
 
 Each spike folder holds:
 

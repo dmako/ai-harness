@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
-  <PropertyGroup><TargetFramework>net11.0-browser</TargetFramework><OutputType>Exe</OutputType><StaticWebAssetsEnabled>true</StaticWebAssetsEnabled><CompressionEnabled>true</CompressionEnabled></PropertyGroup>
-  <Import Project="../Common.props" />
-  <ItemGroup>
-    <PackageReference Include="Avalonia.Browser" Version="12.1.6" />
-    <PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" Version="4.156.0" />
-    <PackageReference Include="HarfBuzzSharp.NativeAssets.WebAssembly" Version="14.4.0.100" />
-  </ItemGroup>
-</Project>

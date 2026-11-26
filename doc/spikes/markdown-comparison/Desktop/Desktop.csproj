@@ -1,5 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net11.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup>
-  <Import Project="../Common.props" />
-  <ItemGroup><PackageReference Include="Avalonia.Desktop" Version="12.1.6" /></ItemGroup>
-</Project>
