@@ -24,7 +24,19 @@ import ui_bundle as bundle_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 RIDS = {"win-x64": ("windows", "amd64"), "linux-x64": ("linux", "amd64"), "linux-arm64": ("linux", "arm64"), "osx-arm64": ("darwin", "arm64")}
-PRODUCTS = {"Cli": "harness", "Graphify": "harness-graphify", "Agents": "harness-agents", "Collect": "harness-collect", "Share": "harness-share"}
+PRODUCTS = {"Cli": "harness", "Graphify": "harness-graphify", "Agents": "harness-agents", "Collect": "harness-collect", "Share": "harness-share", "Ui.Desktop": "harness-ui-app"}
+# Each archive group: its projects, the folder under the output and the archive name's prefix.
+GROUPS = {"main": (("Cli", "Graphify", "Agents"), "", "harness-"), "developer": (("Collect", "Share"), "developer-tools", "harness-"), "app": (("Ui.Desktop",), "ui-app", "harness-ui-app-")}
+# Native libraries an executable loads from its own folder: SQLite for the CLI tools; Skia, HarfBuzz, ANGLE (Windows)
+# and Avalonia's macOS backend for the desktop app.
+NATIVE_LIBRARIES = {prefix + stem + suffix for stem in ("e_sqlite3", "SkiaSharp", "HarfBuzzSharp", "AvaloniaNative") for prefix, suffix in (("", ".dll"), ("lib", ".dll"), ("lib", ".so"), ("lib", ".dylib"))} | {"av_libglesv2.dll"}
+# Native AOT compiler messages that were checked and do not affect the release; any other one fails the app's publish.
+# Avalonia.Win32's MicroCom vtables for *implementing* IDCompositionDevice in managed code (never done: Avalonia only
+# calls the system's DirectComposition through its proxies) cannot be [UnmanagedCallersOnly] with a bool parameter.
+KNOWN_AOT_MESSAGES = {
+    "Avalonia.Win32.DComposition.Impl.__MicroComIDCompositionDeviceVTable.CreateTargetForHwnd(void*,native int,bool,void**)",
+    "Avalonia.Win32.DComposition.Impl.__MicroComIDCompositionDesktopDeviceVTable.CreateTargetForHwnd(void*,native int,bool,void**)",
+}
 
 
 def host_rid():
@@ -34,10 +46,22 @@ def host_rid():
 
 
 def native_dependencies(directory):
-    # Native AOT executables load SQLite alongside the executable. The managed
+    # Native AOT executables load their native libraries alongside the executable. The managed
     # single-file bundle extractor is not part of a Native AOT deployment.
-    return sorted(path for path in directory.iterdir()
-                  if path.name in ("e_sqlite3.dll", "libe_sqlite3.so", "libe_sqlite3.dylib"))
+    return sorted(path for path in directory.iterdir() if path.name in NATIVE_LIBRARIES)
+
+
+def aot_messages(log):
+    """Trim and Native AOT warnings in a publish log that are not known to be harmless."""
+    found = set()
+    for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+        method = re.search(r"ILC: Method '\[[^\]]+\]([^']+)' will always throw", line)
+        if method:
+            if method.group(1) not in KNOWN_AOT_MESSAGES:
+                found.add(line.strip())
+        elif re.search(r"warning IL\d{4}", line):
+            found.add(line.strip())
+    return sorted(found)
 
 
 def git(*args):
@@ -133,9 +157,9 @@ def main():
     source_files = git("ls-files", "--cached", "--others", "--exclude-standard").splitlines()
     source_files = [name for name in source_files if name.split("/")[0] in ("src", "configuration", "scripts") or name in ("global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "NuGet.config", ".editorconfig", "LICENSE", "doc/third-party-notices/unicode-BSD.txt", "README.md")]
     source_hashes = {name: sha(ROOT / name) for name in source_files if (ROOT / name).is_file()}
-    manifest = {"schema": 1, "version": a.version, "commit": commit, "modified": modified, "source_date_epoch": epoch, "sdk": subprocess.check_output(["dotnet", "--version"], cwd=ROOT, env=environment).decode().strip(), "build_directory": build.relative_to(ROOT).as_posix(), "self_contained": True, "single_file": False, "trimmed": True, "native_aot": True, "source_sha256": source_hashes, "companion_policy": "Main archives contain harness, harness-graphify and harness-agents. Optional collect/share developer archives are separate and never installed by harness. Native SQLite libraries must stay beside their executables.", "repository_license_declaration": "MIT", "artifacts": []}
+    manifest = {"schema": 1, "version": a.version, "commit": commit, "modified": modified, "source_date_epoch": epoch, "sdk": subprocess.check_output(["dotnet", "--version"], cwd=ROOT, env=environment).decode().strip(), "build_directory": build.relative_to(ROOT).as_posix(), "self_contained": True, "single_file": False, "trimmed": True, "native_aot": True, "source_sha256": source_hashes, "companion_policy": "Main archives contain harness, harness-graphify and harness-agents. Optional collect/share developer archives are separate and never installed by harness. The ui-app archive holds the native desktop UI, harness-ui-app, which needs harness beside it or on PATH and is never installed by harness. Native libraries (SQLite; Skia, HarfBuzz, ANGLE and Avalonia's for the app) must stay beside their executables.", "repository_license_declaration": "MIT", "artifacts": []}
     manifest["ui_bundle"] = dict(ui_bundle, shipped=True, storage="embedded-brotli-when-available")
-    notes = "# Harness " + a.version + "\n\nTrimmed Native AOT binaries targeting .NET 11. Keep the included native SQLite library beside the executables. The browser UI is embedded in harness. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools. See the included README.md for distribution dependencies (including libssl3t64 where applicable) and explicit trust steps for unsigned macOS downloads.\n\nMain archives: harness + harness-graphify + harness-agents. Developer archives: harness-collect + harness-share, not installed with the main CLI.\n\nCross-compilation does not imply native qualification. See doc/releases.md and the validation receipt for host/architecture execution status. Trimming and Native AOT are enabled; release archives contain native executables and the SQLite sidecar.\n"
+    notes = "# Harness " + a.version + "\n\nTrimmed Native AOT binaries targeting .NET 11. Keep the included native SQLite library beside the executables. The browser UI is embedded in harness. No preinstalled .NET, Node or Python is required by the core. Linux still needs supported OS native dependencies, including OpenSSL 3. Git is needed for sync/history; semantic providers remain optional external tools. See the included README.md for distribution dependencies (including libssl3t64 where applicable) and explicit trust steps for unsigned macOS downloads.\n\nMain archives: harness + harness-graphify + harness-agents. Developer archives: harness-collect + harness-share, not installed with the main CLI. Desktop app archives (harness-ui-app-*): harness ui in a native window, harness-ui-app; it uses a running harness ui or starts one with the harness found beside it or on PATH, so install the main archive too, and keep its Skia/HarfBuzz (ANGLE on Windows, Avalonia on macOS) libraries beside it. On Linux it needs a desktop session (X11 or XWayland) with fontconfig, libICE and libSM.\n\nCross-compilation does not imply native qualification. See doc/releases.md and the validation receipt for host/architecture execution status. Trimming and Native AOT are enabled; release archives contain native executables and the SQLite sidecar.\n"
     (output / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
     for rid in a.rids:
         stage = build / rid
@@ -151,6 +175,8 @@ def main():
             execute([*restore, "-bl:" + str(build / (rid + "-" + project + "-restore-" + uuid.uuid4().hex + ".binlog"))], build / (rid + "-" + project + "-restore.log"), environment)
             destination = stage / project
             execute(["dotnet", "publish", str(csproj), "--no-restore", *properties, "-o", str(destination), "-bl:" + str(build / (rid + "-" + project + "-publish-" + uuid.uuid4().hex + ".binlog"))], build / (rid + "-" + project + "-publish.log"), environment)
+            if project == "Ui.Desktop" and (unknown := aot_messages(build / (rid + "-" + project + "-publish.log"))):
+                raise ValueError("Unqualified trim/Native AOT warnings in " + executable + ":\n" + "\n".join(unknown))
             binary = destination / (executable + (".exe" if rid.startswith("win-") else ""))
             if not binary.is_file():
                 raise ValueError("Missing Native AOT executable")
@@ -169,7 +195,7 @@ def main():
             license_stage = stage / (project + "-licenses")
             entries = inventory(deps, packages, license_stage / "LICENSES")
             binaries[project] = (binary, entries, license_stage)
-        for group, projects in (("main", ("Cli", "Graphify", "Agents")), ("developer", ("Collect", "Share"))):
+        for group, (projects, folder, prefix) in GROUPS.items():
             tree = stage / (group + "-archive")
             tree.mkdir()
             licenses = {}
@@ -191,8 +217,8 @@ def main():
             write_json(tree / "THIRD_PARTY_NOTICES.json", sorted(licenses.values(), key=lambda e: e["package"]))
             write_json(tree / "BUILD.json", {k: v for k, v in manifest.items() if k not in ("artifacts", "build_directory")})
             osname, arch = RIDS[rid]
-            filename = "harness-" + a.version + "-" + osname + "-" + arch + (".zip" if osname == "windows" else ".tar.gz")
-            target = output / ("developer-tools" if group == "developer" else "") / filename
+            filename = prefix + a.version + "-" + osname + "-" + arch + (".zip" if osname == "windows" else ".tar.gz")
+            target = output / folder / filename
             target.parent.mkdir(parents=True, exist_ok=True)
             archive(tree, target, epoch, osname == "windows")
             manifest["artifacts"].append({"rid": rid, "group": group, "file": target.relative_to(output).as_posix(), "bytes": target.stat().st_size, "sha256": sha(target), "binaries": [{"file": binaries[project][0].name, "bytes": binaries[project][0].stat().st_size, "sha256": sha(binaries[project][0]), "repeat_publish_verified": a.verify_repeat} for project in projects], "licenses": [{"package": e["package"], "version": e["version"], "license_type": e["license_type"], "license": e["license"]} for e in sorted(licenses.values(), key=lambda e: e["package"]) ]})

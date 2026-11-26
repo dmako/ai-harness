@@ -20,6 +20,12 @@ public sealed class UiStartup
     /// what it reports meanwhile; a <see cref="Hosting.UiServerException"/> is shown in place of the UI.
     /// </summary>
     public Func<IProgress<string>, CancellationToken, Task>? Connect { get; init; }
+
+    /// <summary>
+    /// Told how far the start got (the release smoke check): "window" once the window opened, "ui" once the main view
+    /// loaded its lists, or "failed: " and why it could not connect.
+    /// </summary>
+    public Action<string>? Reached { get; init; }
 }
 
 /// <summary>harness ui's Avalonia application: resources, styles and the main view, the same for every host.</summary>
@@ -51,6 +57,7 @@ public sealed partial class App : Application
                         Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://Harness.Ui/Assets/logo.png"))),
 #pragma warning restore S1075
                     };
+                    desktop.MainWindow.Opened += (_, _) => startup.Reached?.Invoke("window");
                     break;
                 default:
                     break;
@@ -74,11 +81,13 @@ public sealed partial class App : Application
             catch (Hosting.UiServerException exception)
             {
                 status.Fail(exception.Message);
+                startup.Reached?.Invoke("failed: " + exception.Message);
                 return;
             }
         }
         var model = new MainViewModel(new UiServices(startup.Api, startup.Host));
         host.Content = new MainView { DataContext = model };
         await model.StartAsync(CancellationToken.None);
+        startup.Reached?.Invoke("ui");
     }
 }

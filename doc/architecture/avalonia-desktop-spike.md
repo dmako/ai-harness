@@ -1,11 +1,23 @@
 # Avalonia desktop host
 
-`Harness.Ui.Desktop` runs the shared Avalonia UI in a native window. Start `harness ui --no-open` first, then run `dotnet run --project src/Harness.Ui.Desktop`. The host connects to `http://127.0.0.1:17477` by default. Like `harness ui`, it uses `HARNESS_UI_ADDR` when set. Pass an address as the first argument to override either default, for example `dotnet run --project src/Harness.Ui.Desktop -- 127.0.0.1:17478`. The address is configured rather than discovered by scanning ports; an instance started with `--addr` must be supplied explicitly or via the environment.
+`Harness.Ui.Desktop` runs the shared Avalonia UI in a native window. The release publishes it as `harness-ui-app` (`harness-ui-app.exe` on Windows), a windowed app without a console.
 
-The desktop process talks to the running server's HTTP API and does not start a server. Its navigation and preferences currently live in memory for the lifetime of the window. Links that open a new page open in the browser.
+## Connecting to harness ui
 
-The native window uses the shared application logo; Windows executables also embed it as an ICO. A macOS app bundle or Linux desktop launcher would need its own platform packaging and icon metadata when those packages are produced.
+The host connects to `http://127.0.0.1:17477` by default. Like `harness ui`, it uses `HARNESS_UI_ADDR` when set. To override either default, pass an address as the first argument, for example `harness-ui-app 127.0.0.1:17478` or `dotnet run --project src/Harness.Ui.Desktop -- 127.0.0.1:17478`. The address is configured rather than discovered by scanning ports.
 
-To try a standalone native publish on a matching host, run `dotnet publish src/Harness.Ui.Desktop -c Release -r win-x64 -p:PublishAot=true`. The supported runtime identifiers are `win-x64`, `linux-x64`, `linux-arm64` and `osx-arm64`; Native AOT requires the native toolchain for the target platform. The desktop publish is optional and separate from the existing harness release archive.
+If a harness ui already answers on the address, the app uses it. If nothing answers and the address is local, the app starts `harness ui --no-open --addr <address>` itself (TASK-0214) and stops it when its window closes. It runs the `harness` beside its own executable, or else the first one on PATH.
 
-The spike published on Windows x64 and Linux x64 (WSL). Windows Native AOT reported two Avalonia DirectComposition methods with non-blittable parameters that will throw if invoked; startup and initial API requests succeeded, but those rendering paths need further qualification. Linux ARM64 and macOS ARM64 have not been tested. A publish with `PublishAot=true` changes the generated NuGet lock-file inputs; restore the normal solution lock files before committing them.
+The window's navigation and preferences live in memory for as long as the window is open. Links that open a new page open in the browser.
+
+The native window uses the shared application logo; Windows executables also embed it as an ICO. A macOS app bundle or Linux desktop launcher would need its own platform packaging and icon metadata, if those packages are ever produced.
+
+## Release
+
+Every release ships the app as its own archive, `ui-app/harness-ui-app-VERSION-OS-ARCH` (TASK-0219; see [releases](../releases.md)). The archive is published as trimmed Native AOT for `win-x64`, `linux-x64`, `linux-arm64` and `osx-arm64`. Each runtime is built on its own host, like the CLI tools, and `src/Harness.Ui.Desktop/packages.publish.lock.json` locks that publish graph.
+
+Native AOT on Windows reports two Avalonia DirectComposition methods with non-blittable parameters that "will always throw". Both are MicroCom vtable entries for *implementing* `IDCompositionDevice` and `IDCompositionDesktopDevice` in managed code. Avalonia never implements them: it calls the system's DirectComposition through its proxies, so these entries are never reached. The release script accepts exactly these two and fails on any other trim or AOT warning in the app.
+
+`harness-ui-app ADDRESS --smoke` is the release smoke check. It prints `harness-ui-app: window` when the window opens. It then prints either `harness-ui-app: ui` once the UI has loaded (exit 0) or `harness-ui-app: failed: …` (exit 3), and exits. If the UI has not loaded after 90 s, it prints `harness-ui-app: timeout` and exits with 4.
+
+A local `dotnet publish src/Harness.Ui.Desktop -c Release -r win-x64 -p:PublishProfile=Release` builds the same executable. It needs the native toolchain for the target platform.

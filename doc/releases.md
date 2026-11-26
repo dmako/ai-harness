@@ -23,6 +23,18 @@ then return to locked restores. The main archive contains `harness`,
 `harness-graphify` and `harness-agents`; developer-tools contains `harness-collect` and `harness-share`.
 Keep their included SQLite native library beside the executables. The browser UI is embedded in `harness`.
 
+`ui-app/harness-ui-app-VERSION-OS-ARCH` contains the native desktop UI
+(`src/Harness.Ui.Desktop`, published as `harness-ui-app`) with its native
+libraries: Skia and HarfBuzz, ANGLE (`av_libglesv2.dll`) on Windows, and
+`libAvaloniaNative.dylib` on macOS. It does not contain `harness`. It starts the
+`harness ui` found beside it or on PATH when none answers, so users install it
+together with the main archive. The release lists it as a third asset per
+runtime. Its publish fails on any trim or Native AOT warning except those listed
+in `KNOWN_AOT_MESSAGES` in `scripts/publish_release.py`. That list holds Avalonia's
+DirectComposition vtables for implementing `IDCompositionDevice` in managed code.
+Avalonia never does that: it only calls the system's DirectComposition through
+its proxies.
+
 Archives carry README, build metadata, release notes and actual dependency
 licenses/notices. The repository's [MIT license](../LICENSE), with copyright to
 Matus Zakarovsky and David Makovsky, is included as the archive-root `LICENSE`.
@@ -33,7 +45,7 @@ binary/archive hashes and repeat verification; `SHA256SUMS` covers release files
 Symbols and managed build outputs stay outside the archives.
 
 ```shell
-python test/Harness.Packaging/run_probe.py --archive dist/preview/harness-VERSION-OS-ARCH.zip --developer-archive dist/preview/developer-tools/harness-VERSION-OS-ARCH.zip --output artifacts/native-smoke.json
+python test/Harness.Packaging/run_probe.py --archive dist/preview/harness-VERSION-OS-ARCH.zip --developer-archive dist/preview/developer-tools/harness-VERSION-OS-ARCH.zip --app-archive dist/preview/ui-app/harness-ui-app-VERSION-OS-ARCH.zip --output artifacts/native-smoke.json
 python test/Harness.Packaging/verify_aot.py --release dist/preview --smoke artifacts/native-smoke.json --output artifacts/native-aot-verification.json
 ```
 
@@ -41,9 +53,27 @@ Use the actual archive filenames (`.tar.gz` on Unix). The runtime probe covers
 CLI metadata, SQLite initialization, client configuration preservation, embedded
 docs/packs, task lifecycle and YAML, MCP tools/knowledge/context, Graphify's
 adapter handshake, UI assets/APIs and opt-in telemetry/companion services.
-The verifier binds receipts to both exact archives and checks native executable
-markers/headers, repeat hashes, SQLite sidecars, license checksums and absence of
-managed/debug build output.
+
+It then runs `harness-ui-app ADDRESS --smoke` on a free local port, with PATH
+holding only the main archive's folder. The app must:
+- open its window;
+- start `harness ui` because nothing answers;
+- load the UI;
+- exit 0;
+- leave no server behind.
+
+The probe prints `harness-ui-app: window` and `harness-ui-app: ui`, and the
+receipt's `app_smoke` field records them. On Linux without a display it runs
+under `xvfb-run`; the workflow installs `xvfb`, `libfontconfig1`, `libice6` and
+`libsm6`.
+
+The verifier binds receipts to every exact archive and checks:
+- native executable markers/headers;
+- repeat hashes;
+- each archive's native libraries (SQLite, or the app's Skia/HarfBuzz/ANGLE/Avalonia);
+- license checksums;
+- absence of managed/debug build output;
+- that the app reached its UI.
 
 The release workflow runs these checks on each native host and additionally
 starts the Linux executable in a runtime-dependencies-only container without

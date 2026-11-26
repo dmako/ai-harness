@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- a windowed app on Windows (no console window); released as harness-ui-app (TASK-0219) -->
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>harness-ui-app</AssemblyName>
+    <RootNamespace>Harness.Ui.Desktop</RootNamespace>
     <ApplicationIcon>harness.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

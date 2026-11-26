@@ -1,4 +1,4 @@
-"""Verify a native host release and bind its runtime probe to both exact archives."""
+"""Verify a native host release and bind its runtime probe to every exact archive (main, developer, desktop app)."""
 import argparse
 import hashlib
 import json
@@ -9,6 +9,17 @@ import zipfile
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def native_libraries(rid, group):
+    """The native libraries an archive must carry beside its executables: SQLite for the CLI tools; Skia and HarfBuzz
+    for the desktop app, with ANGLE on Windows and Avalonia's native backend on macOS."""
+    windows, mac = rid.startswith('win-'), rid.startswith('osx-')
+    if group == 'app':
+        suffix = '.dll' if windows else '.dylib' if mac else '.so'
+        return (['libSkiaSharp' + suffix, 'libHarfBuzzSharp' + suffix] + (['av_libglesv2.dll'] if windows else []) +
+                (['libAvaloniaNative.dylib'] if mac else []))
+    return ['e_sqlite3.dll' if windows else 'libe_sqlite3.dylib' if mac else 'libe_sqlite3.so']
 
 
 def verify(release, smoke):
@@ -25,6 +36,8 @@ def verify(release, smoke):
             raise ValueError('Checksum mismatch: ' + name)
     if smoke['status'] != 'pass' or smoke['failures']:
         raise ValueError('Runtime probe did not pass')
+    if 'harness-ui-app: ui' not in smoke.get('app_smoke', {}).get('reached', []):
+        raise ValueError('The desktop app smoke check did not reach its UI')
     artifacts = []
     for artifact in manifest['artifacts']:
         path = release / artifact['file']
@@ -66,17 +79,17 @@ def verify(release, smoke):
                 if not data.startswith(magic):
                     raise ValueError('Unexpected executable format')
                 binaries.append(binary)
-            library = ('e_sqlite3.dll' if artifact['rid'].startswith('win-') else
-                       'libe_sqlite3.dylib' if artifact['rid'].startswith('osx-') else 'libe_sqlite3.so')
-            payload = read(library)
+            libraries = native_libraries(artifact['rid'], artifact['group'])
+            payloads = {library: read(library) for library in libraries}
             unexpected = [name for name in names if '/' not in name and
                           (name.endswith(('.pdb', '.dbg', '.xml', '.deps.json', '.runtimeconfig.json')) or
-                           name.endswith('.dll') and name != library)]
+                           name.endswith('.dll') and name not in libraries)]
             if unexpected:
                 raise ValueError('Unexpected managed/debug build output: ' + repr(unexpected))
             artifacts.append({'rid': artifact['rid'], 'group': artifact['group'], 'file': artifact['file'],
                               'bytes': artifact['bytes'], 'sha256': artifact['sha256'], 'binaries': binaries,
-                              'native_library': {'file': library, 'bytes': len(payload), 'sha256': digest(payload)}})
+                              'native_libraries': [{'file': library, 'bytes': len(payload), 'sha256': digest(payload)}
+                                                   for library, payload in payloads.items()]})
     return {'status': 'pass', 'version': manifest['version'], 'manifest_sha256': digest((release / 'RELEASE.json').read_bytes()),
             'build_commit': manifest['commit'], 'modified': manifest['modified'], 'sdk': manifest['sdk'],
             'artifacts': artifacts, 'runtime_probe': smoke}

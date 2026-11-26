@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import queue
 import re
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -286,17 +287,78 @@ def probe(main_archive, developer_archive, root, report):
     check(not database.exists(), 'project data deleted only with explicit selection')
 
 
+APP_LIBRARIES = {'Windows': ['libSkiaSharp.dll', 'libHarfBuzzSharp.dll', 'av_libglesv2.dll'],
+                 'Linux': ['libSkiaSharp.so', 'libHarfBuzzSharp.so'],
+                 'Darwin': ['libSkiaSharp.dylib', 'libHarfBuzzSharp.dylib', 'libAvaloniaNative.dylib']}
+
+
+def free_port():
+    with contextlib.closing(socket.socket()) as probe_socket:
+        probe_socket.bind(('127.0.0.1', 0))
+        return probe_socket.getsockname()[1]
+
+
+def probe_app(app_archive, main_archive, root, report):
+    """Start the desktop app with --smoke: no harness ui answers, so it must start the harness found on PATH (only the
+    main archive's folder), open its window, load the UI, then exit 0 and stop the server it started."""
+    app = root / 'app'
+    main = root / 'app-main'
+    extract(app_archive, app)
+    extract(main_archive, main)
+    suffix = '.exe' if os.name == 'nt' else ''
+
+    def check(condition, name):
+        report['passed_checks' if condition else 'failed_checks'] += 1
+        report['log'].append(('PASS ' if condition else 'FAIL ') + name)
+        if not condition:
+            report['failures'].append(name)
+
+    for library in APP_LIBRARIES[platform.system()]:
+        check((app / library).is_file(), 'app native library ' + library)
+    for name in ['README.md', 'THIRD_PARTY_NOTICES.json', 'LICENSE']:
+        check((app / name).is_file(), 'app ' + name)
+    check(not (app / ('harness' + suffix)).exists(), 'app archive does not carry harness')
+    sandbox = Sandbox(root / 'app-state', main / ('harness' + suffix))
+    environment = dict(sandbox.env, PATH=str(main))
+    command = [str(app / ('harness-ui-app' + suffix))]
+    if platform.system() == 'Linux':
+        # the system tools a display needs stay reachable; .NET stays hidden by DOTNET_ROOT and the AOT build
+        environment['PATH'] = os.pathsep.join([str(main), '/usr/bin', '/bin'])
+        if not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+            command = ['xvfb-run', '--auto-servernum', *command]
+    address = '127.0.0.1:' + str(free_port())
+    started = time.monotonic()
+    result = subprocess.run([*command, address, '--smoke'], cwd=sandbox.repository, env=environment,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8',
+                            errors='replace', timeout=180)
+    report['measurements'].append({'name': 'desktop app start to loaded UI', 'milliseconds': (time.monotonic() - started) * 1000})
+    lines = [line.strip() for line in result.stdout.splitlines() if line.startswith('harness-ui-app: ')]
+    report['app_smoke'] = {'command': 'harness-ui-app ' + address + ' --smoke', 'exit_code': result.returncode,
+                           'reached': lines, 'stderr_tail': result.stderr[-2000:]}
+    check('harness-ui-app: window' in lines, 'app window opened')
+    check('harness-ui-app: ui' in lines, 'app started harness ui from PATH and loaded the UI')
+    check(result.returncode == 0, 'app smoke exit code')
+    try:
+        http('http://' + address, '/api/projects')
+        stopped = False
+    except (urllib.error.URLError, OSError):
+        stopped = True
+    check(stopped, 'app stopped the harness ui it started')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive', required=True, type=Path)
     parser.add_argument('--developer-archive', required=True, type=Path)
+    parser.add_argument('--app-archive', required=True, type=Path, help='the harness-ui-app archive for this runtime')
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report = {'status': 'fail', 'host': platform.platform(), 'machine': platform.machine(),
               'environment': 'Child PATH empty, nonexistent DOTNET_ROOT; private HOME/config/cache. Host may have SDKs.',
               'passed_checks': 0, 'failed_checks': 0, 'failures': [], 'log': [], 'measurements': [],
-              'archive_sha256': {'main': sha(args.archive), 'developer': sha(args.developer_archive)}}
+              'archive_sha256': {'main': sha(args.archive), 'developer': sha(args.developer_archive),
+                                 'app': sha(args.app_archive)}}
     started = time.monotonic()
     # Native Linux temporary storage preserves POSIX permission semantics in WSL.
     with tempfile.TemporaryDirectory(prefix='harness-package-') as temporary:
@@ -305,6 +367,11 @@ def main():
         except Exception as error:
             report['failed_checks'] += 1
             report['failures'].append(str(error))
+        try:
+            probe_app(args.app_archive.resolve(), args.archive.resolve(), Path(temporary).resolve(), report)
+        except Exception as error:
+            report['failed_checks'] += 1
+            report['failures'].append('desktop app: ' + str(error))
     report['elapsed_seconds'] = time.monotonic() - started
     report['status'] = 'fail' if report['failures'] else 'pass'
     args.output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

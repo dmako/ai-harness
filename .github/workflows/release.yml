@@ -80,12 +80,14 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Install Linux Native AOT compiler prerequisites
+      - name: Install Linux Native AOT compiler and desktop smoke prerequisites
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          sudo apt-get install -y clang zlib1g-dev
+          # clang and zlib for the Native AOT compiler; a virtual display, fontconfig, libICE and libSM for the
+          # desktop app's smoke check (harness-ui-app needs an X11 session)
+          sudo apt-get install -y clang zlib1g-dev xvfb xauth libfontconfig1 libice6 libsm6
           exit $LASTEXITCODE
       - name: Locked restore and standalone tests
         run: |
@@ -98,10 +100,11 @@ jobs:
           path: artifacts/ui-bundle
       - name: Publish and verify repeat binary hashes
         run: python scripts/publish_release.py --version "$env:RELEASE_VERSION" --rids "$env:RID" --output artifacts/package --verify-repeat --ui-bundle artifacts/ui-bundle
-      - name: Native runtime isolation smoke test
+      - name: Native runtime isolation smoke test (CLI tools and the desktop app)
         run: |
           $archive = Get-ChildItem artifacts/package/harness-* | Where-Object { $_.Name -match '\.(zip|tar.gz)$' } | Select-Object -First 1
-          python test/Harness.Packaging/run_probe.py --archive $archive.FullName --developer-archive (Join-Path $PWD "artifacts/package/developer-tools/$($archive.Name)") --output artifacts/native-smoke.json
+          $app = Get-ChildItem artifacts/package/ui-app/harness-ui-app-* | Select-Object -First 1
+          python test/Harness.Packaging/run_probe.py --archive $archive.FullName --developer-archive (Join-Path $PWD "artifacts/package/developer-tools/$($archive.Name)") --app-archive $app.FullName --output artifacts/native-smoke.json
       - name: Browser smoke against the native executable
         if: matrix.rid == 'linux-x64'
         run: |
@@ -156,7 +159,8 @@ jobs:
           set -euo pipefail
           mkdir -p assets
           archives=(-type f \( -name 'harness-*.zip' -o -name 'harness-*.tar.gz' \))
-          # Main archives keep their name: harness-<version>-<os>-<arch>.
+          # Main archives keep their name: harness-<version>-<os>-<arch>; so do the desktop app's,
+          # harness-ui-app-<version>-<os>-<arch> (under ui-app/).
           find qualified "${archives[@]}" -not -path '*/developer-tools/*' -exec cp -n {} assets/ \;
           # A developer archive has the same name under developer-tools/; publish it as
           # harness-devtools-<version>-<os>-<arch>.
@@ -164,8 +168,8 @@ jobs:
             cp -n "$archive" "assets/harness-devtools-$(basename "$archive" | sed 's/^harness-//')"
           done < <(find qualified "${archives[@]}" -path '*/developer-tools/*' -print0)
           count=$(find assets -maxdepth 1 -type f | wc -l)
-          if [ "$count" -ne 8 ]; then
-            echo "expected 8 archives (main and devtools for 4 runtimes), found $count" >&2
+          if [ "$count" -ne 12 ]; then
+            echo "expected 12 archives (main, devtools and ui-app for 4 runtimes), found $count" >&2
             ls -l assets >&2
             exit 1
           fi
