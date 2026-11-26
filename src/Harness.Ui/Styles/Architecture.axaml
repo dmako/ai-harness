@@ -295,6 +295,141 @@
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
 
+  <!-- the workspace's service map (style.css .sysmap, .syscard, .dbchip, .syslegend): columns (rows when narrow), every
+       other one shaded; a service is a card with its kind's colour down its left edge, its calls, language and
+       databases; the selected one outlined in ink, what it calls in Accent, what calls it in Gold, the rest dimmed -->
+  <Style Selector="Border.card.sysmapcard">
+    <Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="Border.sysband">
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="Border.sysband.row">
+    <Setter Property="Padding" Value="0,6" />
+  </Style>
+  <Style Selector="Border.sysband.shaded">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+  </Style>
+  <Style Selector="TextBlock.syslabel">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="LetterSpacing" Value="0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="Margin" Value="0,0,0,12" />
+  </Style>
+  <Style Selector="Border.sysband.row TextBlock.syslabel">
+    <Setter Property="Margin" Value="12,0,0,0" />
+  </Style>
+  <Style Selector="Button.syscard">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinWidth" Value="160" />
+    <Setter Property="MaxWidth" Value="300" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Button.syscard:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.syscard:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.syscard.hub /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.syscard.rel-out /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.syscard.rel-in /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Gold}" />
+  </Style>
+  <Style Selector="Button.syscard.sel /template/ ContentPresenter#PART_ContentPresenter, Button.syscard.sel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Button.syscard.dim">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="Button.syscard Border.sysstrip">
+    <Setter Property="Width" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource Axis}" />
+  </Style>
+  <Style Selector="Button.syscard.sys-service Border.sysstrip">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.syscard.sys-frontend Border.sysstrip">
+    <Setter Property="Background" Value="{DynamicResource CGoal}" />
+  </Style>
+  <Style Selector="Button.syscard.sys-external Border.sysstrip">
+    <Setter Property="Background" Value="{DynamicResource Gold}" />
+  </Style>
+  <Style Selector="Button.syscard.sys-broker Border.sysstrip">
+    <Setter Property="Background" Value="{DynamicResource CConvention}" />
+  </Style>
+  <Style Selector="TextBlock.sysname">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBlock.sysmeta">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.syshub">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Border.sysdbhead">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="0,6,0,0" />
+    <Setter Property="Margin" Value="0,4,0,0" />
+  </Style>
+  <Style Selector="Border.sysdbhead TextBlock">
+    <Setter Property="FontSize" Value="10.5" />
+    <Setter Property="LetterSpacing" Value="0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="Border.language-mark.small">
+    <Setter Property="Padding" Value="4,1" />
+  </Style>
+  <Style Selector="Border.language-mark.small TextBlock">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+  </Style>
+  <!-- a database chip: a small cylinder outline and its name on Surface 2; one per tenant has two chips behind it -->
+  <Style Selector="Border.dbchip">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="7,2" />
+  </Style>
+  <Style Selector="Border.dbchip.mini">
+    <Setter Property="Padding" Value="4,2" />
+  </Style>
+  <Style Selector="Border.dbicon">
+    <Setter Property="Width" Value="9" />
+    <Setter Property="Height" Value="11" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Axis}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusXs}" />
+  </Style>
+  <Style Selector="TextBlock.dbname">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="TextBlock.dbnote">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.syslegend">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+
   <!-- a workspace's library (style.css .libsum, .libmx): its summary in Ink 2, then a matrix filling its card. Every row
        has cells padded 7 x 12 and a line under it; the package name takes the room left, the members' columns and "used
        by" have fixed widths, centred marks. A use is a round accent badge with a tick, a non-use a quiet dot. -->

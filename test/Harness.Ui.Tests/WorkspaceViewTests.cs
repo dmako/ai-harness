@@ -1,5 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Headless;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
@@ -35,6 +38,34 @@ public sealed class WorkspaceViewTests
           {"project_id":"prj_api","project":"api","root":"C:/repos/api","title":"Api"},
           {"project_id":"prj_worker","project":"worker","root":"C:/repos/worker","title":"Worker"},
           {"project_id":"prj_core","project":"core","root":"C:/repos/core","title":"Core"}]}]}
+        """;
+
+    private const string ServiceMap = """
+        {"nodes":[
+           {"id":"prj_evp","name":"EVP-WebAPI","kind":"service","member_id":"prj_api","layer":2},
+           {"id":"prj_tp","name":"Transport-Planner-WebAPI","kind":"service","member_id":"prj_worker","layer":2},
+           {"id":"prj_na","name":"NavAdmin-WebAPI","kind":"service","member_id":"prj_core","layer":1},
+           {"id":"prj_ui","name":"NavAdmin-UI","kind":"frontend","layer":1},
+           {"id":"prj_ns","name":"Notification-Service","kind":"service","layer":1},
+           {"id":"db:main","name":"Main","kind":"database","detail":"per tenant","layer":0},
+           {"id":"db:app","name":"App","kind":"database","layer":0},
+           {"id":"db:config","name":"Config","kind":"database","layer":0},
+           {"id":"db:route","name":"Route","kind":"database","layer":0},
+           {"id":"ext:import","name":"ImportDataReader","kind":"external","detail":"appsettings.json","layer":0},
+           {"id":"ext:email","name":"EmailService","kind":"external","detail":"appsettings.json","layer":0},
+           {"id":"brk:kafka","name":"Kafka","kind":"broker","layer":0}],
+         "links":[
+           {"from":"prj_evp","to":"prj_na","style":"grpc","what":["IUsers"],"contracts":["IUsers"],"uses":2,"evidence":[]},
+           {"from":"prj_tp","to":"prj_na","style":"grpc","what":["IRoutes"],"contracts":["IRoutes"],"uses":2,"evidence":[]},
+           {"from":"prj_tp","to":"prj_ns","style":"grpc","what":["IEmail"],"contracts":["IEmail"],"uses":2,"evidence":[]},
+           {"from":"prj_na","to":"ext:import","style":"http","what":["ImportDataReader:BaseUrl"],"uses":1,"evidence":[]},
+           {"from":"prj_ns","to":"brk:kafka","style":"messaging","what":["topic"],"uses":1,"evidence":[]},
+           {"from":"prj_ui","to":"prj_na","style":"http","what":["api"],"uses":1,"evidence":[]},
+           {"from":"prj_evp","to":"db:main","style":"database","what":["MainContext"],"uses":1,"evidence":[]},
+           {"from":"prj_na","to":"db:app","style":"database","what":["AppDbContext"],"uses":1,"evidence":[]},
+           {"from":"prj_na","to":"db:config","style":"database","what":["ConfigDbContext"],"uses":1,"evidence":[]},
+           {"from":"prj_na","to":"db:route","style":"database","what":["RouteDbContext"],"uses":1,"evidence":[]}],
+         "contracts":[],"smells":[]}
         """;
 
     private const string System = """
@@ -153,15 +184,19 @@ public sealed class WorkspaceViewTests
 
         s.Summary.Should().Be("2 services");
         s.SummaryMore.Should().Be(" · 1 outside system · 1 database in code · 2 gRPC contracts");
-        s.Rows.Select(r => (r.Label, string.Join(",", r.Nodes.Select(n => n.Label)))).Should().Equal(("callers", "Api"), ("called", "Worker"), ("outside", "Payments"));
-        s.Rows[0].Nodes[0].Badge.Should().Be("⛁ Orders (per tenant)");
-        s.Edges.Select(e => (e.From, e.To, e.Tone)).Should().Equal(("prj_api", "prj_worker", "CDecision"), ("prj_worker", "ext:payments", "Accent"));
+        s.Columns.Select(r => (r.Label, string.Join(",", r.Nodes.Select(n => n.Name)))).Should().Equal(("callers", "Api"), ("called", "Worker"), ("outside", "Payments"));
+        s.Columns[0].Nodes[0].Databases.Should().ContainSingle().Which.Should().Be(
+            new SystemDatabase("Orders", true, "Orders: one database per tenant (one context, many databases)")
+        );
+        s.Columns[0].Nodes[0].Meta.Should().Be("calls 1 · called by 0");
+        s.Lines.Select(e => (e.From, e.To, e.Style)).Should().Equal(("prj_api", "prj_worker", "grpc"), ("prj_worker", "ext:payments", "http"));
+        s.CallKinds.Should().Equal("grpc", "http");
         s.Services.Select(x => x.Line).Should().Equal("calls Worker · 1 database", "calls Payments · called by Api");
         s.Pairs.Should().ContainSingle(p => p.Clients == "Api" && p.Servers == "Worker" && p.Contracts.SequenceEqual(new[] { "Orders" }));
         s.IdleHead.Should().Be("1 contract served, used by no other member");
         s.Board.Groups.Should().ContainSingle(g => g.Kind == "sync-cycle");
 
-        var graph = window.GetVisualDescendants().OfType<LayerGraph>().Single(g => g.Name == "SystemGraph");
+        var graph = window.GetVisualDescendants().OfType<SystemMap>().Single(g => g.Name == "SystemMap");
         graph.Selected = "prj_api";
         s.SelectedName.Should().Be("Api");
         s.Calls.Single().ContractsLine.Should().Be("1 contract: Orders");
@@ -176,6 +211,95 @@ public sealed class WorkspaceViewTests
         task.Member = task.Members.Single(m => m.Id == "prj_api");
         await task.AcceptCommand.ExecuteAsync(null);
         api.Posts[^1].Should().Be((Root + "/findings/task", """{"key":"sys:1","project":"prj_api"}""", api.Posts[^1].Origin, "1"));
+    });
+
+    [Theory]
+    [InlineData(1280, false)]
+    [InlineData(1280, true)]
+    [InlineData(390, false)]
+    [InlineData(390, true)]
+    public Task TheServiceMapReadsLikeTheOriginalWithStyledAndFlowingLines(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        api.Answers[Root + "/system"] = ServiceMap;
+        var (window, _, model) = await OpenAsync("architecture", api, width, 1000);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var s = ((WorkspaceArchitectureViewModel)Page(model).Body!).System;
+        await Ui.UntilAsync(() => s.HasContent);
+        Ui.Settle();
+        var map = window.GetVisualDescendants().OfType<SystemMap>().Single();
+        _ = window.CaptureRenderedFrame();
+
+        // wide: callers, called and outside side by side; narrow: one under the other
+        var bands = map.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("sysband")).ToArray();
+        bands.Should().HaveCount(3);
+        var at = bands.Select(b => b.TranslatePoint(default, map)!.Value).ToArray();
+        map.Wide.Should().Be(width >= 1100);
+        if (width >= 1100)
+        {
+            at.Select(p => p.Y).Distinct().Should().ContainSingle();
+            at.Select(p => p.X).Should().BeInAscendingOrder();
+        }
+        else
+        {
+            at.Select(p => p.Y).Should().BeInAscendingOrder().And.OnlyHaveUniqueItems();
+        }
+        bands.Select(b => b.Classes.Contains("shaded")).Should().Equal(true, false, true);
+        bands.SelectMany(b => b.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("syslabel")).Select(t => t.Text))
+            .Should().Equal("CALLERS", "CALLED", "OUTSIDE");
+
+        // a service card: name, its calls, language and every database, a per-tenant one stacked
+        string[] Texts(string id) => [.. map.NodeFor(id)!.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? "")];
+        Texts("prj_na").Should().Contain(["NavAdmin-WebAPI", "calls 1 · called by 3", "DATABASES", "App", "Config", "Route"]);
+        Texts("prj_evp").Should().Contain(["Main", "per tenant"]);
+        map.NodeFor("prj_evp")!.GetVisualDescendants().OfType<Border>().Count(b => b.Classes.Contains("behind")).Should().Be(2);
+        Texts("brk:kafka").Should().Contain(["⇄ Kafka", "broker"]);
+        Texts("ext:import").Should().Contain("outside the workspace");
+        map.NodeFor("prj_na")!.Classes.Should().Contain("sys-service");
+
+        // lines by kind: gRPC solid Accent, HTTP dashed Gold, messaging dotted, all quiet while nothing is selected
+        Color Tone(string key) => ((ISolidColorBrush)map.FindResource(map.ActualThemeVariant, key)!).Color;
+        var drawn = map.Drawn.ToDictionary(d => (d.Line.From, d.Line.To));
+        drawn.Should().HaveCount(6);
+        var grpc = drawn[("prj_evp", "prj_na")];
+        var grpcBrush = grpc.Pen.Brush.Should().BeAssignableTo<ISolidColorBrush>().Subject;
+        grpcBrush.Color.Should().Be(Tone("Accent"));
+        grpcBrush.Opacity.Should().Be(0.75);
+        grpc.Pen.DashStyle.Should().BeNull();
+        grpc.Pen.Thickness.Should().Be(1.4);
+        var http = drawn[("prj_na", "ext:import")];
+        ((ISolidColorBrush)http.Pen.Brush!).Color.Should().Be(Tone("Gold"));
+        http.Pen.DashStyle.Should().NotBeNull().And.Subject.As<IDashStyle>().Dashes.Should().Equal(7 / 1.4, 4 / 1.4);
+        ((ISolidColorBrush)drawn[("prj_ns", "brk:kafka")].Pen.Brush!).Color.Should().Be(Tone("CConvention"));
+        map.Flowing.Should().BeFalse();
+        window.GetVisualDescendants().OfType<SystemLegend>().Single().Children.Should().HaveCount(5);
+
+        // a service selected: its lines hot and flowing, the others hidden, what it does not touch dimmed
+        s.Selected = "prj_na";
+        Ui.Settle();
+        _ = window.CaptureRenderedFrame();
+        map.Flowing.Should().BeTrue();
+        map.Drawn.Select(d => (d.Line.From, d.Line.To)).Should().BeEquivalentTo(new[] { ("prj_evp", "prj_na"), ("prj_tp", "prj_na"), ("prj_ui", "prj_na"), ("prj_na", "ext:import") });
+        map.Drawn.Should().AllSatisfy(d =>
+        {
+            d.Hot.Should().BeTrue();
+            d.Flow.Should().BeTrue();
+            d.Pen.Thickness.Should().Be(2.2);
+            d.Pen.DashStyle!.Dashes.Should().Equal(SystemMap.FlowDash / 2.2, SystemMap.FlowGap / 2.2);
+        });
+        map.NodeFor("prj_na")!.Classes.Should().Contain("sel");
+        map.NodeFor("prj_evp")!.Classes.Should().Contain("rel-in");
+        map.NodeFor("ext:import")!.Classes.Should().Contain("rel-out");
+        map.NodeFor("prj_ns")!.Opacity.Should().Be(0.4);
+        map.NodeFor("brk:kafka")!.Opacity.Should().Be(0.4);
+        s.SelectedName.Should().Be("NavAdmin-WebAPI");
+        UiChecks.Check(window).Should().BeEmpty();
+
+        s.Selected = null;
+        Ui.Settle();
+        map.Flowing.Should().BeFalse();
+        map.NodeFor("prj_ns")!.Opacity.Should().Be(1);
+        window.Close();
     });
 
     [Fact]

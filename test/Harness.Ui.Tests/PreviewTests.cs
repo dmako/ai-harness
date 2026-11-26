@@ -57,7 +57,7 @@ public sealed class PreviewTests
         var task = PreviewData.TaskDialog;
         await Ui.UntilAsync(() => workspace.System.HasContent && issues.Rollup.HasContent && issues.Issues.HasContent
             && overview.Glance.HasContent && knowledge.Memories.HasContent && task.Loaded.IsCompleted);
-        workspace.System.Rows.Should().NotBeEmpty();
+        workspace.System.Columns.Should().NotBeEmpty();
         overview.Tiles.Should().NotBeEmpty();
         issues.Issues.Groups.Should().NotBeEmpty();
         task.Task.Should().NotBeNull();

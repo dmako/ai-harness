@@ -20,14 +20,8 @@ public static class CallStyles
             _ => style,
         };
 
-    public static string Tone(string style) =>
-        style switch
-        {
-            "grpc" => "CDecision",
-            "http" => "Accent",
-            "messaging" => "CGoal",
-            _ => "Axis",
-        };
+    /// <summary>A call's colour token, the map's line colour (style.css .sline.st-*).</summary>
+    public static string Tone(string style) => SystemMap.Tone(style);
 
     /// <summary>A contract's short name: IOrdersGrpcService is Orders.</summary>
     public static string Brief(string contract)
@@ -43,9 +37,6 @@ public static class CallStyles
         return name;
     }
 }
-
-/// <summary>A call style in the legend.</summary>
-public sealed record StyleKey(string Label, string Tone);
 
 /// <summary>A service in the side list when nothing is selected: whom it calls, who calls it, its databases.</summary>
 public sealed record ServiceLine(string Id, string Name, string Line);
@@ -108,6 +99,7 @@ public sealed partial class SystemSection : SectionViewModel
 {
     private readonly WorkspaceContext _context;
     private SystemAnswer? _system;
+    private IReadOnlyDictionary<string, ProjectStack>? _stacks;
 
     public SystemSection(WorkspaceContext context)
         : base("", null, ["sync", "findings", "levels"])
@@ -118,7 +110,6 @@ public sealed partial class SystemSection : SectionViewModel
     }
 
     public FindingsBoard Board { get; }
-    public ObservableCollection<StyleKey> Legend { get; } = [];
     public ObservableCollection<ServiceLine> Services { get; } = [];
     public ObservableCollection<CallRow> Calls { get; } = [];
     public ObservableCollection<CallRow> CalledBy { get; } = [];
@@ -132,11 +123,17 @@ public sealed partial class SystemSection : SectionViewModel
     [ObservableProperty]
     public partial string SummaryMore { get; private set; } = "";
 
+    /// <summary>The map's columns: callers, the called, outside (rows on a narrow window).</summary>
     [ObservableProperty]
-    public partial IReadOnlyList<GraphRow> Rows { get; private set; } = [];
+    public partial IReadOnlyList<SystemColumn> Columns { get; private set; } = [];
 
+    /// <summary>The calls between the map's nodes.</summary>
     [ObservableProperty]
-    public partial IReadOnlyList<GraphEdge> Edges { get; private set; } = [];
+    public partial IReadOnlyList<SystemLine> Lines { get; private set; } = [];
+
+    /// <summary>The call kinds the map shows, for its legend (grpc, http, messaging).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<string> CallKinds { get; private set; } = [];
 
     [ObservableProperty]
     public partial string? Selected { get; set; }
@@ -164,7 +161,7 @@ public sealed partial class SystemSection : SectionViewModel
     public bool HasContracts => Pairs.Count > 0 || Idle.Count > 0;
     public bool HasIdle => Idle.Count > 0;
     public string IdleHead => $"{Shell.Plural(Idle.Count, "contract")} served, used by no other member";
-    public bool HasMap => Rows.Count > 0;
+    public bool HasMap => Columns.Count > 0;
 
     partial void OnSelectedChanged(string? value) => DrawSide();
 
@@ -175,6 +172,15 @@ public sealed partial class SystemSection : SectionViewModel
     {
         var s = await _context.Services.Api.SystemAsync(_context.Name, token);
         _system = s;
+        try
+        {
+            _stacks = (await _context.Services.Api.WorkspaceStackAsync(_context.Name, token)).Stacks;
+        }
+        catch (Exception exception) when (exception is HarnessApiException or HttpRequestException)
+        {
+            // the language marks are a convenience: the map stands without them
+            _stacks = null;
+        }
         int Count(string kind) => s.Nodes.Count(n => n.Kind == kind);
         var fe = Count("frontend");
         Summary = $"{Count("service") + fe} services" + (fe > 0 ? $" ({Shell.Plural(fe, "front-end")})" : "");
@@ -194,6 +200,16 @@ public sealed partial class SystemSection : SectionViewModel
     private static IReadOnlyList<SystemNode> DatabasesOf(SystemAnswer s, string id) =>
         [.. s.Links.Where(l => l.From == id && l.Style is "database").Select(l => s.Nodes.FirstOrDefault(n => n.Id == l.To)).OfType<SystemNode>()];
 
+    /// <summary>What pointing at a database chip says (app.js dbchip title).</summary>
+    private static string DatabaseTip(SystemNode d)
+    {
+        if (d.Detail is "per tenant")
+        {
+            return $"{d.Name}: one database per tenant (one context, many databases)";
+        }
+        return d.Detail is { Length: > 0 } detail ? $"{d.Name}: {detail}" : d.Name;
+    }
+
     private string Label(string id) => _system?.Nodes.FirstOrDefault(n => n.Id == id)?.Name ?? id;
 
     /// <summary>The map: callers above the services they call, outside systems and brokers in a row of their own.</summary>
@@ -205,19 +221,33 @@ public sealed partial class SystemSection : SectionViewModel
         var silent = members.Where(n => !talking.Contains(n.Id) && DatabasesOf(s, n.Id).Count is 0).ToArray();
         var shown = members.Except(silent).ToArray();
         var others = shown.Length - 1;
-        GraphNode Card(SystemNode n)
+        SystemCard Card(SystemNode n)
         {
             var callers = calls.Where(l => l.To == n.Id && members.Any(m => m.Id == l.From)).Select(l => l.From).Distinct().Count();
-            var hub = others > 1 && callers == others;
             var dbs = DatabasesOf(s, n.Id);
-            var badge = string.Join(
-                " · ",
-                new[] { hub ? "every other service calls it" : null, dbs.Count > 0 ? "⛁ " + string.Join(", ", dbs.Select(d => d.Name + (d.Detail is "per tenant" ? " (per tenant)" : ""))) : null }.OfType<string>()
+            var mark = n.MemberId is { } member && _stacks?.GetValueOrDefault(member) is { } stack ? stack.Mark : null;
+            return new SystemCard(
+                n.Id,
+                n.Name,
+                n.Kind,
+                $"calls {calls.Count(l => l.From == n.Id)} · called by {callers}",
+                n.Name,
+                mark,
+                others > 1 && callers == others,
+                [
+                    .. dbs.Select(d =>
+                        new SystemDatabase(
+                            d.Name,
+                            d.Detail is "per tenant",
+                            DatabaseTip(d)
+                        )
+                    ),
+                ]
             );
-            return new GraphNode(n.Id, n.Name, $"calls {calls.Count(l => l.From == n.Id)} · called by {callers}", badge.Length > 0 ? badge : null, n.Name);
         }
+        // callers before the called (higher layers call lower ones), outside systems and brokers last
         var layers = shown.Select(n => n.Layer).Distinct().OrderByDescending(l => l).ToArray();
-        var rows = new List<GraphRow>();
+        var columns = new List<SystemColumn>();
         for (var i = 0; i < layers.Length; i++)
         {
             var label = "";
@@ -229,21 +259,21 @@ public sealed partial class SystemSection : SectionViewModel
             {
                 label = "called";
             }
-            rows.Add(new GraphRow(label, [.. shown.Where(n => n.Layer == layers[i]).Select(Card)]));
+            columns.Add(new SystemColumn(label, [.. shown.Where(n => n.Layer == layers[i]).Select(Card)]));
         }
         var outside = s.Nodes.Where(n => n.Kind is "external" or "broker").ToArray();
         if (outside.Length > 0)
         {
-            rows.Add(
-                new GraphRow(
+            columns.Add(
+                new SystemColumn(
                     "outside",
                     [
                         .. outside.Select(n =>
-                            new GraphNode(
+                            new SystemCard(
                                 n.Id,
                                 n.Kind is "broker" ? "⇄ " + n.Name : n.Name,
+                                n.Kind,
                                 n.Kind is "broker" ? "broker" : "outside the workspace",
-                                null,
                                 n.Detail is { Length: > 0 } d ? $"declared by {d}" : n.Name
                             )
                         ),
@@ -251,14 +281,14 @@ public sealed partial class SystemSection : SectionViewModel
                 )
             );
         }
-        Rows = rows;
-        Edges =
+        Columns = columns;
+        Lines =
         [
             .. calls.Select(l =>
-                new GraphEdge(l.From, l.To, Tone: CallStyles.Tone(l.Style), Tip: $"{Label(l.From)} → {Label(l.To)} ({CallStyles.Label(l.Style)}): {string.Join(", ", l.What)}")
+                new SystemLine(l.From, l.To, l.Style, $"{Label(l.From)} → {Label(l.To)} ({CallStyles.Label(l.Style)}): {string.Join(", ", l.What)}")
             ),
         ];
-        Lists.Sync(Legend, new[] { "grpc", "http", "messaging" }.Where(st => calls.Any(l => l.Style == st)).Select(st => new StyleKey(CallStyles.Label(st), CallStyles.Tone(st))));
+        CallKinds = [.. new[] { "grpc", "http", "messaging" }.Where(st => calls.Any(l => l.Style == st))];
         Silent = silent.Length > 0 ? $"Services with no call, configured address or database found: {string.Join(", ", silent.Select(n => n.Name))}." : null;
         Lists.Sync(
             Services,

@@ -48,22 +48,15 @@
             <TextBlock Classes="h3" Text="Communication" />
             <TextBlock Classes="hint" TextWrapping="Wrap"
                        Text="Who calls whom and how: callers above the services they call, lines pointing from the caller. Each service shows the databases its code owns." />
-            <ItemsControl ItemsSource="{Binding Legend}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><WrapPanel ItemSpacing="14" /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:StyleKey">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:Swatch BrushKey="{Binding Tone}" VerticalAlignment="Center" />
-                    <TextBlock Classes="small" Text="{Binding Label}" />
-                  </StackPanel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
             <TextBlock Classes="empty" Text="No service found in the members' code." IsVisible="{Binding !HasMap}" />
             <Grid Name="SystemGrid" c:SidePanel.Follows="True" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" IsVisible="{Binding HasMap}">
-              <c:LayerGraph Name="SystemGraph" Rows="{Binding Rows}" Edges="{Binding Edges}" Selected="{Binding Selected}" Margin="0,0,12,0" />
+              <!-- app.js systemView: the legend over the map, in a card, the selected service beside it -->
+              <Border Name="SystemCard" Classes="card sysmapcard" Margin="0,0,12,0">
+                <StackPanel Spacing="12">
+                  <c:SystemLegend Name="SystemLegend" Kinds="{Binding CallKinds}" />
+                  <c:SystemMap Name="SystemMap" Columns="{Binding Columns}" Lines="{Binding Lines}" Selected="{Binding Selected}" />
+                </StackPanel>
+              </Border>
               <Border Name="SystemSide" Grid.Column="1" Classes="side" Width="300" VerticalAlignment="Top">
                 <StackPanel Spacing="6">
                   <StackPanel Spacing="4" IsVisible="{Binding NoSelection}">
