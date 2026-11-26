@@ -25,6 +25,7 @@
   <StreamGeometry x:Key="Icon.process">M20 11a8 8 0 0 0-14.3-4.9 M4 4v4h4 M4 13a8 8 0 0 0 14.3 4.9 M20 20v-4h-4</StreamGeometry>
   <StreamGeometry x:Key="Icon.type-other">M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8z</StreamGeometry>
   <StreamGeometry x:Key="Icon.up">M12 19V5 M6 11 l6-6 6 6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.chevron">M6 9 l6 6 6-6</StreamGeometry>
   <StreamGeometry x:Key="Icon.down">M12 5v14 M6 13 l6 6 6-6</StreamGeometry>
   <StreamGeometry x:Key="Icon.p-low">M12 5v14 M6 13 l6 6 6-6</StreamGeometry>
   <StreamGeometry x:Key="Icon.p-medium">M5 9h14 M5 15h14</StreamGeometry>

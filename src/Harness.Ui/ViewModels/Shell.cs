@@ -28,6 +28,16 @@ public static class Shell
         };
     }
 
+    /// <summary>A state kind in words (app.js STATE_WORD).</summary>
+    public static string StateWord(string kind) =>
+        kind switch
+        {
+            "ok" => "ok",
+            "stale" => "stale index",
+            "warn" => "needs a fix",
+            _ => "unreadable",
+        };
+
     /// <summary>The icon of a state kind (app.js STATE_ICON): a shape per state, never colour alone.</summary>
     public static string StateIcon(string kind) =>
         kind switch
@@ -63,6 +73,15 @@ public static class Shell
             route.Page is "workspace" && route.Workspace == w.Name,
             [.. shown.Select(p => NavProject.Of(p, route, view))],
             members.Length - shown.Length
-        );
+        )
+        {
+            Count = members.Length,
+            States =
+            [
+                .. new[] { "bad", "warn", "stale", "ok" }
+                    .Select(kind => new ProjectStateCount(kind, members.Count(p => p.Live.Kind == kind)))
+                    .Where(c => c.Count > 0),
+            ],
+        };
     }
 }

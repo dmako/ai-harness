@@ -52,6 +52,44 @@
     <Setter Property="Margin" Value="20,0,4,0" />
   </Style>
 
+  <!-- a workspace's row (app.js .nws, .twist, .nsum): its chevron toggle before the link, pointing down while its
+       projects show and right when they are hidden; collapsed, a line of its projects' states under it -->
+  <Style Selector="ToggleButton.twist">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="MinWidth" Value="24" />
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="4,0,0,0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ToggleButton.twist /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.twist:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ToggleButton.twist:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.twist:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.twist:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface2}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="c|Icon.twist">
+    <Setter Property="Size" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+  </Style>
+  <Style Selector="c|Icon.twist.closed">
+    <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+  </Style>
+  <Style Selector="Button.nav.ws">
+    <Setter Property="Margin" Value="0,0,4,0" />
+    <Setter Property="Padding" Value="4,4,8,4" />
+  </Style>
+  <Style Selector="ItemsControl.nsum">
+    <Setter Property="Margin" Value="36,0,8,4" />
+  </Style>
   <!-- a text link inside a page -->
   <Style Selector="Button.link">
     <Setter Property="Background" Value="Transparent" />

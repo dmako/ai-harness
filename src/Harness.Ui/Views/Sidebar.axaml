@@ -37,19 +37,47 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:NavWorkspace">
             <StackPanel>
-              <c:AppLink Classes="nav" Classes.current="{Binding Current}" Href="{Binding Href}"
-                         AutomationProperties.Name="{Binding Title}">
-                <DockPanel>
-                  <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}" ToolTip.Tip="waiting for you in its projects">
-                    <TextBlock Text="{Binding Waiting}" />
-                  </Border>
-                  <Grid ColumnDefinitions="Auto,*">
-                    <c:Icon Kind="workspace" Foreground="{DynamicResource Accent}" Margin="0,0,8,0" />
-                    <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
-                  </Grid>
-                </DockPanel>
-              </c:AppLink>
-              <ItemsControl ItemsSource="{Binding Members}">
+              <!-- app.js nws: the chevron shows or hides its projects (remembered), the name opens the workspace -->
+              <DockPanel>
+                <ToggleButton DockPanel.Dock="Left" Classes="twist" IsChecked="{Binding Fold.IsOpen, Mode=OneWay}"
+                              Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).ToggleWorkspaceCommand}" CommandParameter="{Binding}"
+                              AutomationProperties.Name="{Binding ToggleName}" ToolTip.Tip="{Binding ToggleName}">
+                  <c:Icon Kind="chevron" Classes="twist" Classes.closed="{Binding !Fold.IsOpen}" />
+                </ToggleButton>
+                <c:AppLink Classes="nav ws" Classes.current="{Binding Current}" Href="{Binding Href}"
+                           AutomationProperties.Name="{Binding Title}">
+                  <DockPanel>
+                    <Border DockPanel.Dock="Right" Classes="badge" IsVisible="{Binding HasWaiting}" ToolTip.Tip="waiting for you in its projects">
+                      <TextBlock Text="{Binding Waiting}" />
+                    </Border>
+                    <TextBlock DockPanel.Dock="Right" Classes="count" Text="{Binding Count}" ToolTip.Tip="{Binding CountTip}"
+                               IsVisible="{Binding !Fold.IsOpen}" VerticalAlignment="Center" Margin="6,0" />
+                    <Grid ColumnDefinitions="Auto,*">
+                      <c:Icon Kind="workspace" Foreground="{DynamicResource Accent}" Margin="0,0,8,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+                    </Grid>
+                  </DockPanel>
+                </c:AppLink>
+              </DockPanel>
+              <!-- collapsed (app.js nsum): its projects by state, the worst first -->
+              <ItemsControl Classes="nsum" ItemsSource="{Binding States}" IsVisible="{Binding !Fold.IsOpen}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="10" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ProjectStateCount">
+                    <StackPanel Orientation="Horizontal" Spacing="3" ToolTip.Tip="{Binding Words}">
+                      <c:Icon Classes="state" Classes.g-ok="{Binding Kind, Converter={x:Static c:Converters.Is}, ConverterParameter=ok}"
+                              Classes.g-stale="{Binding Kind, Converter={x:Static c:Converters.Is}, ConverterParameter=stale}"
+                              Classes.g-warn="{Binding Kind, Converter={x:Static c:Converters.Is}, ConverterParameter=warn}"
+                              Classes.g-bad="{Binding Kind, Converter={x:Static c:Converters.Is}, ConverterParameter=bad}"
+                              Kind="{Binding Icon}" />
+                      <TextBlock Classes="muted small" Text="{Binding Count}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <ItemsControl ItemsSource="{Binding Members}" IsVisible="{Binding Fold.IsOpen}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:NavProject">
                     <c:AppLink Classes="nav member" Classes.current="{Binding Current}" Href="{Binding Href}"
@@ -69,9 +97,11 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <c:AppLink Classes="nav member" Href="{Binding MoreHref}" AutomationProperties.Name="{Binding MoreText}" IsVisible="{Binding HasMore}">
-                <TextBlock Classes="muted" Text="{Binding MoreText}" />
-              </c:AppLink>
+              <Panel IsVisible="{Binding Fold.IsOpen}">
+                <c:AppLink Classes="nav member" Href="{Binding MoreHref}" AutomationProperties.Name="{Binding MoreText}" IsVisible="{Binding HasMore}">
+                  <TextBlock Classes="muted" Text="{Binding MoreText}" />
+                </c:AppLink>
+              </Panel>
             </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

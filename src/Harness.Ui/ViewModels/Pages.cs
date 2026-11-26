@@ -37,9 +37,37 @@ public sealed record NavProject(string Id, string Name, string Href, string Stat
         };
 }
 
+/// <summary>
+/// Whether a workspace's projects show in the sidebar (app.js ws-open.&lt;name&gt;): one per workspace, kept across live
+/// updates and navigation so a row never flickers open.
+/// </summary>
+public sealed partial class WorkspaceFold : ObservableObject
+{
+    [ObservableProperty]
+    public partial bool IsOpen { get; set; } = true;
+}
+
+/// <summary>How many of a collapsed workspace's projects are in a state (app.js nsum): the state's glyph and the count.</summary>
+public sealed record ProjectStateCount(string Kind, int Count)
+{
+    public string Icon => Shell.StateIcon(Kind);
+    public string Words => $"{Count} {Shell.StateWord(Kind)}";
+}
+
 /// <summary>A workspace in the sidebar: its name and badge, and its first projects (at most 8, app.js NAV_CAP).</summary>
 public sealed record NavWorkspace(string Name, string Title, string Href, int Waiting, bool Current, IReadOnlyList<NavProject> Members, int MoreCount)
 {
+    /// <summary>Whether its projects show (the sidebar's toggle); Home's cards leave it open.</summary>
+    public WorkspaceFold Fold { get; init; } = new();
+
+    /// <summary>All its projects, shown or not.</summary>
+    public int Count { get; init; }
+
+    /// <summary>Its projects by state, the worst first, for the collapsed row.</summary>
+    public IReadOnlyList<ProjectStateCount> States { get; init; } = [];
+
+    public string ToggleName => $"Show or hide the projects of {Title}";
+    public string CountTip => Shell.Plural(Count, "project");
     public bool HasWaiting => Waiting > 0;
     public bool HasMore => MoreCount > 0;
     public string MoreText => $"All {Members.Count + MoreCount} projects →";
@@ -52,6 +80,9 @@ public sealed record NavWorkspace(string Name, string Title, string Href, int Wa
         && Waiting == other.Waiting
         && Current == other.Current
         && MoreCount == other.MoreCount
+        && Count == other.Count
+        && ReferenceEquals(Fold, other.Fold)
+        && States.SequenceEqual(other.States)
         && Members.SequenceEqual(other.Members);
 
     public override int GetHashCode() => HashCode.Combine(Name, Waiting, Current, Members.Count);

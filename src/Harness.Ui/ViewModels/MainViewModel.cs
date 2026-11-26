@@ -312,13 +312,48 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Page = page;
     }
 
+    /// <summary>The sidebar's first projects of a workspace (app.js NAV_CAP).</summary>
+    public const int NavCap = 8;
+
+    private readonly Dictionary<string, WorkspaceFold> _folds = new(StringComparer.Ordinal);
+
+    /// <summary>The preference keeping whether a workspace's projects show (app.js store "ws-open." + name: "1" or "0").</summary>
+    public static string FoldKey(string workspace) => "ws-open." + workspace;
+
+    /// <summary>
+    /// A workspace's card with its fold: open as last chosen, else (app.js) open when it is small or the page is in it.
+    /// </summary>
+    private NavWorkspace Folded(NavWorkspace card, WorkspaceInfo w, Route route)
+    {
+        if (!_folds.TryGetValue(w.Name, out var fold))
+        {
+            _folds[w.Name] = fold = new WorkspaceFold();
+        }
+        var stored = Services.Host.Preferences.Get(FoldKey(w.Name));
+        fold.IsOpen = stored is "1" or "0"
+            ? stored is "1"
+            : card.Count <= NavCap
+              || (route.Page is "workspace" && route.Workspace == w.Name)
+              || (route.Page is "project" && w.Members.Any(m => m.ProjectId == route.Id));
+        return card with { Fold = fold };
+    }
+
+    /// <summary>Shows or hides a workspace's projects in the sidebar and remembers it.</summary>
+    [RelayCommand]
+    private void ToggleWorkspace(NavWorkspace workspace)
+    {
+        var open = !workspace.Fold.IsOpen;
+        Services.Host.Preferences.Set(FoldKey(workspace.Name), open ? "1" : "0");
+        workspace.Fold.IsOpen = open;
+    }
+
     private void Sidebar(Route route)
     {
         var inWorkspace = _workspaces
             .SelectMany(w => w.Members.Select(m => m.ProjectId))
             .ToHashSet(StringComparer.Ordinal);
         var view = route.Page is "project" ? route.View : "";
-        Lists.Sync(Workspaces, _workspaces.Select(w => Shell.Card(w, _projects, route, 8)));
+        Lists.Sync(Workspaces, _workspaces.Select(w => Folded(Shell.Card(w, _projects, route, NavCap), w, route)));
         Lists.Sync(
             Outside,
             _projects.Where(p => !inWorkspace.Contains(p.Id)).Select(p => NavProject.Of(p, route, view))
