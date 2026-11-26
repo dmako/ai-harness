@@ -294,4 +294,84 @@
   <Style Selector="ToggleButton.irow TextBlock.muted">
     <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
   </Style>
+
+  <!-- a workspace's library (style.css .libsum, .libmx): its summary in Ink 2, then a matrix filling its card. Every row
+       has cells padded 7 x 12 and a line under it; the package name takes the room left, the members' columns and "used
+       by" have fixed widths, centred marks. A use is a round accent badge with a tick, a non-use a quiet dot. -->
+  <Style Selector="TextBlock.libsum">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.card.libmx">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.mxrow">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+  </Style>
+  <Style Selector="Border.mxrow TextBlock.mxname">
+    <Setter Property="Padding" Value="12,7" />
+    <Setter Property="MinWidth" Value="200" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.mxth">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <Style Selector="TextBlock.mxfoot">
+    <Setter Property="FontSize" Value="{StaticResource TextSm}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.mxname.unused">
+    <Setter Property="Opacity" Value="0.6" />
+  </Style>
+  <Style Selector="TextBlock.mxname Run.mxprefix">
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+  </Style>
+  <!-- a member's column and the "used by" column -->
+  <Style Selector=":is(Control).mxcol">
+    <Setter Property="Width" Value="120" />
+  </Style>
+  <Style Selector="Panel.mxcol">
+    <Setter Property="MinHeight" Value="36" />
+  </Style>
+  <Style Selector="TextBlock.mxcol">
+    <Setter Property="Padding" Value="12,7" />
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Control).mxn">
+    <Setter Property="Width" Value="96" />
+  </Style>
+  <Style Selector="TextBlock.mxn">
+    <Setter Property="Padding" Value="12,7" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.mximports">
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="Border.mxyes">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="Background" Value="{DynamicResource AccentWash}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.mxyes TextBlock">
+    <Setter Property="FontSize" Value="{StaticResource TextXs}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Ellipse.mxno">
+    <Setter Property="Width" Value="3" />
+    <Setter Property="Height" Value="3" />
+    <Setter Property="Fill" Value="{DynamicResource Axis}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
 </Styles>

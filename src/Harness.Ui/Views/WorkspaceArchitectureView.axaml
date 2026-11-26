@@ -227,7 +227,9 @@
     <views:SectionView Name="LibrariesSection" DataContext="{Binding Libraries}" IsVisible="{Binding $parent[views:WorkspaceArchitectureView].((vm:WorkspaceArchitectureViewModel)DataContext).ShowsLibraries}">
       <views:SectionView.Body>
         <StackPanel x:DataType="vm:LibrariesSection" Spacing="10">
-          <TextBlock Classes="hint" TextWrapping="Wrap"
+          <!-- app.js sharedCode, libraryView, style.css .libtitle, .libsum, .libmx: the library picker, then its title,
+               summary and a matrix of its packages by the members using any, filling its card -->
+          <TextBlock Name="LibrariesIntro" TextWrapping="Wrap"
                      Text="Projects whose packages other projects use, and how much of each is used: read from the manifests and the code's imports." />
           <TextBlock Classes="empty" Text="No project here uses another project's packages." IsVisible="{Binding IsEmpty}" />
           <WrapPanel ItemSpacing="6" LineSpacing="6" IsVisible="{Binding !IsEmpty}">
@@ -247,50 +249,64 @@
             </ItemsControl>
           </WrapPanel>
           <TextBlock Classes="empty" Text="{Binding DetailMessage}" IsVisible="{Binding HasDetailMessage}" TextWrapping="Wrap" />
-          <StackPanel Spacing="8" IsVisible="{Binding HasDetail}">
-            <TextBlock Name="LibraryTitle" Classes="h3" Text="{Binding Library.Label, FallbackValue=''}" />
-            <TextBlock Name="LibrarySummary" Text="{Binding Summary}" TextWrapping="Wrap" />
-            <TextBlock Classes="label" Text="Who uses what" />
-            <TextBlock Classes="hint" TextWrapping="Wrap"
-                       Text="A mark where a project references the package in its manifest; below, how many of its code files import the library and its own copies of the library's types." />
-            <Border Classes="card" Padding="8">
-              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="2">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Classes="th" Text="package" Width="220" />
-                    <ItemsControl ItemsSource="{Binding Columns}" ItemTemplate="{StaticResource HeadCell}">
-                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <StackPanel Spacing="4" IsVisible="{Binding HasDetail}">
+            <TextBlock Name="LibraryTitle" Classes="h2" Text="{Binding Library.Label, FallbackValue=''}" />
+            <TextBlock Name="LibrarySummary" Classes="libsum" Text="{Binding Summary}" />
+            <StackPanel Classes="section">
+              <TextBlock Classes="h3" Text="Who uses what" />
+              <TextBlock Classes="hint"
+                         Text="A mark where a project references the package in its manifest; below, how many of its code files import the library and its own copies of the library's types." />
+              <Border Classes="card libmx">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                  <StackPanel>
+                    <Border Classes="mxrow">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Classes="mxth mxn" Text="used by" />
+                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Columns}" ItemTemplate="{StaticResource HeadCell}">
+                          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <TextBlock Classes="mxth mxname" Text="package" />
+                      </DockPanel>
+                    </Border>
+                    <ItemsControl Name="LibraryMatrix" ItemsSource="{Binding Packages}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PackageUseRow">
+                          <Border Classes="mxrow">
+                            <DockPanel>
+                              <TextBlock DockPanel.Dock="Right" Classes="mxn small" Classes.muted="{Binding Unused}" Text="{Binding UsedBy}" />
+                              <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Cells}" ItemTemplate="{StaticResource MarkCell}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                              </ItemsControl>
+                              <TextBlock Classes="mono small mxname" Classes.unused="{Binding Unused}" AutomationProperties.Name="{Binding Name}">
+                                <Run Classes="mxprefix" Text="{Binding Prefix, Mode=OneWay}" /><Run Text="{Binding Rest, Mode=OneWay}" />
+                              </TextBlock>
+                            </DockPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Classes="th" Text="used by" Width="90" />
+                    <Border Classes="mxrow">
+                      <DockPanel>
+                        <Border DockPanel.Dock="Right" Classes="mxn" />
+                        <ItemsControl DockPanel.Dock="Right" Name="LibraryImports" ItemsSource="{Binding Imports}" ItemTemplate="{StaticResource ImportCell}">
+                          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <TextBlock Classes="mxfoot mxname" Text="files importing" />
+                      </DockPanel>
+                    </Border>
+                    <Border Classes="mxrow">
+                      <DockPanel>
+                        <Border DockPanel.Dock="Right" Classes="mxn" />
+                        <ItemsControl DockPanel.Dock="Right" Name="LibraryCopies" ItemsSource="{Binding Copies}" ItemTemplate="{StaticResource CopiesCell}">
+                          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <TextBlock Classes="mxfoot mxname" Text="own copies of its types" />
+                      </DockPanel>
+                    </Border>
                   </StackPanel>
-                  <ItemsControl Name="LibraryMatrix" ItemsSource="{Binding Packages}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:PackageUseRow">
-                        <StackPanel Orientation="Horizontal" Margin="0,2">
-                          <TextBlock Classes="mono small" Classes.muted="{Binding Unused}" Text="{Binding Name}" Width="220" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                          <ItemsControl ItemsSource="{Binding Cells}" ItemTemplate="{StaticResource Cell}">
-                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                          </ItemsControl>
-                          <TextBlock Classes="small" Text="{Binding UsedBy}" Width="90" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                    <TextBlock Classes="small" FontWeight="SemiBold" Text="files importing" Width="220" />
-                    <ItemsControl ItemsSource="{Binding Imports}" ItemTemplate="{StaticResource Cell}">
-                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Classes="small" FontWeight="SemiBold" Text="own copies of its types" Width="220" />
-                    <ItemsControl ItemsSource="{Binding Copies}" ItemTemplate="{StaticResource Cell}">
-                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                  </StackPanel>
-                </StackPanel>
-              </ScrollViewer>
-            </Border>
+                </ScrollViewer>
+              </Border>
+            </StackPanel>
             <TextBlock Classes="hint" Text="{Binding NotUsing}" IsVisible="{Binding HasNotUsing}" TextWrapping="Wrap" />
           </StackPanel>
         </StackPanel>
@@ -300,10 +316,26 @@
 
   <UserControl.Resources>
     <DataTemplate x:Key="HeadCell" x:DataType="x:String">
-      <TextBlock Classes="th" Text="{Binding}" Width="110" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding}" />
+      <TextBlock Classes="mxth mxcol" Text="{Binding}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding}" />
     </DataTemplate>
-    <DataTemplate x:Key="Cell" x:DataType="x:String">
-      <TextBlock Classes="small" Text="{Binding}" Width="110" />
+    <!-- a member's mark for a package: a round accent badge with a tick, else a quiet dot (named "not used") -->
+    <DataTemplate x:Key="MarkCell" x:DataType="vm:PackageCell">
+      <Panel Classes="mxcol" AutomationProperties.Name="{Binding Name}">
+        <Border Classes="mxyes" IsVisible="{Binding Used}" ToolTip.Tip="{Binding Tip}"><TextBlock Text="✓" /></Border>
+        <Ellipse Classes="mxno" IsVisible="{Binding !Used}" />
+      </Panel>
+    </DataTemplate>
+    <DataTemplate x:Key="ImportCell" x:DataType="x:String">
+      <TextBlock Classes="mxcol mximports" Text="{Binding}" />
+    </DataTemplate>
+    <DataTemplate x:Key="CopiesCell" x:DataType="vm:CopiesCell">
+      <Panel Classes="mxcol">
+        <c:AppLink Classes="link" Href="{Binding Href}" IsVisible="{Binding HasCopies}" ToolTip.Tip="{Binding Names}" HorizontalAlignment="Center"
+                   VerticalAlignment="Center" AutomationProperties.Name="{Binding Text}">
+          <TextBlock Classes="small" Text="{Binding Text}" />
+        </c:AppLink>
+        <TextBlock Classes="muted small" Text="none" IsVisible="{Binding !HasCopies}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Panel>
     </DataTemplate>
     <DataTemplate x:Key="ChipTemplate" x:DataType="vm:DepChip">
       <Button Classes="ghost small" Content="{Binding Text}" AutomationProperties.Name="{Binding Text}"

@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
 using Harness.Ui.Controls;
@@ -221,10 +223,49 @@ public sealed class WorkspaceViewTests
         api.GetsWithQuery.Should().Contain(Root + "/adoption?library=core");
         libs.Summary.Should().Be("Offers 3 packages; 2 of 3 other projects use it, 1 package nobody here uses.");
         libs.Columns.Should().Equal("Api", "Worker");
-        libs.Packages.Select(p => (p.Name, string.Join("", p.Cells), p.UsedBy)).Should().Equal(("Core.Contracts", "✓✓", "2 of 3"), ("Core.Client", "✓·", "1 of 3"), ("Core.Unused", "··", "nobody"));
+        libs.Packages.Select(p => (p.Name, string.Concat(p.Cells.Select(c => c.Used ? "✓" : "·")), p.UsedBy))
+            .Should().Equal(("Core.Contracts", "✓✓", "2 of 3"), ("Core.Client", "✓·", "1 of 3"), ("Core.Unused", "··", "nobody"));
+        libs.Packages[1].Cells[1].Name.Should().Be("not used");
+        libs.Packages[0].Cells[0].Tip.Should().Be("Api uses Core.Contracts");
         libs.Imports.Should().Equal("7", "2");
-        libs.Copies.Should().Equal("none", "▲ 1");
+        libs.Copies.Select(c => c.Text).Should().Equal("none", "▲ 1");
+        libs.Copies[1].Href.Should().Be("#/w/main/issues/shared");
         libs.NotUsing.Should().Be("Not using it: fixture.");
+    });
+
+    [Theory]
+    [InlineData(1280, 800, false)]
+    [InlineData(1280, 800, true)]
+    [InlineData(390, 844, false)]
+    [InlineData(390, 844, true)]
+    public Task TheLibraryMatrixFillsItsCardAsATable(int width, int height, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = Api();
+        var (window, _, model) = await OpenAsync("architecture/libraries", api, width, height);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var libs = ((WorkspaceArchitectureViewModel)Page(model).Body!).Libraries;
+        await Ui.UntilAsync(() => libs.HasDetail);
+        Ui.Settle();
+
+        var matrix = window.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "LibraryMatrix");
+        var card = matrix.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("libmx"));
+        var rows = matrix.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("mxrow")).ToArray();
+        rows.Should().HaveCount(3);
+        rows.Should().AllSatisfy(r => r.BorderThickness.Bottom.Should().Be(1));
+        if (width >= 1280)
+        {
+            // the table fills its card, the package names get the room left and show whole
+            rows[0].Bounds.Width.Should().BeApproximately(card.Bounds.Width - card.BorderThickness.Left - card.BorderThickness.Right, 1);
+            var names = matrix.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("mxname")).ToArray();
+            names.Should().AllSatisfy(n => n.Bounds.Width.Should().BeGreaterThan(400));
+        }
+        matrix.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("mxyes")).Where(b => b.IsVisible).Should().HaveCount(3);
+        matrix.GetVisualDescendants().OfType<Ellipse>().Where(e => e.IsVisible).Should().HaveCount(3);
+        var unused = matrix.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Classes.Contains("mxname") && t.Classes.Contains("unused"));
+        unused.Opacity.Should().Be(0.6);
+        window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "LibraryTitle").Classes.Should().Contain("h2");
+        UiChecks.Check(window).Should().BeEmpty();
+        window.Close();
     });
 
     [Fact]

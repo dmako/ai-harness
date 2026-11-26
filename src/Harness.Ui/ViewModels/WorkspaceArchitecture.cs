@@ -518,8 +518,27 @@ public sealed partial class LibraryChoice(DependencyNode node, string label, int
     public partial bool Selected { get; set; }
 }
 
-/// <summary>A package in the library's matrix: who references it, and how many of the other members.</summary>
-public sealed record PackageUseRow(string Name, IReadOnlyList<string> Cells, string UsedBy, bool Unused);
+/// <summary>
+/// A package in the library's matrix (app.js libraryView): its name, the prefix all the library's packages share (shown
+/// muted, app.js pkgName) and the rest, a cell per member using any, and how many of the other members use it.
+/// </summary>
+public sealed record PackageUseRow(string Name, string Prefix, string Rest, IReadOnlyList<PackageCell> Cells, string UsedBy, bool Unused)
+{
+    public bool HasPrefix => Prefix.Length > 0;
+}
+
+/// <summary>A member's mark for a package: a ✓ where its manifest references it (with who and what), else a quiet dot.</summary>
+public sealed record PackageCell(bool Used, string Tip)
+{
+    public string Name => Used ? Tip : "not used";
+}
+
+/// <summary>A member's own copies of the library's types (app.js: ▲ N linking to the shared issues, else none).</summary>
+public sealed record CopiesCell(int Count, string Names, string Href)
+{
+    public bool HasCopies => Count > 0;
+    public string Text => HasCopies ? $"▲ {Count}" : "none";
+}
 
 /// <summary>
 /// Libraries (app.js sharedCode, libraryView): members whose packages other members use, and how much of each is used:
@@ -535,7 +554,7 @@ public sealed partial class LibrariesSection(WorkspaceContext context) : Section
     public ObservableCollection<string> Columns { get; } = [];
     public ObservableCollection<PackageUseRow> Packages { get; } = [];
     public ObservableCollection<string> Imports { get; } = [];
-    public ObservableCollection<string> Copies { get; } = [];
+    public ObservableCollection<CopiesCell> Copies { get; } = [];
 
     [ObservableProperty]
     public partial LibraryChoice? Library { get; private set; }
@@ -633,22 +652,36 @@ public sealed partial class LibrariesSection(WorkspaceContext context) : Section
             $"Offers {Shell.Plural(r.Packages.Count, "package")}; {consumers.Length} of {Shell.Plural(others, "other project")} use it"
             + (used < r.Packages.Count ? $", {Shell.Plural(r.Packages.Count - used, "package")} nobody here uses." : ".");
         Lists.Sync(Columns, consumers.Select(c => context.Folder(c.Project)));
+        // the prefix every package shares: the shortest name, when the others start with it and a dot (app.js pkgName)
+        var root = r.Packages.OrderBy(p => p.Length).FirstOrDefault() ?? "";
+        // by users, then by name as app.js's localeCompare orders them (letters before case)
         Lists.Sync(
             Packages,
             r.Packages.OrderByDescending(p => users[p].Count)
+                .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(p => p, StringComparer.Ordinal)
                 .Select(p =>
-                    new PackageUseRow(
+                {
+                    var shared = p != root && p.StartsWith(root + ".", StringComparison.Ordinal);
+                    return new PackageUseRow(
                         p,
-                        [.. consumers.Select(c => users[p].Contains(c.Project) ? "✓" : "·")],
+                        shared ? root : "",
+                        shared ? p[root.Length..] : p,
+                        [.. consumers.Select(c => new PackageCell(users[p].Contains(c.Project), $"{context.Folder(c.Project)} uses {p}"))],
                         users[p].Count > 0 ? $"{users[p].Count} of {others}" : "nobody",
                         users[p].Count is 0
-                    )
-                )
+                    );
+                })
         );
         Lists.Sync(Imports, consumers.Select(c => c.ImportFiles.ToString(CultureInfo.InvariantCulture)));
-        var twins = r.PossibleLocalImplementations.GroupBy(t => t.Project).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
-        Lists.Sync(Copies, consumers.Select(c => twins.TryGetValue(c.Project, out var n) ? $"▲ {n}" : "none"));
+        var twins = r.PossibleLocalImplementations.GroupBy(t => t.Project)
+            .ToDictionary(g => g.Key, g => g.Select(t => t.Declared.Name).ToArray(), StringComparer.Ordinal);
+        Lists.Sync(
+            Copies,
+            consumers.Select(c =>
+                twins.TryGetValue(c.Project, out var names) ? new CopiesCell(names.Length, string.Join(", ", names), SharedHref) : new CopiesCell(0, "", SharedHref)
+            )
+        );
         NotUsing = r.NonConsumers.Count > 0 ? $"Not using it: {string.Join(", ", r.NonConsumers)}." : null;
         OnPropertyChanged(nameof(HasNotUsing));
     }
