@@ -124,7 +124,20 @@
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                      <c:DayBars Days="{Binding Bars}" IsVisible="{Binding HasTools}" />
+                      <!-- its calls by day, as compact as a finding's trend, with the activity strip's key -->
+                      <StackPanel Name="ScmUsage" Spacing="4" IsVisible="{Binding HasTools}" MaxWidth="360" HorizontalAlignment="Left">
+                        <c:DayBars Name="ScmBars" Days="{Binding Bars}" />
+                        <WrapPanel ItemSpacing="12">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <c:Swatch BrushKey="Accent" Size="8" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted small" Text="calls" />
+                          </StackPanel>
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <c:Swatch BrushKey="Critical" Size="8" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted small" Text="failed" />
+                          </StackPanel>
+                        </WrapPanel>
+                      </StackPanel>
                       <TextBlock Classes="muted small" Text="{Binding NoTools}" IsVisible="{Binding !HasTools}" TextWrapping="Wrap" />
                     </StackPanel>
                   </StackPanel>

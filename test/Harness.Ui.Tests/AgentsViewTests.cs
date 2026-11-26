@@ -1,4 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using AwesomeAssertions;
@@ -36,6 +40,49 @@ public sealed class AgentsViewTests
         UiChecks.Check(window).Should().BeEmpty();
         window.Close();
     });
+
+    [Theory]
+    [InlineData(390, false)]
+    [InlineData(1280, true)]
+    public Task TheScmUsageChartIsCompactWithAKeyAndHoverValues(int width, bool dark) => Ui.RunAsync(async () =>
+    {
+        var api = new FixtureApi();
+        api.Answers[Root + "/scm"] = Scm.Replace(
+            "\"trend\":{\"days\":[{\"day\":\"2026-11-13\"",
+            "\"trend\":{\"days\":[{\"day\":\"2026-11-12\",\"calls\":0,\"errors\":0,\"slow\":0},{\"day\":\"2026-11-13\"",
+            StringComparison.Ordinal
+        );
+        var (window, _, _) = await OpenAsync("agents/tools", api, width);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        Ui.Settle();
+        var usage = window.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Name == "ScmUsage");
+        var chart = usage.GetVisualDescendants().OfType<DayBars>().Single();
+        chart.Days.Should().HaveCount(2);
+        chart.Bounds.Width.Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(360);
+        usage.HorizontalAlignment.Should().Be(HorizontalAlignment.Left);
+        usage.GetVisualDescendants().OfType<Swatch>().Select(s => s.BrushKey).Should().Equal("Accent", "Critical");
+        usage.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).Should().Contain(["calls", "failed"]);
+
+        // hovering a column shows its day's counts; an empty day says so
+        Point At(int column) => chart.TranslatePoint(new Point(chart.Bounds.Width / 4 * (1 + (2 * column)), chart.Bounds.Height - 1), window)!.Value;
+        window.MouseMove(At(1));
+        Ui.Settle();
+        ToolTip.GetTip(chart).Should().Be("2026-11-13: 4 calls, 1 failed");
+        window.MouseMove(At(0));
+        Ui.Settle();
+        ToolTip.GetTip(chart).Should().Be("2026-11-12: 0 calls");
+        UiChecks.Check(window).Should().BeEmpty();
+        window.Close();
+    });
+
+    [Fact]
+    public void ADayDescribesItsCalls()
+    {
+        DayBars.Describe(new DayBar(12, 2)).Should().Be("12 calls, 2 failed");
+        DayBars.Describe(new DayBar(1, 0)).Should().Be("1 call, 0 failed");
+        DayBars.Describe(new DayBar(0, 0)).Should().Be("No calls");
+        DayBars.Describe(new DayBar(3, 3, "2026-11-13: 3 calls, 1 slow")).Should().Be("2026-11-13: 3 calls, 1 slow");
+    }
 
     private const string Report = """
         {"days":30,"context":{"calls":40,"changed":20,"hits":13,"hit_rate":0.65,"after_read":{"touched":10,"hits":7,"hit_rate":0.7}},

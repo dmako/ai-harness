@@ -2,15 +2,20 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Rendering;
 
 namespace Harness.Ui.Controls;
 
 /// <summary>A rate shown as a ring: its colour token and how far it has come (null: nothing to show yet).</summary>
 public sealed record RingValue(string Brush, double? Value);
 
-/// <summary>A day of the activity strip: its agents' calls, the failed ones among them.</summary>
-public sealed record DayBar(int Calls, int Failed);
+/// <summary>
+/// A day of the activity strip: its agents' calls, the failed ones among them, and what hovering its bar says (app.js:
+/// the bar's title; none: its counts).
+/// </summary>
+public sealed record DayBar(int Calls, int Failed, string? Tip = null);
 
 /// <summary>What the charts share: a colour token by name, in the current theme; decorative to screen readers.</summary>
 public abstract class Chart : Control
@@ -203,9 +208,10 @@ public sealed class Sparkline : Chart
 
 /// <summary>
 /// The activity strip's bars (app.js activityStrip()): a column per day as high as its agents' calls against the
-/// busiest day, the failed share on top in the critical colour; a day without calls is a short line.
+/// busiest day, the failed share on top in the critical colour; a day without calls is a short line. Hovering a column
+/// shows its day's counts as a tooltip (app.js: a bar's title).
 /// </summary>
-public sealed class DayBars : Chart
+public sealed class DayBars : Chart, ICustomHitTest
 {
     public static readonly StyledProperty<IReadOnlyList<DayBar>?> DaysProperty = AvaloniaProperty.Register<
         DayBars,
@@ -218,6 +224,50 @@ public sealed class DayBars : Chart
     {
         get => GetValue(DaysProperty);
         set => SetValue(DaysProperty, value);
+    }
+
+    /// <summary>A day in words: its own tip, else its counts ("12 calls, 2 failed"; a day without calls says so).</summary>
+    public static string Describe(DayBar day) =>
+        day.Tip
+        ?? day.Calls switch
+        {
+            0 => "No calls",
+            1 => $"1 call, {day.Failed} failed",
+            var calls => $"{calls} calls, {day.Failed} failed",
+        };
+
+    /// <summary>The column under <paramref name="x"/> (in the chart's own coordinates), or -1.</summary>
+    public int ColumnAt(double x) =>
+        Days is { Count: > 0 } days && Bounds.Width > 0 && x >= 0 && x < Bounds.Width
+            ? Math.Min(days.Count - 1, (int)(x / (Bounds.Width / days.Count)))
+            : -1;
+
+    // the whole strip answers the pointer, between the bars too, so a short or empty day still shows its tooltip
+    bool ICustomHitTest.HitTest(Point point) => new Rect(Bounds.Size).Contains(point);
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == DaysProperty)
+        {
+            // a tip from the start, so the tooltip service opens one; the column under the pointer replaces it
+            ToolTip.SetTip(this, Days is { Count: > 0 } days ? Total(days) : null);
+        }
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (Days is { Count: > 0 } days && ColumnAt(e.GetPosition(this).X) is var column and >= 0)
+        {
+            ToolTip.SetTip(this, Describe(days[column]));
+        }
+    }
+
+    private static string Total(IReadOnlyList<DayBar> days)
+    {
+        var calls = days.Sum(d => d.Calls);
+        return (calls is 1 ? "1 call" : $"{calls} calls") + $" over {days.Count} days";
     }
 
     protected override Size MeasureOverride(Size availableSize) =>

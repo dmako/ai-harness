@@ -22,8 +22,15 @@ public static class DayCharts
         {
             var run = all.Skip(i).Take(per).ToArray();
             var calls = run.Sum(d => d.Calls);
-            var bad = run.Sum(d => d.Errors + d.Slow) > 0;
-            bars.Add(new DayBar(calls, bad ? calls : 0));
+            var errors = run.Sum(d => d.Errors);
+            var slow = run.Sum(d => d.Slow);
+            // a bar is red as a whole where a call failed or was slow; hovering it says its day(s) and counts
+            var day = per > 1 ? $"{run[0].Day} – {run[^1].Day}" : run[0].Day;
+            var tip =
+                $"{day}: {Shell.Plural(calls, "call")}"
+                + (errors > 0 ? $", {errors} failed" : "")
+                + (slow > 0 ? $", {slow} slow" : "");
+            bars.Add(new DayBar(calls, errors + slow > 0 ? calls : 0, tip));
         }
         return bars;
     }

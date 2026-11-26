@@ -638,7 +638,19 @@ public sealed partial class ActivityViewModel : SectionViewModel
                 changes[index]++;
             }
         }
-        Bars = [.. Enumerable.Range(0, 7).Select(i => new DayBar(calls[i], failed[i]))];
+        // hovering a day (app.js activityStrip's title): its date, calls (failed) in sessions, and changes
+        Bars =
+        [
+            .. Enumerable
+                .Range(0, 7)
+                .Select(i => new DayBar(
+                    calls[i],
+                    failed[i],
+                    days[i].ToString("ddd MMM dd yyyy", CultureInfo.InvariantCulture)
+                        + $": {Shell.Plural(calls[i], "call")} ({failed[i]} failed) in {Shell.Plural(sessions[i], "session")}; "
+                        + Shell.Plural(changes[i], "change")
+                )),
+        ];
         Lists.Sync(
             Week,
             Enumerable
